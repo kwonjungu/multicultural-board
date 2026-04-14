@@ -279,6 +279,62 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "Roster Setup", uz: "Roster Setup", hi: "Roster Setup",
     id: "Roster Setup", ar: "Roster Setup", my: "Roster Setup",
   },
+  addComment: {
+    ko: "댓글 쓰기", en: "Add comment", vi: "Add comment",
+    zh: "Add comment", fil: "Add comment", ja: "Add comment",
+    th: "Add comment", km: "Add comment", mn: "Add comment",
+    ru: "Add comment", uz: "Add comment", hi: "Add comment",
+    id: "Add comment", ar: "Add comment", my: "Add comment",
+  },
+  commentPlaceholder: {
+    ko: "따뜻한 댓글을 남겨보세요", en: "Leave a warm comment", vi: "Leave a warm comment",
+    zh: "Leave a warm comment", fil: "Leave a warm comment", ja: "Leave a warm comment",
+    th: "Leave a warm comment", km: "Leave a warm comment", mn: "Leave a warm comment",
+    ru: "Leave a warm comment", uz: "Leave a warm comment", hi: "Leave a warm comment",
+    id: "Leave a warm comment", ar: "Leave a warm comment", my: "Leave a warm comment",
+  },
+  submitComment: {
+    ko: "등록", en: "Post", vi: "Post",
+    zh: "Post", fil: "Post", ja: "Post",
+    th: "Post", km: "Post", mn: "Post",
+    ru: "Post", uz: "Post", hi: "Post",
+    id: "Post", ar: "Post", my: "Post",
+  },
+  noComments: {
+    ko: "아직 댓글이 없어요. 첫 댓글을 남겨보세요 💬", en: "No comments yet. Be the first 💬", vi: "No comments yet. Be the first 💬",
+    zh: "No comments yet. Be the first 💬", fil: "No comments yet. Be the first 💬", ja: "No comments yet. Be the first 💬",
+    th: "No comments yet. Be the first 💬", km: "No comments yet. Be the first 💬", mn: "No comments yet. Be the first 💬",
+    ru: "No comments yet. Be the first 💬", uz: "No comments yet. Be the first 💬", hi: "No comments yet. Be the first 💬",
+    id: "No comments yet. Be the first 💬", ar: "No comments yet. Be the first 💬", my: "No comments yet. Be the first 💬",
+  },
+  deleteComment: {
+    ko: "삭제", en: "Delete", vi: "Delete",
+    zh: "Delete", fil: "Delete", ja: "Delete",
+    th: "Delete", km: "Delete", mn: "Delete",
+    ru: "Delete", uz: "Delete", hi: "Delete",
+    id: "Delete", ar: "Delete", my: "Delete",
+  },
+  commentPending: {
+    ko: "승인 대기 중", en: "Pending approval", vi: "Pending approval",
+    zh: "Pending approval", fil: "Pending approval", ja: "Pending approval",
+    th: "Pending approval", km: "Pending approval", mn: "Pending approval",
+    ru: "Pending approval", uz: "Pending approval", hi: "Pending approval",
+    id: "Pending approval", ar: "Pending approval", my: "Pending approval",
+  },
+  commentTranslating: {
+    ko: "번역 중...", en: "Translating...", vi: "Translating...",
+    zh: "Translating...", fil: "Translating...", ja: "Translating...",
+    th: "Translating...", km: "Translating...", mn: "Translating...",
+    ru: "Translating...", uz: "Translating...", hi: "Translating...",
+    id: "Translating...", ar: "Translating...", my: "Translating...",
+  },
+  commentFailed: {
+    ko: "댓글 등록 실패. 다시 시도해주세요", en: "Comment failed. Please retry", vi: "Comment failed. Please retry",
+    zh: "Comment failed. Please retry", fil: "Comment failed. Please retry", ja: "Comment failed. Please retry",
+    th: "Comment failed. Please retry", km: "Comment failed. Please retry", mn: "Comment failed. Please retry",
+    ru: "Comment failed. Please retry", uz: "Comment failed. Please retry", hi: "Comment failed. Please retry",
+    id: "Comment failed. Please retry", ar: "Comment failed. Please retry", my: "Comment failed. Please retry",
+  },
 };
 
 export function t(key: string, lang: string): string {

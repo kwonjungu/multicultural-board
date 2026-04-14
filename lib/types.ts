@@ -55,16 +55,29 @@ export interface PostData {
   authorClientId?: string;
 }
 
+export interface CommentData {
+  id: string;
+  authorName: string;
+  authorLang: string;
+  authorClientId: string;
+  isTeacher: boolean;
+  text: string;
+  translations: Record<string, string>;
+  timestamp: number;
+  status?: CardStatus;
+  flagged?: boolean;
+}
+
 export interface TranslateRequest {
   text: string;
   fromLang: string;
   targetLangs: string[];
-  colId: string;
+  colId?: string;
   authorName: string;
   isTeacher: boolean;
   paletteIdx: number;
   roomCode: string;
-  cardType?: CardType;
+  cardType?: CardType | "comment";
   imageUrl?: string;
   youtubeId?: string;
   status?: CardStatus;
