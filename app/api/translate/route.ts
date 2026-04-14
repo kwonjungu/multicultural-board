@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       authorClientId,
     } = body;
 
-    if (!fromLang || !colId) {
+    if (!fromLang || (!colId && cardType !== "comment")) {
       return NextResponse.json({ error: "필수 파라미터 누락" }, { status: 400 });
     }
     if (cardType === "text" && !text) {
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     let safe = true;
     let reason = "";
 
-    if (cardType === "text" && targetLangs && targetLangs.length > 0) {
+    if ((cardType === "text" || cardType === "comment") && targetLangs && targetLangs.length > 0) {
       const prompt = `You are a translation and content safety assistant for a multicultural elementary classroom in Korea.
 
 Input text (${LANGUAGES[fromLang]?.name}): "${text}"
@@ -75,7 +75,12 @@ Respond ONLY with raw JSON (no markdown, no explanation):
       }
     }
 
-    // ── 2. Firebase: rooms/${roomCode}/cards 에 저장 ─────────
+    // ── 2. comment 타입은 번역 결과만 반환 (Firebase 저장 없음) ──
+    if (cardType === "comment") {
+      return NextResponse.json({ translations, safe, reason });
+    }
+
+    // ── 3. Firebase: rooms/${roomCode}/cards 에 저장 ─────────
     const db = getAdminDb();
     const cardRef = db.ref(`rooms/${roomCode}/cards`).push();
     const cardId = cardRef.key!;
