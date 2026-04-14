@@ -7,7 +7,7 @@ import { getClientDb } from "@/lib/firebase-client";
 import { LANGUAGES } from "@/lib/constants";
 import SetupScreen from "@/components/SetupScreen";
 import PadletBoard from "@/components/PadletBoard";
-import { UserConfig } from "@/lib/types";
+import { UserConfig, RoomConfig } from "@/lib/types";
 
 const ALL_LANGS = Object.keys(LANGUAGES);
 
@@ -16,17 +16,30 @@ export default function RoomPage() {
   const roomCode = params.roomCode as string;
   const [user, setUser] = useState<UserConfig | null>(null);
   const [roomLangs, setRoomLangs] = useState<string[]>(ALL_LANGS);
+  const [roomConfig, setRoomConfig] = useState<RoomConfig>({ languages: ALL_LANGS });
   const [langsLoaded, setLangsLoaded] = useState(false);
+
+  const [myClientId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    let id = localStorage.getItem("clientId") || "";
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem("clientId", id); }
+    return id;
+  });
 
   const validCode = /^\d{4}$/.test(roomCode);
 
   useEffect(() => {
     if (!validCode) { setLangsLoaded(true); return; }
     const db = getClientDb();
-    get(ref(db, `rooms/${roomCode}/config/languages`))
+    get(ref(db, `rooms/${roomCode}/config`))
       .then((snap) => {
-        const val = snap.val();
-        if (Array.isArray(val) && val.length > 0) setRoomLangs(val);
+        const val = snap.val() as RoomConfig | null;
+        if (val) {
+          setRoomConfig(val);
+          if (Array.isArray(val.languages) && val.languages.length > 0) {
+            setRoomLangs(val.languages);
+          }
+        }
       })
       .catch(() => {/* fallback to all langs */})
       .finally(() => setLangsLoaded(true));
@@ -64,7 +77,14 @@ export default function RoomPage() {
   }
 
   if (!user) {
-    return <SetupScreen onDone={setUser} roomCode={roomCode} availableLangs={roomLangs} />;
+    return (
+      <SetupScreen
+        onDone={setUser}
+        roomCode={roomCode}
+        availableLangs={roomLangs}
+        roomConfig={roomConfig}
+      />
+    );
   }
 
   return (
@@ -73,6 +93,8 @@ export default function RoomPage() {
       roomCode={roomCode}
       roomLangs={roomLangs}
       onLogout={() => setUser(null)}
+      roomConfig={roomConfig}
+      myClientId={myClientId}
     />
   );
 }

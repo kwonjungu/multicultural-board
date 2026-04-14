@@ -2,21 +2,24 @@
 
 import { useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
-import { UserConfig } from "@/lib/types";
+import { UserConfig, RoomConfig } from "@/lib/types";
 import { t } from "@/lib/i18n";
 
 interface Props {
   onDone: (config: UserConfig) => void;
   roomCode: string;
   availableLangs: string[];
+  roomConfig: RoomConfig;
 }
 
-export default function SetupScreen({ onDone, roomCode, availableLangs }: Props) {
+export default function SetupScreen({ onDone, roomCode, availableLangs, roomConfig }: Props) {
   const [myLang, setMyLang] = useState(() => {
     // Default to first available lang, prefer ko
     return availableLangs.includes("ko") ? "ko" : availableLangs[0] ?? "ko";
   });
   const [myName, setMyName] = useState("");
+
+  const isRosterMode = roomConfig.rosterMode && roomConfig.roster && roomConfig.roster.length > 0;
 
   function handleEnter() {
     if (!myName.trim()) return;
@@ -96,28 +99,55 @@ export default function SetupScreen({ onDone, roomCode, availableLangs }: Props)
           <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
             NAME &nbsp;·&nbsp; 이름
           </p>
-          <input
-            value={myName}
-            onChange={(e) => setMyName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleEnter()}
-            placeholder={t("enterName", myLang)}
-            style={{
-              width: "100%", padding: "13px 16px", borderRadius: 12,
-              border: "2px solid #E5E7EB", fontSize: 15, color: "#111827",
-              background: "#F9FAFB", outline: "none", transition: "all 0.18s", fontWeight: 500,
-              boxSizing: "border-box",
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = "#5B57F5";
-              e.target.style.background = "#fff";
-              e.target.style.boxShadow = "0 0 0 4px rgba(91,87,245,0.1)";
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = "#E5E7EB";
-              e.target.style.background = "#F9FAFB";
-              e.target.style.boxShadow = "none";
-            }}
-          />
+
+          {isRosterMode ? (
+            <>
+              <p style={{ margin: "0 0 10px", fontSize: 12, color: "#6B7280" }}>
+                {t("selectYourName", myLang)}
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 200, overflowY: "auto" }}>
+                {(roomConfig.roster || []).map((name) => (
+                  <button
+                    key={name}
+                    onClick={() => setMyName(name)}
+                    style={{
+                      padding: "10px 18px", borderRadius: 20, fontSize: 13,
+                      border: `1.5px solid ${myName === name ? "#5B57F5" : "#E5E7EB"}`,
+                      background: myName === name ? "#EEEEFF" : "#F9FAFB",
+                      color: myName === name ? "#5B57F5" : "#374151",
+                      fontWeight: myName === name ? 700 : 400, cursor: "pointer",
+                      transition: "all 0.12s", whiteSpace: "nowrap", outline: "none",
+                    }}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <input
+              value={myName}
+              onChange={(e) => setMyName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleEnter()}
+              placeholder={t("enterName", myLang)}
+              style={{
+                width: "100%", padding: "13px 16px", borderRadius: 12,
+                border: "2px solid #E5E7EB", fontSize: 15, color: "#111827",
+                background: "#F9FAFB", outline: "none", transition: "all 0.18s", fontWeight: 500,
+                boxSizing: "border-box",
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "#5B57F5";
+                e.target.style.background = "#fff";
+                e.target.style.boxShadow = "0 0 0 4px rgba(91,87,245,0.1)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "#E5E7EB";
+                e.target.style.background = "#F9FAFB";
+                e.target.style.boxShadow = "none";
+              }}
+            />
+          )}
         </div>
 
         {/* Enter */}
