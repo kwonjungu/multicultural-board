@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CardData } from "@/lib/types";
 import { LANGUAGES, CARD_PALETTES } from "@/lib/constants";
 
@@ -9,6 +9,8 @@ const TTS_LANG_MAP: Record<string, string> = {
   ja: "ja-JP", th: "th-TH", km: "km-KH", mn: "mn-MN", ru: "ru-RU",
   uz: "uz-UZ", hi: "hi-IN", id: "id-ID", ar: "ar-SA", my: "my-MM",
 };
+
+const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
 function speakText(text: string, lang: string) {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -59,29 +61,57 @@ interface Props {
   card: CardData;
   viewerLang: string;
   colColor: string;
+  isTeacher?: boolean;
+  myClientId?: string;
+  onEdit?: () => void;
+  isPending?: boolean;
 }
 
-export default function PadletCard({ card, viewerLang, colColor }: Props) {
+export default function PadletCard({
+  card,
+  viewerLang,
+  colColor,
+  isTeacher,
+  myClientId,
+  onEdit,
+  isPending,
+}: Props) {
   const p = CARD_PALETTES[card.paletteIdx % CARD_PALETTES.length];
   const [open, setOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const cardType = card.cardType || "text";
+
+  // Tick to update edit window expiry
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isMyCard = !!myClientId && card.authorClientId === myClientId;
+  const withinEditWindow = now - card.timestamp < EDIT_WINDOW_MS;
+  const canEdit = (isTeacher || (isMyCard && withinEditWindow)) && !!onEdit;
 
   const otherLangs = Object.keys(card.translations || {}).filter(
     (l) => l !== card.authorLang && l !== viewerLang
   );
 
+  const pendingBorderStyle = isPending
+    ? { border: "2px solid #F59E0B", background: "#FFFBEB" }
+    : {};
+
   return (
     <div
       style={{
-        background: p.bg,
+        background: isPending ? "#FFFBEB" : p.bg,
         borderRadius: 14,
-        border: "1px solid #EEF0F6",
-        borderLeft: `4px solid ${p.accent}`,
+        border: isPending ? "2px solid #F59E0B" : "1px solid #EEF0F6",
+        borderLeft: isPending ? "4px solid #F59E0B" : `4px solid ${p.accent}`,
         boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 2px 6px rgba(0,0,0,0.04)",
         marginBottom: 10,
         transition: "box-shadow 0.2s, transform 0.2s",
         overflow: "hidden",
+        ...pendingBorderStyle,
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 24px rgba(0,0,0,0.1)";
@@ -129,6 +159,19 @@ export default function PadletCard({ card, viewerLang, colColor }: Props) {
                   borderRadius: 6, padding: "1px 7px", border: "1px solid #FECACA",
                 }}>⚠️ 검토</span>
               )}
+              {isPending && (
+                <span style={{
+                  fontSize: 9, background: "#FEF3C7", color: "#D97706",
+                  borderRadius: 6, padding: "1px 7px", border: "1px solid #FDE68A",
+                  fontWeight: 700,
+                }}>대기 중</span>
+              )}
+              {card.editedAt && (
+                <span style={{
+                  fontSize: 9, background: "#F0F9FF", color: "#0369A1",
+                  borderRadius: 6, padding: "1px 7px",
+                }}>수정됨</span>
+              )}
             </div>
             <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
               {LANGUAGES[card.authorLang]?.flag}
@@ -137,6 +180,27 @@ export default function PadletCard({ card, viewerLang, colColor }: Props) {
               <span>{timeAgo(card.timestamp)}</span>
             </div>
           </div>
+
+          {/* Edit button */}
+          {canEdit && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
+              title={isTeacher ? "수정" : "5분 내 수정 가능"}
+              style={{
+                background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8,
+                padding: "4px 8px", cursor: "pointer", fontSize: 12, color: "#0369A1",
+                fontWeight: 700, flexShrink: 0, transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "#E0F2FE";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "#F0F9FF";
+              }}
+            >
+              ✏️
+            </button>
+          )}
         </div>
 
         {/* ── Image / Drawing ── */}
