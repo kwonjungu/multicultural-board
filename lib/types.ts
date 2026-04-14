@@ -48,6 +48,7 @@ export interface TranslateRequest {
   authorName: string;
   isTeacher: boolean;
   paletteIdx: number;
+  roomCode: string;
   cardType?: CardType;
   imageUrl?: string;
   youtubeId?: string;

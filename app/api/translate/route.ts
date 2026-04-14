@@ -4,7 +4,6 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { LANGUAGES } from "@/lib/constants";
 import { TranslateRequest } from "@/lib/types";
 
-// 빌드 타임에 환경변수가 없어도 에러 안 나도록 lazy 초기화
 function getGroqClient() {
   return new OpenAI({
     apiKey: process.env.GROQ_API_KEY || "placeholder",
@@ -23,6 +22,7 @@ export async function POST(req: NextRequest) {
       authorName,
       isTeacher,
       paletteIdx,
+      roomCode = "0000",
       cardType = "text",
       imageUrl,
       youtubeId,
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "필수 파라미터 누락" }, { status: 400 });
     }
 
-    // ── 1. 텍스트 카드만 번역 + 안전 검사 ──────────────────────
+    // ── 1. 번역 + 안전 검사 (텍스트 카드만) ─────────────────────
     let translations: Record<string, string> = { [fromLang]: text };
     let safe = true;
     let reason = "";
@@ -73,9 +73,9 @@ Respond ONLY with raw JSON (no markdown, no explanation):
       }
     }
 
-    // ── 2. Firebase Admin: Realtime DB에 카드 저장 ───────────
+    // ── 2. Firebase: rooms/${roomCode}/cards 에 저장 ─────────
     const db = getAdminDb();
-    const cardRef = db.ref("cards").push();
+    const cardRef = db.ref(`rooms/${roomCode}/cards`).push();
     const cardId = cardRef.key!;
 
     const cardData = {
