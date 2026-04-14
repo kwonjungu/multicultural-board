@@ -29,8 +29,11 @@ const COL_COLORS = [
 
 export default function PadletBoard({ user, roomCode, onLogout }: Props) {
   const [cards, setCards] = useState<CardData[]>([]);
-  const [columns, setColumns] = useState<FirebaseColumn[]>([]);
-  const [modal, setModal] = useState<{ colId: string } | null>(null);
+  // Initialize with defaults so board is visible immediately while Firebase loads
+  const [columns, setColumns] = useState<FirebaseColumn[]>(
+    COLUMNS_DEFAULT.map((col, i) => ({ ...col, order: i }))
+  );
+  const [modal, setModal] = useState<{ colId: string; colTitle: string; colColor: string } | null>(null);
   const [posting, setPosting] = useState(false);
   const lang = user.myLang;
 
@@ -344,7 +347,7 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
               </div>
 
               <button
-                onClick={() => setModal({ colId: col.id })}
+                onClick={() => setModal({ colId: col.id, colTitle: col.title, colColor: col.color })}
                 style={{
                   flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   background: "#fff", border: "none", borderTop: "1px solid #F3F4F8",
@@ -601,6 +604,8 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
       {modal && (
         <PostModal
           colId={modal.colId}
+          colTitle={modal.colTitle}
+          colColor={modal.colColor}
           user={{ ...user, isTeacher, teacherLangs: isTeacher ? teacherLangs : [] }}
           posting={posting}
           onPost={handlePost}

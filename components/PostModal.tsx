@@ -1,52 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { LANGUAGES, COLUMNS_DEFAULT } from "@/lib/constants";
+import { LANGUAGES } from "@/lib/constants";
 import { UserConfig, PostData, CardType } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import DrawingCanvas from "./DrawingCanvas";
+import WorksheetTab from "./WorksheetTab";
+import { compressToUnder1MB, fmtBytes } from "@/lib/imageUtils";
 
 function extractYouTubeId(url: string): string | null {
   const match = url.match(
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/
   );
   return match ? match[1] : null;
-}
-
-async function compressToUnder1MB(file: File | Blob): Promise<Blob> {
-  const targetSize = 900 * 1024;
-  if (file.size <= targetSize) return file;
-
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
-    image.onerror = reject;
-    image.src = url;
-  });
-
-  const canvas = document.createElement("canvas");
-  const MAX_DIM = 1920;
-  let { width, height } = img;
-  if (width > MAX_DIM || height > MAX_DIM) {
-    const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
-    width = Math.round(width * ratio);
-    height = Math.round(height * ratio);
-  }
-  canvas.width = width;
-  canvas.height = height;
-  canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-
-  for (const quality of [0.85, 0.7, 0.55, 0.4, 0.28, 0.2]) {
-    const blob = await new Promise<Blob>((resolve) => {
-      canvas.toBlob((b) => resolve(b!), "image/jpeg", quality);
-    });
-    if (blob.size <= targetSize) return blob;
-  }
-  // absolute fallback
-  return new Promise<Blob>((resolve) => {
-    canvas.toBlob((b) => resolve(b!), "image/jpeg", 0.15);
-  });
 }
 
 async function uploadToServer(blob: Blob): Promise<string> {
@@ -70,30 +36,29 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([u8arr], { type: mime });
 }
 
-function fmtBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
-}
+type ModalMode = CardType | "worksheet";
 
 interface Props {
   colId: string;
+  colTitle: string;
+  colColor: string;
   user: UserConfig;
   posting: boolean;
   onPost: (data: PostData) => void;
   onClose: () => void;
 }
 
-export default function PostModal({ colId, user, posting, onPost, onClose }: Props) {
+export default function PostModal({ colId, colTitle, colColor, user, posting, onPost, onClose }: Props) {
   const lang = user.myLang;
-  const TABS: { key: CardType; icon: string; label: string }[] = [
-    { key: "text",    icon: "📝", label: t("tabWrite", lang)  },
-    { key: "image",   icon: "🖼️", label: t("tabPhoto", lang)  },
-    { key: "youtube", icon: "📺", label: "YouTube" },
-    { key: "drawing", icon: "✏️", label: t("tabDraw", lang)   },
+  const TABS: { key: ModalMode; icon: string; label: string }[] = [
+    { key: "text",      icon: "📝", label: t("tabWrite", lang)     },
+    { key: "image",     icon: "🖼️", label: t("tabPhoto", lang)     },
+    { key: "youtube",   icon: "📺", label: "YouTube"               },
+    { key: "drawing",   icon: "✏️", label: t("tabDraw", lang)      },
+    { key: "worksheet", icon: "📋", label: t("tabWorksheet", lang) },
   ];
 
-  const [mode, setMode] = useState<CardType>("text");
+  const [mode, setMode] = useState<ModalMode>("text");
   const [inputText, setInputText] = useState("");
   const [writeLang, setWriteLang] = useState(user.myLang);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -108,8 +73,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const col = COLUMNS_DEFAULT.find((c) => c.id === colId);
-  const accent = col?.color || "#5B57F5";
+  const accent = colColor || "#5B57F5";
 
   useEffect(() => {
     if (mode === "text") setTimeout(() => textareaRef.current?.focus(), 80);
@@ -140,10 +104,11 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
 
   const canPost = () => {
     if (uploading || posting || compressing) return false;
-    if (mode === "text")    return inputText.trim().length > 0;
-    if (mode === "youtube") return !!youtubeId;
-    if (mode === "image")   return !!compressedBlob;
-    if (mode === "drawing") return !!drawingDataUrl;
+    if (mode === "text")      return inputText.trim().length > 0;
+    if (mode === "youtube")   return !!youtubeId;
+    if (mode === "image")     return !!compressedBlob;
+    if (mode === "drawing")   return !!drawingDataUrl;
+    if (mode === "worksheet") return false; // worksheet handles its own submit
     return false;
   };
 
@@ -206,7 +171,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0, boxShadow: `0 0 0 3px ${accent}22` }} />
           <span style={{ fontWeight: 800, fontSize: 14, color: "#111827", flex: 1, letterSpacing: -0.2 }}>
-            {col?.title}
+            {colTitle}
           </span>
           <button
             onClick={onClose}
@@ -429,8 +394,19 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
           )
         )}
 
+        {/* ── 활동지 모드 ── */}
+        {mode === "worksheet" && (
+          <WorksheetTab
+            userLang={lang}
+            onPostText={(text, postLang) => {
+              onPost({ cardType: "text", text, writeLang: postLang });
+            }}
+            onClose={onClose}
+          />
+        )}
+
         {/* Bottom submit */}
-        {!(mode === "drawing" && !drawingDataUrl) && (
+        {!(mode === "drawing" && !drawingDataUrl) && mode !== "worksheet" && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
             <span style={{ fontSize: 11, color: "#CBD5E1" }}>
               {mode === "text" ? "Ctrl+Enter" : ""}

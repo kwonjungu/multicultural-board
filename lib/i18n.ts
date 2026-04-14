@@ -132,6 +132,13 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "🗜 Сжатие...", uz: "🗜 Siqilmoqda...", hi: "🗜 संपीड़ित हो रहा है...",
     id: "🗜 Mengompres...", ar: "🗜 جارٍ الضغط...", my: "🗜 ချုံ့နေသည်...",
   },
+  tabWorksheet: {
+    ko: "활동지", en: "Worksheet", vi: "Bài tập",
+    zh: "活动纸", fil: "Worksheet", ja: "ワークシート",
+    th: "ใบงาน", km: "សន្លឹកកិច្ចការ", mn: "Ажлын хуудас",
+    ru: "Задание", uz: "Ish varaqasi", hi: "वर्कशीट",
+    id: "Lembar kerja", ar: "ورقة عمل", my: "လုပ်ငန်းစာရွက်",
+  },
   myLang: {
     ko: "내 언어", en: "My Language", vi: "Ngôn ngữ của tôi",
     zh: "我的语言", fil: "Aking Wika", ja: "自分の言語",
