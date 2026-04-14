@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
       cardType = "text",
       imageUrl,
       youtubeId,
+      status,
+      authorClientId,
     } = body;
 
     if (!fromLang || !colId) {
@@ -94,6 +96,8 @@ Respond ONLY with raw JSON (no markdown, no explanation):
       loading: false,
       ...(imageUrl ? { imageUrl } : {}),
       ...(youtubeId ? { youtubeId } : {}),
+      ...(status ? { status } : {}),
+      ...(authorClientId ? { authorClientId } : {}),
     };
 
     await cardRef.set(cardData);

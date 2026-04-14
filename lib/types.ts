@@ -1,5 +1,15 @@
 export type CardType = "text" | "image" | "youtube" | "drawing";
 
+export type CardStatus = "pending" | "approved";
+
+export interface RoomConfig {
+  languages: string[];
+  qrEntry?: boolean;
+  rosterMode?: boolean;
+  roster?: string[];
+  approvalMode?: boolean;
+}
+
 export interface CardData {
   id: string;
   colId: string;
@@ -17,6 +27,9 @@ export interface CardData {
   translateError?: boolean;
   imageUrl?: string;
   youtubeId?: string;
+  status?: CardStatus;
+  authorClientId?: string;
+  editedAt?: number;
 }
 
 export interface ColumnData {
@@ -38,6 +51,8 @@ export interface PostData {
   writeLang: string;
   imageUrl?: string;
   youtubeId?: string;
+  status?: CardStatus;
+  authorClientId?: string;
 }
 
 export interface TranslateRequest {
@@ -52,6 +67,8 @@ export interface TranslateRequest {
   cardType?: CardType;
   imageUrl?: string;
   youtubeId?: string;
+  status?: CardStatus;
+  authorClientId?: string;
 }
 
 export interface TranslateResponse {
