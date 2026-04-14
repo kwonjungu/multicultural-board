@@ -1,0 +1,33 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# env - 절대 커밋 금지!
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# firebase admin key (혹시 파일로 저장한 경우)
+serviceAccountKey.json
+firebase-admin-key.json
+*firebase-adminsdk*.json
+
+# 설정 메모장
+firebase-setup-notes.txt
