@@ -22,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           *, *::before, *::after { box-sizing: border-box; }
           body { color: #111827; }
           button, input, textarea, select { font-family: inherit; }
+          *:focus-visible { outline: 2px solid #6C63FF; outline-offset: 2px; border-radius: 4px; }
 
           @keyframes spin { to { transform: rotate(360deg); } }
           @keyframes slideUp {

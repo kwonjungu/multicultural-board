@@ -30,3 +30,5 @@ export const CARD_PALETTES = [
   { bg: "#F5F3FF", accent: "#8B5CF6" },
   { bg: "#FFF7ED", accent: "#F97316" },
 ];
+
+export const BRAND_GRADIENT = "linear-gradient(135deg, #5B57F5 0%, #8B5CF6 100%)";
