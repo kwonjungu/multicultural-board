@@ -87,11 +87,16 @@ export default function DrawingCanvas({ onDone }: Props) {
           <button
             key={c}
             onClick={() => { setColor(c); setIsEraser(false); }}
+            aria-label={`색상 ${c}`}
+            aria-pressed={!isEraser && color === c}
             style={{
-              width: 26, height: 26, borderRadius: "50%", border: `3px solid ${!isEraser && color === c ? "#555" : "transparent"}`,
+              width: 26, height: 26, borderRadius: "50%",
+              border: !isEraser && color === c ? "2px solid #1F2937" : "2px solid transparent",
               background: c, cursor: "pointer", flexShrink: 0,
-              boxShadow: c === "#ffffff" ? "inset 0 0 0 1px #ddd" : "none",
-              transition: "border-color 0.12s",
+              boxShadow: !isEraser && color === c
+                ? "0 0 0 3px rgba(0,0,0,0.08)"
+                : c === "#ffffff" ? "inset 0 0 0 1px #ddd" : "none",
+              transition: "border-color 0.12s, box-shadow 0.12s",
             }}
           />
         ))}
@@ -102,12 +107,15 @@ export default function DrawingCanvas({ onDone }: Props) {
           <button
             key={s}
             onClick={() => { setSize(s); setIsEraser(false); }}
+            aria-label={`브러시 크기 ${s}`}
+            aria-pressed={!isEraser && size === s}
             style={{
               width: 26, height: 26, borderRadius: "50%",
-              border: `2px solid ${!isEraser && size === s ? "#555" : "#e5e5e5"}`,
+              border: !isEraser && size === s ? "2px solid #1F2937" : "2px solid transparent",
               background: "#fff", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "border-color 0.12s",
+              boxShadow: !isEraser && size === s ? "0 0 0 3px rgba(0,0,0,0.08)" : "none",
+              transition: "border-color 0.12s, box-shadow 0.12s",
             }}
           >
             <div style={{ width: s, height: s, borderRadius: "50%", background: "#333" }} />
@@ -116,9 +124,11 @@ export default function DrawingCanvas({ onDone }: Props) {
 
         <button
           onClick={() => setIsEraser((v) => !v)}
+          aria-label="지우개"
+          aria-pressed={isEraser}
           style={{
             padding: "4px 10px", borderRadius: 8, fontSize: 11,
-            border: `2px solid ${isEraser ? "#555" : "#e5e5e5"}`,
+            border: `2px solid ${isEraser ? "#1F2937" : "#e5e5e5"}`,
             background: isEraser ? "#f0f0f0" : "#fff",
             cursor: "pointer", fontWeight: isEraser ? 700 : 400,
           }}
@@ -128,6 +138,7 @@ export default function DrawingCanvas({ onDone }: Props) {
 
         <button
           onClick={clear}
+          aria-label="전체 지우기"
           style={{
             padding: "4px 10px", borderRadius: 8, fontSize: 11,
             border: "2px solid #e5e5e5", background: "#fff", cursor: "pointer",
