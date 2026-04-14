@@ -589,6 +589,19 @@ export default function PostModal({
             onPostText={(text, postLang) => {
               onPost({ cardType: "text", text, writeLang: postLang });
             }}
+            onPostWorksheetImage={async (blob, originalText, translatedText, postLang) => {
+              // 이미지 업로드 후 image 카드로 게시 (originalText에 번역문 저장 → 카드에 표시)
+              setUploading(true);
+              try {
+                const imageUrl = await uploadToServer(blob);
+                onPost({ cardType: "image", text: translatedText, writeLang: postLang, imageUrl });
+              } catch (err) {
+                console.error("활동지 이미지 업로드 실패:", err);
+                // fallback: 텍스트만
+                onPost({ cardType: "text", text: translatedText, writeLang: postLang });
+              }
+              setUploading(false);
+            }}
             onClose={onClose}
           />
         )}

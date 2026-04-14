@@ -358,6 +358,22 @@ export default function PadletCard({
             이미지를 불러올 수 없습니다
           </div>
         )}
+        {/* 활동지 이미지: 번역 텍스트 */}
+        {cardType === "image" && card.originalText && (
+          <div style={{
+            marginTop: 8, padding: "8px 12px", borderRadius: 8,
+            background: p.accent + "0A", borderLeft: `3px solid ${p.accent}`,
+          }}>
+            <div style={{ fontSize: 10, color: p.accent, fontWeight: 700, marginBottom: 3, opacity: 0.8 }}>
+              {LANGUAGES[card.authorLang]?.flag} 번역
+            </div>
+            <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.65 }}>
+              {card.translations?.[viewerLang] && viewerLang !== card.authorLang
+                ? card.translations[viewerLang]
+                : card.originalText}
+            </div>
+          </div>
+        )}
 
         {/* ── YouTube ── */}
         {cardType === "youtube" && card.youtubeId && (

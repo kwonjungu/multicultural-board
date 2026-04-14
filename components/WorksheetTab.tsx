@@ -14,10 +14,11 @@ interface WorksheetResult {
 interface Props {
   userLang: string;
   onPostText: (text: string, lang: string) => void;
+  onPostWorksheetImage?: (blob: Blob, originalText: string, translatedText: string, toLang: string) => void;
   onClose: () => void;
 }
 
-export default function WorksheetTab({ userLang, onPostText, onClose }: Props) {
+export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImage, onClose }: Props) {
   // Smart defaults: if user speaks Korean, translate TO Korean FROM English; else FROM that lang TO Korean
   const [fromLang, setFromLang] = useState(userLang === "ko" ? "en" : userLang);
   const [toLang, setToLang]     = useState(userLang === "ko" ? "ko" : "ko");
@@ -26,6 +27,7 @@ export default function WorksheetTab({ userLang, onPostText, onClose }: Props) {
   const [result, setResult] = useState<WorksheetResult | null>(null);
   const [showOverlay, setShowOverlay] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
@@ -46,6 +48,7 @@ export default function WorksheetTab({ userLang, onPostText, onClose }: Props) {
       if (isImage) {
         setStatusMsg("🗜 이미지 압축 중...");
         uploadFile = await compressToUnder1MB(file);
+        setCompressedBlob(uploadFile); // 이미지 게시용으로 보관
       }
       setStatusMsg(isPDF ? "📄 PDF 텍스트 읽는 중..." : "🔍 OCR 분석 중...");
 
@@ -350,7 +353,7 @@ export default function WorksheetTab({ userLang, onPostText, onClose }: Props) {
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <button
-              onClick={() => { setResult(null); setError(null); setShowOverlay(false); }}
+              onClick={() => { setResult(null); setError(null); setShowOverlay(false); setCompressedBlob(null); }}
               style={{
                 flex: 1, padding: "10px 0", borderRadius: 11, border: "1.5px solid #E5E7EB",
                 background: "#fff", color: "#6B7280", fontWeight: 700, fontSize: 13, cursor: "pointer",
@@ -358,7 +361,13 @@ export default function WorksheetTab({ userLang, onPostText, onClose }: Props) {
             >↩ 다시 올리기</button>
             <button
               onClick={() => {
-                onPostText(result.translatedText, toLang);
+                if (compressedBlob && onPostWorksheetImage) {
+                  // 이미지 + 번역 텍스트 함께 게시
+                  onPostWorksheetImage(compressedBlob, result.originalText, result.translatedText, toLang);
+                } else {
+                  // fallback: 텍스트만
+                  onPostText(result.translatedText, toLang);
+                }
                 onClose();
               }}
               style={{
@@ -367,7 +376,7 @@ export default function WorksheetTab({ userLang, onPostText, onClose }: Props) {
                 color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer",
                 boxShadow: "0 4px 16px rgba(91,87,245,0.35)",
               }}
-            >📌 번역 게시하기</button>
+            >📌 이미지+번역 게시하기</button>
           </div>
         </div>
       )}
