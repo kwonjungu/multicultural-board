@@ -539,8 +539,12 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                       colColor={col.color}
                       isTeacher={isTeacher}
                       myClientId={myClientId}
+                      authorName={user.myName}
                       isPending={isTeacher && card.status === "pending"}
                       onEdit={() => setEditModal({ card, colTitle: col.title, colColor: col.color })}
+                      roomCode={roomCode}
+                      roomLangs={teacherLangs}
+                      approvalMode={roomConfigState.approvalMode}
                     />
                   ))
                 )}
@@ -1038,6 +1042,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               >✕</button>
             </div>
             <div style={{ padding: "16px 24px 24px" }}>
+              {/* TODO: include pending comments in approval panel */}
               {cards.filter((c) => c.status === "pending").length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "#9CA3AF" }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
