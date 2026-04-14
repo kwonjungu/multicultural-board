@@ -33,24 +33,25 @@ function timeAgo(ts: number) {
 function TranslationRow({ lang, text, accent }: { lang: string; text: string; accent: string }) {
   return (
     <div style={{
-      display: "flex", alignItems: "flex-start", gap: 8,
-      padding: "7px 0", borderTop: "1px solid #F3F4F6",
+      position: "relative",
+      background: accent + "0A",
+      borderLeft: "3px solid " + accent,
+      padding: "8px 12px",
+      borderRadius: 8,
+      marginTop: 6,
     }}>
-      <span style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: 0.2,
-        background: accent + "18", color: accent,
-        borderRadius: 8, padding: "2px 7px", flexShrink: 0, marginTop: 2,
-        whiteSpace: "nowrap",
-      }}>
+      <span style={{ fontSize: 10, opacity: 0.7, display: "block", marginBottom: 4, color: accent, fontWeight: 700 }}>
         {LANGUAGES[lang]?.flag} {LANGUAGES[lang]?.label}
       </span>
-      <span style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, flex: 1 }}>{text}</span>
+      <span style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{text}</span>
       <button
         onClick={() => speakText(text, lang)}
         title="읽어주기"
+        aria-label={`${LANGUAGES[lang]?.label} 읽어주기`}
         style={{
+          position: "absolute", top: 8, right: 8,
           background: "none", border: "none", cursor: "pointer",
-          fontSize: 12, color: "#CBD5E1", flexShrink: 0, padding: "2px",
+          fontSize: 12, color: "#CBD5E1", padding: "2px",
           transition: "color 0.15s", lineHeight: 1,
         }}
         onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = accent)}
@@ -271,44 +272,49 @@ export default function PadletCard({
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: "#1F2937" }}>
                 {card.authorName}
               </span>
               {card.isTeacher && (
                 <span style={{
-                  fontSize: 9, background: p.accent, color: "#fff",
-                  borderRadius: 6, padding: "1px 7px", fontWeight: 700,
+                  fontSize: 11, background: p.accent, color: "#fff",
+                  borderRadius: 999, padding: "2px 8px", fontWeight: 700,
+                  height: 20, display: "inline-flex", alignItems: "center",
                 }}>선생님</span>
               )}
               {cardType !== "text" && (
                 <span style={{
-                  fontSize: 9, background: "#F3F4F6", color: "#6B7280",
-                  borderRadius: 6, padding: "1px 7px",
+                  fontSize: 11, background: "#F3F4F6", color: "#6B7280",
+                  borderRadius: 999, padding: "2px 8px",
+                  height: 20, display: "inline-flex", alignItems: "center",
                 }}>
                   {cardType === "image" ? "🖼️ 사진" : cardType === "youtube" ? "📺 YouTube" : "✏️ 그림"}
                 </span>
               )}
               {card.flagged && (
                 <span style={{
-                  fontSize: 9, background: "#FEF2F2", color: "#DC2626",
-                  borderRadius: 6, padding: "1px 7px", border: "1px solid #FECACA",
+                  fontSize: 11, background: "#FEF2F2", color: "#DC2626",
+                  borderRadius: 999, padding: "2px 8px", border: "1px solid #FECACA",
+                  height: 20, display: "inline-flex", alignItems: "center",
                 }}>⚠️ 검토</span>
               )}
               {isPending && (
                 <span style={{
-                  fontSize: 9, background: "#FEF3C7", color: "#D97706",
-                  borderRadius: 6, padding: "1px 7px", border: "1px solid #FDE68A",
+                  fontSize: 11, background: "#FEF3C7", color: "#D97706",
+                  borderRadius: 999, padding: "2px 8px", border: "1px solid #FDE68A",
                   fontWeight: 700,
+                  height: 20, display: "inline-flex", alignItems: "center",
                 }}>대기 중</span>
               )}
               {card.editedAt && (
                 <span style={{
-                  fontSize: 9, background: "#F0F9FF", color: "#0369A1",
-                  borderRadius: 6, padding: "1px 7px",
+                  fontSize: 11, background: "#F0F9FF", color: "#0369A1",
+                  borderRadius: 999, padding: "2px 8px",
+                  height: 20, display: "inline-flex", alignItems: "center",
                 }}>수정됨</span>
               )}
             </div>
-            <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
               {LANGUAGES[card.authorLang]?.flag}
               <span>{LANGUAGES[card.authorLang]?.label}</span>
               <span style={{ color: "#E5E7EB" }}>·</span>
@@ -398,7 +404,12 @@ export default function PadletCard({
             )}
 
             {card.translateError && (
-              <div style={{ fontSize: 11, color: "#EF4444", marginTop: 6 }}>⚠️ 번역 실패</div>
+              <div style={{
+                background: "#FEF2F2", color: "#B91C1C",
+                borderLeft: "3px solid #EF4444",
+                padding: "6px 10px", borderRadius: 6, fontSize: 12,
+                marginTop: 6,
+              }}>⚠️ 번역 실패</div>
             )}
 
             {otherLangs.length > 0 && (
