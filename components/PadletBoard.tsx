@@ -257,11 +257,10 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
     setPosting(true);
 
+    // 교사가 설정한 방 언어 목록으로 번역 (학생도 동일하게 적용)
     const targetLangs =
       cardType === "text"
-        ? isTeacher
-          ? teacherLangs.filter((l) => l !== writeLang)
-          : ["ko", "en"].filter((l) => l !== writeLang)
+        ? teacherLangs.filter((l) => l !== writeLang)
         : [];
 
     const tempId = `temp_${Date.now()}`;
