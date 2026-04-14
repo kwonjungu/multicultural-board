@@ -111,6 +111,13 @@ export default function PostModal({
   // Error state
   const [postError, setPostError] = useState<string | null>(null);
 
+  // STT state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -178,6 +185,72 @@ export default function PostModal({
     if (!draftKey) return;
     localStorage.removeItem(draftKey);
   }
+
+  // ── STT: start/stop recording ──
+  async function startRecording() {
+    if (isRecording || isTranscribing) return;
+    setPostError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+      const mime = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+          ? "audio/mp4"
+          : "";
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      rec.onstop = async () => {
+        audioStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+        audioStreamRef.current = null;
+        const blob = new Blob(audioChunksRef.current, { type: rec.mimeType || "audio/webm" });
+        audioChunksRef.current = [];
+        if (blob.size < 1000) return; // too short
+        await transcribeBlob(blob);
+      };
+      mediaRecorderRef.current = rec;
+      rec.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("mic error:", err);
+      setPostError(t("micDenied", lang));
+    }
+  }
+
+  function stopRecording() {
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== "inactive") rec.stop();
+    setIsRecording(false);
+  }
+
+  async function transcribeBlob(blob: Blob) {
+    setIsTranscribing(true);
+    try {
+      const fd = new FormData();
+      const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+      fd.append("audio", blob, `voice.${ext}`);
+      fd.append("lang", writeLang);
+      const res = await fetch("/api/stt", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("STT failed");
+      const data = (await res.json()) as { text?: string };
+      const text = (data.text || "").trim();
+      if (text) setInputText((prev) => (prev ? `${prev} ${text}` : text));
+    } catch (err) {
+      console.error("transcribe error:", err);
+      setPostError(t("sttFailed", lang));
+    }
+    setIsTranscribing(false);
+  }
+
+  // Clean up media stream on unmount
+  useEffect(() => {
+    return () => {
+      audioStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+      const rec = mediaRecorderRef.current;
+      if (rec && rec.state !== "inactive") rec.stop();
+    };
+  }, []);
 
   const langOptions = user.isTeacher ? user.teacherLangs : Object.keys(LANGUAGES);
   const youtubeId = extractYouTubeId(youtubeUrl);
@@ -441,6 +514,42 @@ export default function PostModal({
                 e.target.style.boxShadow = "none";
               }}
             />
+
+            {/* Voice input */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+              <button
+                type="button"
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isTranscribing}
+                aria-pressed={isRecording}
+                aria-label={t("voiceInput", lang)}
+                style={{
+                  padding: "9px 14px", borderRadius: 11,
+                  border: `1.5px solid ${isRecording ? "#EF4444" : "#E5E7EB"}`,
+                  background: isRecording ? "#FEF2F2" : "#F9FAFB",
+                  color: isRecording ? "#EF4444" : "#6B7280",
+                  fontWeight: 700, fontSize: 13,
+                  cursor: isTranscribing ? "wait" : "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  transition: "all 0.15s",
+                  opacity: isTranscribing ? 0.6 : 1,
+                }}
+              >
+                {isRecording ? (
+                  <>
+                    <span style={{
+                      display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+                      background: "#EF4444", animation: "pulse 1s infinite",
+                    }} />
+                    {t("recording", lang)}
+                  </>
+                ) : isTranscribing ? (
+                  t("transcribing", lang)
+                ) : (
+                  t("voiceInput", lang)
+                )}
+              </button>
+            </div>
           </>
         )}
 

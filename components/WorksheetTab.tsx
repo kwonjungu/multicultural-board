@@ -7,8 +7,12 @@ import { compressToUnder1MB } from "@/lib/imageUtils";
 interface WorksheetResult {
   originalText: string;
   translatedText: string;
-  fileType: "pdf" | "image";
+  fileType: "pdf" | "image" | "pptx";
   imagePreviewUrl?: string;
+  pptxBlob?: Blob;
+  pptxFileName?: string;
+  pptxSegments?: number;
+  pptxBackend?: string;
 }
 
 interface Props {
@@ -31,10 +35,12 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
-    const isPDF   = file.type === "application/pdf";
+    const name = file.name.toLowerCase();
+    const isPDF   = file.type === "application/pdf" || name.endsWith(".pdf");
+    const isPPTX  = name.endsWith(".pptx");
     const isImage = file.type.startsWith("image/");
-    if (!isPDF && !isImage) {
-      setError("PDF 또는 이미지 파일만 지원합니다");
+    if (!isPDF && !isImage && !isPPTX) {
+      setError("PDF, PPTX 또는 이미지 파일만 지원합니다");
       return;
     }
 
@@ -44,6 +50,37 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
     setShowOverlay(false);
 
     try {
+      // ── PPTX 처리 (오픈소스 NLLB / Groq 폴백) ──
+      if (isPPTX) {
+        setStatusMsg("📊 PPTX 분석 중...");
+        const fd = new FormData();
+        fd.append("file", file, file.name);
+        fd.append("fromLang", fromLang);
+        fd.append("toLang", toLang);
+
+        setStatusMsg("🌐 슬라이드 번역 중...");
+        const res = await fetch("/api/pptx-translate", { method: "POST", body: fd });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "PPTX 번역 실패");
+        }
+        const blob = await res.blob();
+        const segments = res.headers.get("X-Segments-Translated") || "";
+        const backend  = res.headers.get("X-Translation-Backend")  || "";
+        setResult({
+          originalText: "",
+          translatedText: "",
+          fileType: "pptx",
+          pptxBlob: blob,
+          pptxFileName: file.name.replace(/\.pptx$/i, "") + `_${toLang}.pptx`,
+          pptxSegments: Number(segments) || 0,
+          pptxBackend: backend,
+        });
+        setProcessing(false);
+        setStatusMsg("");
+        return;
+      }
+
       let uploadFile: File | Blob = file;
       if (isImage) {
         setStatusMsg("🗜 이미지 압축 중...");
@@ -78,6 +115,18 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
     }
     setProcessing(false);
     setStatusMsg("");
+  }
+
+  function downloadPptx() {
+    if (!result?.pptxBlob || !result.pptxFileName) return;
+    const url = URL.createObjectURL(result.pptxBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = result.pptxFileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   const selectStyle: React.CSSProperties = {
@@ -136,7 +185,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,image/*"
+            accept=".pdf,.pptx,image/*"
             style={{ display: "none" }}
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -176,7 +225,8 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
             </div>
             <div style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.7 }}>
               클릭하거나 파일을 드래그해서 놓으세요<br />
-              <span style={{ fontWeight: 600, color: "#6B7280" }}>PDF</span> 또는{" "}
+              <span style={{ fontWeight: 600, color: "#6B7280" }}>PDF</span> ·{" "}
+              <span style={{ fontWeight: 600, color: "#6B7280" }}>PPTX</span> ·{" "}
               <span style={{ fontWeight: 600, color: "#6B7280" }}>사진 (JPG, PNG)</span> 지원
             </div>
           </div>
@@ -276,6 +326,49 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
                 boxShadow: "0 4px 16px rgba(91,87,245,0.35)",
               }}
             >📌 번역 게시하기</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── PPTX Result ── */}
+      {result && result.fileType === "pptx" && result.pptxBlob && (
+        <div style={{
+          background: "linear-gradient(135deg, #F0EEFF, #FFF7ED)",
+          borderRadius: 14, padding: "22px 18px",
+          border: "1px solid #DDD9FF", textAlign: "center",
+        }}>
+          <div style={{ fontSize: 42, marginBottom: 8 }}>📊</div>
+          <div style={{ fontWeight: 800, fontSize: 15, color: "#1E1B4B", marginBottom: 6 }}>
+            PPTX 번역 완료
+          </div>
+          <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 4 }}>
+            {LANGUAGES[fromLang]?.flag} {LANGUAGES[fromLang]?.label} → {LANGUAGES[toLang]?.flag} {LANGUAGES[toLang]?.label}
+          </div>
+          <div style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 14 }}>
+            {result.pptxSegments ? `${result.pptxSegments}개 텍스트 조각 번역` : ""}
+            {result.pptxBackend === "hf" ? " · NLLB-200 (오픈소스)" : result.pptxBackend === "groq" ? " · Groq Llama" : ""}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => { setResult(null); setError(null); }}
+              style={{
+                flex: 1, padding: "11px 0", borderRadius: 11, border: "1.5px solid #E5E7EB",
+                background: "#fff", color: "#6B7280", fontWeight: 700, fontSize: 13, cursor: "pointer",
+              }}
+            >↩ 다시 올리기</button>
+            <button
+              onClick={downloadPptx}
+              style={{
+                flex: 2, padding: "11px 0", borderRadius: 11, border: "none",
+                background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+                color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer",
+                boxShadow: "0 4px 16px rgba(91,87,245,0.35)",
+              }}
+            >📥 번역된 PPTX 다운로드</button>
+          </div>
+          <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 10, lineHeight: 1.6 }}>
+            원본 레이아웃이 유지된 PPTX 파일이 다운로드됩니다.<br />
+            PowerPoint, Keynote, Google Slides에서 열 수 있어요.
           </div>
         </div>
       )}

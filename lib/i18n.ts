@@ -359,6 +359,55 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "Pending Comment", uz: "Pending Comment", hi: "Pending Comment",
     id: "Pending Comment", ar: "Pending Comment", my: "Pending Comment",
   },
+  voiceInput: {
+    ko: "🎤 음성 입력", en: "🎤 Voice", vi: "🎤 Voice",
+    zh: "🎤 Voice", fil: "🎤 Voice", ja: "🎤 音声",
+    th: "🎤 Voice", km: "🎤 Voice", mn: "🎤 Voice",
+    ru: "🎤 Голос", uz: "🎤 Voice", hi: "🎤 Voice",
+    id: "🎤 Voice", ar: "🎤 صوت", my: "🎤 Voice",
+  },
+  recording: {
+    ko: "● 녹음 중... (클릭하여 정지)", en: "● Recording... (tap to stop)", vi: "● Recording... (tap to stop)",
+    zh: "● 录音中... (点击停止)", fil: "● Recording... (tap to stop)", ja: "● 録音中... (タップで停止)",
+    th: "● Recording... (tap to stop)", km: "● Recording... (tap to stop)", mn: "● Recording... (tap to stop)",
+    ru: "● Запись... (нажмите, чтобы остановить)", uz: "● Recording... (tap to stop)", hi: "● Recording... (tap to stop)",
+    id: "● Recording... (tap to stop)", ar: "● جاري التسجيل... (انقر للإيقاف)", my: "● Recording... (tap to stop)",
+  },
+  transcribing: {
+    ko: "⟳ 음성 변환 중...", en: "⟳ Transcribing...", vi: "⟳ Transcribing...",
+    zh: "⟳ 转录中...", fil: "⟳ Transcribing...", ja: "⟳ 変換中...",
+    th: "⟳ Transcribing...", km: "⟳ Transcribing...", mn: "⟳ Transcribing...",
+    ru: "⟳ Расшифровка...", uz: "⟳ Transcribing...", hi: "⟳ Transcribing...",
+    id: "⟳ Transcribing...", ar: "⟳ جاري النسخ...", my: "⟳ Transcribing...",
+  },
+  sttFailed: {
+    ko: "음성 변환에 실패했습니다", en: "Voice transcription failed", vi: "Voice transcription failed",
+    zh: "语音转录失败", fil: "Voice transcription failed", ja: "音声変換に失敗しました",
+    th: "Voice transcription failed", km: "Voice transcription failed", mn: "Voice transcription failed",
+    ru: "Не удалось расшифровать аудио", uz: "Voice transcription failed", hi: "Voice transcription failed",
+    id: "Voice transcription failed", ar: "فشل نسخ الصوت", my: "Voice transcription failed",
+  },
+  micDenied: {
+    ko: "마이크 권한이 없습니다", en: "Microphone permission denied", vi: "Microphone permission denied",
+    zh: "麦克风权限被拒绝", fil: "Microphone permission denied", ja: "マイクの権限がありません",
+    th: "Microphone permission denied", km: "Microphone permission denied", mn: "Microphone permission denied",
+    ru: "Нет доступа к микрофону", uz: "Microphone permission denied", hi: "Microphone permission denied",
+    id: "Microphone permission denied", ar: "تم رفض إذن الميكروفون", my: "Microphone permission denied",
+  },
+  pptxProcessing: {
+    ko: "📊 PPTX 분석 중...", en: "📊 Analyzing PPTX...", vi: "📊 Analyzing PPTX...",
+    zh: "📊 分析 PPTX 中...", fil: "📊 Analyzing PPTX...", ja: "📊 PPTXを分析中...",
+    th: "📊 Analyzing PPTX...", km: "📊 Analyzing PPTX...", mn: "📊 Analyzing PPTX...",
+    ru: "📊 Анализ PPTX...", uz: "📊 Analyzing PPTX...", hi: "📊 Analyzing PPTX...",
+    id: "📊 Analyzing PPTX...", ar: "📊 تحليل PPTX...", my: "📊 Analyzing PPTX...",
+  },
+  pptxDownload: {
+    ko: "📥 번역된 PPTX 다운로드", en: "📥 Download translated PPTX", vi: "📥 Download translated PPTX",
+    zh: "📥 下载翻译后的 PPTX", fil: "📥 Download translated PPTX", ja: "📥 翻訳済みPPTXをダウンロード",
+    th: "📥 Download translated PPTX", km: "📥 Download translated PPTX", mn: "📥 Download translated PPTX",
+    ru: "📥 Скачать переведённый PPTX", uz: "📥 Download translated PPTX", hi: "📥 Download translated PPTX",
+    id: "📥 Download translated PPTX", ar: "📥 تحميل PPTX المترجم", my: "📥 Download translated PPTX",
+  },
 };
 
 export function t(key: string, lang: string): string {
