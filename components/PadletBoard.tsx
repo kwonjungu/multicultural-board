@@ -19,6 +19,7 @@ interface FirebaseColumn {
 interface Props {
   user: UserConfig;
   roomCode: string;
+  roomLangs: string[];
   onLogout: () => void;
 }
 
@@ -27,7 +28,7 @@ const COL_COLORS = [
   "#8B5CF6", "#EC4899", "#14B8A6", "#F97316", "#10B981",
 ];
 
-export default function PadletBoard({ user, roomCode, onLogout }: Props) {
+export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Props) {
   const [cards, setCards] = useState<CardData[]>([]);
   // Initialize with defaults so board is visible immediately while Firebase loads
   const [columns, setColumns] = useState<FirebaseColumn[]>(
@@ -39,7 +40,8 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
 
   // Teacher state
   const [isTeacher, setIsTeacher] = useState(false);
-  const [teacherLangs] = useState(["ko", "en", "vi", "zh", "fil"]);
+  // teacherLangs from Firebase (synced), fallback to roomLangs
+  const [teacherLangs, setTeacherLangs] = useState<string[]>(roomLangs);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState(false);
@@ -76,6 +78,18 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
     });
     return () => off(colsRef);
   }, [roomCode]);
+
+  // ── Firebase: rooms/${roomCode}/config/languages ──
+  useEffect(() => {
+    const db = getClientDb();
+    const langRef = ref(db, `rooms/${roomCode}/config/languages`);
+    onValue(langRef, (snap) => {
+      const val = snap.val();
+      if (Array.isArray(val) && val.length > 0) setTeacherLangs(val);
+      else setTeacherLangs(roomLangs);
+    });
+    return () => off(langRef);
+  }, [roomCode, roomLangs]);
 
   // ── Firebase: rooms/${roomCode}/cards ──
   useEffect(() => {
@@ -536,6 +550,44 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Language management */}
+              <div style={{ borderTop: "1px dashed #E5E7EB", paddingTop: 18, marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 10 }}>
+                  언어 설정 (학생 입장 시 보이는 언어)
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                  {Object.entries(LANGUAGES).map(([code, info]) => {
+                    const active = teacherLangs.includes(code);
+                    return (
+                      <button
+                        key={code}
+                        onClick={() => {
+                          const db = getClientDb();
+                          const next = active
+                            ? teacherLangs.filter((l) => l !== code)
+                            : [...teacherLangs, code];
+                          if (next.length === 0) return; // 최소 1개
+                          set(ref(db, `rooms/${roomCode}/config/languages`), next);
+                        }}
+                        style={{
+                          padding: "5px 11px", borderRadius: 20, fontSize: 12,
+                          border: `1.5px solid ${active ? "#5B57F5" : "#E5E7EB"}`,
+                          background: active ? "#EEEEFF" : "#F9FAFB",
+                          color: active ? "#5B57F5" : "#9CA3AF",
+                          fontWeight: active ? 700 : 400, cursor: "pointer",
+                          transition: "all 0.12s",
+                        }}
+                      >
+                        {info.flag} {info.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 8 }}>
+                  선택된 언어: {teacherLangs.length}개 · 번역 대상 언어이기도 합니다
+                </div>
               </div>
 
               {/* Add column */}

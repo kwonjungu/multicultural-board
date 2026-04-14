@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { ref, onValue, off } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
+import { LANGUAGES } from "@/lib/constants";
 import { useRouter } from "next/navigation";
+
+const DEFAULT_LANGS = ["ko", "en", "vi", "zh", "fil"];
 
 interface RoomInfo {
   code: string;
@@ -20,6 +23,7 @@ export default function AdminPage() {
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [newCode, setNewCode] = useState("");
+  const [newLangs, setNewLangs] = useState<string[]>(DEFAULT_LANGS);
   const [loading, setLoading] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -74,12 +78,16 @@ export default function AdminPage() {
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, password: "4321", roomCode }),
+        body: JSON.stringify({
+          action, password: "4321", roomCode,
+          ...(action === "create" ? { languages: newLangs } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setMsg({ text: action === "delete" ? `방 ${roomCode} 삭제 완료` : `방 ${roomCode} 생성 완료`, ok: true });
       setNewCode("");
+      setNewLangs(DEFAULT_LANGS);
     } catch (e: unknown) {
       setMsg({ text: (e as Error).message || "오류 발생", ok: false });
     }
@@ -207,7 +215,7 @@ export default function AdminPage() {
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid #E9ECF5",
         }}>
           <h3 style={{ margin: "0 0 14px", fontWeight: 800, fontSize: 15, color: "#111827" }}>새 방 만들기</h3>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
             <input
               value={newCode}
               onChange={(e) => setNewCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
@@ -236,6 +244,37 @@ export default function AdminPage() {
             >
               {loading === "create" ? "생성 중..." : "+ 방 생성"}
             </button>
+          </div>
+
+          {/* Language picker */}
+          <div style={{ background: "#F8F9FC", borderRadius: 12, padding: "12px 14px", border: "1px solid #E9ECF5" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1, marginBottom: 10 }}>
+              이 방에서 사용할 언어 선택 ({newLangs.length}개)
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {Object.entries(LANGUAGES).map(([code, info]) => {
+                const active = newLangs.includes(code);
+                return (
+                  <button
+                    key={code}
+                    onClick={() => setNewLangs(active
+                      ? newLangs.filter((l) => l !== code)
+                      : [...newLangs, code]
+                    )}
+                    style={{
+                      padding: "5px 10px", borderRadius: 20, fontSize: 11,
+                      border: `1.5px solid ${active ? "#5B57F5" : "#E5E7EB"}`,
+                      background: active ? "#EEEEFF" : "#fff",
+                      color: active ? "#5B57F5" : "#9CA3AF",
+                      fontWeight: active ? 700 : 400, cursor: "pointer",
+                      transition: "all 0.12s",
+                    }}
+                  >
+                    {info.flag} {info.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           {msg && (
             <div style={{ marginTop: 10, fontSize: 13, color: msg.ok ? "#10B981" : "#EF4444", fontWeight: 600 }}>

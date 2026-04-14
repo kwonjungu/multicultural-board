@@ -8,20 +8,19 @@ import { t } from "@/lib/i18n";
 interface Props {
   onDone: (config: UserConfig) => void;
   roomCode: string;
+  availableLangs: string[];
 }
 
-export default function SetupScreen({ onDone, roomCode }: Props) {
-  const [myLang, setMyLang] = useState("ko");
+export default function SetupScreen({ onDone, roomCode, availableLangs }: Props) {
+  const [myLang, setMyLang] = useState(() => {
+    // Default to first available lang, prefer ko
+    return availableLangs.includes("ko") ? "ko" : availableLangs[0] ?? "ko";
+  });
   const [myName, setMyName] = useState("");
 
   function handleEnter() {
     if (!myName.trim()) return;
-    onDone({
-      myLang,
-      myName: myName.trim(),
-      isTeacher: false,
-      teacherLangs: [],
-    });
+    onDone({ myLang, myName: myName.trim(), isTeacher: false, teacherLangs: [] });
   }
 
   const ready = myName.trim().length > 0;
@@ -43,14 +42,11 @@ export default function SetupScreen({ onDone, roomCode }: Props) {
         boxShadow: "0 40px 100px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)",
         animation: "fadeSlideIn 0.4s ease", position: "relative", zIndex: 1,
       }}>
-
         {/* Room badge */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#F0EEFF", borderRadius: 20, padding: "6px 16px", marginBottom: 18 }}>
             <span style={{ fontSize: 13 }}>🚪</span>
-            <span style={{ fontWeight: 800, fontSize: 13, color: "#5B57F5", letterSpacing: 2 }}>
-              Room {roomCode}
-            </span>
+            <span style={{ fontWeight: 800, fontSize: 13, color: "#5B57F5", letterSpacing: 2 }}>Room {roomCode}</span>
           </div>
           <div style={{
             width: 60, height: 60, borderRadius: 18, margin: "0 auto 14px",
@@ -62,7 +58,7 @@ export default function SetupScreen({ onDone, roomCode }: Props) {
             다문화 교실 소통판
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 13, color: "#9CA3AF" }}>
-            {t("enterName", myLang).replace("...", "")} — {LANGUAGES[myLang]?.flag}
+            {LANGUAGES[myLang]?.flag} {t("enterName", myLang).replace(/\.\.\.$/, "")}
           </p>
         </div>
 
@@ -72,22 +68,26 @@ export default function SetupScreen({ onDone, roomCode }: Props) {
             {t("myLang", myLang).toUpperCase()} &nbsp;·&nbsp; MY LANGUAGE
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7, maxHeight: 148, overflowY: "auto", padding: "2px 0" }}>
-            {Object.entries(LANGUAGES).map(([code, info]) => (
-              <button
-                key={code}
-                onClick={() => setMyLang(code)}
-                style={{
-                  padding: "6px 12px", borderRadius: 20, fontSize: 12,
-                  border: `1.5px solid ${myLang === code ? "#5B57F5" : "#E5E7EB"}`,
-                  background: myLang === code ? "#EEEEFF" : "#F9FAFB",
-                  color: myLang === code ? "#5B57F5" : "#6B7280",
-                  fontWeight: myLang === code ? 700 : 400, cursor: "pointer",
-                  transition: "all 0.12s", whiteSpace: "nowrap", outline: "none",
-                }}
-              >
-                {info.flag} {info.label}
-              </button>
-            ))}
+            {availableLangs.map((code) => {
+              const info = LANGUAGES[code];
+              if (!info) return null;
+              return (
+                <button
+                  key={code}
+                  onClick={() => setMyLang(code)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 20, fontSize: 12,
+                    border: `1.5px solid ${myLang === code ? "#5B57F5" : "#E5E7EB"}`,
+                    background: myLang === code ? "#EEEEFF" : "#F9FAFB",
+                    color: myLang === code ? "#5B57F5" : "#6B7280",
+                    fontWeight: myLang === code ? 700 : 400, cursor: "pointer",
+                    transition: "all 0.12s", whiteSpace: "nowrap", outline: "none",
+                  }}
+                >
+                  {info.flag} {info.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -105,6 +105,7 @@ export default function SetupScreen({ onDone, roomCode }: Props) {
               width: "100%", padding: "13px 16px", borderRadius: 12,
               border: "2px solid #E5E7EB", fontSize: 15, color: "#111827",
               background: "#F9FAFB", outline: "none", transition: "all 0.18s", fontWeight: 500,
+              boxSizing: "border-box",
             }}
             onFocus={(e) => {
               e.target.style.borderColor = "#5B57F5";

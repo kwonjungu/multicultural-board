@@ -5,7 +5,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "4321";
 
 export async function POST(req: NextRequest) {
   try {
-    const { action, password, roomCode } = await req.json();
+    const { action, password, roomCode, languages } = await req.json();
 
     if (password !== ADMIN_PASSWORD) {
       return NextResponse.json({ error: "비밀번호가 틀렸습니다" }, { status: 401 });
@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
         created: Date.now(),
         active: true,
       });
+      if (Array.isArray(languages) && languages.length > 0) {
+        await db.ref(`rooms/${roomCode}/config/languages`).set(languages);
+      }
       return NextResponse.json({ success: true });
     }
 
