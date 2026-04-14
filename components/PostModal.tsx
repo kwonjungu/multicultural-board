@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
-import { UserConfig, PostData, CardType } from "@/lib/types";
+import { UserConfig, PostData, CardType, CardData, CardStatus } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import DrawingCanvas from "./DrawingCanvas";
 import WorksheetTab from "./WorksheetTab";
@@ -46,38 +46,138 @@ interface Props {
   posting: boolean;
   onPost: (data: PostData) => void;
   onClose: () => void;
+  approvalMode?: boolean;
+  myClientId?: string;
+  editCard?: CardData;
+  roomCode: string;
 }
 
-export default function PostModal({ colId, colTitle, colColor, user, posting, onPost, onClose }: Props) {
+export default function PostModal({
+  colId,
+  colTitle,
+  colColor,
+  user,
+  posting,
+  onPost,
+  onClose,
+  approvalMode,
+  myClientId,
+  editCard,
+  roomCode,
+}: Props) {
   const lang = user.myLang;
+  const accent = colColor || "#5B57F5";
+
+  const draftKey = editCard ? null : `draft_${roomCode}_${colId}`;
+
   const TABS: { key: ModalMode; icon: string; label: string }[] = [
     { key: "text",      icon: "📝", label: t("tabWrite", lang)     },
     { key: "image",     icon: "🖼️", label: t("tabPhoto", lang)     },
     { key: "youtube",   icon: "📺", label: "YouTube"               },
     { key: "drawing",   icon: "✏️", label: t("tabDraw", lang)      },
-    { key: "worksheet", icon: "📋", label: t("tabWorksheet", lang) },
+    ...(editCard ? [] : [{ key: "worksheet" as ModalMode, icon: "📋", label: t("tabWorksheet", lang) }]),
   ];
 
-  const [mode, setMode] = useState<ModalMode>("text");
-  const [inputText, setInputText] = useState("");
-  const [writeLang, setWriteLang] = useState(user.myLang);
+  const initialMode: ModalMode = editCard
+    ? (editCard.cardType as ModalMode)
+    : "text";
+
+  const [mode, setMode] = useState<ModalMode>(initialMode);
+  const [inputText, setInputText] = useState(() => {
+    if (editCard) return editCard.originalText || "";
+    return "";
+  });
+  const [writeLang, setWriteLang] = useState(editCard ? editCard.authorLang : user.myLang);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageOrigSize, setImageOrigSize] = useState<number>(0);
-  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState(() => {
+    if (editCard?.cardType === "youtube" && editCard.youtubeId) {
+      return `https://youtu.be/${editCard.youtubeId}`;
+    }
+    return "";
+  });
   const [drawingDataUrl, setDrawingDataUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [compressedSize, setCompressedSize] = useState<number>(0);
   const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
 
+  // Draft state
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Error state
+  const [postError, setPostError] = useState<string | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const accent = colColor || "#5B57F5";
 
+  // On mount: check for draft (only when not editing)
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { text?: string; youtubeUrl?: string };
+        if (parsed.text && parsed.text.trim()) {
+          setHasDraft(true);
+        }
+      }
+    } catch {
+      // ignore
+    }
+    setDraftLoaded(true);
+  }, [draftKey]);
+
+  // Focus textarea on text mode
   useEffect(() => {
     if (mode === "text") setTimeout(() => textareaRef.current?.focus(), 80);
   }, [mode]);
+
+  // Debounced draft save
+  useEffect(() => {
+    if (!draftKey || !draftLoaded || hasDraft) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (inputText.trim() || youtubeUrl.trim()) {
+        localStorage.setItem(draftKey, JSON.stringify({ text: inputText, youtubeUrl }));
+      }
+    }, 800);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [inputText, youtubeUrl, draftKey, draftLoaded, hasDraft]);
+
+  function restoreDraft() {
+    if (!draftKey) return;
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { text?: string; youtubeUrl?: string };
+        if (parsed.text) setInputText(parsed.text);
+        if (parsed.youtubeUrl) {
+          setYoutubeUrl(parsed.youtubeUrl);
+          setMode("youtube");
+        }
+      }
+    } catch {
+      // ignore
+    }
+    setHasDraft(false);
+  }
+
+  function discardDraft() {
+    if (!draftKey) return;
+    localStorage.removeItem(draftKey);
+    setHasDraft(false);
+  }
+
+  function clearDraft() {
+    if (!draftKey) return;
+    localStorage.removeItem(draftKey);
+  }
 
   const langOptions = user.isTeacher ? user.teacherLangs : Object.keys(LANGUAGES);
   const youtubeId = extractYouTubeId(youtubeUrl);
@@ -92,7 +192,6 @@ export default function PostModal({ colId, colTitle, colColor, user, posting, on
       const compressed = await compressToUnder1MB(file);
       setCompressedBlob(compressed);
       setCompressedSize(compressed.size);
-      // Update preview to compressed version
       setImagePreview(URL.createObjectURL(compressed));
     } catch {
       setCompressedBlob(file);
@@ -108,41 +207,65 @@ export default function PostModal({ colId, colTitle, colColor, user, posting, on
     if (mode === "youtube")   return !!youtubeId;
     if (mode === "image")     return !!compressedBlob;
     if (mode === "drawing")   return !!drawingDataUrl;
-    if (mode === "worksheet") return false; // worksheet handles its own submit
+    if (mode === "worksheet") return false;
     return false;
   };
 
   async function handleSubmit() {
     if (!canPost()) return;
+    setPostError(null);
 
-    if (mode === "text") {
-      onPost({ cardType: "text", text: inputText, writeLang });
-      return;
-    }
-    if (mode === "youtube") {
-      onPost({ cardType: "youtube", text: "", writeLang, youtubeId: youtubeId! });
-      return;
-    }
+    const shouldPend = approvalMode && !user.isTeacher;
+    const statusField: { status?: CardStatus; authorClientId?: string } = shouldPend
+      ? { status: "pending" as CardStatus, authorClientId: myClientId || "" }
+      : {};
 
-    setUploading(true);
     try {
-      let blob: Blob;
-      if (mode === "image" && compressedBlob) {
-        blob = compressedBlob;
-      } else {
-        const raw = dataUrlToBlob(drawingDataUrl!);
-        blob = await compressToUnder1MB(raw);
+      if (mode === "text") {
+        onPost({ cardType: "text", text: inputText, writeLang, ...statusField });
+        clearDraft();
+        return;
       }
-      const imageUrl = await uploadToServer(blob);
-      onPost({ cardType: mode as import("@/lib/types").CardType, text: "", writeLang, imageUrl });
+      if (mode === "youtube") {
+        onPost({ cardType: "youtube", text: "", writeLang, youtubeId: youtubeId!, ...statusField });
+        clearDraft();
+        return;
+      }
+
+      setUploading(true);
+      try {
+        let blob: Blob;
+        if (mode === "image" && compressedBlob) {
+          blob = compressedBlob;
+        } else {
+          const raw = dataUrlToBlob(drawingDataUrl!);
+          blob = await compressToUnder1MB(raw);
+        }
+        const imageUrl = await uploadToServer(blob);
+        onPost({ cardType: mode as import("@/lib/types").CardType, text: "", writeLang, imageUrl, ...statusField });
+        clearDraft();
+      } catch (err) {
+        console.error("업로드 실패:", err);
+        setPostError(t("postFailed", lang));
+      }
+      setUploading(false);
     } catch (err) {
-      console.error("업로드 실패:", err);
-      alert("업로드에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      console.error("게시 실패:", err);
+      setPostError(t("postFailed", lang));
     }
-    setUploading(false);
   }
 
   const btnDisabled = !canPost();
+  const isEdit = !!editCard;
+  const btnLabel = isEdit
+    ? "수정 완료"
+    : compressing
+      ? t("compressing", lang)
+      : uploading
+        ? t("uploading", lang)
+        : posting
+          ? t("saving", lang)
+          : t("post", lang);
 
   return (
     <div
@@ -171,7 +294,7 @@ export default function PostModal({ colId, colTitle, colColor, user, posting, on
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0, boxShadow: `0 0 0 3px ${accent}22` }} />
           <span style={{ fontWeight: 800, fontSize: 14, color: "#111827", flex: 1, letterSpacing: -0.2 }}>
-            {colTitle}
+            {isEdit ? `✏️ ${t("editCard", lang)} — ${colTitle}` : colTitle}
           </span>
           <button
             onClick={onClose}
@@ -185,6 +308,54 @@ export default function PostModal({ colId, colTitle, colColor, user, posting, on
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#F3F4F6")}
           >✕</button>
         </div>
+
+        {/* Draft banner */}
+        {hasDraft && !isEdit && (
+          <div style={{
+            background: "#FEF3C7", borderRadius: 10, padding: "10px 14px",
+            marginBottom: 14, display: "flex", alignItems: "center", gap: 10,
+            border: "1px solid #FDE68A",
+          }}>
+            <span style={{ fontSize: 13, color: "#92400E", flex: 1, fontWeight: 600 }}>
+              💾 {t("draftRestore", lang)}
+            </span>
+            <button
+              onClick={restoreDraft}
+              style={{
+                padding: "5px 12px", borderRadius: 8, border: "none", background: "#F59E0B",
+                color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer",
+              }}
+            >복원</button>
+            <button
+              onClick={discardDraft}
+              style={{
+                padding: "5px 12px", borderRadius: 8, border: "1px solid #D97706",
+                color: "#92400E", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                background: "transparent",
+              }}
+            >{t("draftDiscard", lang)}</button>
+          </div>
+        )}
+
+        {/* Error banner */}
+        {postError && (
+          <div style={{
+            background: "#FEF2F2", borderRadius: 10, padding: "10px 14px",
+            marginBottom: 14, display: "flex", alignItems: "center", gap: 10,
+            border: "1px solid #FECACA",
+          }}>
+            <span style={{ fontSize: 13, color: "#991B1B", flex: 1, fontWeight: 600 }}>
+              ❌ {postError}
+            </span>
+            <button
+              onClick={() => { setPostError(null); handleSubmit(); }}
+              style={{
+                padding: "5px 12px", borderRadius: 8, border: "none", background: "#EF4444",
+                color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer",
+              }}
+            >{t("retry", lang)}</button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 4, marginBottom: 18, background: "#F3F4F6", borderRadius: 12, padding: 4 }}>
@@ -394,8 +565,8 @@ export default function PostModal({ colId, colTitle, colColor, user, posting, on
           )
         )}
 
-        {/* ── 활동지 모드 ── */}
-        {mode === "worksheet" && (
+        {/* ── 활동지 모드 (not available in edit mode) ── */}
+        {mode === "worksheet" && !isEdit && (
           <WorksheetTab
             userLang={lang}
             onPostText={(text, postLang) => {
@@ -426,13 +597,7 @@ export default function PostModal({ colId, colTitle, colColor, user, posting, on
                 transition: "all 0.18s", letterSpacing: -0.2,
               }}
             >
-              {compressing
-                ? t("compressing", lang)
-                : uploading
-                  ? t("uploading", lang)
-                  : posting
-                    ? t("saving", lang)
-                    : t("post", lang)}
+              {btnLabel}
             </button>
           </div>
         )}
