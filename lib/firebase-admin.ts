@@ -4,7 +4,7 @@ import { getDatabase } from "firebase-admin/database";
 // 싱글톤 패턴 - 서버 재시작 없이 중복 초기화 방지
 let adminApp: App;
 
-function getAdminApp(): App {
+export function getAdminApp(): App {
   if (adminApp) return adminApp;
 
   if (getApps().length > 0) {
@@ -20,6 +20,7 @@ function getAdminApp(): App {
       privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     }),
     databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   });
 
   return adminApp;

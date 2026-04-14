@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { UserConfig } from "@/lib/types";
+import { t } from "@/lib/i18n";
 
 interface Props {
   onDone: (config: UserConfig) => void;
@@ -61,42 +62,14 @@ export default function SetupScreen({ onDone, roomCode }: Props) {
             다문화 교실 소통판
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 13, color: "#9CA3AF" }}>
-            이름과 언어를 선택해 입장하세요
+            {t("enterName", myLang).replace("...", "")} — {LANGUAGES[myLang]?.flag}
           </p>
         </div>
 
-        {/* Name */}
+        {/* Language — pick first so name placeholder updates */}
         <div style={{ marginBottom: 22 }}>
           <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
-            이름 NAME
-          </p>
-          <input
-            value={myName}
-            onChange={(e) => setMyName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleEnter()}
-            placeholder="이름을 입력하세요"
-            style={{
-              width: "100%", padding: "13px 16px", borderRadius: 12,
-              border: "2px solid #E5E7EB", fontSize: 15, color: "#111827",
-              background: "#F9FAFB", outline: "none", transition: "all 0.18s", fontWeight: 500,
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = "#5B57F5";
-              e.target.style.background = "#fff";
-              e.target.style.boxShadow = "0 0 0 4px rgba(91,87,245,0.1)";
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = "#E5E7EB";
-              e.target.style.background = "#F9FAFB";
-              e.target.style.boxShadow = "none";
-            }}
-          />
-        </div>
-
-        {/* Language */}
-        <div style={{ marginBottom: 28 }}>
-          <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
-            내 언어 MY LANGUAGE
+            {t("myLang", myLang).toUpperCase()} &nbsp;·&nbsp; MY LANGUAGE
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7, maxHeight: 148, overflowY: "auto", padding: "2px 0" }}>
             {Object.entries(LANGUAGES).map(([code, info]) => (
@@ -118,6 +91,34 @@ export default function SetupScreen({ onDone, roomCode }: Props) {
           </div>
         </div>
 
+        {/* Name */}
+        <div style={{ marginBottom: 28 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
+            NAME &nbsp;·&nbsp; 이름
+          </p>
+          <input
+            value={myName}
+            onChange={(e) => setMyName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleEnter()}
+            placeholder={t("enterName", myLang)}
+            style={{
+              width: "100%", padding: "13px 16px", borderRadius: 12,
+              border: "2px solid #E5E7EB", fontSize: 15, color: "#111827",
+              background: "#F9FAFB", outline: "none", transition: "all 0.18s", fontWeight: 500,
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = "#5B57F5";
+              e.target.style.background = "#fff";
+              e.target.style.boxShadow = "0 0 0 4px rgba(91,87,245,0.1)";
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = "#E5E7EB";
+              e.target.style.background = "#F9FAFB";
+              e.target.style.boxShadow = "none";
+            }}
+          />
+        </div>
+
         {/* Enter */}
         <button
           disabled={!ready}
@@ -132,7 +133,7 @@ export default function SetupScreen({ onDone, roomCode }: Props) {
             transition: "all 0.2s",
           }}
         >
-          입장하기 →
+          {t("enter", myLang)}
         </button>
       </div>
     </div>

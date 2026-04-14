@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { LANGUAGES, COLUMNS_DEFAULT } from "@/lib/constants";
 import { UserConfig, PostData, CardType } from "@/lib/types";
-import { getClientStorage } from "@/lib/firebase-client";
+import { t } from "@/lib/i18n";
 import DrawingCanvas from "./DrawingCanvas";
 
 function extractYouTubeId(url: string): string | null {
@@ -14,13 +13,52 @@ function extractYouTubeId(url: string): string | null {
   return match ? match[1] : null;
 }
 
-async function uploadBlob(blob: Blob): Promise<string> {
-  const storage = getClientStorage();
-  const ext = blob.type === "image/png" ? "png" : "jpg";
-  const path = `uploads/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-  const fileRef = storageRef(storage, path);
-  await uploadBytes(fileRef, blob);
-  return getDownloadURL(fileRef);
+async function compressToUnder1MB(file: File | Blob): Promise<Blob> {
+  const targetSize = 900 * 1024;
+  if (file.size <= targetSize) return file;
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+    image.onerror = reject;
+    image.src = url;
+  });
+
+  const canvas = document.createElement("canvas");
+  const MAX_DIM = 1920;
+  let { width, height } = img;
+  if (width > MAX_DIM || height > MAX_DIM) {
+    const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+    width = Math.round(width * ratio);
+    height = Math.round(height * ratio);
+  }
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+
+  for (const quality of [0.85, 0.7, 0.55, 0.4, 0.28, 0.2]) {
+    const blob = await new Promise<Blob>((resolve) => {
+      canvas.toBlob((b) => resolve(b!), "image/jpeg", quality);
+    });
+    if (blob.size <= targetSize) return blob;
+  }
+  // absolute fallback
+  return new Promise<Blob>((resolve) => {
+    canvas.toBlob((b) => resolve(b!), "image/jpeg", 0.15);
+  });
+}
+
+async function uploadToServer(blob: Blob): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", blob, `upload_${Date.now()}.jpg`);
+  const res = await fetch("/api/upload", { method: "POST", body: formData });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "업로드 실패");
+  }
+  const data = await res.json();
+  return data.url as string;
 }
 
 function dataUrlToBlob(dataUrl: string): Blob {
@@ -32,12 +70,11 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([u8arr], { type: mime });
 }
 
-const TABS: { key: CardType; icon: string; label: string }[] = [
-  { key: "text",    icon: "📝", label: "글쓰기"  },
-  { key: "image",   icon: "🖼️", label: "사진"    },
-  { key: "youtube", icon: "📺", label: "YouTube" },
-  { key: "drawing", icon: "✏️", label: "그림"    },
-];
+function fmtBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
 
 interface Props {
   colId: string;
@@ -48,14 +85,26 @@ interface Props {
 }
 
 export default function PostModal({ colId, user, posting, onPost, onClose }: Props) {
+  const lang = user.myLang;
+  const TABS: { key: CardType; icon: string; label: string }[] = [
+    { key: "text",    icon: "📝", label: t("tabWrite", lang)  },
+    { key: "image",   icon: "🖼️", label: t("tabPhoto", lang)  },
+    { key: "youtube", icon: "📺", label: "YouTube" },
+    { key: "drawing", icon: "✏️", label: t("tabDraw", lang)   },
+  ];
+
   const [mode, setMode] = useState<CardType>("text");
   const [inputText, setInputText] = useState("");
   const [writeLang, setWriteLang] = useState(user.myLang);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageOrigSize, setImageOrigSize] = useState<number>(0);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [drawingDataUrl, setDrawingDataUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [compressing, setCompressing] = useState(false);
+  const [compressedSize, setCompressedSize] = useState<number>(0);
+  const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,11 +118,31 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
   const langOptions = user.isTeacher ? user.teacherLangs : Object.keys(LANGUAGES);
   const youtubeId = extractYouTubeId(youtubeUrl);
 
+  async function handleImageSelect(file: File) {
+    setImageOrigSize(file.size);
+    setImagePreview(URL.createObjectURL(file));
+    setCompressing(true);
+    setCompressedBlob(null);
+    setCompressedSize(0);
+    try {
+      const compressed = await compressToUnder1MB(file);
+      setCompressedBlob(compressed);
+      setCompressedSize(compressed.size);
+      // Update preview to compressed version
+      setImagePreview(URL.createObjectURL(compressed));
+    } catch {
+      setCompressedBlob(file);
+      setCompressedSize(file.size);
+    }
+    setCompressing(false);
+    setImageFile(file);
+  }
+
   const canPost = () => {
-    if (uploading || posting) return false;
+    if (uploading || posting || compressing) return false;
     if (mode === "text")    return inputText.trim().length > 0;
     if (mode === "youtube") return !!youtubeId;
-    if (mode === "image")   return !!imageFile;
+    if (mode === "image")   return !!compressedBlob;
     if (mode === "drawing") return !!drawingDataUrl;
     return false;
   };
@@ -89,16 +158,21 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
       onPost({ cardType: "youtube", text: "", writeLang, youtubeId: youtubeId! });
       return;
     }
+
     setUploading(true);
     try {
-      const blob = mode === "image" && imageFile
-        ? imageFile
-        : dataUrlToBlob(drawingDataUrl!);
-      const imageUrl = await uploadBlob(blob);
+      let blob: Blob;
+      if (mode === "image" && compressedBlob) {
+        blob = compressedBlob;
+      } else {
+        const raw = dataUrlToBlob(drawingDataUrl!);
+        blob = await compressToUnder1MB(raw);
+      }
+      const imageUrl = await uploadToServer(blob);
       onPost({ cardType: mode, text: "", writeLang, imageUrl });
     } catch (err) {
       console.error("업로드 실패:", err);
-      alert("업로드에 실패했습니다.\nFirebase Storage 규칙을 확인하세요.");
+      alert("업로드에 실패했습니다. 잠시 후 다시 시도해주세요.");
     }
     setUploading(false);
   }
@@ -171,7 +245,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
         {mode === "text" && (
           <>
             <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 0.5 }}>작성 언어</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 0.5 }}>{t("writingLang", lang)}</span>
               {langOptions.map((l) => (
                 <button
                   key={l}
@@ -194,7 +268,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSubmit(); }}
-              placeholder={`${LANGUAGES[writeLang]?.flag} ${LANGUAGES[writeLang]?.label}로 입력하면 자동으로 번역됩니다...`}
+              placeholder={`${LANGUAGES[writeLang]?.flag} ${LANGUAGES[writeLang]?.label}...`}
               rows={4}
               style={{
                 width: "100%", padding: "14px 16px", borderRadius: 14,
@@ -227,8 +301,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                setImageFile(file);
-                setImagePreview(URL.createObjectURL(file));
+                handleImageSelect(file);
               }}
             />
             {!imagePreview ? (
@@ -251,22 +324,42 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
                 }}
               >
                 <div style={{ fontSize: 40, marginBottom: 10 }}>🖼️</div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#374151", marginBottom: 4 }}>사진을 선택하세요</div>
-                <div style={{ fontSize: 12, color: "#9CA3AF" }}>클릭하여 업로드</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#374151", marginBottom: 4 }}>{t("selectPhoto", lang)}</div>
+                <div style={{ fontSize: 12, color: "#9CA3AF" }}>{t("clickToUpload", lang)}</div>
               </div>
             ) : (
-              <div style={{ position: "relative" }}>
-                <img src={imagePreview} alt="preview"
-                  style={{ width: "100%", borderRadius: 12, maxHeight: 280, objectFit: "contain", background: "#F9FAFB" }} />
-                <button
-                  onClick={() => { setImageFile(null); setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                  style={{
-                    position: "absolute", top: 8, right: 8,
-                    background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%",
-                    width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 13,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}
-                >✕</button>
+              <div>
+                <div style={{ position: "relative" }}>
+                  <img src={imagePreview} alt="preview"
+                    style={{ width: "100%", borderRadius: 12, maxHeight: 280, objectFit: "contain", background: "#F9FAFB" }} />
+                  <button
+                    onClick={() => {
+                      setImageFile(null);
+                      setImagePreview(null);
+                      setCompressedBlob(null);
+                      setCompressedSize(0);
+                      setImageOrigSize(0);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                    style={{
+                      position: "absolute", top: 8, right: 8,
+                      background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%",
+                      width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 13,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >✕</button>
+                </div>
+                {/* Compression info */}
+                <div style={{ marginTop: 8, fontSize: 12, textAlign: "center" }}>
+                  {compressing ? (
+                    <span style={{ color: "#F59E0B", fontWeight: 600 }}>{t("compressing", lang)}</span>
+                  ) : compressedSize > 0 && imageOrigSize > 0 ? (
+                    <span style={{ color: "#10B981", fontWeight: 600 }}>
+                      🗜 {fmtBytes(imageOrigSize)} → {fmtBytes(compressedSize)}
+                      {compressedSize < imageOrigSize && ` (-${Math.round((1 - compressedSize / imageOrigSize) * 100)}%)`}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             )}
           </div>
@@ -279,7 +372,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
               type="text"
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
-              placeholder="YouTube URL 붙여넣기 (youtu.be/... 또는 youtube.com/watch?v=...)"
+              placeholder="YouTube URL (youtu.be/... 또는 youtube.com/watch?v=...)"
               style={{
                 width: "100%", padding: "14px 16px", borderRadius: 14,
                 border: "2px solid #E5E7EB", fontSize: 14, background: "#F9FAFB",
@@ -340,7 +433,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
         {!(mode === "drawing" && !drawingDataUrl) && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
             <span style={{ fontSize: 11, color: "#CBD5E1" }}>
-              {mode === "text" ? "Ctrl+Enter로 빠른 게시" : ""}
+              {mode === "text" ? "Ctrl+Enter" : ""}
             </span>
             <button
               onClick={handleSubmit}
@@ -357,7 +450,13 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
                 transition: "all 0.18s", letterSpacing: -0.2,
               }}
             >
-              {uploading ? "⟳ 업로드 중..." : posting ? "⟳ 저장 중..." : "게시하기 →"}
+              {compressing
+                ? t("compressing", lang)
+                : uploading
+                  ? t("uploading", lang)
+                  : posting
+                    ? t("saving", lang)
+                    : t("post", lang)}
             </button>
           </div>
         )}

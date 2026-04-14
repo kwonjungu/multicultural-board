@@ -1,12 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ref, onValue, off } from "firebase/database";
+import { ref, onValue, off, set, remove } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES } from "@/lib/constants";
 import { CardData, UserConfig, PostData } from "@/lib/types";
+import { t } from "@/lib/i18n";
 import PadletCard from "./PadletCard";
 import PostModal from "./PostModal";
+
+interface FirebaseColumn {
+  id: string;
+  title: string;
+  color: string;
+  order: number;
+}
 
 interface Props {
   user: UserConfig;
@@ -14,19 +22,57 @@ interface Props {
   onLogout: () => void;
 }
 
+const COL_COLORS = [
+  "#6C63FF", "#FF6584", "#43C59E", "#F59E0B", "#3B82F6",
+  "#8B5CF6", "#EC4899", "#14B8A6", "#F97316", "#10B981",
+];
+
 export default function PadletBoard({ user, roomCode, onLogout }: Props) {
   const [cards, setCards] = useState<CardData[]>([]);
+  const [columns, setColumns] = useState<FirebaseColumn[]>([]);
   const [modal, setModal] = useState<{ colId: string } | null>(null);
   const [posting, setPosting] = useState(false);
+  const lang = user.myLang;
 
-  // Teacher upgrade state
+  // Teacher state
   const [isTeacher, setIsTeacher] = useState(false);
   const [teacherLangs] = useState(["ko", "en", "vi", "zh", "fil"]);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState(false);
 
-  const viewerLang = user.myLang;
+  // Management modal state
+  const [showManage, setShowManage] = useState(false);
+  const [editTitle, setEditTitle] = useState<Record<string, string>>({});
+  const [newColTitle, setNewColTitle] = useState("");
+  const [newColColor, setNewColColor] = useState(COL_COLORS[0]);
+
+  // ── Firebase: rooms/${roomCode}/columns ──
+  useEffect(() => {
+    const db = getClientDb();
+    const colsRef = ref(db, `rooms/${roomCode}/columns`);
+    onValue(colsRef, (snap) => {
+      const data = snap.val();
+      if (!data) {
+        const defaults: Record<string, Omit<FirebaseColumn, "id">> = {};
+        COLUMNS_DEFAULT.forEach((col, i) => {
+          defaults[col.id] = { title: col.title, color: col.color, order: i };
+        });
+        set(colsRef, defaults);
+      } else {
+        const list: FirebaseColumn[] = Object.entries(data).map(([id, val]) => ({
+          id,
+          ...(val as Omit<FirebaseColumn, "id">),
+        }));
+        list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        setColumns(list);
+        const initEdit: Record<string, string> = {};
+        list.forEach((c) => { initEdit[c.id] = c.title; });
+        setEditTitle(initEdit);
+      }
+    });
+    return () => off(colsRef);
+  }, [roomCode]);
 
   // ── Firebase: rooms/${roomCode}/cards ──
   useEffect(() => {
@@ -42,7 +88,6 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
     return () => off(cardsRef);
   }, [roomCode]);
 
-  // Teacher auth
   function handleTeacherAuth() {
     if (pwInput === roomCode) {
       setIsTeacher(true);
@@ -52,6 +97,50 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
     } else {
       setPwError(true);
     }
+  }
+
+  // ── Column management ──
+  function saveColTitle(colId: string) {
+    const title = editTitle[colId]?.trim();
+    if (!title) return;
+    const db = getClientDb();
+    set(ref(db, `rooms/${roomCode}/columns/${colId}/title`), title);
+  }
+
+  function changeColColor(colId: string, color: string) {
+    const db = getClientDb();
+    set(ref(db, `rooms/${roomCode}/columns/${colId}/color`), color);
+  }
+
+  function deleteCol(colId: string) {
+    if (!confirm("이 컬럼을 삭제할까요?\n컬럼 안의 카드들은 숨겨집니다.")) return;
+    const db = getClientDb();
+    remove(ref(db, `rooms/${roomCode}/columns/${colId}`));
+  }
+
+  function moveCol(colId: string, direction: "up" | "down") {
+    const idx = columns.findIndex((c) => c.id === colId);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= columns.length) return;
+    const db = getClientDb();
+    const myOrder = columns[idx].order;
+    const theirOrder = columns[swapIdx].order;
+    set(ref(db, `rooms/${roomCode}/columns/${colId}/order`), theirOrder);
+    set(ref(db, `rooms/${roomCode}/columns/${columns[swapIdx].id}/order`), myOrder);
+  }
+
+  function addColumn() {
+    if (!newColTitle.trim()) return;
+    const db = getClientDb();
+    const newId = `col_${Date.now()}`;
+    const maxOrder = columns.length > 0 ? Math.max(...columns.map((c) => c.order)) : -1;
+    set(ref(db, `rooms/${roomCode}/columns/${newId}`), {
+      title: newColTitle.trim(),
+      color: newColColor,
+      order: maxOrder + 1,
+    });
+    setNewColTitle("");
+    setNewColColor(COL_COLORS[0]);
   }
 
   const handlePost = useCallback(async (data: PostData) => {
@@ -156,12 +245,12 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
             <span style={{ color: "#E5E7EB", fontWeight: 700, fontSize: 13 }}>{user.myName}</span>
             {isTeacher && (
               <span style={{ fontSize: 9, background: "#5B57F5", color: "#fff", borderRadius: 8, padding: "1px 7px", fontWeight: 700 }}>
-                선생님
+                {t("teacherTag", lang)}
               </span>
             )}
           </div>
 
-          {/* Teacher button (if not already teacher) */}
+          {/* Teacher mode button */}
           {!isTeacher && (
             <button
               onClick={() => { setShowTeacherModal(true); setPwInput(""); setPwError(false); }}
@@ -173,7 +262,29 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#E5E7EB"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF"; }}
             >
-              👩‍🏫 선생님
+              {t("teacherBtn", lang)}
+            </button>
+          )}
+
+          {/* Manage button (teacher only) */}
+          {isTeacher && (
+            <button
+              onClick={() => setShowManage(true)}
+              style={{
+                background: "rgba(91,87,245,0.2)", border: "1px solid rgba(91,87,245,0.4)",
+                color: "#A5B4FC", borderRadius: 10, padding: "6px 14px",
+                fontSize: 12, cursor: "pointer", fontWeight: 700, transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.35)";
+                (e.currentTarget as HTMLButtonElement).style.color = "#fff";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.2)";
+                (e.currentTarget as HTMLButtonElement).style.color = "#A5B4FC";
+              }}
+            >
+              {t("manage", lang)}
             </button>
           )}
 
@@ -187,7 +298,7 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#6B7280"; }}
           >
-            ⚙ 설정
+            {t("settings", lang)}
           </button>
         </div>
       </header>
@@ -198,7 +309,7 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
         display: "flex", gap: 14, padding: "16px 18px",
         alignItems: "flex-start",
       }}>
-        {COLUMNS_DEFAULT.map((col) => {
+        {columns.map((col) => {
           const colCards = cards.filter((c) => c.colId === col.id);
           return (
             <div key={col.id} style={{
@@ -222,12 +333,12 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
                 {colCards.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "40px 16px", color: "#CBD5E1" }}>
                     <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.5 }}>✏️</div>
-                    <div style={{ fontWeight: 600, color: "#9CA3AF", fontSize: 12 }}>아직 게시물이 없어요</div>
-                    <div style={{ fontSize: 11, marginTop: 4 }}>아래 버튼으로 추가해보세요</div>
+                    <div style={{ fontWeight: 600, color: "#9CA3AF", fontSize: 12 }}>{t("noPosts", lang)}</div>
+                    <div style={{ fontSize: 11, marginTop: 4 }}>{t("addBelowHint", lang)}</div>
                   </div>
                 ) : (
                   colCards.map((card) => (
-                    <PadletCard key={card.id} card={card} viewerLang={viewerLang} colColor={col.color} />
+                    <PadletCard key={card.id} card={card} viewerLang={lang} colColor={col.color} />
                   ))
                 )}
               </div>
@@ -243,26 +354,11 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
                 onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = col.color + "0D")}
                 onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#fff")}
               >
-                <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span> 여기에 추가
+                <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span> {t("addHere", lang)}
               </button>
             </div>
           );
         })}
-
-        {isTeacher && (
-          <div style={{
-            width: 240, flexShrink: 0, height: 112,
-            border: "2px dashed #D1D5E0", borderRadius: 14,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#9CA3AF", fontSize: 13, fontWeight: 700, cursor: "pointer",
-            transition: "all 0.2s",
-          }}
-            onMouseEnter={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.background = "rgba(91,87,245,0.04)"; el.style.borderColor = "#5B57F5"; el.style.color = "#5B57F5"; }}
-            onMouseLeave={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.background = "transparent"; el.style.borderColor = "#D1D5E0"; el.style.color = "#9CA3AF"; }}
-          >
-            + 컬럼 추가
-          </div>
-        )}
       </main>
 
       {/* ── Teacher auth modal ── */}
@@ -282,7 +378,6 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
             <div style={{ fontSize: 36, marginBottom: 12 }}>👩‍🏫</div>
             <h3 style={{ margin: "0 0 6px", fontWeight: 900, fontSize: 18, color: "#111827" }}>선생님 모드</h3>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6B7280" }}>이 방의 비밀번호를 입력하세요</p>
-
             <input
               type="password"
               value={pwInput}
@@ -304,24 +399,200 @@ export default function PadletBoard({ user, roomCode, onLogout }: Props) {
                 비밀번호가 틀렸습니다
               </p>
             )}
-
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button onClick={() => setShowTeacherModal(false)} style={{ flex: 1, padding: "11px 0", borderRadius: 12, fontSize: 14, background: "#F3F4F6", color: "#6B7280", fontWeight: 700, border: "none", cursor: "pointer" }}>취소</button>
+              <button onClick={handleTeacherAuth} style={{ flex: 1, padding: "11px 0", borderRadius: 12, fontSize: 14, background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(91,87,245,0.4)" }}>확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Management modal ── */}
+      {showManage && isTeacher && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(9,7,30,0.8)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 400, backdropFilter: "blur(8px)", padding: 20,
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowManage(false); }}
+        >
+          <div style={{
+            background: "#fff", borderRadius: 24, width: "100%", maxWidth: 520,
+            maxHeight: "88vh", overflowY: "auto",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
+            animation: "fadeSlideIn 0.25s ease",
+          }}>
+            {/* Modal header */}
+            <div style={{
+              display: "flex", alignItems: "center", padding: "20px 24px 16px",
+              borderBottom: "1px solid #F3F4F8", position: "sticky", top: 0, background: "#fff", zIndex: 1,
+            }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🛠 관리 패널</div>
+                <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>Room {roomCode}</div>
+              </div>
               <button
-                onClick={() => setShowTeacherModal(false)}
+                onClick={() => setShowManage(false)}
                 style={{
-                  flex: 1, padding: "11px 0", borderRadius: 12, fontSize: 14,
-                  background: "#F3F4F6", color: "#6B7280", fontWeight: 700, border: "none", cursor: "pointer",
+                  marginLeft: "auto", background: "#F3F4F6", border: "none", borderRadius: "50%",
+                  width: 32, height: 32, fontSize: 14, cursor: "pointer", color: "#6B7280",
+                  display: "flex", alignItems: "center", justifyContent: "center",
                 }}
-              >취소</button>
-              <button
-                onClick={handleTeacherAuth}
-                style={{
-                  flex: 1, padding: "11px 0", borderRadius: 12, fontSize: 14,
-                  background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
-                  color: "#fff", fontWeight: 800, border: "none", cursor: "pointer",
-                  boxShadow: "0 4px 16px rgba(91,87,245,0.4)",
-                }}
-              >확인</button>
+              >✕</button>
+            </div>
+
+            <div style={{ padding: "20px 24px 28px" }}>
+              {/* Section: Column management */}
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 12 }}>
+                컬럼 관리
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                {columns.map((col, idx) => (
+                  <div key={col.id} style={{
+                    background: "#F8F9FC", borderRadius: 14, padding: "12px 14px",
+                    border: "1px solid #E9ECF5",
+                  }}>
+                    {/* Row 1: order controls + title */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      {/* Move buttons */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+                        <button
+                          onClick={() => moveCol(col.id, "up")}
+                          disabled={idx === 0}
+                          style={{
+                            width: 22, height: 22, borderRadius: 6, border: "1px solid #E5E7EB",
+                            background: idx === 0 ? "#F9FAFB" : "#fff", cursor: idx === 0 ? "default" : "pointer",
+                            fontSize: 10, color: idx === 0 ? "#D1D5DB" : "#6B7280",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >▲</button>
+                        <button
+                          onClick={() => moveCol(col.id, "down")}
+                          disabled={idx === columns.length - 1}
+                          style={{
+                            width: 22, height: 22, borderRadius: 6, border: "1px solid #E5E7EB",
+                            background: idx === columns.length - 1 ? "#F9FAFB" : "#fff",
+                            cursor: idx === columns.length - 1 ? "default" : "pointer",
+                            fontSize: 10, color: idx === columns.length - 1 ? "#D1D5DB" : "#6B7280",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >▼</button>
+                      </div>
+
+                      {/* Color dot */}
+                      <div style={{
+                        width: 12, height: 12, borderRadius: "50%", background: col.color,
+                        flexShrink: 0, boxShadow: `0 0 0 3px ${col.color}33`,
+                      }} />
+
+                      {/* Title input */}
+                      <input
+                        value={editTitle[col.id] ?? col.title}
+                        onChange={(e) => setEditTitle((prev) => ({ ...prev, [col.id]: e.target.value }))}
+                        onBlur={() => saveColTitle(col.id)}
+                        onKeyDown={(e) => e.key === "Enter" && saveColTitle(col.id)}
+                        style={{
+                          flex: 1, padding: "7px 10px", borderRadius: 9,
+                          border: "1.5px solid #E5E7EB", fontSize: 13, fontWeight: 700,
+                          color: "#111827", background: "#fff", outline: "none",
+                        }}
+                        onFocus={(e) => (e.target.style.borderColor = col.color)}
+                        onBlurCapture={(e) => (e.target.style.borderColor = "#E5E7EB")}
+                      />
+
+                      {/* Delete */}
+                      <button
+                        onClick={() => deleteCol(col.id)}
+                        style={{
+                          width: 30, height: 30, borderRadius: 8, border: "none",
+                          background: "#FEF2F2", color: "#EF4444", cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+                          flexShrink: 0,
+                        }}
+                        title="컬럼 삭제"
+                      >🗑</button>
+                    </div>
+
+                    {/* Row 2: color swatches */}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingLeft: 30 }}>
+                      {COL_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => changeColColor(col.id, color)}
+                          style={{
+                            width: 22, height: 22, borderRadius: "50%", background: color, border: "none",
+                            cursor: "pointer", transition: "transform 0.12s",
+                            outline: col.color === color ? `3px solid ${color}` : "none",
+                            outlineOffset: 2,
+                            transform: col.color === color ? "scale(1.2)" : "scale(1)",
+                          }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add column */}
+              <div style={{
+                borderTop: "1px dashed #E5E7EB", paddingTop: 18,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 10 }}>
+                  새 컬럼 추가
+                </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                  <input
+                    value={newColTitle}
+                    onChange={(e) => setNewColTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addColumn()}
+                    placeholder="컬럼 이름 입력..."
+                    style={{
+                      flex: 1, padding: "10px 14px", borderRadius: 11,
+                      border: "1.5px solid #E5E7EB", fontSize: 14, color: "#111827",
+                      background: "#F9FAFB", outline: "none",
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5B57F5";
+                      e.target.style.background = "#fff";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#E5E7EB";
+                      e.target.style.background = "#F9FAFB";
+                    }}
+                  />
+                  <button
+                    onClick={addColumn}
+                    disabled={!newColTitle.trim()}
+                    style={{
+                      padding: "10px 18px", borderRadius: 11, border: "none",
+                      background: newColTitle.trim() ? "linear-gradient(135deg, #5B57F5, #8B5CF6)" : "#F3F4F6",
+                      color: newColTitle.trim() ? "#fff" : "#D1D5DB",
+                      fontWeight: 800, fontSize: 13, cursor: newColTitle.trim() ? "pointer" : "not-allowed",
+                      boxShadow: newColTitle.trim() ? "0 4px 14px rgba(91,87,245,0.35)" : "none",
+                      whiteSpace: "nowrap",
+                    }}
+                  >+ 추가</button>
+                </div>
+
+                {/* New col color picker */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {COL_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setNewColColor(color)}
+                      style={{
+                        width: 26, height: 26, borderRadius: "50%", background: color, border: "none",
+                        cursor: "pointer", transition: "transform 0.12s",
+                        outline: newColColor === color ? `3px solid ${color}` : "none",
+                        outlineOffset: 2,
+                        transform: newColColor === color ? "scale(1.2)" : "scale(1)",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
