@@ -4,14 +4,17 @@ import { useState } from "react";
 import { CardData } from "@/lib/types";
 import { LANGUAGES, CARD_PALETTES } from "@/lib/constants";
 
+const TTS_LANG_MAP: Record<string, string> = {
+  ko: "ko-KR", en: "en-US", vi: "vi-VN", zh: "zh-CN", fil: "fil-PH",
+  ja: "ja-JP", th: "th-TH", km: "km-KH", mn: "mn-MN", ru: "ru-RU",
+  uz: "uz-UZ", hi: "hi-IN", id: "id-ID", ar: "ar-SA", my: "my-MM",
+};
+
 function speakText(text: string, lang: string) {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  const map: Record<string, string> = {
-    ko: "ko-KR", en: "en-US", vi: "vi-VN", zh: "zh-CN", fil: "fil-PH",
-  };
-  u.lang = map[lang] || "en-US";
+  u.lang = TTS_LANG_MAP[lang] || "en-US";
   window.speechSynthesis.speak(u);
 }
 
@@ -28,8 +31,7 @@ function LangBadge({ lang, text, accent }: { lang: string; text: string; accent:
       <span style={{
         flexShrink: 0, fontSize: 11, fontWeight: 700,
         background: accent + "22", color: accent,
-        borderRadius: 12, padding: "2px 8px", lineHeight: "18px",
-        whiteSpace: "nowrap",
+        borderRadius: 12, padding: "2px 8px", lineHeight: "18px", whiteSpace: "nowrap",
       }}>
         {LANGUAGES[lang]?.flag} {LANGUAGES[lang]?.label}
       </span>
@@ -38,9 +40,7 @@ function LangBadge({ lang, text, accent }: { lang: string; text: string; accent:
         onClick={() => speakText(text, lang)}
         style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, opacity: 0.4, flexShrink: 0, padding: 0 }}
         title="읽어주기"
-      >
-        🔊
-      </button>
+      >🔊</button>
     </div>
   );
 }
@@ -54,6 +54,9 @@ interface Props {
 export default function PadletCard({ card, viewerLang, colColor }: Props) {
   const p = CARD_PALETTES[card.paletteIdx % CARD_PALETTES.length];
   const [open, setOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  const cardType = card.cardType || "text";
 
   const otherLangs = Object.keys(card.translations || {}).filter(
     (l) => l !== card.authorLang && l !== viewerLang
@@ -66,7 +69,6 @@ export default function PadletCard({ card, viewerLang, colColor }: Props) {
         boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
         marginBottom: 10, position: "relative",
         transition: "box-shadow 0.18s, transform 0.18s",
-        cursor: "default",
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 22px rgba(0,0,0,0.13)";
@@ -85,22 +87,20 @@ export default function PadletCard({ card, viewerLang, colColor }: Props) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
           <div style={{
             width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-            background: p.dot, display: "flex", alignItems: "center",
-            justifyContent: "center", fontSize: 14,
+            background: p.dot, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
           }}>
             {card.isTeacher ? "👩‍🏫" : LANGUAGES[card.authorLang]?.flag}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontWeight: 700, fontSize: 13, color: "#1a1a1a",
-              display: "flex", alignItems: "center", gap: 5,
-            }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "#1a1a1a", display: "flex", alignItems: "center", gap: 5 }}>
               {card.authorName}
               {card.isTeacher && (
-                <span style={{
-                  fontSize: 9, background: p.dot, color: "#fff",
-                  borderRadius: 8, padding: "1px 6px",
-                }}>선생님</span>
+                <span style={{ fontSize: 9, background: p.dot, color: "#fff", borderRadius: 8, padding: "1px 6px" }}>선생님</span>
+              )}
+              {cardType !== "text" && (
+                <span style={{ fontSize: 9, background: "#f0f0f0", color: "#888", borderRadius: 8, padding: "1px 6px" }}>
+                  {cardType === "image" ? "🖼️" : cardType === "youtube" ? "📺" : "✏️"}
+                </span>
               )}
             </div>
             <div style={{ fontSize: 10, color: "#bbb" }}>
@@ -108,64 +108,87 @@ export default function PadletCard({ card, viewerLang, colColor }: Props) {
             </div>
           </div>
           {card.flagged && (
-            <span style={{
-              fontSize: 10, background: "#FFEBEE", color: "#C62828",
-              borderRadius: 8, padding: "2px 6px", border: "1px solid #FFCDD2",
-            }}>
+            <span style={{ fontSize: 10, background: "#FFEBEE", color: "#C62828", borderRadius: 8, padding: "2px 6px", border: "1px solid #FFCDD2" }}>
               ⚠️ 검토
             </span>
           )}
         </div>
 
-        {/* 원문 */}
-        <div style={{
-          fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.65,
-          background: "rgba(255,255,255,0.6)", borderRadius: 10,
-          padding: "8px 10px", display: "flex", gap: 6, alignItems: "flex-start",
-        }}>
-          <span style={{ flex: 1 }}>{card.originalText}</span>
-          <button
-            onClick={() => speakText(card.originalText, card.authorLang)}
-            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, opacity: 0.4, flexShrink: 0, padding: 0 }}
-          >
-            🔊
-          </button>
-        </div>
+        {/* ── 사진 / 그림 카드 ── */}
+        {(cardType === "image" || cardType === "drawing") && card.imageUrl && !imgError && (
+          <img
+            src={card.imageUrl}
+            alt={cardType === "drawing" ? "그림" : "사진"}
+            onError={() => setImgError(true)}
+            style={{ width: "100%", borderRadius: 10, marginBottom: 4, display: "block" }}
+          />
+        )}
+        {(cardType === "image" || cardType === "drawing") && imgError && (
+          <div style={{ padding: "20px 0", textAlign: "center", color: "#ccc", fontSize: 12 }}>이미지를 불러올 수 없습니다</div>
+        )}
 
-        {/* 로딩 */}
-        {card.loading && (
-          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#bbb", marginTop: 8 }}>
-            <span style={{ display: "inline-block", animation: "spin 0.9s linear infinite", fontSize: 13 }}>⟳</span>
-            번역 중...
+        {/* ── YouTube 카드 ── */}
+        {cardType === "youtube" && card.youtubeId && (
+          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 10, overflow: "hidden", marginBottom: 4 }}>
+            <iframe
+              src={`https://www.youtube.com/embed/${card.youtubeId}`}
+              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title="YouTube video"
+            />
           </div>
         )}
 
-        {/* 내 언어 번역 우선 노출 */}
-        {!card.loading && card.translations?.[viewerLang] && viewerLang !== card.authorLang && (
-          <LangBadge lang={viewerLang} text={card.translations[viewerLang]} accent={colColor} />
-        )}
-
-        {/* 번역 오류 */}
-        {card.translateError && (
-          <div style={{ fontSize: 11, color: "#E65100", marginTop: 6 }}>⚠️ 번역 실패</div>
-        )}
-
-        {/* 다른 언어 펼치기 */}
-        {otherLangs.length > 0 && (
+        {/* ── 텍스트 카드 ── */}
+        {cardType === "text" && (
           <>
-            <button
-              onClick={() => setOpen((v) => !v)}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                fontSize: 11, color: p.dot, fontWeight: 700, marginTop: 7, padding: 0,
-              }}
-            >
-              {open ? "▲ 접기" : `▼ +${otherLangs.length}개 언어`}
-            </button>
-            {open && otherLangs.map((l) =>
-              card.translations[l] ? (
-                <LangBadge key={l} lang={l} text={card.translations[l]} accent={p.dot} />
-              ) : null
+            {/* 원문 */}
+            <div style={{
+              fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.65,
+              background: "rgba(255,255,255,0.6)", borderRadius: 10,
+              padding: "8px 10px", display: "flex", gap: 6, alignItems: "flex-start",
+            }}>
+              <span style={{ flex: 1 }}>{card.originalText}</span>
+              <button
+                onClick={() => speakText(card.originalText, card.authorLang)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, opacity: 0.4, flexShrink: 0, padding: 0 }}
+              >🔊</button>
+            </div>
+
+            {/* 로딩 */}
+            {card.loading && (
+              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#bbb", marginTop: 8 }}>
+                <span style={{ display: "inline-block", animation: "spin 0.9s linear infinite", fontSize: 13 }}>⟳</span>
+                번역 중...
+              </div>
+            )}
+
+            {/* 내 언어 번역 우선 노출 */}
+            {!card.loading && card.translations?.[viewerLang] && viewerLang !== card.authorLang && (
+              <LangBadge lang={viewerLang} text={card.translations[viewerLang]} accent={colColor} />
+            )}
+
+            {/* 번역 오류 */}
+            {card.translateError && (
+              <div style={{ fontSize: 11, color: "#E65100", marginTop: 6 }}>⚠️ 번역 실패</div>
+            )}
+
+            {/* 다른 언어 펼치기 */}
+            {otherLangs.length > 0 && (
+              <>
+                <button
+                  onClick={() => setOpen((v) => !v)}
+                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: p.dot, fontWeight: 700, marginTop: 7, padding: 0 }}
+                >
+                  {open ? "▲ 접기" : `▼ +${otherLangs.length}개 언어`}
+                </button>
+                {open && otherLangs.map((l) =>
+                  card.translations[l] ? (
+                    <LangBadge key={l} lang={l} text={card.translations[l]} accent={p.dot} />
+                  ) : null
+                )}
+              </>
             )}
           </>
         )}

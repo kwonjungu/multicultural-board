@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ref, onValue, off } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES } from "@/lib/constants";
-import { CardData, UserConfig } from "@/lib/types";
+import { CardData, UserConfig, PostData } from "@/lib/types";
 import PadletCard from "./PadletCard";
 import PostModal from "./PostModal";
 
@@ -23,33 +23,37 @@ export default function PadletBoard({ user, onLogout }: Props) {
   useEffect(() => {
     const db = getClientDb();
     const cardsRef = ref(db, "cards");
-
     onValue(cardsRef, (snapshot) => {
       const data = snapshot.val();
       if (!data) { setCards([]); return; }
       const list: CardData[] = Object.values(data);
-      // 최신순 정렬
       list.sort((a, b) => b.timestamp - a.timestamp);
       setCards(list);
     });
-
     return () => off(cardsRef);
   }, []);
 
   // ── 게시 처리 ──
-  const handlePost = useCallback(async (text: string, writeLang: string) => {
-    if (!text.trim() || posting || !modal) return;
+  const handlePost = useCallback(async (data: PostData) => {
+    if (posting || !modal) return;
+    const { cardType, text, writeLang, imageUrl, youtubeId } = data;
+
+    if (cardType === "text" && !text.trim()) return;
+
     setPosting(true);
 
-    const targetLangs = user.isTeacher
-      ? user.teacherLangs.filter((l) => l !== writeLang)
-      : ["ko", "en"].filter((l) => l !== writeLang);
+    const targetLangs =
+      cardType === "text"
+        ? user.isTeacher
+          ? user.teacherLangs.filter((l) => l !== writeLang)
+          : ["ko", "en"].filter((l) => l !== writeLang)
+        : [];
 
-    // 낙관적 업데이트: 로컬에 임시 카드 추가
     const tempId = `temp_${Date.now()}`;
     const tempCard: CardData = {
       id: tempId,
       colId: modal.colId,
+      cardType,
       authorLang: writeLang,
       authorName: user.myName,
       isTeacher: user.isTeacher,
@@ -57,8 +61,10 @@ export default function PadletBoard({ user, onLogout }: Props) {
       translations: { [writeLang]: text },
       paletteIdx: Math.floor(Math.random() * CARD_PALETTES.length),
       timestamp: Date.now(),
-      loading: true,
+      loading: cardType === "text",
       flagged: false,
+      imageUrl,
+      youtubeId,
     };
     setCards((prev) => [tempCard, ...prev]);
     setModal(null);
@@ -75,16 +81,14 @@ export default function PadletBoard({ user, onLogout }: Props) {
           authorName: user.myName,
           isTeacher: user.isTeacher,
           paletteIdx: tempCard.paletteIdx,
+          cardType,
+          imageUrl,
+          youtubeId,
         }),
       });
-
       if (!res.ok) throw new Error("API 오류");
-
-      // 성공 시 Firebase에 저장됐으니 임시 카드만 제거
-      // (onValue 구독이 실제 데이터 받아서 자동 갱신됨)
       setCards((prev) => prev.filter((c) => c.id !== tempId));
     } catch {
-      // 실패 시 임시 카드에 오류 표시
       setCards((prev) =>
         prev.map((c) =>
           c.id === tempId ? { ...c, loading: false, translateError: true } : c
@@ -109,49 +113,31 @@ export default function PadletBoard({ user, onLogout }: Props) {
         display: "flex", alignItems: "center", gap: 14, padding: "0 20px",
       }}>
         <span style={{ fontSize: 22 }}>🌏</span>
-        <span style={{ fontWeight: 900, fontSize: 15, color: "#fff" }}>
-          다문화 교실 소통판
-        </span>
+        <span style={{ fontWeight: 900, fontSize: 15, color: "#fff" }}>다문화 교실 소통판</span>
         <span style={{ fontSize: 11, color: "#7986CB" }}>Multicultural Board</span>
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          {/* 내 정보 뱃지 */}
           <div style={{
             background: "#6C63FF22", border: "1px solid #6C63FF66",
             borderRadius: 20, padding: "4px 14px",
             display: "flex", alignItems: "center", gap: 6,
           }}>
-            <span style={{ fontSize: 14 }}>
-              {user.isTeacher ? "👩‍🏫" : LANGUAGES[user.myLang]?.flag}
-            </span>
-            <span style={{ color: "#C5CAE9", fontWeight: 700, fontSize: 13 }}>
-              {user.myName}
-            </span>
+            <span style={{ fontSize: 14 }}>{user.isTeacher ? "👩‍🏫" : LANGUAGES[user.myLang]?.flag}</span>
+            <span style={{ color: "#C5CAE9", fontWeight: 700, fontSize: 13 }}>{user.myName}</span>
             {user.isTeacher && (
-              <span style={{
-                fontSize: 10, background: "#6C63FF", color: "#fff",
-                borderRadius: 10, padding: "1px 7px",
-              }}>선생님</span>
+              <span style={{ fontSize: 10, background: "#6C63FF", color: "#fff", borderRadius: 10, padding: "1px 7px" }}>선생님</span>
             )}
           </div>
 
-          {/* 활성 언어 */}
           {(user.isTeacher ? user.teacherLangs : [user.myLang]).map((l) => (
-            <span key={l} style={{
-              background: "rgba(255,255,255,0.07)", color: "#9FA8DA",
-              borderRadius: 16, fontSize: 12, padding: "3px 10px",
-            }}>
+            <span key={l} style={{ background: "rgba(255,255,255,0.07)", color: "#9FA8DA", borderRadius: 16, fontSize: 12, padding: "3px 10px" }}>
               {LANGUAGES[l]?.flag}
             </span>
           ))}
 
           <button
             onClick={onLogout}
-            style={{
-              background: "none", border: "1px solid rgba(255,255,255,0.15)",
-              color: "#7986CB", borderRadius: 20, padding: "4px 12px",
-              fontSize: 11, cursor: "pointer",
-            }}
+            style={{ background: "none", border: "1px solid rgba(255,255,255,0.15)", color: "#7986CB", borderRadius: 20, padding: "4px 12px", fontSize: 11, cursor: "pointer" }}
           >
             ⚙ 설정
           </button>
@@ -171,64 +157,36 @@ export default function PadletBoard({ user, onLogout }: Props) {
               key={col.id}
               style={{
                 width: 292, flexShrink: 0, display: "flex", flexDirection: "column",
-                height: "calc(100vh - 70px)",
-                borderRadius: 16, overflow: "hidden",
+                height: "calc(100vh - 70px)", borderRadius: 16, overflow: "hidden",
                 boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
               }}
             >
-              {/* 컬럼 헤더 */}
-              <div style={{
-                background: col.color, padding: "14px 16px",
-                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
-              }}>
-                <span style={{ flex: 1, fontWeight: 800, fontSize: 13, color: "#fff", lineHeight: 1.35 }}>
-                  {col.title}
-                </span>
-                <span style={{
-                  background: "rgba(255,255,255,0.22)", color: "#fff",
-                  borderRadius: 20, fontSize: 12, fontWeight: 800,
-                  padding: "2px 10px", minWidth: 28, textAlign: "center",
-                }}>
+              <div style={{ background: col.color, padding: "14px 16px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <span style={{ flex: 1, fontWeight: 800, fontSize: 13, color: "#fff", lineHeight: 1.35 }}>{col.title}</span>
+                <span style={{ background: "rgba(255,255,255,0.22)", color: "#fff", borderRadius: 20, fontSize: 12, fontWeight: 800, padding: "2px 10px", minWidth: 28, textAlign: "center" }}>
                   {colCards.length}
                 </span>
               </div>
 
-              {/* 카드 목록 */}
-              <div style={{
-                flex: 1, overflowY: "auto", background: "#ECEEF7",
-                padding: "12px 10px 4px",
-                scrollbarWidth: "thin", scrollbarColor: "#C5CAE9 transparent",
-              }}>
+              <div style={{ flex: 1, overflowY: "auto", background: "#ECEEF7", padding: "12px 10px 4px", scrollbarWidth: "thin", scrollbarColor: "#C5CAE9 transparent" }}>
                 {colCards.length === 0 ? (
-                  <div style={{
-                    textAlign: "center", color: "#c0c4d6",
-                    padding: "36px 16px", fontSize: 13, lineHeight: 2,
-                  }}>
+                  <div style={{ textAlign: "center", color: "#c0c4d6", padding: "36px 16px", fontSize: 13, lineHeight: 2 }}>
                     <div style={{ fontSize: 30, marginBottom: 8 }}>✏️</div>
                     아직 게시물이 없어요<br />아래 버튼으로 추가해보세요!
                   </div>
                 ) : (
                   colCards.map((card) => (
-                    <PadletCard
-                      key={card.id}
-                      card={card}
-                      viewerLang={viewerLang}
-                      colColor={col.color}
-                    />
+                    <PadletCard key={card.id} card={card} viewerLang={viewerLang} colColor={col.color} />
                   ))
                 )}
               </div>
 
-              {/* 하단 추가 버튼 */}
               <button
                 onClick={() => setModal({ colId: col.id })}
                 style={{
-                  flexShrink: 0, display: "flex", alignItems: "center",
-                  justifyContent: "center", gap: 6,
-                  background: "#fff", border: "none",
-                  borderTop: `3px solid ${col.color}22`,
-                  padding: "13px 0", cursor: "pointer",
-                  color: col.color, fontWeight: 800, fontSize: 13,
+                  flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  background: "#fff", border: "none", borderTop: `3px solid ${col.color}22`,
+                  padding: "13px 0", cursor: "pointer", color: col.color, fontWeight: 800, fontSize: 13,
                   transition: "background 0.15s",
                 }}
                 onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = col.color + "12")}
@@ -240,7 +198,6 @@ export default function PadletBoard({ user, onLogout }: Props) {
           );
         })}
 
-        {/* 컬럼 추가 (교사 전용) */}
         {user.isTeacher && (
           <div style={{
             width: 240, flexShrink: 0, height: 110,
@@ -267,7 +224,6 @@ export default function PadletBoard({ user, onLogout }: Props) {
         )}
       </main>
 
-      {/* ── 입력 모달 ── */}
       {modal && (
         <PostModal
           colId={modal.colId}

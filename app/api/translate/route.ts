@@ -4,27 +4,41 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { LANGUAGES } from "@/lib/constants";
 import { TranslateRequest } from "@/lib/types";
 
-// Grok API는 OpenAI 호환 클라이언트로 사용 가능
-const grok = new OpenAI({
-  apiKey: process.env.XAI_API_KEY,
-  baseURL: "https://api.x.ai/v1",
+// Groq API (LLaMA 3.3 70B, 무료)
+const groq = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
 });
 
 export async function POST(req: NextRequest) {
   try {
     const body: TranslateRequest = await req.json();
-    const { text, fromLang, targetLangs, colId, authorName, isTeacher, paletteIdx } = body;
+    const {
+      text,
+      fromLang,
+      targetLangs,
+      colId,
+      authorName,
+      isTeacher,
+      paletteIdx,
+      cardType = "text",
+      imageUrl,
+      youtubeId,
+    } = body;
 
-    if (!text || !fromLang || !colId) {
+    if (!fromLang || !colId) {
+      return NextResponse.json({ error: "필수 파라미터 누락" }, { status: 400 });
+    }
+    if (cardType === "text" && !text) {
       return NextResponse.json({ error: "필수 파라미터 누락" }, { status: 400 });
     }
 
-    // ── 1. Grok API: 번역 + 유해 콘텐츠 필터링 ──────────────
+    // ── 1. 텍스트 카드만 번역 + 안전 검사 ──────────────────────
     let translations: Record<string, string> = { [fromLang]: text };
     let safe = true;
     let reason = "";
 
-    if (targetLangs && targetLangs.length > 0) {
+    if (cardType === "text" && targetLangs && targetLangs.length > 0) {
       const prompt = `You are a translation and content safety assistant for a multicultural elementary classroom in Korea.
 
 Input text (${LANGUAGES[fromLang]?.name}): "${text}"
@@ -36,8 +50,8 @@ Tasks:
 Respond ONLY with raw JSON (no markdown, no explanation):
 {"translations":{${targetLangs.map((l) => `"${l}":""`).join(",")}},"safe":true,"reason":""}`;
 
-      const completion = await grok.chat.completions.create({
-        model: "grok-3-mini",
+      const completion = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 800,
         temperature: 0.3,
@@ -53,8 +67,7 @@ Respond ONLY with raw JSON (no markdown, no explanation):
         safe = parsed.safe ?? true;
         reason = parsed.reason ?? "";
       } catch {
-        // JSON 파싱 실패 시 원문만 저장
-        console.error("Grok 응답 파싱 실패:", raw);
+        console.error("LLaMA 응답 파싱 실패:", raw);
       }
     }
 
@@ -66,31 +79,26 @@ Respond ONLY with raw JSON (no markdown, no explanation):
     const cardData = {
       id: cardId,
       colId,
+      cardType,
       authorLang: fromLang,
       authorName,
       isTeacher,
-      originalText: text,
+      originalText: text || "",
       translations,
       paletteIdx,
       timestamp: Date.now(),
       flagged: !safe,
       flagReason: reason,
       loading: false,
+      ...(imageUrl ? { imageUrl } : {}),
+      ...(youtubeId ? { youtubeId } : {}),
     };
 
     await cardRef.set(cardData);
 
-    return NextResponse.json({
-      id: cardId,
-      translations,
-      safe,
-      reason,
-    });
+    return NextResponse.json({ id: cardId, translations, safe, reason });
   } catch (err) {
     console.error("번역 API 오류:", err);
-    return NextResponse.json(
-      { error: "서버 오류가 발생했습니다" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });
   }
 }

@@ -1,9 +1,19 @@
 export const LANGUAGES: Record<string, { label: string; flag: string; name: string }> = {
-  ko: { label: "한국어", flag: "🇰🇷", name: "Korean" },
-  en: { label: "English", flag: "🇺🇸", name: "English" },
-  vi: { label: "Tiếng Việt", flag: "🇻🇳", name: "Vietnamese" },
-  zh: { label: "中文", flag: "🇨🇳", name: "Chinese" },
-  fil: { label: "Filipino", flag: "🇵🇭", name: "Filipino" },
+  ko:  { label: "한국어",           flag: "🇰🇷", name: "Korean" },
+  en:  { label: "English",          flag: "🇺🇸", name: "English" },
+  vi:  { label: "Tiếng Việt",       flag: "🇻🇳", name: "Vietnamese" },
+  zh:  { label: "中文",             flag: "🇨🇳", name: "Chinese" },
+  fil: { label: "Filipino",         flag: "🇵🇭", name: "Filipino" },
+  ja:  { label: "日本語",           flag: "🇯🇵", name: "Japanese" },
+  th:  { label: "ภาษาไทย",         flag: "🇹🇭", name: "Thai" },
+  km:  { label: "ភាសាខ្មែរ",       flag: "🇰🇭", name: "Khmer" },
+  mn:  { label: "Монгол",           flag: "🇲🇳", name: "Mongolian" },
+  ru:  { label: "Русский",          flag: "🇷🇺", name: "Russian" },
+  uz:  { label: "O'zbek",           flag: "🇺🇿", name: "Uzbek" },
+  hi:  { label: "हिन्दी",           flag: "🇮🇳", name: "Hindi" },
+  id:  { label: "Bahasa Indonesia", flag: "🇮🇩", name: "Indonesian" },
+  ar:  { label: "العربية",          flag: "🇸🇦", name: "Arabic" },
+  my:  { label: "မြန်မာ",           flag: "🇲🇲", name: "Burmese" },
 };
 
 export const COLUMNS_DEFAULT = [

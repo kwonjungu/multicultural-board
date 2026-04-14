@@ -1,6 +1,9 @@
+export type CardType = "text" | "image" | "youtube" | "drawing";
+
 export interface CardData {
   id: string;
   colId: string;
+  cardType: CardType;
   authorLang: string;
   authorName: string;
   isTeacher: boolean;
@@ -12,6 +15,8 @@ export interface CardData {
   flagged: boolean;
   flagReason?: string;
   translateError?: boolean;
+  imageUrl?: string;
+  youtubeId?: string;
 }
 
 export interface ColumnData {
@@ -27,6 +32,14 @@ export interface UserConfig {
   teacherLangs: string[];
 }
 
+export interface PostData {
+  cardType: CardType;
+  text: string;
+  writeLang: string;
+  imageUrl?: string;
+  youtubeId?: string;
+}
+
 export interface TranslateRequest {
   text: string;
   fromLang: string;
@@ -35,6 +48,9 @@ export interface TranslateRequest {
   authorName: string;
   isTeacher: boolean;
   paletteIdx: number;
+  cardType?: CardType;
+  imageUrl?: string;
+  youtubeId?: string;
 }
 
 export interface TranslateResponse {
