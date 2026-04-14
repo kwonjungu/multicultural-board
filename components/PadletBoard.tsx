@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ref, onValue, off, set, remove, update } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
-import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES } from "@/lib/constants";
+import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES, BRAND_GRADIENT } from "@/lib/constants";
 import { CardData, UserConfig, PostData, RoomConfig, CardStatus } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import PadletCard from "./PadletCard";
@@ -107,6 +107,21 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     });
     return () => off(configRef);
   }, [roomCode]);
+
+  // ── ESC key handler for modals ──
+  useEffect(() => {
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (showTeacherModal) setShowTeacherModal(false);
+        else if (showManage) setShowManage(false);
+        else if (showQR) setShowQR(false);
+        else if (showApproval) setShowApproval(false);
+        else if (editModal) setEditModal(null);
+      }
+    }
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [showTeacherModal, showManage, showQR, showApproval, editModal]);
 
   // ── Firebase: rooms/${roomCode}/cards ──
   useEffect(() => {
@@ -326,7 +341,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 34, height: 34, borderRadius: 10,
-            background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+            background: BRAND_GRADIENT,
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 17, boxShadow: "0 4px 12px rgba(91,87,245,0.4)", flexShrink: 0,
           }}>🌏</div>
@@ -340,7 +355,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           </div>
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {/* User badge */}
           <div style={{
             display: "flex", alignItems: "center", gap: 8,
@@ -349,7 +364,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           }}>
             <div style={{
               width: 26, height: 26, borderRadius: "50%",
-              background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+              background: BRAND_GRADIENT,
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: isTeacher ? 13 : 11, fontWeight: 800, color: "#fff",
             }}>
@@ -501,20 +516,24 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           flex: 1, overflowX: "auto", overflowY: "hidden",
           display: "flex", gap: 14, padding: "16px 18px",
           alignItems: "flex-start",
+          scrollSnapType: "x mandatory",
         }}
       >
         {columns.map((col) => {
           const colCards = visibleCards.filter((c) => c.colId === col.id);
           return (
             <div key={col.id} style={{
-              width: 296, flexShrink: 0, display: "flex", flexDirection: "column",
+              width: "clamp(260px, 28vw, 320px)", flexShrink: 0, display: "flex", flexDirection: "column",
               height: "calc(100vh - 74px)", borderRadius: 16, overflow: "hidden",
               boxShadow: "0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)",
               background: "#fff", border: "1px solid #E9ECF5",
+              scrollSnapAlign: "start",
             }}>
               <div style={{
-                padding: "14px 16px 12px", borderBottom: "1px solid #F3F4F8",
-                display: "flex", alignItems: "center", gap: 10, flexShrink: 0, background: "#fff",
+                padding: "14px 16px 12px",
+                borderBottom: `2px solid ${col.color}`,
+                display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
+                background: `${col.color}12`,
               }}>
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: col.color, flexShrink: 0, boxShadow: `0 0 0 3px ${col.color}22` }} />
                 <span style={{ flex: 1, fontWeight: 800, fontSize: 13, color: "#111827", letterSpacing: -0.2, lineHeight: 1.35 }}>{col.title}</span>
@@ -575,6 +594,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 300, backdropFilter: "blur(6px)",
         }}
+          role="dialog" aria-modal="true" aria-labelledby="modal-title-teacher"
           onClick={(e) => { if (e.target === e.currentTarget) setShowTeacherModal(false); }}
         >
           <div style={{
@@ -583,7 +603,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             animation: "fadeSlideIn 0.2s ease", textAlign: "center",
           }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>👩‍🏫</div>
-            <h3 style={{ margin: "0 0 6px", fontWeight: 900, fontSize: 18, color: "#111827" }}>선생님 모드</h3>
+            <h3 id="modal-title-teacher" style={{ margin: "0 0 6px", fontWeight: 900, fontSize: 18, color: "#111827" }}>선생님 모드</h3>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6B7280" }}>이 방의 비밀번호를 입력하세요</p>
             <input
               type="password"
@@ -608,7 +628,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             )}
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <button onClick={() => setShowTeacherModal(false)} style={{ flex: 1, padding: "11px 0", borderRadius: 12, fontSize: 14, background: "#F3F4F6", color: "#6B7280", fontWeight: 700, border: "none", cursor: "pointer" }}>취소</button>
-              <button onClick={handleTeacherAuth} style={{ flex: 1, padding: "11px 0", borderRadius: 12, fontSize: 14, background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(91,87,245,0.4)" }}>확인</button>
+              <button onClick={handleTeacherAuth} style={{ flex: 1, padding: "11px 0", borderRadius: 12, fontSize: 14, background: BRAND_GRADIENT, color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(91,87,245,0.4)" }}>확인</button>
             </div>
           </div>
         </div>
@@ -621,6 +641,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 400, backdropFilter: "blur(8px)", padding: 20,
         }}
+          role="dialog" aria-modal="true" aria-labelledby="modal-title-manage"
           onClick={(e) => { if (e.target === e.currentTarget) setShowManage(false); }}
         >
           <div style={{
@@ -635,7 +656,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               borderBottom: "1px solid #F3F4F8", position: "sticky", top: 0, background: "#fff", zIndex: 1,
             }}>
               <div>
-                <div style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🛠 관리 패널</div>
+                <div id="modal-title-manage" style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🛠 관리 패널</div>
                 <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>Room {roomCode}</div>
               </div>
               <button
@@ -764,7 +785,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                       }}
                       style={{
                         marginTop: 8, padding: "9px 20px", borderRadius: 10, border: "none",
-                        background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff",
+                        background: BRAND_GRADIENT, color: "#fff",
                         fontWeight: 800, fontSize: 13, cursor: "pointer",
                         boxShadow: "0 4px 14px rgba(91,87,245,0.35)",
                       }}
@@ -936,7 +957,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                     disabled={!newColTitle.trim()}
                     style={{
                       padding: "10px 18px", borderRadius: 11, border: "none",
-                      background: newColTitle.trim() ? "linear-gradient(135deg, #5B57F5, #8B5CF6)" : "#F3F4F6",
+                      background: newColTitle.trim() ? BRAND_GRADIENT : "#F3F4F6",
                       color: newColTitle.trim() ? "#fff" : "#D1D5DB",
                       fontWeight: 800, fontSize: 13, cursor: newColTitle.trim() ? "pointer" : "not-allowed",
                       boxShadow: newColTitle.trim() ? "0 4px 14px rgba(91,87,245,0.35)" : "none",
@@ -974,6 +995,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 400, backdropFilter: "blur(8px)", padding: 20,
         }}
+          role="dialog" aria-modal="true" aria-labelledby="modal-title-qr"
           onClick={(e) => { if (e.target === e.currentTarget) setShowQR(false); }}
         >
           <div style={{
@@ -982,7 +1004,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
             animation: "fadeSlideIn 0.25s ease",
           }}>
-            <h3 style={{ margin: "0 0 4px", fontWeight: 900, fontSize: 18, color: "#111827" }}>
+            <h3 id="modal-title-qr" style={{ margin: "0 0 4px", fontWeight: 900, fontSize: 18, color: "#111827" }}>
               {t("qrCode", lang)}
             </h3>
             <p style={{ margin: "0 0 24px", fontSize: 13, color: "#6B7280" }}>
@@ -1000,7 +1022,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             <button
               onClick={() => setShowQR(false)}
               style={{
-                padding: "12px 32px", borderRadius: 12, background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+                padding: "12px 32px", borderRadius: 12, background: BRAND_GRADIENT,
                 color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", fontSize: 14,
                 boxShadow: "0 4px 16px rgba(91,87,245,0.4)",
               }}
@@ -1016,6 +1038,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 400, backdropFilter: "blur(8px)", padding: 20,
         }}
+          role="dialog" aria-modal="true" aria-labelledby="modal-title-approval"
           onClick={(e) => { if (e.target === e.currentTarget) setShowApproval(false); }}
         >
           <div style={{
@@ -1029,7 +1052,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               borderBottom: "1px solid #F3F4F8", position: "sticky", top: 0, background: "#fff", zIndex: 1,
             }}>
               <div>
-                <div style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🔔 {t("approvalPending", lang)}</div>
+                <div id="modal-title-approval" style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🔔 {t("approvalPending", lang)}</div>
                 <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>{pendingCount}개 대기 중</div>
               </div>
               <button
