@@ -69,6 +69,7 @@ export default function WorksheetTab({ userLang, onPostText, onClose }: Props) {
         fileType:       isPDF ? "pdf" : "image",
         imagePreviewUrl: isImage ? URL.createObjectURL(uploadFile) : undefined,
       });
+      if (isImage) setShowOverlay(true); // 이미지는 번역 오버레이 기본 ON
     } catch (e: unknown) {
       setError((e as Error).message || "처리 중 오류가 발생했습니다");
     }
@@ -286,10 +287,11 @@ export default function WorksheetTab({ userLang, onPostText, onClose }: Props) {
               alt="worksheet"
               style={{ width: "100%", display: "block", maxHeight: 320, objectFit: "contain", background: "#F9FAFB" }}
             />
-            {/* Translation overlay */}
+            {/* Translation overlay — semi-transparent so image shows through */}
             <div style={{
               position: "absolute", inset: 0,
-              background: "rgba(15,12,40,0.9)",
+              background: "rgba(10,8,28,0.72)",
+              backdropFilter: "blur(2px)",
               opacity: showOverlay ? 1 : 0,
               transition: "opacity 0.3s ease",
               pointerEvents: showOverlay ? "auto" : "none",
