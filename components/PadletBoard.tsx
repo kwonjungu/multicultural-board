@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { ref, onValue, off, set, remove } from "firebase/database";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { ref, onValue, off, set, remove, update } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES } from "@/lib/constants";
-import { CardData, UserConfig, PostData } from "@/lib/types";
+import { CardData, UserConfig, PostData, RoomConfig, CardStatus } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import PadletCard from "./PadletCard";
 import PostModal from "./PostModal";
+import { QRCodeSVG } from "qrcode.react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 interface FirebaseColumn {
   id: string;
@@ -21,6 +24,8 @@ interface Props {
   roomCode: string;
   roomLangs: string[];
   onLogout: () => void;
+  roomConfig: RoomConfig;
+  myClientId: string;
 }
 
 const COL_COLORS = [
@@ -28,9 +33,8 @@ const COL_COLORS = [
   "#8B5CF6", "#EC4899", "#14B8A6", "#F97316", "#10B981",
 ];
 
-export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Props) {
+export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomConfig, myClientId }: Props) {
   const [cards, setCards] = useState<CardData[]>([]);
-  // Initialize with defaults so board is visible immediately while Firebase loads
   const [columns, setColumns] = useState<FirebaseColumn[]>(
     COLUMNS_DEFAULT.map((col, i) => ({ ...col, order: i }))
   );
@@ -40,7 +44,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
 
   // Teacher state
   const [isTeacher, setIsTeacher] = useState(false);
-  // teacherLangs from Firebase (synced), fallback to roomLangs
   const [teacherLangs, setTeacherLangs] = useState<string[]>(roomLangs);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [pwInput, setPwInput] = useState("");
@@ -51,6 +54,18 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
   const [editTitle, setEditTitle] = useState<Record<string, string>>({});
   const [newColTitle, setNewColTitle] = useState("");
   const [newColColor, setNewColColor] = useState(COL_COLORS[0]);
+
+  // Room config state (live-updated)
+  const [roomConfigState, setRoomConfigState] = useState<RoomConfig>(roomConfig);
+  const [rosterText, setRosterText] = useState("");
+
+  // Feature modals
+  const [showQR, setShowQR] = useState(false);
+  const [showApproval, setShowApproval] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [editModal, setEditModal] = useState<{ card: CardData; colTitle: string; colColor: string } | null>(null);
+
+  const boardRef = useRef<HTMLDivElement>(null);
 
   // ── Firebase: rooms/${roomCode}/columns ──
   useEffect(() => {
@@ -79,17 +94,19 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
     return () => off(colsRef);
   }, [roomCode]);
 
-  // ── Firebase: rooms/${roomCode}/config/languages ──
+  // ── Firebase: rooms/${roomCode}/config (full config listener) ──
   useEffect(() => {
     const db = getClientDb();
-    const langRef = ref(db, `rooms/${roomCode}/config/languages`);
-    onValue(langRef, (snap) => {
-      const val = snap.val();
-      if (Array.isArray(val) && val.length > 0) setTeacherLangs(val);
-      else setTeacherLangs(roomLangs);
+    const configRef = ref(db, `rooms/${roomCode}/config`);
+    onValue(configRef, (snap) => {
+      const val = snap.val() as RoomConfig | null;
+      if (val) {
+        setRoomConfigState(val);
+        if (Array.isArray(val.languages) && val.languages.length > 0) setTeacherLangs(val.languages);
+      }
     });
-    return () => off(langRef);
-  }, [roomCode, roomLangs]);
+    return () => off(configRef);
+  }, [roomCode]);
 
   // ── Firebase: rooms/${roomCode}/cards ──
   useEffect(() => {
@@ -104,6 +121,10 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
     });
     return () => off(cardsRef);
   }, [roomCode]);
+
+  // Card visibility
+  const visibleCards = isTeacher ? cards : cards.filter((c) => !c.status || c.status === "approved");
+  const pendingCount = cards.filter((c) => c.status === "pending").length;
 
   function handleTeacherAuth() {
     if (pwInput === roomCode) {
@@ -160,9 +181,63 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
     setNewColColor(COL_COLORS[0]);
   }
 
+  // ── PDF Export ──
+  async function exportPDF() {
+    if (!boardRef.current) return;
+    setShowExport(false);
+    const canvas = await html2canvas(boardRef.current, { scale: 1.5, useCORS: true, logging: false });
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = (canvas.height * pdfW) / canvas.width;
+    pdf.addImage(imgData, "PNG", 0, 0, pdfW, Math.min(pdfH, pdf.internal.pageSize.getHeight()));
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    pdf.save(`${roomCode}_${stamp}.pdf`);
+  }
+
+  // ── CSV Export ──
+  function exportCSV() {
+    setShowExport(false);
+    const bom = "\uFEFF";
+    const header = "작성자,컬럼,타입,원문,언어,시각\n";
+    const rows = visibleCards.map((card) => {
+      const col = columns.find((c) => c.id === card.colId);
+      const colTitle = (col?.title || card.colId).replace(/"/g, '""');
+      let content = (card.originalText || "").replace(/"/g, '""');
+      if (card.cardType === "image") content = `[사진] ${card.imageUrl || ""}`;
+      if (card.cardType === "youtube") content = `[YouTube] https://youtu.be/${card.youtubeId || ""}`;
+      if (card.cardType === "drawing") content = "[그림]";
+      const time = new Date(card.timestamp).toLocaleString("ko-KR");
+      return `"${card.authorName}","${colTitle}","${card.cardType}","${content}","${card.authorLang}","${time}"`;
+    });
+    const blob = new Blob([bom + header + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    a.href = url;
+    a.download = `${roomCode}_${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Approval actions ──
+  async function approveCard(cardId: string) {
+    const db = getClientDb();
+    await update(ref(db, `rooms/${roomCode}/cards/${cardId}`), { status: "approved" as CardStatus });
+  }
+
+  async function rejectCard(cardId: string) {
+    const db = getClientDb();
+    await remove(ref(db, `rooms/${roomCode}/cards/${cardId}`));
+  }
+
   const handlePost = useCallback(async (data: PostData) => {
     if (posting || !modal) return;
-    const { cardType, text, writeLang, imageUrl, youtubeId } = data;
+    const { cardType, text, writeLang, imageUrl, youtubeId, status, authorClientId } = data;
     if (cardType === "text" && !text.trim()) return;
 
     setPosting(true);
@@ -190,6 +265,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
       flagged: false,
       imageUrl,
       youtubeId,
+      ...(status ? { status } : {}),
+      ...(authorClientId ? { authorClientId } : {}),
     };
     setCards((prev) => [tempCard, ...prev]);
     setModal(null);
@@ -203,6 +280,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
           colId: modal.colId, authorName: user.myName,
           isTeacher, paletteIdx: tempCard.paletteIdx,
           roomCode, cardType, imageUrl, youtubeId,
+          ...(data.status ? { status: data.status } : {}),
+          ...(data.authorClientId ? { authorClientId: data.authorClientId } : {}),
         }),
       });
       if (!res.ok) throw new Error("API 오류");
@@ -214,6 +293,23 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
     }
     setPosting(false);
   }, [posting, modal, user, isTeacher, teacherLangs, roomCode]);
+
+  // ── Edit post handler ──
+  const handleEditPost = useCallback(async (data: PostData) => {
+    if (!editModal) return;
+    const db = getClientDb();
+    const cardRef = ref(db, `rooms/${roomCode}/cards/${editModal.card.id}`);
+    const updates: Record<string, unknown> = {
+      originalText: data.text || editModal.card.originalText,
+      authorLang: data.writeLang,
+      translations: { [data.writeLang]: data.text || "" },
+      editedAt: Date.now(),
+    };
+    if (data.imageUrl) updates.imageUrl = data.imageUrl;
+    if (data.youtubeId) updates.youtubeId = data.youtubeId;
+    await update(cardRef, updates);
+    setEditModal(null);
+  }, [editModal, roomCode]);
 
   return (
     <div style={{
@@ -267,6 +363,106 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
             )}
           </div>
 
+          {/* Teacher-only buttons */}
+          {isTeacher && (
+            <>
+              {/* QR button */}
+              <button
+                onClick={() => setShowQR(true)}
+                style={{
+                  background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)",
+                  color: "#6EE7B7", borderRadius: 10, padding: "6px 12px",
+                  fontSize: 12, cursor: "pointer", fontWeight: 700,
+                }}
+              >
+                📱 QR
+              </button>
+
+              {/* Pending badge */}
+              {pendingCount > 0 && (
+                <button
+                  onClick={() => setShowApproval(true)}
+                  style={{
+                    background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)",
+                    color: "#FCD34D", borderRadius: 10, padding: "6px 12px",
+                    fontSize: 12, cursor: "pointer", fontWeight: 700,
+                  }}
+                >
+                  🔔 {t("approvalPending", lang)} {pendingCount}
+                </button>
+              )}
+
+              {/* Export dropdown */}
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setShowExport((v) => !v)}
+                  style={{
+                    background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)",
+                    color: "#93C5FD", borderRadius: 10, padding: "6px 12px",
+                    fontSize: 12, cursor: "pointer", fontWeight: 700,
+                  }}
+                >
+                  📤 {t("exportBtn", lang)} ▾
+                </button>
+                {showExport && (
+                  <div style={{
+                    position: "absolute", top: "calc(100% + 6px)", right: 0,
+                    background: "#fff", borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                    border: "1px solid #E9ECF5", zIndex: 100, minWidth: 160, overflow: "hidden",
+                  }}>
+                    <button
+                      onClick={exportPDF}
+                      style={{
+                        width: "100%", padding: "12px 16px", textAlign: "left", border: "none",
+                        background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                        color: "#374151", display: "block",
+                      }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
+                    >
+                      📄 {t("exportPdf", lang)}
+                    </button>
+                    <button
+                      onClick={exportCSV}
+                      style={{
+                        width: "100%", padding: "12px 16px", textAlign: "left", border: "none",
+                        background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                        color: "#374151", borderTop: "1px solid #F3F4F6", display: "block",
+                      }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
+                    >
+                      📊 {t("exportCsv", lang)}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Manage button */}
+              <button
+                onClick={() => {
+                  setRosterText((roomConfigState.roster || []).join("\n"));
+                  setShowManage(true);
+                }}
+                style={{
+                  background: "rgba(91,87,245,0.2)", border: "1px solid rgba(91,87,245,0.4)",
+                  color: "#A5B4FC", borderRadius: 10, padding: "6px 14px",
+                  fontSize: 12, cursor: "pointer", fontWeight: 700, transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.35)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "#fff";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.2)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "#A5B4FC";
+                }}
+              >
+                {t("manage", lang)}
+              </button>
+            </>
+          )}
+
           {/* Teacher mode button */}
           {!isTeacher && (
             <button
@@ -280,28 +476,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF"; }}
             >
               {t("teacherBtn", lang)}
-            </button>
-          )}
-
-          {/* Manage button (teacher only) */}
-          {isTeacher && (
-            <button
-              onClick={() => setShowManage(true)}
-              style={{
-                background: "rgba(91,87,245,0.2)", border: "1px solid rgba(91,87,245,0.4)",
-                color: "#A5B4FC", borderRadius: 10, padding: "6px 14px",
-                fontSize: 12, cursor: "pointer", fontWeight: 700, transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.35)";
-                (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.2)";
-                (e.currentTarget as HTMLButtonElement).style.color = "#A5B4FC";
-              }}
-            >
-              {t("manage", lang)}
             </button>
           )}
 
@@ -321,13 +495,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
       </header>
 
       {/* ── Board ── */}
-      <main style={{
-        flex: 1, overflowX: "auto", overflowY: "hidden",
-        display: "flex", gap: 14, padding: "16px 18px",
-        alignItems: "flex-start",
-      }}>
+      <main
+        ref={boardRef}
+        style={{
+          flex: 1, overflowX: "auto", overflowY: "hidden",
+          display: "flex", gap: 14, padding: "16px 18px",
+          alignItems: "flex-start",
+        }}
+      >
         {columns.map((col) => {
-          const colCards = cards.filter((c) => c.colId === col.id);
+          const colCards = visibleCards.filter((c) => c.colId === col.id);
           return (
             <div key={col.id} style={{
               width: 296, flexShrink: 0, display: "flex", flexDirection: "column",
@@ -355,7 +532,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
                   </div>
                 ) : (
                   colCards.map((card) => (
-                    <PadletCard key={card.id} card={card} viewerLang={lang} colColor={col.color} />
+                    <PadletCard
+                      key={card.id}
+                      card={card}
+                      viewerLang={lang}
+                      colColor={col.color}
+                      isTeacher={isTeacher}
+                      myClientId={myClientId}
+                      isPending={isTeacher && card.status === "pending"}
+                      onEdit={() => setEditModal({ card, colTitle: col.title, colColor: col.color })}
+                    />
                   ))
                 )}
               </div>
@@ -459,6 +645,132 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
             </div>
 
             <div style={{ padding: "20px 24px 28px" }}>
+              {/* Section: Room Settings */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 12 }}>
+                  방 설정
+                </div>
+
+                {/* QR Entry Toggle */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 0", borderBottom: "1px solid #F3F4F8",
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{t("qrEntryToggle", lang)}</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const db = getClientDb();
+                      set(ref(db, `rooms/${roomCode}/config/qrEntry`), !roomConfigState.qrEntry);
+                    }}
+                    style={{
+                      width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
+                      background: roomConfigState.qrEntry ? "#5B57F5" : "#E5E7EB",
+                      position: "relative", transition: "background 0.2s", flexShrink: 0,
+                    }}
+                  >
+                    <div style={{
+                      position: "absolute", top: 3, left: roomConfigState.qrEntry ? 25 : 3,
+                      width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                      transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                    }} />
+                  </button>
+                </div>
+
+                {/* Approval Mode Toggle */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 0", borderBottom: "1px solid #F3F4F8",
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{t("approvalMode", lang)}</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const db = getClientDb();
+                      set(ref(db, `rooms/${roomCode}/config/approvalMode`), !roomConfigState.approvalMode);
+                    }}
+                    style={{
+                      width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
+                      background: roomConfigState.approvalMode ? "#5B57F5" : "#E5E7EB",
+                      position: "relative", transition: "background 0.2s", flexShrink: 0,
+                    }}
+                  >
+                    <div style={{
+                      position: "absolute", top: 3, left: roomConfigState.approvalMode ? 25 : 3,
+                      width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                      transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                    }} />
+                  </button>
+                </div>
+
+                {/* Roster Mode Toggle */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 0", borderBottom: "1px solid #F3F4F8",
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{t("rosterMode", lang)}</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const db = getClientDb();
+                      set(ref(db, `rooms/${roomCode}/config/rosterMode`), !roomConfigState.rosterMode);
+                    }}
+                    style={{
+                      width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
+                      background: roomConfigState.rosterMode ? "#5B57F5" : "#E5E7EB",
+                      position: "relative", transition: "background 0.2s", flexShrink: 0,
+                    }}
+                  >
+                    <div style={{
+                      position: "absolute", top: 3, left: roomConfigState.rosterMode ? 25 : 3,
+                      width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                      transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                    }} />
+                  </button>
+                </div>
+
+                {/* Roster textarea (when rosterMode is on) */}
+                {roomConfigState.rosterMode && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 8 }}>
+                      {t("rosterSetup", lang)} (한 줄에 한 명)
+                    </div>
+                    <textarea
+                      value={rosterText}
+                      onChange={(e) => setRosterText(e.target.value)}
+                      placeholder={"홍길동\n김철수\n이영희"}
+                      rows={5}
+                      style={{
+                        width: "100%", padding: "12px 14px", borderRadius: 12,
+                        border: "2px solid #E5E7EB", fontSize: 14, resize: "vertical",
+                        boxSizing: "border-box", outline: "none", fontFamily: "inherit",
+                        color: "#111827", background: "#F9FAFB",
+                      }}
+                      onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; }}
+                      onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
+                    />
+                    <button
+                      onClick={() => {
+                        const db = getClientDb();
+                        const names = rosterText.split("\n").map((s) => s.trim()).filter(Boolean);
+                        set(ref(db, `rooms/${roomCode}/config/roster`), names);
+                      }}
+                      style={{
+                        marginTop: 8, padding: "9px 20px", borderRadius: 10, border: "none",
+                        background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff",
+                        fontWeight: 800, fontSize: 13, cursor: "pointer",
+                        boxShadow: "0 4px 14px rgba(91,87,245,0.35)",
+                      }}
+                    >
+                      저장
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Section: Column management */}
               <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 12 }}>
                 컬럼 관리
@@ -568,7 +880,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
                           const next = active
                             ? teacherLangs.filter((l) => l !== code)
                             : [...teacherLangs, code];
-                          if (next.length === 0) return; // 최소 1개
+                          if (next.length === 0) return;
                           set(ref(db, `rooms/${roomCode}/config/languages`), next);
                         }}
                         style={{
@@ -591,9 +903,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
               </div>
 
               {/* Add column */}
-              <div style={{
-                borderTop: "1px dashed #E5E7EB", paddingTop: 18,
-              }}>
+              <div style={{ borderTop: "1px dashed #E5E7EB", paddingTop: 18 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 10 }}>
                   새 컬럼 추가
                 </div>
@@ -653,6 +963,145 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
         </div>
       )}
 
+      {/* ── QR Modal ── */}
+      {showQR && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(9,7,30,0.8)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 400, backdropFilter: "blur(8px)", padding: 20,
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowQR(false); }}
+        >
+          <div style={{
+            background: "#fff", borderRadius: 24, padding: "36px 40px",
+            maxWidth: 460, width: "100%", textAlign: "center",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
+            animation: "fadeSlideIn 0.25s ease",
+          }}>
+            <h3 style={{ margin: "0 0 4px", fontWeight: 900, fontSize: 18, color: "#111827" }}>
+              {t("qrCode", lang)}
+            </h3>
+            <p style={{ margin: "0 0 24px", fontSize: 13, color: "#6B7280" }}>
+              {t("qrDescription", lang)}
+            </p>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+              <QRCodeSVG
+                value={`${typeof window !== "undefined" ? window.location.origin : ""}/${roomCode}`}
+                size={260}
+              />
+            </div>
+            <p style={{ fontSize: 13, color: "#6B7280", wordBreak: "break-all", marginBottom: 24 }}>
+              {typeof window !== "undefined" ? window.location.origin : ""}/{roomCode}
+            </p>
+            <button
+              onClick={() => setShowQR(false)}
+              style={{
+                padding: "12px 32px", borderRadius: 12, background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+                color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", fontSize: 14,
+                boxShadow: "0 4px 16px rgba(91,87,245,0.4)",
+              }}
+            >닫기</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Approval Modal ── */}
+      {showApproval && isTeacher && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(9,7,30,0.8)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 400, backdropFilter: "blur(8px)", padding: 20,
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowApproval(false); }}
+        >
+          <div style={{
+            background: "#fff", borderRadius: 24, width: "100%", maxWidth: 520,
+            maxHeight: "88vh", overflowY: "auto",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
+            animation: "fadeSlideIn 0.25s ease",
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", padding: "20px 24px 16px",
+              borderBottom: "1px solid #F3F4F8", position: "sticky", top: 0, background: "#fff", zIndex: 1,
+            }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🔔 {t("approvalPending", lang)}</div>
+                <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>{pendingCount}개 대기 중</div>
+              </div>
+              <button
+                onClick={() => setShowApproval(false)}
+                style={{
+                  marginLeft: "auto", background: "#F3F4F6", border: "none", borderRadius: "50%",
+                  width: 32, height: 32, fontSize: 14, cursor: "pointer", color: "#6B7280",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >✕</button>
+            </div>
+            <div style={{ padding: "16px 24px 24px" }}>
+              {cards.filter((c) => c.status === "pending").length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#9CA3AF" }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                  <div style={{ fontWeight: 600 }}>승인 대기 중인 게시물이 없습니다</div>
+                </div>
+              ) : (
+                cards.filter((c) => c.status === "pending").map((card) => {
+                  const col = columns.find((c) => c.id === card.colId);
+                  return (
+                    <div key={card.id} style={{
+                      background: "#FFFBEB", border: "1px solid #FDE68A",
+                      borderRadius: 12, padding: "14px 16px", marginBottom: 12,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{card.authorName}</div>
+                        <span style={{ fontSize: 11, color: "#9CA3AF" }}>→</span>
+                        <div style={{ fontSize: 11, color: "#6B7280" }}>{col?.title || card.colId}</div>
+                        <span style={{ fontSize: 10, background: "#FEF3C7", color: "#D97706", borderRadius: 6, padding: "1px 7px", fontWeight: 700, marginLeft: "auto" }}>
+                          대기 중
+                        </span>
+                      </div>
+                      {card.cardType === "text" && (
+                        <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, marginBottom: 10 }}>
+                          {card.originalText}
+                        </div>
+                      )}
+                      {card.cardType === "image" && card.imageUrl && (
+                        <img src={card.imageUrl} alt="pending" style={{ width: "100%", borderRadius: 8, marginBottom: 10 }} />
+                      )}
+                      {card.cardType === "youtube" && card.youtubeId && (
+                        <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 10 }}>
+                          YouTube: https://youtu.be/{card.youtubeId}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={() => approveCard(card.id)}
+                          style={{
+                            flex: 1, padding: "9px 0", borderRadius: 10, border: "none",
+                            background: "#10B981", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13,
+                          }}
+                        >
+                          ✅ {t("approve", lang)}
+                        </button>
+                        <button
+                          onClick={() => rejectCard(card.id)}
+                          style={{
+                            flex: 1, padding: "9px 0", borderRadius: 10, border: "none",
+                            background: "#EF4444", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13,
+                          }}
+                        >
+                          ❌ {t("reject", lang)}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Post Modal ── */}
       {modal && (
         <PostModal
           colId={modal.colId}
@@ -662,6 +1111,24 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout }: Pro
           posting={posting}
           onPost={handlePost}
           onClose={() => setModal(null)}
+          approvalMode={roomConfigState.approvalMode}
+          myClientId={myClientId}
+          roomCode={roomCode}
+        />
+      )}
+
+      {/* ── Edit Modal ── */}
+      {editModal && (
+        <PostModal
+          colId={editModal.card.colId}
+          colTitle={editModal.colTitle}
+          colColor={editModal.colColor}
+          user={{ ...user, isTeacher, teacherLangs: isTeacher ? teacherLangs : [] }}
+          posting={posting}
+          onPost={handleEditPost}
+          onClose={() => setEditModal(null)}
+          editCard={editModal.card}
+          roomCode={roomCode}
         />
       )}
     </div>

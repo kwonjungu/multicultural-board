@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ref, onValue, off } from "firebase/database";
+import { ref, onValue, off, get, update } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { LANGUAGES } from "@/lib/constants";
 import { useRouter } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
+import { RoomConfig } from "@/lib/types";
 
 const DEFAULT_LANGS = ["ko", "en", "vi", "zh", "fil"];
 
@@ -26,6 +28,17 @@ export default function AdminPage() {
   const [newLangs, setNewLangs] = useState<string[]>(DEFAULT_LANGS);
   const [loading, setLoading] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // QR & Settings modal state
+  const [qrModal, setQrModal] = useState<string | null>(null);
+  const [settingsModal, setSettingsModal] = useState<string | null>(null);
+  const [configForm, setConfigForm] = useState<{
+    qrEntry: boolean;
+    rosterMode: boolean;
+    roster: string;
+    approvalMode: boolean;
+  }>({ qrEntry: false, rosterMode: false, roster: "", approvalMode: false });
+  const [savingConfig, setSavingConfig] = useState(false);
 
   // Connection status
   useEffect(() => {
@@ -92,6 +105,36 @@ export default function AdminPage() {
       setMsg({ text: (e as Error).message || "오류 발생", ok: false });
     }
     setLoading(null);
+  }
+
+  async function openSettings(code: string) {
+    const db = getClientDb();
+    const snap = await get(ref(db, `rooms/${code}/config`));
+    const cfg = snap.val() as RoomConfig | null;
+    setConfigForm({
+      qrEntry: cfg?.qrEntry ?? false,
+      rosterMode: cfg?.rosterMode ?? false,
+      roster: (cfg?.roster || []).join("\n"),
+      approvalMode: cfg?.approvalMode ?? false,
+    });
+    setSettingsModal(code);
+  }
+
+  async function saveConfig() {
+    if (!settingsModal) return;
+    setSavingConfig(true);
+    const db = getClientDb();
+    const roster = configForm.rosterMode
+      ? configForm.roster.split("\n").map((s) => s.trim()).filter(Boolean)
+      : [];
+    await update(ref(db, `rooms/${settingsModal}/config`), {
+      qrEntry: configForm.qrEntry,
+      rosterMode: configForm.rosterMode,
+      roster,
+      approvalMode: configForm.approvalMode,
+    });
+    setSavingConfig(false);
+    setSettingsModal(null);
   }
 
   function fmt(ts: number | null) {
@@ -325,6 +368,24 @@ export default function AdminPage() {
 
                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                   <button
+                    onClick={() => setQrModal(room.code)}
+                    style={{
+                      padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      background: "#F0FDF4", color: "#16A34A", border: "none", cursor: "pointer",
+                    }}
+                  >
+                    QR
+                  </button>
+                  <button
+                    onClick={() => openSettings(room.code)}
+                    style={{
+                      padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      background: "#FFF7ED", color: "#EA580C", border: "none", cursor: "pointer",
+                    }}
+                  >
+                    설정
+                  </button>
+                  <button
                     onClick={() => router.push(`/${room.code}`)}
                     style={{
                       padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
@@ -359,6 +420,138 @@ export default function AdminPage() {
           관리자 패널 · 다문화 교실 소통판
         </p>
       </main>
+
+      {/* QR Modal */}
+      {qrModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(9,7,30,0.8)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 500, backdropFilter: "blur(8px)", padding: 20,
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setQrModal(null); }}
+        >
+          <div style={{
+            background: "#fff", borderRadius: 24, padding: "36px 40px",
+            maxWidth: 500, width: "100%", textAlign: "center",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
+            animation: "fadeSlideIn 0.25s ease",
+          }}>
+            <h3 style={{ margin: "0 0 6px", fontWeight: 900, fontSize: 18, color: "#111827" }}>QR 코드</h3>
+            <p style={{ margin: "0 0 24px", fontSize: 13, color: "#6B7280" }}>Room {qrModal}</p>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+              <QRCodeSVG
+                value={`${typeof window !== "undefined" ? window.location.origin : ""}/${qrModal}`}
+                size={300}
+              />
+            </div>
+            <p style={{ fontSize: 13, color: "#6B7280", wordBreak: "break-all", marginBottom: 24 }}>
+              {typeof window !== "undefined" ? window.location.origin : ""}/{qrModal}
+            </p>
+            <button
+              onClick={() => setQrModal(null)}
+              style={{
+                padding: "12px 32px", borderRadius: 12, background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+                color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", fontSize: 14,
+                boxShadow: "0 4px 16px rgba(91,87,245,0.4)",
+              }}
+            >닫기</button>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {settingsModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(9,7,30,0.8)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 500, backdropFilter: "blur(8px)", padding: 20,
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setSettingsModal(null); }}
+        >
+          <div style={{
+            background: "#fff", borderRadius: 24, padding: "28px 32px",
+            maxWidth: 480, width: "100%",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
+            animation: "fadeSlideIn 0.25s ease",
+            maxHeight: "90vh", overflowY: "auto",
+          }}>
+            <h3 style={{ margin: "0 0 6px", fontWeight: 900, fontSize: 18, color: "#111827" }}>방 설정</h3>
+            <p style={{ margin: "0 0 24px", fontSize: 13, color: "#6B7280" }}>Room {settingsModal}</p>
+
+            {/* Toggles */}
+            {[
+              { key: "qrEntry" as const, label: "QR 진입 활성화", desc: "학생이 QR 코드로 입장할 수 있습니다" },
+              { key: "rosterMode" as const, label: "출석부 명단 모드", desc: "학생이 이름 목록에서 선택합니다" },
+              { key: "approvalMode" as const, label: "게시 전 교사 승인", desc: "학생 게시물이 승인 후 표시됩니다" },
+            ].map((item) => (
+              <div key={item.key} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "14px 0", borderBottom: "1px solid #F3F4F8",
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>{item.label}</div>
+                  <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>{item.desc}</div>
+                </div>
+                <button
+                  onClick={() => setConfigForm((prev) => ({ ...prev, [item.key]: !prev[item.key] }))}
+                  style={{
+                    width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
+                    background: configForm[item.key] ? "#5B57F5" : "#E5E7EB",
+                    position: "relative", transition: "background 0.2s", flexShrink: 0,
+                  }}
+                >
+                  <div style={{
+                    position: "absolute", top: 3, left: configForm[item.key] ? 25 : 3,
+                    width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                    transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                  }} />
+                </button>
+              </div>
+            ))}
+
+            {/* Roster textarea */}
+            {configForm.rosterMode && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 8 }}>
+                  출석부 명단 (한 줄에 한 명)
+                </div>
+                <textarea
+                  value={configForm.roster}
+                  onChange={(e) => setConfigForm((prev) => ({ ...prev, roster: e.target.value }))}
+                  placeholder={"홍길동\n김철수\n이영희"}
+                  rows={6}
+                  style={{
+                    width: "100%", padding: "12px 14px", borderRadius: 12,
+                    border: "2px solid #E5E7EB", fontSize: 14, resize: "vertical",
+                    boxSizing: "border-box", outline: "none", fontFamily: "inherit",
+                    color: "#111827", background: "#F9FAFB",
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
+                />
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+              <button
+                onClick={() => setSettingsModal(null)}
+                style={{ flex: 1, padding: "12px 0", borderRadius: 12, background: "#F3F4F6", color: "#6B7280", fontWeight: 700, border: "none", cursor: "pointer", fontSize: 14 }}
+              >취소</button>
+              <button
+                onClick={saveConfig}
+                disabled={savingConfig}
+                style={{
+                  flex: 2, padding: "12px 0", borderRadius: 12,
+                  background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+                  color: "#fff", fontWeight: 800, border: "none", cursor: savingConfig ? "not-allowed" : "pointer",
+                  fontSize: 14, boxShadow: "0 4px 16px rgba(91,87,245,0.4)",
+                  opacity: savingConfig ? 0.7 : 1,
+                }}
+              >{savingConfig ? "저장 중..." : "저장"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
