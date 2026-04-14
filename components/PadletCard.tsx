@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ref, get, onValue, off, push, set, remove } from "firebase/database";
+import { ref, onValue, off, push, set, remove } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { CardData, CommentData } from "@/lib/types";
 import { LANGUAGES, CARD_PALETTES } from "@/lib/constants";
@@ -13,14 +13,43 @@ const TTS_LANG_MAP: Record<string, string> = {
   uz: "uz-UZ", hi: "hi-IN", id: "id-ID", ar: "ar-SA", my: "my-MM",
 };
 
+// Languages that Web Speech API reliably supports across browsers
+const WEB_SPEECH_SUPPORTED = new Set(["ko", "en", "vi", "zh", "ja", "th", "ru", "hi", "id", "ar"]);
+
 const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
-function speakText(text: string, lang: string) {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = TTS_LANG_MAP[lang] || "en-US";
-  window.speechSynthesis.speak(u);
+// Singleton audio element to avoid overlapping playback
+let serverTtsAudio: HTMLAudioElement | null = null;
+
+async function speakText(text: string, lang: string) {
+  if (typeof window === "undefined") return;
+
+  const bcp47 = TTS_LANG_MAP[lang] || "en-US";
+
+  // Check if browser has a matching voice loaded
+  const voices = window.speechSynthesis?.getVoices() ?? [];
+  const langPrefix = bcp47.split("-")[0];
+  const hasVoice = voices.some((v) => v.lang.startsWith(langPrefix));
+
+  if (WEB_SPEECH_SUPPORTED.has(lang) && hasVoice) {
+    // Use Web Speech API
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = bcp47;
+    window.speechSynthesis.speak(u);
+  } else {
+    // Fall back to server-side Google Translate TTS proxy
+    try {
+      window.speechSynthesis?.cancel();
+      if (serverTtsAudio) { serverTtsAudio.pause(); serverTtsAudio = null; }
+      const url = `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text.slice(0, 200))}`;
+      const audio = new Audio(url);
+      serverTtsAudio = audio;
+      await audio.play();
+    } catch {
+      // silent fail — network error or browser blocked autoplay
+    }
+  }
 }
 
 function timeAgo(ts: number) {
@@ -108,20 +137,6 @@ export default function PadletCard({
     const interval = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(interval);
   }, []);
-
-  // Comment count fetch (one-time on mount)
-  useEffect(() => {
-    const db = getClientDb();
-    get(ref(db, `rooms/${roomCode}/cards/${card.id}/comments`))
-      .then((snap) => {
-        const data = snap.val();
-        if (data) {
-          const list = Object.values(data) as CommentData[];
-          setCommentCount(list.filter((c) => !c.status || c.status === "approved").length);
-        }
-      })
-      .catch(() => {});
-  }, [roomCode, card.id]);
 
   // Comment listener (only when open)
   useEffect(() => {
@@ -280,7 +295,7 @@ export default function PadletCard({
                   fontSize: 11, background: p.accent, color: "#fff",
                   borderRadius: 999, padding: "2px 8px", fontWeight: 700,
                   height: 20, display: "inline-flex", alignItems: "center",
-                }}>선생님</span>
+                }}>{t("teacherTag", viewerLang)}</span>
               )}
               {cardType !== "text" && (
                 <span style={{
@@ -288,7 +303,7 @@ export default function PadletCard({
                   borderRadius: 999, padding: "2px 8px",
                   height: 20, display: "inline-flex", alignItems: "center",
                 }}>
-                  {cardType === "image" ? "🖼️ 사진" : cardType === "youtube" ? "📺 YouTube" : "✏️ 그림"}
+                  {cardType === "image" ? "🖼️ 사진" : cardType === "youtube" ? "📺 YouTube" : t("drawBadge", viewerLang)}
                 </span>
               )}
               {card.flagged && (

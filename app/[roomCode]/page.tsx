@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { ref, get } from "firebase/database";
+import { ref, onValue } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { LANGUAGES } from "@/lib/constants";
 import SetupScreen from "@/components/SetupScreen";
@@ -31,18 +31,25 @@ export default function RoomPage() {
   useEffect(() => {
     if (!validCode) { setLangsLoaded(true); return; }
     const db = getClientDb();
-    get(ref(db, `rooms/${roomCode}/config`))
-      .then((snap) => {
-        const val = snap.val() as RoomConfig | null;
-        if (val) {
-          setRoomConfig(val);
-          if (Array.isArray(val.languages) && val.languages.length > 0) {
-            setRoomLangs(val.languages);
-          }
+    const configRef = ref(db, `rooms/${roomCode}/config`);
+    const unsub = onValue(configRef, (snap) => {
+      const val = snap.val() as RoomConfig | null;
+      if (val) {
+        // Firebase may return numeric-keyed objects instead of arrays — normalize
+        if (val.roster && !Array.isArray(val.roster)) {
+          val.roster = Object.values(val.roster as unknown as Record<string, string>);
         }
-      })
-      .catch(() => {/* fallback to all langs */})
-      .finally(() => setLangsLoaded(true));
+        if (val.languages && !Array.isArray(val.languages)) {
+          val.languages = Object.values(val.languages as unknown as Record<string, string>);
+        }
+        setRoomConfig(val);
+        if (Array.isArray(val.languages) && val.languages.length > 0) {
+          setRoomLangs(val.languages);
+        }
+      }
+      setLangsLoaded(true);
+    }, () => setLangsLoaded(true));
+    return () => unsub();
   }, [roomCode, validCode]);
 
   if (!validCode) {

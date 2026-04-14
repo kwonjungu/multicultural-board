@@ -19,7 +19,10 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
   });
   const [myName, setMyName] = useState("");
 
-  const isRosterMode = roomConfig.rosterMode && roomConfig.roster && roomConfig.roster.length > 0;
+  const rosterList: string[] = Array.isArray(roomConfig.roster)
+    ? roomConfig.roster
+    : roomConfig.roster ? Object.values(roomConfig.roster as unknown as Record<string, string>) : [];
+  const isRosterMode = roomConfig.rosterMode && rosterList.length > 0;
 
   function handleEnter() {
     if (!myName.trim()) return;
@@ -106,7 +109,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 {t("selectYourName", myLang)}
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 200, overflowY: "auto" }}>
-                {(roomConfig.roster || []).map((name) => (
+                {rosterList.map((name) => (
                   <button
                     key={name}
                     onClick={() => setMyName(name)}

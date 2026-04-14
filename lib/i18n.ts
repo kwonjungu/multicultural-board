@@ -335,6 +335,30 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "Comment failed. Please retry", uz: "Comment failed. Please retry", hi: "Comment failed. Please retry",
     id: "Comment failed. Please retry", ar: "Comment failed. Please retry", my: "Comment failed. Please retry",
   },
+  drawBadge: {
+    ko: "✏️ 그림", en: "✏️ Draw", vi: "✏️ Draw",
+    zh: "✏️ Draw", fil: "✏️ Draw", ja: "✏️ 絵",
+    th: "✏️ Draw", km: "✏️ Draw", mn: "✏️ Draw",
+    ru: "✏️ Draw", uz: "✏️ Draw", hi: "✏️ Draw",
+    id: "✏️ Draw", ar: "✏️ رسم", my: "✏️ Draw",
+  },
+  confirmDeleteColumn: {
+    ko: "이 컬럼을 삭제할까요?\n컬럼 안의 카드들은 숨겨집니다.", en: "Delete this column?\nCards inside will be hidden.",
+    vi: "Delete this column?\nCards inside will be hidden.", zh: "删除此列？\n列内的卡片将被隐藏。",
+    fil: "Delete this column?\nCards inside will be hidden.", ja: "この列を削除しますか？\n列内のカードは非表示になります。",
+    th: "Delete this column?\nCards inside will be hidden.", km: "Delete this column?\nCards inside will be hidden.",
+    mn: "Delete this column?\nCards inside will be hidden.", ru: "Удалить этот столбец?\nКарточки внутри будут скрыты.",
+    uz: "Delete this column?\nCards inside will be hidden.", hi: "Delete this column?\nCards inside will be hidden.",
+    id: "Delete this column?\nCards inside will be hidden.", ar: "حذف هذا العمود؟\nسيتم إخفاء البطاقات الموجودة بداخله.",
+    my: "Delete this column?\nCards inside will be hidden.",
+  },
+  pendingComment: {
+    ko: "댓글 대기", en: "Pending Comment", vi: "Pending Comment",
+    zh: "Pending Comment", fil: "Pending Comment", ja: "Pending Comment",
+    th: "Pending Comment", km: "Pending Comment", mn: "Pending Comment",
+    ru: "Pending Comment", uz: "Pending Comment", hi: "Pending Comment",
+    id: "Pending Comment", ar: "Pending Comment", my: "Pending Comment",
+  },
 };
 
 export function t(key: string, lang: string): string {

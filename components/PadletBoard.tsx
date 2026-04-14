@@ -4,13 +4,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { ref, onValue, off, set, remove, update } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES, BRAND_GRADIENT } from "@/lib/constants";
-import { CardData, UserConfig, PostData, RoomConfig, CardStatus } from "@/lib/types";
+import { CardData, UserConfig, PostData, RoomConfig, CardStatus, CommentData } from "@/lib/types";
 import { t } from "@/lib/i18n";
 import PadletCard from "./PadletCard";
 import PostModal from "./PostModal";
 import { QRCodeSVG } from "qrcode.react";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+
+type PendingItem =
+  | { kind: "card"; data: CardData }
+  | { kind: "comment"; data: CommentData; parentCard: CardData };
 
 interface FirebaseColumn {
   id: string;
@@ -59,6 +61,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const [roomConfigState, setRoomConfigState] = useState<RoomConfig>(roomConfig);
   const [rosterText, setRosterText] = useState("");
 
+  // Pending items (cards + comments) for approval panel
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
+
   // Feature modals
   const [showQR, setShowQR] = useState(false);
   const [showApproval, setShowApproval] = useState(false);
@@ -101,6 +106,13 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     onValue(configRef, (snap) => {
       const val = snap.val() as RoomConfig | null;
       if (val) {
+        // Normalize Firebase numeric-keyed objects back to arrays
+        if (val.roster && !Array.isArray(val.roster)) {
+          val.roster = Object.values(val.roster as unknown as Record<string, string>);
+        }
+        if (val.languages && !Array.isArray(val.languages)) {
+          val.languages = Object.values(val.languages as unknown as Record<string, string>);
+        }
         setRoomConfigState(val);
         if (Array.isArray(val.languages) && val.languages.length > 0) setTeacherLangs(val.languages);
       }
@@ -129,17 +141,44 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     const cardsRef = ref(db, `rooms/${roomCode}/cards`);
     onValue(cardsRef, (snapshot) => {
       const data = snapshot.val();
-      if (!data) { setCards([]); return; }
-      const list: CardData[] = Object.values(data);
+      if (!data) { setCards([]); setPendingItems([]); return; }
+
+      // Raw data includes nested comments sub-tree
+      type RawCard = CardData & { comments?: Record<string, CommentData> };
+      const rawList: RawCard[] = Object.values(data);
+
+      // Cards without comments for normal display
+      const list: CardData[] = rawList.map(({ comments: _c, ...rest }) => rest as CardData);
       list.sort((a, b) => b.timestamp - a.timestamp);
       setCards(list);
+
+      // Build pending items (cards + comments)
+      const pending: PendingItem[] = [];
+      for (const raw of rawList) {
+        const card = list.find((c) => c.id === raw.id)!;
+        if (!card) continue;
+        if (raw.status === "pending") pending.push({ kind: "card", data: card });
+        if (raw.comments) {
+          for (const comment of Object.values(raw.comments)) {
+            if (comment.status === "pending") {
+              pending.push({ kind: "comment", data: comment, parentCard: card });
+            }
+          }
+        }
+      }
+      pending.sort((a, b) => {
+        const tsA = a.kind === "card" ? a.data.timestamp : a.data.timestamp;
+        const tsB = b.kind === "card" ? b.data.timestamp : b.data.timestamp;
+        return tsA - tsB;
+      });
+      setPendingItems(pending);
     });
     return () => off(cardsRef);
   }, [roomCode]);
 
   // Card visibility
   const visibleCards = isTeacher ? cards : cards.filter((c) => !c.status || c.status === "approved");
-  const pendingCount = cards.filter((c) => c.status === "pending").length;
+  const pendingCount = pendingItems.length;
 
   function handleTeacherAuth() {
     if (pwInput === roomCode) {
@@ -166,7 +205,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   }
 
   function deleteCol(colId: string) {
-    if (!confirm("이 컬럼을 삭제할까요?\n컬럼 안의 카드들은 숨겨집니다.")) return;
+    if (!confirm(t("confirmDeleteColumn", lang))) return;
     const db = getClientDb();
     remove(ref(db, `rooms/${roomCode}/columns/${colId}`));
   }
@@ -196,27 +235,115 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     setNewColColor(COL_COLORS[0]);
   }
 
-  // ── PDF Export ──
+  // ── PDF Export (text-based with comment summaries) ──
   async function exportPDF() {
-    if (!boardRef.current) return;
     setShowExport(false);
-    const canvas = await html2canvas(boardRef.current, { scale: 1.5, useCORS: true, logging: false });
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    const pdfW = pdf.internal.pageSize.getWidth();
-    const pdfH = (canvas.height * pdfW) / canvas.width;
-    pdf.addImage(imgData, "PNG", 0, 0, pdfW, Math.min(pdfH, pdf.internal.pageSize.getHeight()));
+    const { default: jsPDFLib } = await import("jspdf");
+    const pdf = new jsPDFLib({ orientation: "portrait", unit: "mm", format: "a4" });
+    const W = pdf.internal.pageSize.getWidth();
+    const margin = 14;
+    let y = margin;
+    const lineH = 6;
+    const maxW = W - margin * 2;
+
+    function ensurePage(need = 10) {
+      if (y + need > 285) { pdf.addPage(); y = margin; }
+    }
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(14);
+    pdf.text(`Room ${roomCode}`, margin, y);
+    y += lineH + 2;
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(130, 130, 130);
+    pdf.text(new Date().toLocaleString("ko-KR"), margin, y);
+    pdf.setTextColor(0, 0, 0);
+    y += lineH + 4;
+
+    for (const col of columns) {
+      const colCards = visibleCards.filter((c) => c.colId === col.id);
+      if (!colCards.length) continue;
+      ensurePage(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.text(col.title, margin, y);
+      y += lineH;
+
+      for (const card of colCards) {
+        ensurePage(20);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(9);
+        pdf.text(`${card.authorName} (${LANGUAGES[card.authorLang]?.flag || ""} ${card.authorLang})`, margin + 4, y);
+        y += lineH - 1;
+
+        pdf.setFont("helvetica", "normal");
+        const body =
+          card.cardType === "image" ? "[이미지 첨부]"
+          : card.cardType === "youtube" ? `[YouTube: ${card.youtubeId}]`
+          : card.cardType === "drawing" ? "[그림]"
+          : card.originalText || "";
+        const lines = pdf.splitTextToSize(body, maxW - 4);
+        lines.slice(0, 4).forEach((line: string) => {
+          ensurePage();
+          pdf.text(line, margin + 4, y);
+          y += lineH - 1;
+        });
+        if (lines.length > 4) {
+          pdf.setTextColor(130, 130, 130);
+          pdf.text(`... (${lines.length - 4} more lines)`, margin + 4, y);
+          pdf.setTextColor(0, 0, 0);
+          y += lineH - 1;
+        }
+
+        // Comment summaries from pendingItems (approved comments)
+        const cardComments = pendingItems
+          .filter((p) => p.kind === "comment" && p.parentCard.id === card.id && p.data.status !== "pending")
+          .map((p) => (p as { kind: "comment"; data: CommentData; parentCard: CardData }).data);
+        if (cardComments.length) {
+          const shown = cardComments.slice(0, 3);
+          const more = cardComments.length - 3;
+          shown.forEach((c) => {
+            ensurePage();
+            pdf.setTextColor(80, 80, 180);
+            pdf.setFontSize(8);
+            const cLine = `  💬 ${c.authorName}: ${c.text.slice(0, 60)}${c.text.length > 60 ? "…" : ""}`;
+            pdf.text(cLine, margin + 4, y);
+            y += lineH - 2;
+          });
+          if (more > 0) {
+            pdf.text(`  ... +${more}개`, margin + 4, y);
+            y += lineH - 2;
+          }
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFontSize(9);
+        }
+        y += 2;
+      }
+      y += 4;
+    }
+
     const now = new Date();
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
     pdf.save(`${roomCode}_${stamp}.pdf`);
   }
 
-  // ── CSV Export ──
-  function exportCSV() {
+  // ── CSV Export (includes comment rows) ──
+  async function exportCSV() {
     setShowExport(false);
+    const { get, ref: dbRef } = await import("firebase/database");
+    const db = getClientDb();
+
+    // Fetch full card data (with comments) for export
+    type RawCard = CardData & { comments?: Record<string, CommentData> };
+    const snap = await get(dbRef(db, `rooms/${roomCode}/cards`)).catch(() => null);
+    const rawData: Record<string, RawCard> = snap?.val() || {};
+
     const bom = "\uFEFF";
-    const header = "작성자,컬럼,타입,원문,언어,시각\n";
-    const rows = visibleCards.map((card) => {
+    const header = "종류,작성자,컬럼,타입,원문,언어,시각\n";
+    const rows: string[] = [];
+
+    for (const card of visibleCards) {
       const col = columns.find((c) => c.id === card.colId);
       const colTitle = (col?.title || card.colId).replace(/"/g, '""');
       let content = (card.originalText || "").replace(/"/g, '""');
@@ -224,8 +351,20 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       if (card.cardType === "youtube") content = `[YouTube] https://youtu.be/${card.youtubeId || ""}`;
       if (card.cardType === "drawing") content = "[그림]";
       const time = new Date(card.timestamp).toLocaleString("ko-KR");
-      return `"${card.authorName}","${colTitle}","${card.cardType}","${content}","${card.authorLang}","${time}"`;
-    });
+      rows.push(`"card","${card.authorName}","${colTitle}","${card.cardType}","${content}","${card.authorLang}","${time}"`);
+
+      // Append approved comments
+      const rawCard = rawData[card.id];
+      if (rawCard?.comments) {
+        for (const comment of Object.values(rawCard.comments)) {
+          if (comment.status === "pending") continue; // skip unapproved
+          const commentText = comment.text.replace(/"/g, '""');
+          const commentTime = new Date(comment.timestamp).toLocaleString("ko-KR");
+          rows.push(`"comment","${comment.authorName}","${colTitle}","comment","${commentText}","${comment.authorLang}","${commentTime}"`);
+        }
+      }
+    }
+
     const blob = new Blob([bom + header + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -248,6 +387,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   async function rejectCard(cardId: string) {
     const db = getClientDb();
     await remove(ref(db, `rooms/${roomCode}/cards/${cardId}`));
+  }
+
+  async function approveComment(cardId: string, commentId: string) {
+    const db = getClientDb();
+    await set(ref(db, `rooms/${roomCode}/cards/${cardId}/comments/${commentId}/status`), "approved" as CardStatus);
+  }
+
+  async function rejectComment(cardId: string, commentId: string) {
+    const db = getClientDb();
+    await remove(ref(db, `rooms/${roomCode}/cards/${cardId}/comments/${commentId}`));
   }
 
   const handlePost = useCallback(async (data: PostData) => {
@@ -310,20 +459,57 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
   // ── Edit post handler ──
   const handleEditPost = useCallback(async (data: PostData) => {
-    if (!editModal) return;
+    if (!editModal || posting) return;
+    setPosting(true);
     const db = getClientDb();
-    const cardRef = ref(db, `rooms/${roomCode}/cards/${editModal.card.id}`);
-    const updates: Record<string, unknown> = {
-      originalText: data.text || editModal.card.originalText,
-      authorLang: data.writeLang,
-      translations: { [data.writeLang]: data.text || "" },
-      editedAt: Date.now(),
-    };
-    if (data.imageUrl) updates.imageUrl = data.imageUrl;
-    if (data.youtubeId) updates.youtubeId = data.youtubeId;
-    await update(cardRef, updates);
+    const cardId = editModal.card.id;
+
+    try {
+      let translations: Record<string, string> = { [data.writeLang]: data.text || "" };
+
+      // Re-translate text cards via translate API (cardType "comment" = translate-only, no Firebase save)
+      if (data.cardType === "text" && data.text?.trim()) {
+        const targetLangs = teacherLangs.filter((l) => l !== data.writeLang);
+        if (targetLangs.length > 0) {
+          const res = await fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: data.text,
+              fromLang: data.writeLang,
+              targetLangs,
+              colId: "comment",
+              authorName: user.myName,
+              isTeacher,
+              paletteIdx: editModal.card.paletteIdx,
+              roomCode,
+              cardType: "comment", // translate-only mode, returns translations without saving
+            }),
+          });
+          if (res.ok) {
+            const result = await res.json();
+            if (result.translations) translations = result.translations;
+          }
+        }
+      }
+
+      const updates: Record<string, unknown> = {
+        originalText: data.text || editModal.card.originalText,
+        authorLang: data.writeLang,
+        translations,
+        editedAt: Date.now(),
+      };
+      // Only update imageUrl if a new one was uploaded; otherwise preserve existing
+      if (data.imageUrl) updates.imageUrl = data.imageUrl;
+      if (data.youtubeId) updates.youtubeId = data.youtubeId;
+
+      await update(ref(db, `rooms/${roomCode}/cards/${cardId}`), updates);
+    } catch {
+      // keep card as-is on error
+    }
+    setPosting(false);
     setEditModal(null);
-  }, [editModal, roomCode]);
+  }, [editModal, posting, user, isTeacher, teacherLangs, roomCode]);
 
   return (
     <div style={{
@@ -1064,63 +1250,83 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               >✕</button>
             </div>
             <div style={{ padding: "16px 24px 24px" }}>
-              {/* TODO: include pending comments in approval panel */}
-              {cards.filter((c) => c.status === "pending").length === 0 ? (
+              {pendingItems.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "#9CA3AF" }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
                   <div style={{ fontWeight: 600 }}>승인 대기 중인 게시물이 없습니다</div>
                 </div>
               ) : (
-                cards.filter((c) => c.status === "pending").map((card) => {
-                  const col = columns.find((c) => c.id === card.colId);
-                  return (
-                    <div key={card.id} style={{
-                      background: "#FFFBEB", border: "1px solid #FDE68A",
-                      borderRadius: 12, padding: "14px 16px", marginBottom: 12,
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{card.authorName}</div>
-                        <span style={{ fontSize: 11, color: "#9CA3AF" }}>→</span>
-                        <div style={{ fontSize: 11, color: "#6B7280" }}>{col?.title || card.colId}</div>
-                        <span style={{ fontSize: 10, background: "#FEF3C7", color: "#D97706", borderRadius: 6, padding: "1px 7px", fontWeight: 700, marginLeft: "auto" }}>
-                          대기 중
-                        </span>
-                      </div>
-                      {card.cardType === "text" && (
-                        <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, marginBottom: 10 }}>
-                          {card.originalText}
+                pendingItems.map((item) => {
+                  if (item.kind === "card") {
+                    const card = item.data;
+                    const col = columns.find((c) => c.id === card.colId);
+                    return (
+                      <div key={`card-${card.id}`} style={{
+                        background: "#FFFBEB", border: "1px solid #FDE68A",
+                        borderRadius: 12, padding: "14px 16px", marginBottom: 12,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{card.authorName}</div>
+                          <span style={{ fontSize: 11, color: "#9CA3AF" }}>→</span>
+                          <div style={{ fontSize: 11, color: "#6B7280" }}>{col?.title || card.colId}</div>
+                          <span style={{ fontSize: 10, background: "#FEF3C7", color: "#D97706", borderRadius: 6, padding: "1px 7px", fontWeight: 700, marginLeft: "auto" }}>
+                            {t("approvalPending", lang)}
+                          </span>
                         </div>
-                      )}
-                      {card.cardType === "image" && card.imageUrl && (
-                        <img src={card.imageUrl} alt="pending" style={{ width: "100%", borderRadius: 8, marginBottom: 10 }} />
-                      )}
-                      {card.cardType === "youtube" && card.youtubeId && (
-                        <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 10 }}>
-                          YouTube: https://youtu.be/{card.youtubeId}
+                        {card.cardType === "text" && (
+                          <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, marginBottom: 10 }}>{card.originalText}</div>
+                        )}
+                        {card.cardType === "image" && card.imageUrl && (
+                          <img src={card.imageUrl} alt="pending" style={{ width: "100%", borderRadius: 8, marginBottom: 10 }} />
+                        )}
+                        {card.cardType === "youtube" && card.youtubeId && (
+                          <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 10 }}>
+                            YouTube: https://youtu.be/{card.youtubeId}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => approveCard(card.id)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "none", background: "#10B981", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+                            ✅ {t("approve", lang)}
+                          </button>
+                          <button onClick={() => rejectCard(card.id)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "none", background: "#EF4444", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+                            ❌ {t("reject", lang)}
+                          </button>
                         </div>
-                      )}
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          onClick={() => approveCard(card.id)}
-                          style={{
-                            flex: 1, padding: "9px 0", borderRadius: 10, border: "none",
-                            background: "#10B981", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13,
-                          }}
-                        >
-                          ✅ {t("approve", lang)}
-                        </button>
-                        <button
-                          onClick={() => rejectCard(card.id)}
-                          style={{
-                            flex: 1, padding: "9px 0", borderRadius: 10, border: "none",
-                            background: "#EF4444", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13,
-                          }}
-                        >
-                          ❌ {t("reject", lang)}
-                        </button>
                       </div>
-                    </div>
-                  );
+                    );
+                  } else {
+                    // comment item
+                    const comment = item.data;
+                    const parentCard = item.parentCard;
+                    const col = columns.find((c) => c.id === parentCard.colId);
+                    return (
+                      <div key={`comment-${comment.id}`} style={{
+                        background: "#F0F9FF", border: "1px solid #BAE6FD",
+                        borderRadius: 12, padding: "14px 16px", marginBottom: 12,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>💬 {comment.authorName}</div>
+                          <span style={{ fontSize: 11, color: "#9CA3AF" }}>→</span>
+                          <div style={{ fontSize: 11, color: "#6B7280" }}>{col?.title || parentCard.colId}</div>
+                          <span style={{ fontSize: 10, background: "#DBEAFE", color: "#2563EB", borderRadius: 6, padding: "1px 7px", fontWeight: 700, marginLeft: "auto" }}>
+                            {t("pendingComment", lang)}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6, fontStyle: "italic" }}>
+                          ↳ {parentCard.authorName}: {(parentCard.originalText || "").slice(0, 50)}{(parentCard.originalText || "").length > 50 ? "…" : ""}
+                        </div>
+                        <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, marginBottom: 10 }}>{comment.text}</div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => approveComment(parentCard.id, comment.id)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "none", background: "#10B981", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+                            ✅ {t("approve", lang)}
+                          </button>
+                          <button onClick={() => rejectComment(parentCard.id, comment.id)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "none", background: "#EF4444", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+                            ❌ {t("reject", lang)}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
                 })
               )}
             </div>
