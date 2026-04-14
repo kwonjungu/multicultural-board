@@ -60,7 +60,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const col = COLUMNS_DEFAULT.find((c) => c.id === colId);
-  const accent = col?.color || "#6C63FF";
+  const accent = col?.color || "#5B57F5";
 
   useEffect(() => {
     if (mode === "text") setTimeout(() => textareaRef.current?.focus(), 80);
@@ -89,24 +89,16 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
       onPost({ cardType: "youtube", text: "", writeLang, youtubeId: youtubeId! });
       return;
     }
-
-    // image / drawing → Firebase Storage 업로드
     setUploading(true);
     try {
-      let blob: Blob;
-      if (mode === "image" && imageFile) {
-        blob = imageFile;
-      } else if (mode === "drawing" && drawingDataUrl) {
-        blob = dataUrlToBlob(drawingDataUrl);
-      } else {
-        setUploading(false);
-        return;
-      }
+      const blob = mode === "image" && imageFile
+        ? imageFile
+        : dataUrlToBlob(drawingDataUrl!);
       const imageUrl = await uploadBlob(blob);
       onPost({ cardType: mode, text: "", writeLang, imageUrl });
     } catch (err) {
       console.error("업로드 실패:", err);
-      alert("업로드에 실패했습니다.\nFirebase Storage 규칙이 설정되어 있는지 확인하세요.");
+      alert("업로드에 실패했습니다.\nFirebase Storage 규칙을 확인하세요.");
     }
     setUploading(false);
   }
@@ -116,41 +108,57 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
   return (
     <div
       style={{
-        position: "fixed", inset: 0, background: "rgba(15,12,41,0.72)",
+        position: "fixed", inset: 0,
+        background: "rgba(9,7,30,0.75)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
-        zIndex: 200, backdropFilter: "blur(5px)",
+        zIndex: 200, backdropFilter: "blur(6px)",
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{
-        background: "#fff", borderRadius: "22px 22px 0 0",
-        width: "100%", maxWidth: 560, padding: "22px 22px 36px",
-        boxShadow: "0 -12px 48px rgba(0,0,0,0.25)",
+        background: "#fff", borderRadius: "24px 24px 0 0",
+        width: "100%", maxWidth: 560, padding: "24px 24px 40px",
+        boxShadow: "0 -16px 60px rgba(0,0,0,0.3)",
         animation: "slideUp 0.22s ease",
         maxHeight: "92vh", overflowY: "auto",
       }}>
-        {/* 헤더 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0 }} />
-          <span style={{ fontWeight: 900, fontSize: 14, color: "#1a1a1a", flex: 1 }}>{col?.title}</span>
+        {/* Handle bar */}
+        <div style={{
+          width: 36, height: 4, borderRadius: 2, background: "#E5E7EB",
+          margin: "-8px auto 20px",
+        }} />
+
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0, boxShadow: `0 0 0 3px ${accent}22` }} />
+          <span style={{ fontWeight: 800, fontSize: 14, color: "#111827", flex: 1, letterSpacing: -0.2 }}>
+            {col?.title}
+          </span>
           <button
             onClick={onClose}
-            style={{ background: "#f2f2f2", border: "none", borderRadius: "50%", width: 28, height: 28, fontSize: 13, cursor: "pointer", color: "#777" }}
+            style={{
+              background: "#F3F4F6", border: "none", borderRadius: "50%",
+              width: 30, height: 30, fontSize: 13, cursor: "pointer", color: "#6B7280",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#E5E7EB")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#F3F4F6")}
           >✕</button>
         </div>
 
-        {/* 탭 */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 16, background: "#f5f5f5", borderRadius: 12, padding: 4 }}>
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 18, background: "#F3F4F6", borderRadius: 12, padding: 4 }}>
           {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setMode(tab.key)}
               style={{
-                flex: 1, padding: "7px 4px", borderRadius: 9, border: "none", cursor: "pointer",
+                flex: 1, padding: "8px 4px", borderRadius: 9, border: "none", cursor: "pointer",
                 background: mode === tab.key ? "#fff" : "transparent",
-                boxShadow: mode === tab.key ? "0 1px 4px rgba(0,0,0,0.12)" : "none",
-                fontWeight: mode === tab.key ? 800 : 400, fontSize: 12,
-                color: mode === tab.key ? accent : "#999",
+                boxShadow: mode === tab.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                fontWeight: mode === tab.key ? 800 : 500, fontSize: 12,
+                color: mode === tab.key ? accent : "#9CA3AF",
                 transition: "all 0.15s",
               }}
             >
@@ -162,18 +170,18 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
         {/* ── 텍스트 모드 ── */}
         {mode === "text" && (
           <>
-            <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontSize: 11, color: "#bbb", fontWeight: 700 }}>작성 언어</span>
+            <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 0.5 }}>작성 언어</span>
               {langOptions.map((l) => (
                 <button
                   key={l}
                   onClick={() => setWriteLang(l)}
                   style={{
-                    padding: "5px 12px", borderRadius: 16, fontSize: 12,
-                    border: `2px solid ${writeLang === l ? accent : "#eee"}`,
-                    background: writeLang === l ? accent + "18" : "#fafafa",
-                    color: writeLang === l ? accent : "#aaa",
-                    fontWeight: writeLang === l ? 800 : 400, cursor: "pointer",
+                    padding: "5px 11px", borderRadius: 16, fontSize: 12,
+                    border: `1.5px solid ${writeLang === l ? accent : "#E5E7EB"}`,
+                    background: writeLang === l ? accent + "15" : "#F9FAFB",
+                    color: writeLang === l ? accent : "#9CA3AF",
+                    fontWeight: writeLang === l ? 700 : 400, cursor: "pointer",
                     transition: "all 0.12s",
                   }}
                 >
@@ -189,13 +197,22 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
               placeholder={`${LANGUAGES[writeLang]?.flag} ${LANGUAGES[writeLang]?.label}로 입력하면 자동으로 번역됩니다...`}
               rows={4}
               style={{
-                width: "100%", padding: "13px 15px", borderRadius: 14,
-                border: "2px solid #e5e5e5", fontSize: 15, resize: "none",
-                boxSizing: "border-box", fontFamily: "inherit", lineHeight: 1.65,
-                outline: "none", transition: "border-color 0.18s", color: "#1a1a1a",
+                width: "100%", padding: "14px 16px", borderRadius: 14,
+                border: "2px solid #E5E7EB", fontSize: 15, resize: "none",
+                boxSizing: "border-box", lineHeight: 1.65,
+                outline: "none", transition: "all 0.18s", color: "#111827",
+                background: "#F9FAFB", fontWeight: 500,
               }}
-              onFocus={(e) => (e.target.style.borderColor = accent)}
-              onBlur={(e) => (e.target.style.borderColor = "#e5e5e5")}
+              onFocus={(e) => {
+                e.target.style.borderColor = accent;
+                e.target.style.background = "#fff";
+                e.target.style.boxShadow = `0 0 0 4px ${accent}14`;
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "#E5E7EB";
+                e.target.style.background = "#F9FAFB";
+                e.target.style.boxShadow = "none";
+              }}
             />
           </>
         )}
@@ -205,8 +222,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
           <div>
             <input
               ref={fileInputRef}
-              type="file"
-              accept="image/*"
+              type="file" accept="image/*"
               style={{ display: "none" }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -219,36 +235,36 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
               <div
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  border: "2px dashed #e5e5e5", borderRadius: 14,
-                  padding: "48px 20px", textAlign: "center", cursor: "pointer",
-                  color: "#bbb", transition: "all 0.18s",
+                  border: "2px dashed #E5E7EB", borderRadius: 14,
+                  padding: "52px 20px", textAlign: "center", cursor: "pointer",
+                  transition: "all 0.18s",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = accent;
-                  (e.currentTarget as HTMLDivElement).style.background = accent + "08";
+                  const el = e.currentTarget as HTMLDivElement;
+                  el.style.borderColor = accent;
+                  el.style.background = accent + "08";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = "#e5e5e5";
-                  (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                  const el = e.currentTarget as HTMLDivElement;
+                  el.style.borderColor = "#E5E7EB";
+                  el.style.background = "transparent";
                 }}
               >
-                <div style={{ fontSize: 40, marginBottom: 8 }}>🖼️</div>
-                <div style={{ fontWeight: 700, marginBottom: 4, color: "#888" }}>사진을 선택하세요</div>
-                <div style={{ fontSize: 12 }}>클릭하여 업로드</div>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>🖼️</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#374151", marginBottom: 4 }}>사진을 선택하세요</div>
+                <div style={{ fontSize: 12, color: "#9CA3AF" }}>클릭하여 업로드</div>
               </div>
             ) : (
               <div style={{ position: "relative" }}>
-                <img
-                  src={imagePreview}
-                  alt="preview"
-                  style={{ width: "100%", borderRadius: 12, maxHeight: 280, objectFit: "contain", background: "#f5f5f5" }}
-                />
+                <img src={imagePreview} alt="preview"
+                  style={{ width: "100%", borderRadius: 12, maxHeight: 280, objectFit: "contain", background: "#F9FAFB" }} />
                 <button
                   onClick={() => { setImageFile(null); setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                   style={{
                     position: "absolute", top: 8, right: 8,
                     background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%",
                     width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 13,
+                    display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                 >✕</button>
               </div>
@@ -263,15 +279,22 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
               type="text"
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
-              placeholder="YouTube URL 붙여넣기 (https://youtu.be/... 또는 youtube.com/watch?v=...)"
+              placeholder="YouTube URL 붙여넣기 (youtu.be/... 또는 youtube.com/watch?v=...)"
               style={{
-                width: "100%", padding: "13px 15px", borderRadius: 14,
-                border: "2px solid #e5e5e5", fontSize: 14,
-                boxSizing: "border-box", outline: "none", fontFamily: "inherit",
-                transition: "border-color 0.18s", color: "#1a1a1a",
+                width: "100%", padding: "14px 16px", borderRadius: 14,
+                border: "2px solid #E5E7EB", fontSize: 14, background: "#F9FAFB",
+                boxSizing: "border-box", outline: "none", transition: "all 0.18s", color: "#111827",
               }}
-              onFocus={(e) => (e.target.style.borderColor = accent)}
-              onBlur={(e) => (e.target.style.borderColor = "#e5e5e5")}
+              onFocus={(e) => {
+                e.target.style.borderColor = accent;
+                e.target.style.background = "#fff";
+                e.target.style.boxShadow = `0 0 0 4px ${accent}14`;
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "#E5E7EB";
+                e.target.style.background = "#F9FAFB";
+                e.target.style.boxShadow = "none";
+              }}
             />
             {youtubeId && (
               <div style={{ marginTop: 12 }}>
@@ -280,7 +303,7 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
                   alt="YouTube thumbnail"
                   style={{ width: "100%", borderRadius: 12 }}
                 />
-                <div style={{ fontSize: 12, color: "#4CAF50", marginTop: 6, textAlign: "center", fontWeight: 700 }}>
+                <div style={{ fontSize: 12, color: "#10B981", marginTop: 8, textAlign: "center", fontWeight: 700 }}>
                   ✅ 유효한 YouTube 링크
                 </div>
               </div>
@@ -300,10 +323,11 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
                     position: "absolute", top: 8, right: 8,
                     background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%",
                     width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 13,
+                    display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                 >✕</button>
               </div>
-              <div style={{ fontSize: 12, color: "#888", marginTop: 6, textAlign: "center" }}>
+              <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 8, textAlign: "center" }}>
                 다시 그리려면 ✕ 버튼을 누르세요
               </div>
             </div>
@@ -312,28 +336,28 @@ export default function PostModal({ colId, user, posting, onPost, onClose }: Pro
           )
         )}
 
-        {/* 하단 게시 버튼 (그림 그리는 중엔 숨김) */}
+        {/* Bottom submit */}
         {!(mode === "drawing" && !drawingDataUrl) && (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-            <span style={{ fontSize: 11, color: "#ccc" }}>
-              {mode === "text" ? "Ctrl+Enter · 자동 번역 포함" : ""}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+            <span style={{ fontSize: 11, color: "#CBD5E1" }}>
+              {mode === "text" ? "Ctrl+Enter로 빠른 게시" : ""}
             </span>
             <button
               onClick={handleSubmit}
               disabled={btnDisabled}
               style={{
-                padding: "11px 26px", borderRadius: 13, fontSize: 14,
+                padding: "12px 28px", borderRadius: 13, fontSize: 14,
                 background: btnDisabled
-                  ? "#e8e8e8"
+                  ? "#F3F4F6"
                   : `linear-gradient(135deg, ${accent}, #9B59B6)`,
-                color: btnDisabled ? "#bbb" : "#fff",
-                fontWeight: 900, border: "none",
+                color: btnDisabled ? "#CBD5E1" : "#fff",
+                fontWeight: 800, border: "none",
                 cursor: btnDisabled ? "not-allowed" : "pointer",
-                boxShadow: !btnDisabled ? `0 4px 16px ${accent}44` : "none",
-                transition: "all 0.18s",
+                boxShadow: !btnDisabled ? `0 4px 20px ${accent}44` : "none",
+                transition: "all 0.18s", letterSpacing: -0.2,
               }}
             >
-              {uploading ? "⟳ 업로드 중..." : posting ? "⟳ 저장 중..." : "게시하기 📤"}
+              {uploading ? "⟳ 업로드 중..." : posting ? "⟳ 저장 중..." : "게시하기 →"}
             </button>
           </div>
         )}

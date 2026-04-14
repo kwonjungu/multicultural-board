@@ -23,10 +23,10 @@ export const COLUMNS_DEFAULT = [
 ];
 
 export const CARD_PALETTES = [
-  { bg: "#FFFBEA", top: "#FFD600", dot: "#F59E0B" },
-  { bg: "#F0FFF4", top: "#34D399", dot: "#059669" },
-  { bg: "#EFF6FF", top: "#60A5FA", dot: "#2563EB" },
-  { bg: "#FFF0F3", top: "#FB7185", dot: "#E11D48" },
-  { bg: "#F5F3FF", top: "#A78BFA", dot: "#7C3AED" },
-  { bg: "#FFF7ED", top: "#FB923C", dot: "#EA580C" },
+  { bg: "#FAFAFE", accent: "#6C63FF" },
+  { bg: "#F0FFF8", accent: "#10B981" },
+  { bg: "#EFF6FF", accent: "#3B82F6" },
+  { bg: "#FFF1F2", accent: "#F43F5E" },
+  { bg: "#F5F3FF", accent: "#8B5CF6" },
+  { bg: "#FFF7ED", accent: "#F97316" },
 ];

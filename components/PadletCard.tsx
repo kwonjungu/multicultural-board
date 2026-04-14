@@ -25,21 +25,31 @@ function timeAgo(ts: number) {
   return `${Math.floor(s / 3600)}시간 전`;
 }
 
-function LangBadge({ lang, text, accent }: { lang: string; text: string; accent: string }) {
+function TranslationRow({ lang, text, accent }: { lang: string; text: string; accent: string }) {
   return (
-    <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginTop: 7 }}>
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 8,
+      padding: "7px 0", borderTop: "1px solid #F3F4F6",
+    }}>
       <span style={{
-        flexShrink: 0, fontSize: 11, fontWeight: 700,
-        background: accent + "22", color: accent,
-        borderRadius: 12, padding: "2px 8px", lineHeight: "18px", whiteSpace: "nowrap",
+        fontSize: 10, fontWeight: 700, letterSpacing: 0.2,
+        background: accent + "18", color: accent,
+        borderRadius: 8, padding: "2px 7px", flexShrink: 0, marginTop: 2,
+        whiteSpace: "nowrap",
       }}>
         {LANGUAGES[lang]?.flag} {LANGUAGES[lang]?.label}
       </span>
-      <span style={{ fontSize: 13, color: "#555", lineHeight: 1.55, flex: 1 }}>{text}</span>
+      <span style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, flex: 1 }}>{text}</span>
       <button
         onClick={() => speakText(text, lang)}
-        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, opacity: 0.4, flexShrink: 0, padding: 0 }}
         title="읽어주기"
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          fontSize: 12, color: "#CBD5E1", flexShrink: 0, padding: "2px",
+          transition: "color 0.15s", lineHeight: 1,
+        }}
+        onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = accent)}
+        onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#CBD5E1")}
       >🔊</button>
     </div>
   );
@@ -55,7 +65,6 @@ export default function PadletCard({ card, viewerLang, colColor }: Props) {
   const p = CARD_PALETTES[card.paletteIdx % CARD_PALETTES.length];
   const [open, setOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
-
   const cardType = card.cardType || "text";
 
   const otherLangs = Object.keys(card.translations || {}).filter(
@@ -65,71 +74,89 @@ export default function PadletCard({ card, viewerLang, colColor }: Props) {
   return (
     <div
       style={{
-        background: p.bg, borderRadius: 14, overflow: "hidden",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-        marginBottom: 10, position: "relative",
-        transition: "box-shadow 0.18s, transform 0.18s",
+        background: p.bg,
+        borderRadius: 14,
+        border: "1px solid #EEF0F6",
+        borderLeft: `4px solid ${p.accent}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 2px 6px rgba(0,0,0,0.04)",
+        marginBottom: 10,
+        transition: "box-shadow 0.2s, transform 0.2s",
+        overflow: "hidden",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 22px rgba(0,0,0,0.13)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 24px rgba(0,0,0,0.1)";
         (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.05), 0 2px 6px rgba(0,0,0,0.04)";
         (e.currentTarget as HTMLDivElement).style.transform = "none";
       }}
     >
-      {/* 컬러 탑바 */}
-      <div style={{ height: 5, background: p.top }} />
-
-      <div style={{ padding: "12px 13px 14px" }}>
-        {/* 작성자 헤더 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+      <div style={{ padding: "12px 14px 14px" }}>
+        {/* Author row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
           <div style={{
-            width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-            background: p.dot, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+            width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+            background: `linear-gradient(135deg, ${p.accent}cc, ${p.accent}66)`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: card.isTeacher ? 15 : 13, fontWeight: 900, color: "#fff",
           }}>
-            {card.isTeacher ? "👩‍🏫" : LANGUAGES[card.authorLang]?.flag}
+            {card.isTeacher ? "👩‍🏫" : card.authorName.charAt(0).toUpperCase()}
           </div>
+
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#1a1a1a", display: "flex", alignItems: "center", gap: 5 }}>
-              {card.authorName}
+            <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+                {card.authorName}
+              </span>
               {card.isTeacher && (
-                <span style={{ fontSize: 9, background: p.dot, color: "#fff", borderRadius: 8, padding: "1px 6px" }}>선생님</span>
+                <span style={{
+                  fontSize: 9, background: p.accent, color: "#fff",
+                  borderRadius: 6, padding: "1px 7px", fontWeight: 700,
+                }}>선생님</span>
               )}
               {cardType !== "text" && (
-                <span style={{ fontSize: 9, background: "#f0f0f0", color: "#888", borderRadius: 8, padding: "1px 6px" }}>
-                  {cardType === "image" ? "🖼️" : cardType === "youtube" ? "📺" : "✏️"}
+                <span style={{
+                  fontSize: 9, background: "#F3F4F6", color: "#6B7280",
+                  borderRadius: 6, padding: "1px 7px",
+                }}>
+                  {cardType === "image" ? "🖼️ 사진" : cardType === "youtube" ? "📺 YouTube" : "✏️ 그림"}
                 </span>
               )}
+              {card.flagged && (
+                <span style={{
+                  fontSize: 9, background: "#FEF2F2", color: "#DC2626",
+                  borderRadius: 6, padding: "1px 7px", border: "1px solid #FECACA",
+                }}>⚠️ 검토</span>
+              )}
             </div>
-            <div style={{ fontSize: 10, color: "#bbb" }}>
-              {LANGUAGES[card.authorLang]?.flag} {LANGUAGES[card.authorLang]?.label} · {timeAgo(card.timestamp)}
+            <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+              {LANGUAGES[card.authorLang]?.flag}
+              <span>{LANGUAGES[card.authorLang]?.label}</span>
+              <span style={{ color: "#E5E7EB" }}>·</span>
+              <span>{timeAgo(card.timestamp)}</span>
             </div>
           </div>
-          {card.flagged && (
-            <span style={{ fontSize: 10, background: "#FFEBEE", color: "#C62828", borderRadius: 8, padding: "2px 6px", border: "1px solid #FFCDD2" }}>
-              ⚠️ 검토
-            </span>
-          )}
         </div>
 
-        {/* ── 사진 / 그림 카드 ── */}
+        {/* ── Image / Drawing ── */}
         {(cardType === "image" || cardType === "drawing") && card.imageUrl && !imgError && (
           <img
             src={card.imageUrl}
-            alt={cardType === "drawing" ? "그림" : "사진"}
+            alt={cardType}
             onError={() => setImgError(true)}
-            style={{ width: "100%", borderRadius: 10, marginBottom: 4, display: "block" }}
+            style={{ width: "100%", borderRadius: 10, display: "block" }}
           />
         )}
         {(cardType === "image" || cardType === "drawing") && imgError && (
-          <div style={{ padding: "20px 0", textAlign: "center", color: "#ccc", fontSize: 12 }}>이미지를 불러올 수 없습니다</div>
+          <div style={{ padding: "24px", textAlign: "center", color: "#9CA3AF", fontSize: 12, background: "#F9FAFB", borderRadius: 10 }}>
+            이미지를 불러올 수 없습니다
+          </div>
         )}
 
-        {/* ── YouTube 카드 ── */}
+        {/* ── YouTube ── */}
         {cardType === "youtube" && card.youtubeId && (
-          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 10, overflow: "hidden", marginBottom: 4 }}>
+          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 10, overflow: "hidden" }}>
             <iframe
               src={`https://www.youtube.com/embed/${card.youtubeId}`}
               style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
@@ -140,55 +167,59 @@ export default function PadletCard({ card, viewerLang, colColor }: Props) {
           </div>
         )}
 
-        {/* ── 텍스트 카드 ── */}
+        {/* ── Text ── */}
         {cardType === "text" && (
           <>
-            {/* 원문 */}
             <div style={{
-              fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.65,
-              background: "rgba(255,255,255,0.6)", borderRadius: 10,
-              padding: "8px 10px", display: "flex", gap: 6, alignItems: "flex-start",
+              fontSize: 14, fontWeight: 600, color: "#111827", lineHeight: 1.7,
+              padding: "9px 11px",
+              background: "rgba(255,255,255,0.75)",
+              borderRadius: 9, border: "1px solid #F3F4F6",
+              display: "flex", gap: 8, alignItems: "flex-start",
             }}>
               <span style={{ flex: 1 }}>{card.originalText}</span>
               <button
                 onClick={() => speakText(card.originalText, card.authorLang)}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, opacity: 0.4, flexShrink: 0, padding: 0 }}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#CBD5E1", flexShrink: 0, padding: "2px", transition: "color 0.15s" }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = p.accent)}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#CBD5E1")}
               >🔊</button>
             </div>
 
-            {/* 로딩 */}
             {card.loading && (
-              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#bbb", marginTop: 8 }}>
-                <span style={{ display: "inline-block", animation: "spin 0.9s linear infinite", fontSize: 13 }}>⟳</span>
-                번역 중...
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9CA3AF", marginTop: 8 }}>
+                <span style={{ display: "inline-block", animation: "pulse 1.2s ease-in-out infinite" }}>● ● ●</span>
               </div>
             )}
 
-            {/* 내 언어 번역 우선 노출 */}
             {!card.loading && card.translations?.[viewerLang] && viewerLang !== card.authorLang && (
-              <LangBadge lang={viewerLang} text={card.translations[viewerLang]} accent={colColor} />
+              <div style={{ paddingTop: 2 }}>
+                <TranslationRow lang={viewerLang} text={card.translations[viewerLang]} accent={colColor} />
+              </div>
             )}
 
-            {/* 번역 오류 */}
             {card.translateError && (
-              <div style={{ fontSize: 11, color: "#E65100", marginTop: 6 }}>⚠️ 번역 실패</div>
+              <div style={{ fontSize: 11, color: "#EF4444", marginTop: 6 }}>⚠️ 번역 실패</div>
             )}
 
-            {/* 다른 언어 펼치기 */}
             {otherLangs.length > 0 && (
-              <>
+              <div>
                 <button
                   onClick={() => setOpen((v) => !v)}
-                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: p.dot, fontWeight: 700, marginTop: 7, padding: 0 }}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    fontSize: 11, color: p.accent, fontWeight: 700,
+                    padding: "6px 0 0", display: "flex", alignItems: "center", gap: 3,
+                  }}
                 >
-                  {open ? "▲ 접기" : `▼ +${otherLangs.length}개 언어`}
+                  {open ? "▲ 접기" : `▼ +${otherLangs.length}개 언어 더보기`}
                 </button>
                 {open && otherLangs.map((l) =>
                   card.translations[l] ? (
-                    <LangBadge key={l} lang={l} text={card.translations[l]} accent={p.dot} />
+                    <TranslationRow key={l} lang={l} text={card.translations[l]} accent={p.accent} />
                   ) : null
                 )}
-              </>
+              </div>
             )}
           </>
         )}

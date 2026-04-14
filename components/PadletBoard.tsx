@@ -19,7 +19,6 @@ export default function PadletBoard({ user, onLogout }: Props) {
   const [posting, setPosting] = useState(false);
   const viewerLang = user.isTeacher ? user.teacherLangs[0] : user.myLang;
 
-  // ── Firebase Realtime DB 구독 ──
   useEffect(() => {
     const db = getClientDb();
     const cardsRef = ref(db, "cards");
@@ -33,11 +32,9 @@ export default function PadletBoard({ user, onLogout }: Props) {
     return () => off(cardsRef);
   }, []);
 
-  // ── 게시 처리 ──
   const handlePost = useCallback(async (data: PostData) => {
     if (posting || !modal) return;
     const { cardType, text, writeLang, imageUrl, youtubeId } = data;
-
     if (cardType === "text" && !text.trim()) return;
 
     setPosting(true);
@@ -74,28 +71,19 @@ export default function PadletBoard({ user, onLogout }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text,
-          fromLang: writeLang,
-          targetLangs,
-          colId: modal.colId,
-          authorName: user.myName,
-          isTeacher: user.isTeacher,
-          paletteIdx: tempCard.paletteIdx,
-          cardType,
-          imageUrl,
-          youtubeId,
+          text, fromLang: writeLang, targetLangs,
+          colId: modal.colId, authorName: user.myName,
+          isTeacher: user.isTeacher, paletteIdx: tempCard.paletteIdx,
+          cardType, imageUrl, youtubeId,
         }),
       });
       if (!res.ok) throw new Error("API 오류");
       setCards((prev) => prev.filter((c) => c.id !== tempId));
     } catch {
       setCards((prev) =>
-        prev.map((c) =>
-          c.id === tempId ? { ...c, loading: false, translateError: true } : c
-        )
+        prev.map((c) => c.id === tempId ? { ...c, loading: false, translateError: true } : c)
       );
     }
-
     setPosting(false);
   }, [posting, modal, user]);
 
@@ -103,51 +91,100 @@ export default function PadletBoard({ user, onLogout }: Props) {
     <div style={{
       height: "100vh", display: "flex", flexDirection: "column",
       fontFamily: "'Noto Sans KR', sans-serif",
-      background: "#E8EAF6", overflow: "hidden",
+      background: "#F0F2FA", overflow: "hidden",
     }}>
-      {/* ── 헤더 ── */}
+      {/* ── Header ── */}
       <header style={{
-        height: 56, flexShrink: 0,
-        background: "linear-gradient(90deg, #1a1a2e 0%, #16213e 100%)",
-        borderBottom: "3px solid #6C63FF",
-        display: "flex", alignItems: "center", gap: 14, padding: "0 20px",
+        height: 58, flexShrink: 0,
+        background: "#0F0C28",
+        borderBottom: "1px solid rgba(255,255,255,0.07)",
+        display: "flex", alignItems: "center", padding: "0 20px", gap: 0,
       }}>
-        <span style={{ fontSize: 22 }}>🌏</span>
-        <span style={{ fontWeight: 900, fontSize: 15, color: "#fff" }}>다문화 교실 소통판</span>
-        <span style={{ fontSize: 11, color: "#7986CB" }}>Multicultural Board</span>
-
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
-            background: "#6C63FF22", border: "1px solid #6C63FF66",
-            borderRadius: 20, padding: "4px 14px",
-            display: "flex", alignItems: "center", gap: 6,
+            width: 34, height: 34, borderRadius: 10,
+            background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 17, boxShadow: "0 4px 12px rgba(91,87,245,0.4)",
+            flexShrink: 0,
+          }}>🌏</div>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 14, color: "#F9FAFB", letterSpacing: -0.3 }}>
+              다문화 교실 소통판
+            </div>
+            <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 400, marginTop: -1 }}>
+              Multicultural Board
+            </div>
+          </div>
+        </div>
+
+        {/* Right side */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Language flags */}
+          <div style={{ display: "flex", gap: 4 }}>
+            {(user.isTeacher ? user.teacherLangs : [user.myLang]).map((l) => (
+              <span key={l} style={{
+                background: "rgba(255,255,255,0.06)", color: "#9CA3AF",
+                borderRadius: 8, fontSize: 13, padding: "4px 8px",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}>
+                {LANGUAGES[l]?.flag}
+              </span>
+            ))}
+          </div>
+
+          {/* User badge */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            background: "rgba(91,87,245,0.15)",
+            border: "1px solid rgba(91,87,245,0.3)",
+            borderRadius: 20, padding: "5px 14px 5px 5px",
           }}>
-            <span style={{ fontSize: 14 }}>{user.isTeacher ? "👩‍🏫" : LANGUAGES[user.myLang]?.flag}</span>
-            <span style={{ color: "#C5CAE9", fontWeight: 700, fontSize: 13 }}>{user.myName}</span>
+            <div style={{
+              width: 26, height: 26, borderRadius: "50%",
+              background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: user.isTeacher ? 13 : 11, fontWeight: 800, color: "#fff",
+            }}>
+              {user.isTeacher ? "👩‍🏫" : user.myName.charAt(0).toUpperCase()}
+            </div>
+            <span style={{ color: "#E5E7EB", fontWeight: 700, fontSize: 13 }}>
+              {user.myName}
+            </span>
             {user.isTeacher && (
-              <span style={{ fontSize: 10, background: "#6C63FF", color: "#fff", borderRadius: 10, padding: "1px 7px" }}>선생님</span>
+              <span style={{
+                fontSize: 9, background: "#5B57F5", color: "#fff",
+                borderRadius: 8, padding: "1px 7px", fontWeight: 700,
+              }}>선생님</span>
             )}
           </div>
 
-          {(user.isTeacher ? user.teacherLangs : [user.myLang]).map((l) => (
-            <span key={l} style={{ background: "rgba(255,255,255,0.07)", color: "#9FA8DA", borderRadius: 16, fontSize: 12, padding: "3px 10px" }}>
-              {LANGUAGES[l]?.flag}
-            </span>
-          ))}
-
           <button
             onClick={onLogout}
-            style={{ background: "none", border: "1px solid rgba(255,255,255,0.15)", color: "#7986CB", borderRadius: 20, padding: "4px 12px", fontSize: 11, cursor: "pointer" }}
+            style={{
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+              color: "#6B7280", borderRadius: 10, padding: "6px 12px",
+              fontSize: 12, cursor: "pointer", fontWeight: 600, transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.1)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#6B7280";
+            }}
           >
             ⚙ 설정
           </button>
         </div>
       </header>
 
-      {/* ── 컬럼 보드 ── */}
+      {/* ── Board ── */}
       <main style={{
         flex: 1, overflowX: "auto", overflowY: "hidden",
-        display: "flex", gap: 14, padding: "14px 16px",
+        display: "flex", gap: 14, padding: "16px 18px",
         alignItems: "flex-start",
       }}>
         {COLUMNS_DEFAULT.map((col) => {
@@ -156,23 +193,54 @@ export default function PadletBoard({ user, onLogout }: Props) {
             <div
               key={col.id}
               style={{
-                width: 292, flexShrink: 0, display: "flex", flexDirection: "column",
-                height: "calc(100vh - 70px)", borderRadius: 16, overflow: "hidden",
-                boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                width: 296, flexShrink: 0, display: "flex", flexDirection: "column",
+                height: "calc(100vh - 74px)", borderRadius: 16, overflow: "hidden",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)",
+                background: "#fff", border: "1px solid #E9ECF5",
               }}
             >
-              <div style={{ background: col.color, padding: "14px 16px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                <span style={{ flex: 1, fontWeight: 800, fontSize: 13, color: "#fff", lineHeight: 1.35 }}>{col.title}</span>
-                <span style={{ background: "rgba(255,255,255,0.22)", color: "#fff", borderRadius: 20, fontSize: 12, fontWeight: 800, padding: "2px 10px", minWidth: 28, textAlign: "center" }}>
+              {/* Column header */}
+              <div style={{
+                padding: "14px 16px 12px",
+                borderBottom: "1px solid #F3F4F8",
+                display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
+                background: "#fff",
+              }}>
+                <div style={{
+                  width: 10, height: 10, borderRadius: "50%",
+                  background: col.color, flexShrink: 0,
+                  boxShadow: `0 0 0 3px ${col.color}22`,
+                }} />
+                <span style={{
+                  flex: 1, fontWeight: 800, fontSize: 13, color: "#111827",
+                  letterSpacing: -0.2, lineHeight: 1.35,
+                }}>
+                  {col.title}
+                </span>
+                <span style={{
+                  background: col.color + "18", color: col.color,
+                  borderRadius: 20, fontSize: 11, fontWeight: 800,
+                  padding: "2px 10px", minWidth: 28, textAlign: "center",
+                }}>
                   {colCards.length}
                 </span>
               </div>
 
-              <div style={{ flex: 1, overflowY: "auto", background: "#ECEEF7", padding: "12px 10px 4px", scrollbarWidth: "thin", scrollbarColor: "#C5CAE9 transparent" }}>
+              {/* Cards */}
+              <div style={{
+                flex: 1, overflowY: "auto", padding: "12px 10px 4px",
+                background: "#F8F9FC",
+                scrollbarWidth: "thin", scrollbarColor: "#D1D5E0 transparent",
+              }}>
                 {colCards.length === 0 ? (
-                  <div style={{ textAlign: "center", color: "#c0c4d6", padding: "36px 16px", fontSize: 13, lineHeight: 2 }}>
-                    <div style={{ fontSize: 30, marginBottom: 8 }}>✏️</div>
-                    아직 게시물이 없어요<br />아래 버튼으로 추가해보세요!
+                  <div style={{
+                    textAlign: "center", padding: "40px 16px",
+                    color: "#CBD5E1", fontSize: 12, lineHeight: 2,
+                    animation: "fadeSlideIn 0.3s ease",
+                  }}>
+                    <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.5 }}>✏️</div>
+                    <div style={{ fontWeight: 600, color: "#9CA3AF" }}>아직 게시물이 없어요</div>
+                    <div style={{ fontSize: 11 }}>아래 버튼으로 추가해보세요</div>
                   </div>
                 ) : (
                   colCards.map((card) => (
@@ -181,42 +249,48 @@ export default function PadletBoard({ user, onLogout }: Props) {
                 )}
               </div>
 
+              {/* Add button */}
               <button
                 onClick={() => setModal({ colId: col.id })}
                 style={{
-                  flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  background: "#fff", border: "none", borderTop: `3px solid ${col.color}22`,
-                  padding: "13px 0", cursor: "pointer", color: col.color, fontWeight: 800, fontSize: 13,
+                  flexShrink: 0, display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 6,
+                  background: "#fff", border: "none",
+                  borderTop: "1px solid #F3F4F8",
+                  padding: "13px 0", cursor: "pointer",
+                  color: col.color, fontWeight: 800, fontSize: 13,
                   transition: "background 0.15s",
                 }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = col.color + "12")}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = col.color + "0D")}
                 onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#fff")}
               >
-                <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> 여기에 추가
+                <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span>
+                여기에 추가
               </button>
             </div>
           );
         })}
 
+        {/* Add column (teacher only) */}
         {user.isTeacher && (
           <div style={{
-            width: 240, flexShrink: 0, height: 110,
-            border: "2.5px dashed #9FA8DA", borderRadius: 14,
+            width: 240, flexShrink: 0, height: 112,
+            border: "2px dashed #D1D5E0", borderRadius: 14,
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#9FA8DA", fontSize: 14, fontWeight: 700, cursor: "pointer",
-            transition: "all 0.2s",
+            color: "#9CA3AF", fontSize: 13, fontWeight: 700, cursor: "pointer",
+            transition: "all 0.2s", background: "transparent",
           }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLDivElement;
-              el.style.background = "rgba(108,99,255,0.06)";
-              el.style.borderColor = "#6C63FF";
-              el.style.color = "#6C63FF";
+              el.style.background = "rgba(91,87,245,0.04)";
+              el.style.borderColor = "#5B57F5";
+              el.style.color = "#5B57F5";
             }}
             onMouseLeave={(e) => {
               const el = e.currentTarget as HTMLDivElement;
               el.style.background = "transparent";
-              el.style.borderColor = "#9FA8DA";
-              el.style.color = "#9FA8DA";
+              el.style.borderColor = "#D1D5E0";
+              el.style.color = "#9CA3AF";
             }}
           >
             + 컬럼 추가
