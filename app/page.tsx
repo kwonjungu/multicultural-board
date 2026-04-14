@@ -73,7 +73,7 @@ export default function Home() {
 
       <div style={{
         background: "#fff", borderRadius: 28, padding: "40px 36px 36px",
-        maxWidth: 460, width: "100%",
+        maxWidth: "min(460px, 92vw)", width: "100%",
         boxShadow: "0 40px 100px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)",
         animation: "fadeSlideIn 0.4s ease", position: "relative", zIndex: 1,
       }}>

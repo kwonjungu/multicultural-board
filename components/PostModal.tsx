@@ -275,11 +275,12 @@ export default function PostModal({
         display: "flex", alignItems: "flex-end", justifyContent: "center",
         zIndex: 200, backdropFilter: "blur(6px)",
       }}
+      role="dialog" aria-modal="true" aria-labelledby="post-modal-title"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{
         background: "#fff", borderRadius: "24px 24px 0 0",
-        width: "100%", maxWidth: 560, padding: "24px 24px 40px",
+        width: "100%", maxWidth: "min(560px, 92vw)", padding: "24px clamp(16px, 4vw, 24px) 40px",
         boxShadow: "0 -16px 60px rgba(0,0,0,0.3)",
         animation: "slideUp 0.22s ease",
         maxHeight: "92vh", overflowY: "auto",
@@ -293,11 +294,12 @@ export default function PostModal({
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0, boxShadow: `0 0 0 3px ${accent}22` }} />
-          <span style={{ fontWeight: 800, fontSize: 14, color: "#111827", flex: 1, letterSpacing: -0.2 }}>
+          <span id="post-modal-title" style={{ fontWeight: 800, fontSize: 14, color: "#111827", flex: 1, letterSpacing: -0.2 }}>
             {isEdit ? `✏️ ${t("editCard", lang)} — ${colTitle}` : colTitle}
           </span>
           <button
             onClick={onClose}
+            aria-label="close"
             style={{
               background: "#F3F4F6", border: "none", borderRadius: "50%",
               width: 30, height: 30, fontSize: 13, cursor: "pointer", color: "#6B7280",
@@ -358,10 +360,22 @@ export default function PostModal({
         )}
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 18, background: "#F3F4F6", borderRadius: 12, padding: 4 }}>
+        <div
+          role="tablist"
+          style={{ display: "flex", gap: 4, marginBottom: 18, background: "#F3F4F6", borderRadius: 12, padding: 4 }}
+          onKeyDown={(e) => {
+            const tabs = TABS.map((t) => t.key);
+            const idx = tabs.indexOf(mode);
+            if (e.key === "ArrowRight") setMode(tabs[(idx + 1) % tabs.length]);
+            if (e.key === "ArrowLeft") setMode(tabs[(idx - 1 + tabs.length) % tabs.length]);
+          }}
+        >
           {TABS.map((tab) => (
             <button
               key={tab.key}
+              role="tab"
+              aria-selected={mode === tab.key}
+              tabIndex={mode === tab.key ? 0 : -1}
               onClick={() => setMode(tab.key)}
               style={{
                 flex: 1, padding: "8px 4px", borderRadius: 9, border: "none", cursor: "pointer",
@@ -376,6 +390,9 @@ export default function PostModal({
             </button>
           ))}
         </div>
+
+        {/* Tab panel */}
+        <div role="tabpanel">
 
         {/* ── 텍스트 모드 ── */}
         {mode === "text" && (
@@ -575,6 +592,7 @@ export default function PostModal({
             onClose={onClose}
           />
         )}
+        </div>{/* end tabpanel */}
 
         {/* Bottom submit */}
         {!(mode === "drawing" && !drawingDataUrl) && mode !== "worksheet" && (
@@ -585,6 +603,7 @@ export default function PostModal({
             <button
               onClick={handleSubmit}
               disabled={btnDisabled}
+              aria-busy={uploading || posting || compressing}
               style={{
                 padding: "12px 28px", borderRadius: 13, fontSize: 14,
                 background: btnDisabled

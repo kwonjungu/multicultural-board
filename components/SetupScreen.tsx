@@ -40,8 +40,8 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
       <div style={{ position: "fixed", bottom: "-15%", left: "-8%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.14) 0%, transparent 65%)", pointerEvents: "none" }} />
 
       <div style={{
-        background: "#fff", borderRadius: 28, padding: "40px 36px 36px",
-        maxWidth: 440, width: "100%",
+        background: "#fff", borderRadius: 28, padding: "clamp(24px, 5vw, 40px) clamp(16px, 5vw, 36px)",
+        maxWidth: "min(440px, 92vw)", width: "100%",
         boxShadow: "0 40px 100px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)",
         animation: "fadeSlideIn 0.4s ease", position: "relative", zIndex: 1,
       }}>
