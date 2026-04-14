@@ -4,11 +4,13 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { LANGUAGES } from "@/lib/constants";
 import { TranslateRequest } from "@/lib/types";
 
-// Groq API (LLaMA 3.3 70B, 무료)
-const groq = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
-});
+// 빌드 타임에 환경변수가 없어도 에러 안 나도록 lazy 초기화
+function getGroqClient() {
+  return new OpenAI({
+    apiKey: process.env.GROQ_API_KEY || "placeholder",
+    baseURL: "https://api.groq.com/openai/v1",
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,7 +52,7 @@ Tasks:
 Respond ONLY with raw JSON (no markdown, no explanation):
 {"translations":{${targetLangs.map((l) => `"${l}":""`).join(",")}},"safe":true,"reason":""}`;
 
-      const completion = await groq.chat.completions.create({
+      const completion = await getGroqClient().chat.completions.create({
         model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 800,
