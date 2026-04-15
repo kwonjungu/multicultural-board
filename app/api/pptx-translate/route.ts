@@ -25,14 +25,10 @@ function encodeXml(s: string): string {
 
 // ─── Layout helpers ────────────────────────────────────────────────
 function enableNormAutofit(xml: string): string {
-  // 1. noAutofit → normAutofit
   xml = xml.replace(/<a:noAutofit\s*\/>/g, "<a:normAutofit/>");
-  // 2. 자기닫힘 bodyPr → open/close + normAutofit
   xml = xml.replace(/<a:bodyPr([^>]*)\/>/g, (_m, attrs: string) =>
     `<a:bodyPr${attrs}><a:normAutofit/></a:bodyPr>`
   );
-  // 3. 이미 open 태그인 bodyPr에만 추가 (각 요소 정확한 대소문자로 체크)
-  //    normAutofit(소문자f), noAutofit(소문자f), spAutoFit(대문자F) — OOXML 스펙
   xml = xml.replace(
     /(<a:bodyPr\b[^>]*>)(?!\s*<a:normAutofit)(?!\s*<a:noAutofit)(?!\s*<a:spAutoFit)/g,
     "$1<a:normAutofit/>"
@@ -58,19 +54,67 @@ function visualWidth(text: string, lang: string): number {
   return w || 1;
 }
 
-function adjustedSz(
+// ─── Run-level text fit (글자크기 + 자간) ──────────────────────────
+interface RunAdjust { sz: string; spc: number | null }
+
+function computeRunAdjustments(
   szStr: string,
   orig: string, trans: string,
   fromLang: string, toLang: string
-): string {
+): RunAdjust {
   const origW  = visualWidth(orig,  fromLang);
   const transW = visualWidth(trans, toLang);
   const ratio  = transW / origW;
-  if (ratio <= 1.0) return szStr;
-  const sz    = Number(szStr);
-  const scale = Math.max(0.55, (1 / ratio) * 0.85);
-  const newSz = Math.max(700, Math.round(sz * scale));
-  return String(newSz);
+  if (ratio <= 1.05) return { sz: szStr, spc: null };
+
+  const sz = Number(szStr);
+  // Stage 1: 글자 크기 (메인 레버, 여유 있게 조정)
+  const newSz = String(Math.max(700, Math.round(sz * Math.max(0.65, (1 / ratio) * 0.92))));
+  // Stage 2: 자간 – ratio ≥ 1.2 시 최대 -2pt (200 hundredths-of-pt)
+  const spc: number | null = ratio >= 1.2
+    ? -Math.min(200, Math.round((ratio - 1.0) * 150))
+    : null;
+  return { sz: newSz, spc };
+}
+
+// ─── Paragraph-level 줄 간격 축소 ─────────────────────────────────
+function reducePptxLineSpacing(xml: string, p90: number): string {
+  if (p90 <= 1.3) return xml;
+  const scale = Math.max(0.65, (1 / p90) * 0.90);
+  // spcPct val 단위: 1/1000th % → 100000 = 100%, 160000 = 160%
+  return xml.replace(
+    /(<a:lnSpc>\s*<a:spcPct\s+val=")(\d+)(")/g,
+    (_m, pre: string, valStr: string, post: string) =>
+      `${pre}${Math.max(90000, Math.round(Number(valStr) * scale))}${post}`
+  );
+}
+
+// ─── 언어별 폰트 교체 (글꼴 깨짐 방지) ──────────────────────────────
+const PPTX_FONTS: Record<string, { latin: string; cs?: string; ea?: string }> = {
+  ar: { latin: "Arial",           cs: "Arial"           },
+  hi: { latin: "Mangal",          cs: "Mangal"          },
+  th: { latin: "Tahoma",          cs: "Tahoma"          },
+  km: { latin: "Khmer UI",        cs: "Khmer UI"        },
+  my: { latin: "Myanmar Text",    cs: "Myanmar Text"    },
+  mn: { latin: "Mongolian Baiti", cs: "Mongolian Baiti" },
+  zh: { latin: "Arial",           ea: "Microsoft YaHei" },
+  ja: { latin: "Arial",           ea: "Meiryo"          },
+  ko: { latin: "Arial",           ea: "Malgun Gothic"   },
+};
+
+function replacePptxFonts(xml: string, toLang: string): string {
+  const f = PPTX_FONTS[toLang] ?? { latin: "Arial" };
+  // + 시작 = 테마 폰트 참조 → 유지, 명시적 폰트명만 교체
+  if (f.latin)
+    xml = xml.replace(/<a:latin\s+typeface="(?!\+)[^"]*"\s*\/>/g,
+      `<a:latin typeface="${f.latin}"/>`);
+  if (f.cs)
+    xml = xml.replace(/<a:cs\s+typeface="(?!\+)[^"]*"\s*\/>/g,
+      `<a:cs typeface="${f.cs}"/>`);
+  if (f.ea)
+    xml = xml.replace(/<a:ea\s+typeface="(?!\+)[^"]*"\s*\/>/g,
+      `<a:ea typeface="${f.ea}"/>`);
+  return xml;
 }
 
 // ─── Main handler ──────────────────────────────────────────────────
@@ -112,13 +156,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "번역할 텍스트가 없습니다" }, { status: 400 });
     }
 
-    // ── Translate (multi-model fallback) ────────────────────────────
+    // ── Translate ───────────────────────────────────────────────────
     const fromName = LANGUAGES[fromLang]?.name || fromLang;
     const toName   = LANGUAGES[toLang]?.name   || toLang;
     const translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
 
     const map = new Map<string, string>();
     segments.forEach((src, i) => map.set(src, translated[i] || src));
+
+    // ── Doc-wide p90 expansion ratio (줄 간격 기준) ─────────────────
+    const docRatios: number[] = [];
+    for (const [src, tgt] of map.entries()) {
+      if (src.trim().length < 3) continue;
+      const r = visualWidth(tgt, toLang) / visualWidth(src, fromLang);
+      if (r > 0 && isFinite(r)) docRatios.push(r);
+    }
+    docRatios.sort((a, b) => a - b);
+    const docP90 = docRatios.length > 0
+      ? docRatios[Math.min(Math.floor(docRatios.length * 0.9), docRatios.length - 1)]
+      : 1.0;
 
     // ── Rewrite each slide XML ──────────────────────────────────────
     const RPR_T_RE =
@@ -128,19 +184,30 @@ export async function POST(req: NextRequest) {
 
     for (const [path, origXml] of Object.entries(slideXmls)) {
       let xml = enableNormAutofit(origXml);
+      xml = replacePptxFonts(xml, toLang);        // 폰트 교체
+      xml = reducePptxLineSpacing(xml, docP90);   // 줄 간격 축소
 
+      // Run-level: 글자 크기 + 자간 조정
       xml = xml.replace(
         RPR_T_RE,
         (_full, rpr: string, szStr: string, ws: string, tOpen: string, inner: string, tClose: string) => {
           const raw = decodeXml(inner);
           const out = map.get(raw);
           if (out === undefined) return _full;
-          const newSz  = adjustedSz(szStr, raw, out, fromLang, toLang);
-          const newRpr = newSz !== szStr ? rpr.replace(`sz="${szStr}"`, `sz="${newSz}"`) : rpr;
+          const { sz: newSz, spc } = computeRunAdjustments(szStr, raw, out, fromLang, toLang);
+          let newRpr = newSz !== szStr ? rpr.replace(`sz="${szStr}"`, `sz="${newSz}"`) : rpr;
+          // 이미 음수 자간이면 건드리지 않음
+          if (spc !== null && !/\bspc="-/.test(newRpr)) {
+            if (/\bspc="/.test(newRpr))
+              newRpr = newRpr.replace(/\bspc="\d+"/, `spc="${spc}"`);
+            else
+              newRpr = newRpr.replace(/\/>$/, ` spc="${spc}"/>`);
+          }
           return newRpr + ws + tOpen + encodeXml(out) + tClose;
         }
       );
 
+      // 나머지 <a:t> (rPr 없는 경우)
       RE.lastIndex = 0;
       xml = xml.replace(RE, (full: string, attrs: string, inner: string) => {
         const raw = decodeXml(inner);

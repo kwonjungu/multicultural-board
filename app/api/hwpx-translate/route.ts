@@ -40,8 +40,7 @@ function visualWidth(text: string, lang: string): number {
   return w || 1;
 }
 
-// ─── header.xml charPr 폰트 스케일 ───────────────────────────────────
-// HWPX height 단위: centi-pt (height="1000" = 10pt, height="700" = 7pt min)
+// ─── header.xml charPr 폰트 크기 스케일 ─────────────────────────────
 function scaleHeaderFonts(headerXml: string, scale: number): string {
   return headerXml.replace(
     /(<(?:[\w]+:)?charPr\b[^>]*?)\bheight="(\d+)"/g,
@@ -50,6 +49,45 @@ function scaleHeaderFonts(headerXml: string, scale: number): string {
       return `${prefix}height="${newH}"`;
     }
   );
+}
+
+// ─── 섹션 XML charPr 폰트 크기 스케일 ────────────────────────────────
+function scaleCharPrInSection(xml: string, scale: number): string {
+  return xml.replace(
+    /(<(?:[\w]+:)?charPr\b[^>]*?\bheight=")(\d+)(")/g,
+    (_m, pre: string, h: string, post: string) =>
+      `${pre}${Math.max(700, Math.round(Number(h) * scale))}${post}`
+  );
+}
+
+// ─── 섹션 XML paraShape 줄 간격 스케일 ───────────────────────────────
+// HWPX lineSpacing 단위: % 정수 (160 = 160%, 최소 85)
+function scaleParaLineSpacing(xml: string, scale: number): string {
+  return xml.replace(
+    /(<(?:[\w]+:)?paraShape\b[^>]*?\blineSpacing=")(\d+)(")/g,
+    (_m, pre: string, val: string, post: string) =>
+      `${pre}${Math.max(85, Math.round(Number(val) * scale))}${post}`
+  );
+}
+
+// ─── 언어별 폰트 교체 (글꼴 깨짐 방지) ──────────────────────────────
+const HWPX_FONTS: Record<string, { other: string; latin: string }> = {
+  ar: { other: "Arial",           latin: "Arial"           },
+  hi: { other: "Mangal",          latin: "Mangal"          },
+  th: { other: "Tahoma",          latin: "Tahoma"          },
+  km: { other: "Khmer UI",        latin: "Khmer UI"        },
+  my: { other: "Myanmar Text",    latin: "Myanmar Text"    },
+  mn: { other: "Mongolian Baiti", latin: "Mongolian Baiti" },
+  zh: { other: "Microsoft YaHei", latin: "Arial"           },
+  ja: { other: "Meiryo",          latin: "Arial"           },
+  ko: { other: "Malgun Gothic",   latin: "Arial"           },
+};
+
+function replaceHwpxFonts(xml: string, toLang: string): string {
+  const f = HWPX_FONTS[toLang] ?? { other: "Arial", latin: "Arial" };
+  xml = xml.replace(/\botherFont="[^"]*"/g, `otherFont="${f.other}"`);
+  xml = xml.replace(/\blatinFont="[^"]*"/g, `latinFont="${f.latin}"`);
+  return xml;
 }
 
 // ─── Main handler ──────────────────────────────────────────────────
@@ -89,7 +127,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "번역할 텍스트가 없습니다" }, { status: 400 });
     }
 
-    // ── Translate: LibreTranslate 우선, 미지원·미설정 시 Groq 폴백 ──
+    // ── Translate: LibreTranslate 우선, 미지원·실패 시 Groq 폴백 ──
     const fromName = LANGUAGES[fromLang]?.name || fromLang;
     const toName   = LANGUAGES[toLang]?.name   || toLang;
 
@@ -105,16 +143,18 @@ export async function POST(req: NextRequest) {
         translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
       }
     } else {
-      if (ltConfigured) console.log(`[hwpx] lang pair ${fromLang}→${toLang} not supported by LibreTranslate, using Groq`);
+      if (ltConfigured) console.log(`[hwpx] lang pair ${fromLang}→${toLang} not LT-supported, using Groq`);
       translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
     }
 
     const map = new Map<string, string>();
     segments.forEach((src, i) => map.set(src, translated[i] || src));
 
-    // ── Compute header.xml font scale ──────────────────────────────
+    // ── p90 확장 비율 계산 → 폰트 크기·줄 간격 스케일 결정 ──────────
+    let sectionFontScale: number | undefined;
     let translatedHeaderXml: string | undefined;
-    if (headerXml) {
+
+    {
       const ratios: number[] = [];
       for (let i = 0; i < segments.length; i++) {
         const src = segments[i];
@@ -127,17 +167,22 @@ export async function POST(req: NextRequest) {
         ratios.sort((a, b) => a - b);
         const p90 = ratios[Math.min(Math.floor(ratios.length * 0.9), ratios.length - 1)];
         if (p90 > 1.1) {
-          const scale = Math.max(0.55, (1 / p90) * 0.85);
-          translatedHeaderXml = scaleHeaderFonts(headerXml, scale);
+          sectionFontScale = Math.max(0.55, (1 / p90) * 0.85);
+          if (headerXml) translatedHeaderXml = scaleHeaderFonts(headerXml, sectionFontScale);
         }
       }
     }
 
-    // ── Rewrite section XMLs ───────────────────────────────────────
+    // 항상 폰트 교체 (header)
+    if (headerXml) {
+      translatedHeaderXml = replaceHwpxFonts(translatedHeaderXml ?? headerXml, toLang);
+    }
+
+    // ── Rewrite section XMLs ──────────────────────────────────────
     const translatedXmls: Record<string, string> = {};
     for (const [path, origXml] of Object.entries(sectionXmls)) {
       RE.lastIndex = 0;
-      const newXml = origXml.replace(
+      let newXml = origXml.replace(
         RE,
         (_full, prefix: string, attrs: string, inner: string) => {
           const raw = decodeXml(inner);
@@ -146,6 +191,16 @@ export async function POST(req: NextRequest) {
           return `<${prefix}t${attrs || ""}>${encodeXml(out)}</${prefix}t>`;
         }
       );
+
+      // 폰트 교체
+      newXml = replaceHwpxFonts(newXml, toLang);
+
+      // 글자 크기 + 줄 간격 스케일 (확장 시에만)
+      if (sectionFontScale !== undefined && sectionFontScale < 1.0) {
+        newXml = scaleCharPrInSection(newXml, sectionFontScale);
+        newXml = scaleParaLineSpacing(newXml, sectionFontScale);
+      }
+
       translatedXmls[path] = newXml;
     }
 
