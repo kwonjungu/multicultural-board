@@ -70,23 +70,28 @@ function scaleParaLineSpacing(xml: string, scale: number): string {
   );
 }
 
-// ─── 언어별 폰트 교체 (글꼴 깨짐 방지) ──────────────────────────────
-const HWPX_FONTS: Record<string, { other: string; latin: string }> = {
-  ar: { other: "Arial",           latin: "Arial"           },
-  hi: { other: "Mangal",          latin: "Mangal"          },
-  th: { other: "Tahoma",          latin: "Tahoma"          },
-  km: { other: "Khmer UI",        latin: "Khmer UI"        },
-  my: { other: "Myanmar Text",    latin: "Myanmar Text"    },
-  mn: { other: "Mongolian Baiti", latin: "Mongolian Baiti" },
-  zh: { other: "Microsoft YaHei", latin: "Arial"           },
-  ja: { other: "Meiryo",          latin: "Arial"           },
-  ko: { other: "Malgun Gothic",   latin: "Arial"           },
-};
+// ─── 폰트 일괄 교체 (함초롱바탕으로 통일, 글꼴 깨짐 방지) ───────────
+const TARGET_FONT = "함초롱바탕";
 
-function replaceHwpxFonts(xml: string, toLang: string): string {
-  const f = HWPX_FONTS[toLang] ?? { other: "Arial", latin: "Arial" };
-  xml = xml.replace(/\botherFont="[^"]*"/g, `otherFont="${f.other}"`);
-  xml = xml.replace(/\blatinFont="[^"]*"/g, `latinFont="${f.latin}"`);
+// HWPX charPr 폰트 속성명 목록 (버전별 다름)
+const HWPX_FONT_ATTRS = [
+  "hangulFont", "latinFont", "hanjFont", "otherFont",
+  "symbolFont", "userFont",
+];
+
+function replaceHwpxFonts(xml: string): string {
+  // charPr 직접 속성 방식
+  for (const attr of HWPX_FONT_ATTRS) {
+    xml = xml.replace(
+      new RegExp(`\\b${attr}="[^"]*"`, "g"),
+      `${attr}="${TARGET_FONT}"`
+    );
+  }
+  // header.xml <...:font name="..."> 방식 (폰트 테이블)
+  xml = xml.replace(
+    /(<(?:[\w]+:)?font\b[^>]*?\bname=")[^"]*(")/g,
+    `$1${TARGET_FONT}$2`
+  );
   return xml;
 }
 
@@ -175,7 +180,7 @@ export async function POST(req: NextRequest) {
 
     // 항상 폰트 교체 (header)
     if (headerXml) {
-      translatedHeaderXml = replaceHwpxFonts(translatedHeaderXml ?? headerXml, toLang);
+      translatedHeaderXml = replaceHwpxFonts(translatedHeaderXml ?? headerXml);
     }
 
     // ── Rewrite section XMLs ──────────────────────────────────────
@@ -193,7 +198,7 @@ export async function POST(req: NextRequest) {
       );
 
       // 폰트 교체
-      newXml = replaceHwpxFonts(newXml, toLang);
+      newXml = replaceHwpxFonts(newXml);
 
       // 글자 크기 + 줄 간격 스케일 (확장 시에만)
       if (sectionFontScale !== undefined && sectionFontScale < 1.0) {

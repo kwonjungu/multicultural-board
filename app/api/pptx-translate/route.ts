@@ -89,31 +89,14 @@ function reducePptxLineSpacing(xml: string, p90: number): string {
   );
 }
 
-// ─── 언어별 폰트 교체 (글꼴 깨짐 방지) ──────────────────────────────
-const PPTX_FONTS: Record<string, { latin: string; cs?: string; ea?: string }> = {
-  ar: { latin: "Arial",           cs: "Arial"           },
-  hi: { latin: "Mangal",          cs: "Mangal"          },
-  th: { latin: "Tahoma",          cs: "Tahoma"          },
-  km: { latin: "Khmer UI",        cs: "Khmer UI"        },
-  my: { latin: "Myanmar Text",    cs: "Myanmar Text"    },
-  mn: { latin: "Mongolian Baiti", cs: "Mongolian Baiti" },
-  zh: { latin: "Arial",           ea: "Microsoft YaHei" },
-  ja: { latin: "Arial",           ea: "Meiryo"          },
-  ko: { latin: "Arial",           ea: "Malgun Gothic"   },
-};
+// ─── 폰트 일괄 교체 (함초롱바탕으로 통일, 글꼴 깨짐 방지) ───────────
+const TARGET_FONT = "함초롱바탕";
 
-function replacePptxFonts(xml: string, toLang: string): string {
-  const f = PPTX_FONTS[toLang] ?? { latin: "Arial" };
+function replacePptxFonts(xml: string): string {
   // + 시작 = 테마 폰트 참조 → 유지, 명시적 폰트명만 교체
-  if (f.latin)
-    xml = xml.replace(/<a:latin\s+typeface="(?!\+)[^"]*"\s*\/>/g,
-      `<a:latin typeface="${f.latin}"/>`);
-  if (f.cs)
-    xml = xml.replace(/<a:cs\s+typeface="(?!\+)[^"]*"\s*\/>/g,
-      `<a:cs typeface="${f.cs}"/>`);
-  if (f.ea)
-    xml = xml.replace(/<a:ea\s+typeface="(?!\+)[^"]*"\s*\/>/g,
-      `<a:ea typeface="${f.ea}"/>`);
+  xml = xml.replace(/<a:latin\s+typeface="(?!\+)[^"]*"\s*\/>/g, `<a:latin typeface="${TARGET_FONT}"/>`);
+  xml = xml.replace(/<a:cs\s+typeface="(?!\+)[^"]*"\s*\/>/g,    `<a:cs typeface="${TARGET_FONT}"/>`);
+  xml = xml.replace(/<a:ea\s+typeface="(?!\+)[^"]*"\s*\/>/g,    `<a:ea typeface="${TARGET_FONT}"/>`);
   return xml;
 }
 
@@ -166,11 +149,11 @@ export async function POST(req: NextRequest) {
 
     // ── Doc-wide p90 expansion ratio (줄 간격 기준) ─────────────────
     const docRatios: number[] = [];
-    for (const [src, tgt] of map.entries()) {
-      if (src.trim().length < 3) continue;
+    map.forEach((tgt, src) => {
+      if (src.trim().length < 3) return;
       const r = visualWidth(tgt, toLang) / visualWidth(src, fromLang);
       if (r > 0 && isFinite(r)) docRatios.push(r);
-    }
+    });
     docRatios.sort((a, b) => a - b);
     const docP90 = docRatios.length > 0
       ? docRatios[Math.min(Math.floor(docRatios.length * 0.9), docRatios.length - 1)]
@@ -184,7 +167,7 @@ export async function POST(req: NextRequest) {
 
     for (const [path, origXml] of Object.entries(slideXmls)) {
       let xml = enableNormAutofit(origXml);
-      xml = replacePptxFonts(xml, toLang);        // 폰트 교체
+      xml = replacePptxFonts(xml);                // 폰트 교체
       xml = reducePptxLineSpacing(xml, docP90);   // 줄 간격 축소
 
       // Run-level: 글자 크기 + 자간 조정
