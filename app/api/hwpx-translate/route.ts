@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LANGUAGES } from "@/lib/constants";
 import { translateBatch } from "@/lib/groq-translate";
+import { translateWithLibreTranslate, isLtSupported } from "@/lib/libretranslate";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -88,10 +89,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "번역할 텍스트가 없습니다" }, { status: 400 });
     }
 
-    // ── Translate (multi-model fallback) ──────────────────────────
+    // ── Translate: LibreTranslate 우선, 미지원·미설정 시 Groq 폴백 ──
     const fromName = LANGUAGES[fromLang]?.name || fromLang;
     const toName   = LANGUAGES[toLang]?.name   || toLang;
-    const translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
+
+    let translated: string[];
+    const ltConfigured = !!process.env.LIBRETRANSLATE_URL;
+
+    if (ltConfigured && isLtSupported(fromLang, toLang)) {
+      try {
+        translated = await translateWithLibreTranslate(segments, fromLang, toLang);
+        console.log(`[hwpx] LibreTranslate OK (${segments.length} segs)`);
+      } catch (ltErr) {
+        console.warn("[hwpx] LibreTranslate failed, falling back to Groq:", (ltErr as Error).message);
+        translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
+      }
+    } else {
+      if (ltConfigured) console.log(`[hwpx] lang pair ${fromLang}→${toLang} not supported by LibreTranslate, using Groq`);
+      translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
+    }
 
     const map = new Map<string, string>();
     segments.forEach((src, i) => map.set(src, translated[i] || src));
