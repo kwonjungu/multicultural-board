@@ -25,12 +25,16 @@ function encodeXml(s: string): string {
 
 // ─── Layout helpers ────────────────────────────────────────────────
 function enableNormAutofit(xml: string): string {
+  // 1. noAutofit → normAutofit
   xml = xml.replace(/<a:noAutofit\s*\/>/g, "<a:normAutofit/>");
+  // 2. 자기닫힘 bodyPr → open/close + normAutofit
   xml = xml.replace(/<a:bodyPr([^>]*)\/>/g, (_m, attrs: string) =>
     `<a:bodyPr${attrs}><a:normAutofit/></a:bodyPr>`
   );
+  // 3. 이미 open 태그인 bodyPr에만 추가 (각 요소 정확한 대소문자로 체크)
+  //    normAutofit(소문자f), noAutofit(소문자f), spAutoFit(대문자F) — OOXML 스펙
   xml = xml.replace(
-    /(<a:bodyPr\b[^>]*>)(?!\s*<a:(?:norm|no|sp)AutoFit)/g,
+    /(<a:bodyPr\b[^>]*>)(?!\s*<a:normAutofit)(?!\s*<a:noAutofit)(?!\s*<a:spAutoFit)/g,
     "$1<a:normAutofit/>"
   );
   return xml;
