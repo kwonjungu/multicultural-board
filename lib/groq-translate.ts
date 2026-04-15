@@ -132,8 +132,7 @@ async function translateChunkWithFallback(
     }
   }
 
-  console.error("[groq-translate] All models exhausted. Returning originals.");
-  return chunk;
+  throw new Error("번역 한도 초과: 모든 Groq 모델 소진. 잠시 후 다시 시도하거나 LibreTranslate를 설정하세요.");
 }
 
 function buildPrompt(chunk: string[], fromName: string, toName: string): string {
@@ -175,6 +174,5 @@ export async function translateLongText(
     }
   }
 
-  console.error("[groq-translate] All models exhausted for long text. Returning original.");
-  return text;
+  throw new Error("번역 한도 초과: 모든 Groq 모델 소진. 잠시 후 다시 시도하거나 LibreTranslate를 설정하세요.");
 }

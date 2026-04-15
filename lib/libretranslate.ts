@@ -64,6 +64,8 @@ export async function translateWithLibreTranslate(
 
   const results: string[] = texts.slice(); // 원본으로 초기화
   let langUnsupported = false;
+  let successCount = 0;
+  let failCount = 0;
 
   for (let i = 0; i < texts.length; i += CONCURRENCY) {
     if (langUnsupported) break;
@@ -84,6 +86,13 @@ export async function translateWithLibreTranslate(
             signal: AbortSignal.timeout(15_000),
           });
 
+          if (!res.ok) {
+            // HTTP 4xx/5xx → 서버 오류로 간주, 실패 카운트
+            console.warn(`[libretranslate] HTTP ${res.status} for segment ${idx}`);
+            failCount++;
+            return;
+          }
+
           const data = (await res.json()) as LtResponse;
 
           if (data.error) {
@@ -92,18 +101,31 @@ export async function translateWithLibreTranslate(
               langUnsupported = true;
               return;
             }
-            // 그 외 오류 → 원본 유지
+            failCount++;
             return;
           }
 
-          if (data.translatedText) results[idx] = data.translatedText;
-        } catch {
-          // 타임아웃·네트워크 오류 → 원본 유지
+          if (data.translatedText) {
+            results[idx] = data.translatedText;
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (e) {
+          // 타임아웃·네트워크 오류
+          console.warn(`[libretranslate] fetch error for segment ${idx}:`, (e as Error).message);
+          failCount++;
         }
       })
     );
   }
 
   if (langUnsupported) throw new Error(`unsupported: ${fromLang}→${toLang}`);
+
+  // 번역 성공이 하나도 없으면 → Groq 폴백 트리거
+  if (successCount === 0 && texts.length > 0) {
+    throw new Error(`LibreTranslate 번역 실패 (${failCount}개 오류) — Groq으로 재시도`);
+  }
+
   return results;
 }
