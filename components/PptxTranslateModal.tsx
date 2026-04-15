@@ -96,13 +96,21 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
         }
         if (paths.length === 0) throw new Error("섹션 파일을 찾을 수 없습니다 (HWPX 형식인지 확인하세요)");
 
-        // header.xml: charPr 폰트 정의 파일 (폰트 크기 조정용)
-        const HEADER_PATHS = ["Contents/header.xml", "header.xml", "Contents/head.xml", "head.xml"];
+        // header.xml: 폰트 테이블 + 스타일 정의
         let headerXml: string | undefined;
         let headerPath: string | undefined;
+        const HEADER_PATHS = ["Contents/header.xml", "header.xml", "Contents/head.xml", "head.xml"];
         for (const hp of HEADER_PATHS) {
           const f = zip.file(hp);
           if (f) { headerXml = await f.async("string"); headerPath = hp; break; }
+        }
+        // 폴백: zip 전체에서 header.xml 패턴 검색
+        if (!headerPath) {
+          zip.forEach((p) => { if (!headerPath && /(?:^|\/)header\.xml$/i.test(p)) headerPath = p; });
+          if (headerPath) {
+            const f = zip.file(headerPath);
+            if (f) headerXml = await f.async("string");
+          }
         }
 
         setStatusMsg("🌐 문서 번역 중...");

@@ -159,6 +159,7 @@ export async function POST(req: NextRequest) {
     let sectionFontScale: number | undefined;
     let translatedHeaderXml: string | undefined;
 
+    console.log(`[hwpx] headerXml received: ${headerXml ? `yes (${headerXml.length} chars)` : "no"}`);
     {
       const ratios: number[] = [];
       for (let i = 0; i < segments.length; i++) {
