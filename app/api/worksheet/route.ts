@@ -13,11 +13,6 @@ function getGroqClient() {
   });
 }
 
-// 429 감지 헬퍼
-function isRateLimit(err: unknown): boolean {
-  if (err instanceof OpenAI.APIError) return err.status === 429;
-  return String((err as Error)?.message ?? "").includes("429");
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -90,11 +85,9 @@ Rules:
 - x, y, w, h must be numbers between 0 and 1
 - If you cannot estimate position, guess reasonably based on visual layout`;
 
-      // Vision 모델: 429 포함 모두 폴백
+      // Vision 모델 (2025-04 기준 Groq 지원 목록)
       const VISION_MODELS = [
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "llama-3.2-90b-vision-preview",
-        "llama-3.2-11b-vision-preview",
+        "meta-llama/llama-4-scout-17b-16e-instruct",  // Preview — 유일한 비전 모델
       ];
 
       let raw = "";
@@ -119,7 +112,6 @@ Rules:
         } catch (e) {
           console.error(`Vision model ${model} failed:`, e);
           visionErr = e;
-          if (!isRateLimit(e)) break; // 429 외 오류는 다음 모델 시도 안 함
         }
       }
 

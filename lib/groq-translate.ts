@@ -1,28 +1,26 @@
 /**
  * Groq 다중 모델 폴백 번역 유틸
  *
- * 모델별 무료 일일 토큰 한도 (TPD):
- *   llama-3.3-70b-versatile :  100,000
- *   gemma2-9b-it            :  500,000  ← 가장 여유 있음
- *   llama-3.1-8b-instant    :  131,000
- *   합계                    :  731,000
+ * 2025-04 현재 Groq Production/Preview 모델 기준 (deprecated 모델 제거)
+ * 한 모델이 429 또는 사용 불가(404/400) 시 다음 모델로 자동 전환.
  *
- * 한 모델이 429(rate limit)를 반환하면 다음 모델로 자동 전환.
+ * Production:
+ *   llama-3.3-70b-versatile  300K TPM  ★ 기본 (최고 품질)
+ *   openai/gpt-oss-120b      250K TPM    폴백1 (120B, 고품질)
+ *   openai/gpt-oss-20b       250K TPM    폴백2
+ *   llama-3.1-8b-instant     250K TPM    폴백3 (빠름)
+ * Preview:
+ *   qwen/qwen3-32b           300K TPM    폴백4 (다국어 강함)
  */
 
 import OpenAI from "openai";
 
 const GROQ_MODELS = [
-  // ── 품질 우선 ────────────────────────────────────────────────────
-  "llama-3.3-70b-versatile",          // 100k TPD  ★ 기본
-  "gemma2-9b-it",                     // 500k TPD  ★ 1순위 폴백 (쿼터 5배)
-  // ── 중간 품질 ───────────────────────────────────────────────────
-  "llama-3.1-8b-instant",             // 131k TPD
-  "llama-3.2-11b-vision-preview",     // 별도 쿼터 (비전 모델이나 텍스트도 가능)
-  "mixtral-8x7b-32768",               // 별도 쿼터
-  // ── 소형/빠른 모델 (최후 수단) ──────────────────────────────────
-  "llama-3.2-3b-preview",             // 별도 쿼터, 빠름
-  "llama-3.1-70b-versatile",          // 구버전, 별도 쿼터
+  "llama-3.3-70b-versatile",    // Production — 최고 품질
+  "openai/gpt-oss-120b",        // Production — 120B, 고품질
+  "openai/gpt-oss-20b",         // Production — 빠름
+  "llama-3.1-8b-instant",       // Production — 경량
+  "qwen/qwen3-32b",             // Preview   — 다국어 특화
 ];
 
 function groqClient() {
@@ -32,16 +30,19 @@ function groqClient() {
   });
 }
 
-function isRateLimit(err: unknown): boolean {
+/** 429 rate limit 또는 모델 미지원(400/404) → 다음 모델로 스킵 */
+function shouldSkipModel(err: unknown): boolean {
   if (!err) return false;
-  // OpenAI SDK APIError
-  if (err instanceof OpenAI.APIError) return err.status === 429;
-  // status 프로퍼티로 직접 확인 (모듈 경계 instanceof 실패 방어)
-  if (typeof (err as { status?: number }).status === "number") {
-    return (err as { status: number }).status === 429;
+  if (err instanceof OpenAI.APIError) {
+    return err.status === 429 || err.status === 404 || err.status === 400;
   }
-  const msg = String((err as Error)?.message ?? "");
-  return msg.includes("429") || msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("rate_limit");
+  const status = (err as { status?: number }).status;
+  if (typeof status === "number") {
+    return status === 429 || status === 404 || status === 400;
+  }
+  const msg = String((err as Error)?.message ?? "").toLowerCase();
+  return msg.includes("429") || msg.includes("rate limit") || msg.includes("rate_limit")
+    || msg.includes("model not found") || msg.includes("not supported");
 }
 
 /**
@@ -97,7 +98,7 @@ async function translateChunkWithFallback(
       while (parsed.length < chunk.length) parsed.push(chunk[parsed.length]);
       return parsed.slice(0, chunk.length);
     } catch (err) {
-      if (isRateLimit(err)) {
+      if (shouldSkipModel(err)) {
         console.warn(`[groq-translate] ${model} rate-limited, trying next model…`);
         continue;
       }
@@ -143,7 +144,7 @@ export async function translateLongText(
       const result = completion.choices[0]?.message?.content?.trim();
       if (result) return result;
     } catch (err) {
-      if (isRateLimit(err)) {
+      if (shouldSkipModel(err)) {
         console.warn(`[groq-translate] ${model} rate-limited (long text), trying next…`);
         continue;
       }
