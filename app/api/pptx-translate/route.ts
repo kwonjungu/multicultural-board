@@ -33,6 +33,93 @@ function encodeXml(s: string): string {
     .replace(/'/g, "&apos;");
 }
 
+// ─── Layout helpers ────────────────────────────────────────────────
+
+/**
+ * Enable normAutofit on every text-body in the slide XML.
+ * This tells PowerPoint/LibreOffice to auto-shrink text that overflows its box.
+ *
+ *  <a:noAutofit/>          → replaced with <a:normAutofit/>
+ *  <a:bodyPr ... />        → self-closing form → open form + inject normAutofit
+ *  <a:bodyPr ...>          → open form with no autofit child → inject normAutofit
+ */
+function enableNormAutofit(xml: string): string {
+  // 1. Explicit noAutofit → normAutofit
+  xml = xml.replace(/<a:noAutofit\s*\/>/g, "<a:normAutofit/>");
+
+  // 2. Self-closing <a:bodyPr ... /> → open tag + child
+  xml = xml.replace(/<a:bodyPr([^>]*)\/>/g, (_m, attrs: string) =>
+    `<a:bodyPr${attrs}><a:normAutofit/></a:bodyPr>`
+  );
+
+  // 3. Open <a:bodyPr ...> with no existing autofit child → inject
+  xml = xml.replace(
+    /(<a:bodyPr\b[^>]*>)(?!\s*<a:(?:norm|no|sp)AutoFit)/g,
+    "$1<a:normAutofit/>"
+  );
+
+  return xml;
+}
+
+// CJK languages whose glyphs are ~2× wider than Latin glyphs at the same pt size
+const CJK = new Set(["zh", "ja", "ko"]);
+
+/**
+ * Visual character width: CJK chars count as 2, everything else as 1.
+ * This avoids over-shrinking when going CJK → Latin (Latin chars are narrower).
+ */
+function visualWidth(text: string, lang: string): number {
+  if (!CJK.has(lang)) return text.replace(/\s/g, "").length;
+  let w = 0;
+  for (const ch of text.replace(/\s/g, "")) {
+    const cp = ch.codePointAt(0) ?? 0;
+    // Covers Hangul, CJK Unified Ideographs, Hiragana, Katakana, fullwidth
+    const isCJKChar =
+      (cp >= 0x1100 && cp <= 0x11FF) ||  // Hangul Jamo
+      (cp >= 0x2E80 && cp <= 0x9FFF) ||  // CJK radicals + unified ideographs
+      (cp >= 0xAC00 && cp <= 0xD7FF) ||  // Hangul syllables
+      (cp >= 0xF900 && cp <= 0xFAFF) ||  // CJK compatibility
+      (cp >= 0xFF00 && cp <= 0xFFEF);    // Fullwidth / halfwidth forms
+    w += isCJKChar ? 2 : 1;
+  }
+  return w || 1;
+}
+
+/**
+ * Given the original text (fromLang) and translated text (toLang),
+ * return a *visual* expansion ratio (> 1 means the translated text takes more space).
+ * Returns 1.0 if the translation is equal or shorter in visual terms.
+ */
+function visualExpansionRatio(
+  orig: string, trans: string, fromLang: string, toLang: string
+): number {
+  const origW  = visualWidth(orig,  fromLang);
+  const transW = visualWidth(trans, toLang);
+  return transW / origW;
+}
+
+/**
+ * Compute a new sz (hundredths-of-a-point) value when text expanded.
+ *
+ * Rules:
+ *  - Only shrink if visual expansion > 1.15 (15 % leeway)
+ *  - Scale proportionally: newSz = oldSz / ratio
+ *  - Hard minimum: 8 pt = sz 800 (anything smaller is unreadable)
+ *  - Never exceed the original (don't make text bigger)
+ */
+function adjustedSz(
+  szStr: string,
+  orig: string, trans: string,
+  fromLang: string, toLang: string
+): string {
+  const ratio = visualExpansionRatio(orig, trans, fromLang, toLang);
+  if (ratio <= 1.15) return szStr;          // fits — keep original size
+  const sz    = Number(szStr);
+  const scale = Math.max(0.65, 1 / ratio);  // never below 65 % of original
+  const newSz = Math.max(800, Math.round(sz * scale));
+  return String(newSz);
+}
+
 // ─── Translation backends ──────────────────────────────────────────
 async function translateHF(texts: string[], fromLang: string, toLang: string): Promise<string[] | null> {
   const token = process.env.HF_TOKEN;
@@ -186,15 +273,50 @@ export async function POST(req: NextRequest) {
     segments.forEach((src, i) => map.set(src, translated![i] || src));
 
     // ── Rewrite each slide XML ──────────────────────────────────────
+    //
+    // Two-pass strategy:
+    //  Pass 1 — <a:rPr sz="N"/> immediately before <a:t>:
+    //           translate text AND adjust sz based on visual expansion ratio.
+    //  Pass 2 — remaining <a:t> nodes (no adjacent sz): translate only.
+    //  + inject <a:normAutofit/> into every <a:bodyPr> so PowerPoint
+    //    can auto-shrink any remaining overflow.
+    //
+    // Regex for pass 1: self-closing rPr with sz attr, optional whitespace, then <a:t>
+    const RPR_T_RE =
+      /(<a:rPr\b[^>]*\bsz="(\d+)"[^>]*\/>)(\s*)(<a:t(?:\s[^>]*)?>)([\s\S]*?)(<\/a:t>)/g;
+
     for (const p of xmlPaths) {
-      const xml = perFileXml[p];
-      const rewritten = xml.replace(RE, (full, attrs, inner) => {
+      let xml = perFileXml[p];
+
+      // ① Inject normAutofit so PowerPoint auto-shrinks overflow
+      xml = enableNormAutofit(xml);
+
+      // ② Pass 1: rPr+t pairs — translate + scale sz
+      const seen = new Set<string>(); // track replaced <a:t> content to skip in pass 2
+      xml = xml.replace(
+        RPR_T_RE,
+        (_full, rpr: string, szStr: string, ws: string, tOpen: string, inner: string, tClose: string) => {
+          const raw  = decodeXml(inner);
+          const out  = map.get(raw);
+          if (out === undefined) return _full; // unknown segment → keep original
+
+          const newSz  = adjustedSz(szStr, raw, out, fromLang, toLang);
+          const newRpr = newSz !== szStr ? rpr.replace(`sz="${szStr}"`, `sz="${newSz}"`) : rpr;
+          seen.add(raw);
+          return newRpr + ws + tOpen + encodeXml(out) + tClose;
+        }
+      );
+
+      // ③ Pass 2: standalone <a:t> (no sz in adjacent rPr) — translate only
+      RE.lastIndex = 0;
+      xml = xml.replace(RE, (full: string, attrs: string, inner: string) => {
         const raw = decodeXml(inner);
         const out = map.get(raw);
         if (out === undefined) return full;
         return `<a:t${attrs || ""}>${encodeXml(out)}</a:t>`;
       });
-      zip.file(p, rewritten);
+
+      zip.file(p, xml);
     }
 
     const outArr = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
