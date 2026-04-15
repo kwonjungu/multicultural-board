@@ -129,11 +129,14 @@ async function translateHF(texts: string[], fromLang: string, toLang: string): P
 
   const out: string[] = [];
   for (const txt of texts) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000); // 8 s per segment — abort and fall back to Groq
     try {
       const res = await fetch(
         "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M",
         {
           method: "POST",
+          signal: ctrl.signal,
           headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -145,6 +148,7 @@ async function translateHF(texts: string[], fromLang: string, toLang: string): P
           }),
         }
       );
+      clearTimeout(timer);
       if (!res.ok) return null; // abort entire batch, let caller fall back
       const data = (await res.json()) as Array<{ translation_text?: string }> | { translation_text?: string };
       const translated = Array.isArray(data)
@@ -152,7 +156,8 @@ async function translateHF(texts: string[], fromLang: string, toLang: string): P
         : (data.translation_text || "");
       out.push(translated || txt);
     } catch {
-      return null;
+      clearTimeout(timer);
+      return null; // timeout or network error → fall back to Groq
     }
   }
   return out;

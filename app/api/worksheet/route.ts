@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { LANGUAGES } from "@/lib/constants";
 
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
 function getGroqClient() {
   return new OpenAI({
     apiKey: process.env.GROQ_API_KEY || "placeholder",
@@ -27,13 +30,17 @@ export async function POST(req: NextRequest) {
     if (type === "pdf") {
       const buffer = Buffer.from(await file.arrayBuffer());
 
+      // pdf-parse v2 API: new PDFParse({ data: buffer }) + parser.getText()
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
+      const { PDFParse } = require("pdf-parse") as { PDFParse: new (opts: { data: Buffer }) => { getText: () => Promise<{ text: string }> } };
       let pdfData: { text: string };
       try {
-        pdfData = await pdfParse(buffer);
-      } catch {
-        return NextResponse.json({ error: "PDF를 읽을 수 없습니다. 이미지 탭을 이용해주세요." }, { status: 400 });
+        const parser = new PDFParse({ data: buffer });
+        pdfData = await parser.getText();
+      } catch (pdfErr) {
+        console.error("pdf-parse error:", pdfErr);
+        const pdfMsg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
+        return NextResponse.json({ error: `PDF를 읽을 수 없습니다: ${pdfMsg}` }, { status: 400 });
       }
 
       const originalText = pdfData.text.trim();
@@ -64,51 +71,78 @@ export async function POST(req: NextRequest) {
       const base64   = buffer.toString("base64");
       const mimeType = file.type || "image/jpeg";
 
-      const completion = await groq.chat.completions.create({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
-        messages: [{
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: { url: `data:${mimeType};base64,${base64}` },
-            },
-            {
-              type: "text",
-              text: `This worksheet image contains text (likely in ${LANGUAGES[fromLang]?.name || fromLang}).
+      const prompt = `This image is a worksheet with text in ${LANGUAGES[fromLang]?.name || fromLang}.
 
-Tasks:
-1. Extract ALL visible text from the image (OCR).
-2. Translate the extracted text to ${LANGUAGES[toLang]?.name || toLang}.
+Detect every distinct text block (title, question, paragraph, label, etc.) visible in the image.
+For each block:
+- Estimate its position as fractions (0–1) of image width/height: x (left edge), y (top edge), w (width), h (height)
+- Extract the original text exactly as written
+- Translate it to ${LANGUAGES[toLang]?.name || toLang}
 
-Return ONLY raw JSON (no markdown, no code block):
-{"originalText":"<all extracted text>","translatedText":"<complete translation>"}`,
-            },
-          ],
-        }],
-        max_tokens: 2000,
-        temperature: 0.2,
-      });
+Return ONLY raw JSON (no markdown, no code fences):
+{"blocks":[{"x":0.05,"y":0.08,"w":0.9,"h":0.06,"original":"...","translated":"..."},...]}
 
-      const raw = (completion.choices[0]?.message?.content || "{}")
-        .replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+Rules:
+- Cover ALL visible text — titles, questions, instructions, labels, answers
+- Keep each logical text block separate (one item per line/paragraph)
+- x, y, w, h must be numbers between 0 and 1
+- If you cannot estimate position, guess reasonably based on visual layout`;
+
+      // Try vision models in order — Scout (Llama 4) first, then Llama 3.2 fallbacks
+      const VISION_MODELS = [
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "llama-3.2-90b-vision-preview",
+        "llama-3.2-11b-vision-preview",
+      ];
+
+      let raw = "";
+      let visionErr: unknown;
+      for (const model of VISION_MODELS) {
+        try {
+          const completion = await groq.chat.completions.create({
+            model,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+                { type: "text", text: prompt },
+              ],
+            }],
+            max_tokens: 3000,
+            temperature: 0.1,
+          });
+          raw = (completion.choices[0]?.message?.content || "{}").replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+          visionErr = null;
+          break; // success
+        } catch (e) {
+          console.error(`Vision model ${model} failed:`, e);
+          visionErr = e;
+        }
+      }
+
+      if (visionErr && !raw) {
+        const msg = visionErr instanceof Error ? visionErr.message : "Vision API 오류";
+        return NextResponse.json({ error: `이미지 처리 실패: ${msg}` }, { status: 500 });
+      }
 
       try {
         const parsed = JSON.parse(raw);
-        return NextResponse.json({
-          originalText:   parsed.originalText   || "",
-          translatedText: parsed.translatedText || "",
-        });
+        const blocks: { x: number; y: number; w: number; h: number; original: string; translated: string }[] =
+          Array.isArray(parsed.blocks) ? parsed.blocks : [];
+        const originalText   = blocks.map((b) => b.original).join("\n");
+        const translatedText = blocks.map((b) => b.translated).join("\n");
+        return NextResponse.json({ blocks, originalText, translatedText });
       } catch {
-        // JSON parsing failed – try to return raw as translation
-        console.error("Vision API JSON parse failed:", raw.slice(0, 200));
-        return NextResponse.json({ originalText: "", translatedText: raw });
+        // JSON parsing failed – return raw as plain text
+        console.error("Vision API JSON parse failed:", raw.slice(0, 300));
+        return NextResponse.json({ blocks: [], originalText: "", translatedText: raw });
       }
     }
 
     return NextResponse.json({ error: "알 수 없는 타입" }, { status: 400 });
   } catch (err) {
     console.error("Worksheet API 오류:", err);
-    return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : "서버 오류가 발생했습니다";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

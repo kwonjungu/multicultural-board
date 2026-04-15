@@ -4,11 +4,17 @@ import { useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { compressToUnder1MB } from "@/lib/imageUtils";
 
+interface Block {
+  x: number; y: number; w: number; h: number;
+  original: string; translated: string;
+}
+
 interface WorksheetResult {
   originalText: string;
   translatedText: string;
   fileType: "pdf" | "image";
   imagePreviewUrl?: string;
+  blocks?: Block[];
 }
 
 interface Props {
@@ -18,15 +24,92 @@ interface Props {
   onClose: () => void;
 }
 
+// ── Canvas overlay helpers ────────────────────────────────────────────
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string, x: number, y: number, maxW: number, lineH: number
+) {
+  // For CJK text, split by character; for Latin split by word
+  const isCJK = /[\u1100-\uD7FF\u2E80-\u9FFF\uAC00-\uD7FF\uF900-\uFAFF\uFF00-\uFFEF]/.test(text);
+  const tokens = isCJK ? Array.from(text) : text.split(" ");
+  let line = "";
+  let cy = y;
+
+  for (const token of tokens) {
+    const test = isCJK ? line + token : line + (line ? " " : "") + token;
+    if (ctx.measureText(test).width > maxW && line) {
+      ctx.fillText(line, x, cy);
+      line = token;
+      cy += lineH;
+    } else {
+      line = test;
+    }
+  }
+  if (line) ctx.fillText(line, x, cy);
+}
+
+async function buildOverlayCanvas(
+  imageUrl: string,
+  blocks: Block[],
+  toLang: string
+): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d")!;
+
+      // 1. Draw original image
+      ctx.drawImage(img, 0, 0);
+
+      for (const block of blocks) {
+        if (!block.translated?.trim()) continue;
+
+        const px = block.x * img.naturalWidth;
+        const py = block.y * img.naturalHeight;
+        const pw = block.w * img.naturalWidth;
+        const ph = block.h * img.naturalHeight;
+
+        // 2. Paint over original text with a white/cream box
+        ctx.fillStyle = "#FFFEF5";
+        ctx.fillRect(px, py, pw, ph);
+
+        // 3. Light border so the box is visible
+        ctx.strokeStyle = "rgba(91,87,245,0.25)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px, py, pw, ph);
+
+        // 4. Draw translated text — auto-size to fit
+        const maxFontPx = Math.max(9, Math.min(ph * 0.72, 20));
+        const lineH     = maxFontPx * 1.25;
+        // Use Noto Sans KR for CJK support (loaded globally in the app)
+        ctx.font        = `${maxFontPx}px 'Noto Sans KR', sans-serif`;
+        ctx.fillStyle   = "#1a1a2e";
+        ctx.textBaseline = "top";
+        wrapText(ctx, block.translated.trim(), px + 3, py + 3, pw - 6, lineH);
+      }
+
+      // Unused toLang suppresses TS warning
+      void toLang;
+
+      resolve(canvas);
+    };
+    img.onerror = reject;
+    img.src = imageUrl;
+  });
+}
+
 export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImage, onClose }: Props) {
-  // Smart defaults: if user speaks Korean, translate TO Korean FROM English; else FROM that lang TO Korean
   const [fromLang, setFromLang] = useState(userLang === "ko" ? "en" : userLang);
   const [toLang, setToLang]     = useState(userLang === "ko" ? "ko" : "ko");
-  const [processing, setProcessing] = useState(false);
-  const [statusMsg, setStatusMsg] = useState("");
-  const [result, setResult] = useState<WorksheetResult | null>(null);
-  const [showOverlay, setShowOverlay] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing]   = useState(false);
+  const [statusMsg, setStatusMsg]     = useState("");
+  const [result, setResult]           = useState<WorksheetResult | null>(null);
+  const [showTranslated, setShowTranslated] = useState(true);
+  const [overlayUrl, setOverlayUrl]   = useState<string | null>(null);
+  const [error, setError]             = useState<string | null>(null);
   const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,44 +123,67 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
 
     setResult(null);
     setError(null);
+    setOverlayUrl(null);
     setProcessing(true);
-    setShowOverlay(false);
+    setShowTranslated(true);
 
     try {
       let uploadFile: File | Blob = file;
       if (isImage) {
         setStatusMsg("🗜 이미지 압축 중...");
         uploadFile = await compressToUnder1MB(file);
-        setCompressedBlob(uploadFile); // 이미지 게시용으로 보관
+        setCompressedBlob(uploadFile);
       }
-      setStatusMsg(isPDF ? "📄 PDF 텍스트 읽는 중..." : "🔍 OCR 분석 중...");
+      setStatusMsg(isPDF ? "📄 PDF 텍스트 읽는 중..." : "🔍 OCR + 번역 중...");
 
-      const formData = new FormData();
-      formData.append("file", uploadFile, file.name);
-      formData.append("fromLang", fromLang);
-      formData.append("toLang", toLang);
-      formData.append("type", isPDF ? "pdf" : "image");
+      const fd = new FormData();
+      fd.append("file", uploadFile, file.name);
+      fd.append("fromLang", fromLang);
+      fd.append("toLang",   toLang);
+      fd.append("type",     isPDF ? "pdf" : "image");
 
-      setStatusMsg("🌐 번역 중...");
-      const res = await fetch("/api/worksheet", { method: "POST", body: formData });
+      const res = await fetch("/api/worksheet", { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "처리 실패");
       }
       const data = await res.json();
+      const previewUrl = isImage ? URL.createObjectURL(uploadFile) : undefined;
 
-      setResult({
+      const r: WorksheetResult = {
         originalText:   data.originalText  || "",
         translatedText: data.translatedText || "",
         fileType:       isPDF ? "pdf" : "image",
-        imagePreviewUrl: isImage ? URL.createObjectURL(uploadFile) : undefined,
-      });
-      if (isImage) setShowOverlay(true); // 이미지는 번역 오버레이 기본 ON
+        imagePreviewUrl: previewUrl,
+        blocks:         data.blocks || [],
+      };
+      setResult(r);
+
+      // Build canvas overlay for images
+      if (isImage && previewUrl && Array.isArray(data.blocks) && data.blocks.length > 0) {
+        setStatusMsg("🎨 번역 덧입히는 중...");
+        try {
+          const canvas = await buildOverlayCanvas(previewUrl, data.blocks, toLang);
+          canvas.toBlob((blob) => {
+            if (blob) setOverlayUrl(URL.createObjectURL(blob));
+          }, "image/png");
+        } catch (e) {
+          console.error("canvas overlay failed:", e);
+        }
+      }
     } catch (e: unknown) {
       setError((e as Error).message || "처리 중 오류가 발생했습니다");
     }
     setProcessing(false);
     setStatusMsg("");
+  }
+
+  function downloadOverlay() {
+    if (!overlayUrl) return;
+    const a = document.createElement("a");
+    a.href = overlayUrl;
+    a.download = `translated_${Date.now()}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
   }
 
   const selectStyle: React.CSSProperties = {
@@ -100,26 +206,13 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
           번역 방향 설정
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <select
-            value={fromLang}
-            onChange={(e) => setFromLang(e.target.value)}
-            style={{ ...selectStyle, flex: 1 }}
-          >
+          <select value={fromLang} onChange={(e) => setFromLang(e.target.value)} style={{ ...selectStyle, flex: 1 }}>
             {Object.entries(LANGUAGES).map(([code, info]) => (
               <option key={code} value={code}>{info.flag} {info.label}</option>
             ))}
           </select>
-
-          <div style={{
-            fontSize: 20, color: "#9CA3AF", fontWeight: 900, flexShrink: 0,
-            padding: "0 4px",
-          }}>→</div>
-
-          <select
-            value={toLang}
-            onChange={(e) => setToLang(e.target.value)}
-            style={{ ...selectStyle, flex: 1 }}
-          >
+          <div style={{ fontSize: 20, color: "#9CA3AF", fontWeight: 900, flexShrink: 0, padding: "0 4px" }}>→</div>
+          <select value={toLang} onChange={(e) => setToLang(e.target.value)} style={{ ...selectStyle, flex: 1 }}>
             {Object.entries(LANGUAGES).map(([code, info]) => (
               <option key={code} value={code}>{info.flag} {info.label}</option>
             ))}
@@ -219,107 +312,95 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
       {/* ── PDF Result ── */}
       {result && result.fileType === "pdf" && (
         <div>
-          <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
-            maxHeight: 300,
-          }}>
-            {/* Original */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 300 }}>
             <div style={{ background: "#F8F9FC", borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <div style={{
-                padding: "8px 12px", fontWeight: 800, fontSize: 11, color: "#6B7280",
-                background: "#F3F4F6", borderBottom: "1px solid #E9ECF5", letterSpacing: 1,
-              }}>
+              <div style={{ padding: "8px 12px", fontWeight: 800, fontSize: 11, color: "#6B7280", background: "#F3F4F6", borderBottom: "1px solid #E9ECF5", letterSpacing: 1 }}>
                 {LANGUAGES[fromLang]?.flag} 원문
               </div>
-              <div style={{
-                padding: "12px", fontSize: 12, color: "#374151", lineHeight: 1.8,
-                overflowY: "auto", flex: 1, maxHeight: 250, whiteSpace: "pre-wrap",
-              }}>
+              <div style={{ padding: "12px", fontSize: 12, color: "#374151", lineHeight: 1.8, overflowY: "auto", flex: 1, maxHeight: 250, whiteSpace: "pre-wrap" }}>
                 {result.originalText || <span style={{ color: "#9CA3AF" }}>텍스트가 없습니다</span>}
               </div>
             </div>
-            {/* Translation */}
             <div style={{ background: "#F0EEFF", borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <div style={{
-                padding: "8px 12px", fontWeight: 800, fontSize: 11, color: "#5B57F5",
-                background: "#EEF0FF", borderBottom: "1px solid #DDD9FF", letterSpacing: 1,
-              }}>
+              <div style={{ padding: "8px 12px", fontWeight: 800, fontSize: 11, color: "#5B57F5", background: "#EEF0FF", borderBottom: "1px solid #DDD9FF", letterSpacing: 1 }}>
                 {LANGUAGES[toLang]?.flag} 번역
               </div>
-              <div style={{
-                padding: "12px", fontSize: 12, color: "#1E1B4B", lineHeight: 1.8,
-                overflowY: "auto", flex: 1, maxHeight: 250, whiteSpace: "pre-wrap",
-              }}>
+              <div style={{ padding: "12px", fontSize: 12, color: "#1E1B4B", lineHeight: 1.8, overflowY: "auto", flex: 1, maxHeight: 250, whiteSpace: "pre-wrap" }}>
                 {result.translatedText || <span style={{ color: "#9CA3AF" }}>번역 결과 없음</span>}
               </div>
             </div>
           </div>
-
-          {/* Actions */}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button
               onClick={() => { setResult(null); setError(null); }}
-              style={{
-                flex: 1, padding: "10px 0", borderRadius: 11, border: "1.5px solid #E5E7EB",
-                background: "#fff", color: "#6B7280", fontWeight: 700, fontSize: 13, cursor: "pointer",
-              }}
+              style={{ flex: 1, padding: "10px 0", borderRadius: 11, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
             >↩ 다시 올리기</button>
             <button
-              onClick={() => {
-                onPostText(result.translatedText, toLang);
-                onClose();
-              }}
-              style={{
-                flex: 2, padding: "10px 0", borderRadius: 11, border: "none",
-                background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
-                color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer",
-                boxShadow: "0 4px 16px rgba(91,87,245,0.35)",
-              }}
+              onClick={() => { onPostText(result.translatedText, toLang); onClose(); }}
+              style={{ flex: 2, padding: "10px 0", borderRadius: 11, border: "none", background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 16px rgba(91,87,245,0.35)" }}
             >📌 번역 게시하기</button>
           </div>
         </div>
       )}
 
       {/* ── Image OCR Result ── */}
-      {result && result.fileType === "image" && result.imagePreviewUrl && (
+      {result && result.fileType === "image" && (
         <div>
-          {/* Image with overlay */}
-          <div style={{ position: "relative", borderRadius: 12, overflow: "hidden" }}>
-            <img
-              src={result.imagePreviewUrl}
-              alt="worksheet"
-              style={{ width: "100%", display: "block", maxHeight: 320, objectFit: "contain", background: "#F9FAFB" }}
-            />
-            {/* Translation overlay — semi-transparent so image shows through */}
-            <div style={{
-              position: "absolute", inset: 0,
-              background: "rgba(10,8,28,0.72)",
-              backdropFilter: "blur(2px)",
-              opacity: showOverlay ? 1 : 0,
-              transition: "opacity 0.3s ease",
-              pointerEvents: showOverlay ? "auto" : "none",
-              overflow: "auto", padding: "20px 16px",
-            }}>
+          {/* Image viewer: toggle original ↔ translated overlay */}
+          <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", background: "#F9FAFB" }}>
+            {/* Original image */}
+            {result.imagePreviewUrl && (
+              <img
+                src={result.imagePreviewUrl}
+                alt="원본"
+                style={{
+                  width: "100%", display: "block", maxHeight: 380,
+                  objectFit: "contain",
+                  opacity: showTranslated && overlayUrl ? 0 : 1,
+                  transition: "opacity 0.2s",
+                  position: overlayUrl ? "absolute" : "relative",
+                  top: 0, left: 0,
+                }}
+              />
+            )}
+            {/* Canvas overlay (translated) */}
+            {overlayUrl && (
+              <img
+                src={overlayUrl}
+                alt="번역 적용"
+                style={{
+                  width: "100%", display: "block", maxHeight: 380,
+                  objectFit: "contain",
+                  opacity: showTranslated ? 1 : 0,
+                  transition: "opacity 0.2s",
+                }}
+              />
+            )}
+            {/* Fallback: no blocks — show dark overlay with text */}
+            {!overlayUrl && result.imagePreviewUrl && (
               <div style={{
-                fontSize: 13, color: "#F9FAFB", lineHeight: 1.9,
-                whiteSpace: "pre-wrap", fontWeight: 500,
+                position: "absolute", inset: 0,
+                background: "rgba(10,8,28,0.75)", backdropFilter: "blur(2px)",
+                opacity: showTranslated ? 1 : 0,
+                transition: "opacity 0.3s",
+                pointerEvents: showTranslated ? "auto" : "none",
+                overflow: "auto", padding: "20px 16px",
               }}>
-                <span style={{
-                  display: "inline-block", fontSize: 10, fontWeight: 800, letterSpacing: 1,
-                  color: "#A5B4FC", marginBottom: 10,
-                }}>
-                  {LANGUAGES[toLang]?.flag} {LANGUAGES[toLang]?.label?.toUpperCase()} 번역
-                </span>
-                {"\n"}{result.translatedText}
+                <div style={{ fontSize: 13, color: "#F9FAFB", lineHeight: 1.9, whiteSpace: "pre-wrap", fontWeight: 500 }}>
+                  <span style={{ display: "block", fontSize: 10, fontWeight: 800, letterSpacing: 1, color: "#A5B4FC", marginBottom: 10 }}>
+                    {LANGUAGES[toLang]?.flag} {LANGUAGES[toLang]?.label?.toUpperCase()} 번역
+                  </span>
+                  {result.translatedText}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Toggle button */}
             <button
-              onClick={() => setShowOverlay(!showOverlay)}
+              onClick={() => setShowTranslated(!showTranslated)}
               style={{
-                position: "absolute", top: 10, right: 10,
-                background: showOverlay ? "rgba(91,87,245,0.9)" : "rgba(0,0,0,0.55)",
+                position: "absolute", top: 10, right: 10, zIndex: 10,
+                background: showTranslated ? "rgba(91,87,245,0.92)" : "rgba(0,0,0,0.55)",
                 border: "none", color: "#fff", borderRadius: 10,
                 padding: "6px 14px", cursor: "pointer",
                 fontSize: 12, fontWeight: 800,
@@ -327,24 +408,17 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
                 transition: "background 0.2s",
               }}
             >
-              {showOverlay ? `🖼️ ${LANGUAGES[fromLang]?.flag} 원본` : `🌐 ${LANGUAGES[toLang]?.flag} 번역`}
+              {showTranslated ? `🖼️ ${LANGUAGES[fromLang]?.flag} 원본` : `🌐 ${LANGUAGES[toLang]?.flag} 번역`}
             </button>
           </div>
 
-          {/* OCR original text (collapsed) */}
+          {/* OCR original text */}
           {result.originalText && (
             <details style={{ marginTop: 8 }}>
-              <summary style={{
-                fontSize: 12, color: "#9CA3AF", cursor: "pointer", fontWeight: 600,
-                padding: "6px 0",
-              }}>
+              <summary style={{ fontSize: 12, color: "#9CA3AF", cursor: "pointer", fontWeight: 600, padding: "6px 0" }}>
                 {LANGUAGES[fromLang]?.flag} 인식된 원문 보기
               </summary>
-              <div style={{
-                padding: "10px 12px", background: "#F8F9FC", borderRadius: 10, marginTop: 6,
-                fontSize: 12, color: "#374151", lineHeight: 1.8, whiteSpace: "pre-wrap",
-                maxHeight: 140, overflowY: "auto",
-              }}>
+              <div style={{ padding: "10px 12px", background: "#F8F9FC", borderRadius: 10, marginTop: 6, fontSize: 12, color: "#374151", lineHeight: 1.8, whiteSpace: "pre-wrap", maxHeight: 140, overflowY: "auto" }}>
                 {result.originalText}
               </div>
             </details>
@@ -353,29 +427,25 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <button
-              onClick={() => { setResult(null); setError(null); setShowOverlay(false); setCompressedBlob(null); }}
-              style={{
-                flex: 1, padding: "10px 0", borderRadius: 11, border: "1.5px solid #E5E7EB",
-                background: "#fff", color: "#6B7280", fontWeight: 700, fontSize: 13, cursor: "pointer",
-              }}
+              onClick={() => { setResult(null); setError(null); setShowTranslated(true); setCompressedBlob(null); setOverlayUrl(null); }}
+              style={{ flex: 1, padding: "10px 0", borderRadius: 11, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
             >↩ 다시 올리기</button>
+            {overlayUrl && (
+              <button
+                onClick={downloadOverlay}
+                style={{ flex: 1, padding: "10px 0", borderRadius: 11, border: "1.5px solid #5B57F5", background: "#fff", color: "#5B57F5", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+              >📥 번역 이미지 저장</button>
+            )}
             <button
               onClick={() => {
                 if (compressedBlob && onPostWorksheetImage) {
-                  // 이미지 + 번역 텍스트 함께 게시
                   onPostWorksheetImage(compressedBlob, result.originalText, result.translatedText, toLang);
                 } else {
-                  // fallback: 텍스트만
                   onPostText(result.translatedText, toLang);
                 }
                 onClose();
               }}
-              style={{
-                flex: 2, padding: "10px 0", borderRadius: 11, border: "none",
-                background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
-                color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer",
-                boxShadow: "0 4px 16px rgba(91,87,245,0.35)",
-              }}
+              style={{ flex: 2, padding: "10px 0", borderRadius: 11, border: "none", background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 16px rgba(91,87,245,0.35)" }}
             >📌 이미지+번역 게시하기</button>
           </div>
         </div>
