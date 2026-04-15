@@ -6,15 +6,6 @@ import { LANGUAGES } from "@/lib/constants";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-// ─── Language codes ────────────────────────────────────────────────
-// NLLB FLORES-200 codes for HuggingFace open-source translation
-const NLLB: Record<string, string> = {
-  ko: "kor_Hang", en: "eng_Latn", vi: "vie_Latn", zh: "zho_Hans",
-  fil: "tgl_Latn", ja: "jpn_Jpan", th: "tha_Thai", km: "khm_Khmr",
-  mn: "khk_Cyrl", ru: "rus_Cyrl", uz: "uzn_Latn", hi: "hin_Deva",
-  id: "ind_Latn", ar: "arb_Arab", my: "mya_Mymr",
-};
-
 // ─── XML helpers ───────────────────────────────────────────────────
 function decodeXml(s: string): string {
   return s
@@ -120,49 +111,7 @@ function adjustedSz(
   return String(newSz);
 }
 
-// ─── Translation backends ──────────────────────────────────────────
-async function translateHF(texts: string[], fromLang: string, toLang: string): Promise<string[] | null> {
-  const token = process.env.HF_TOKEN;
-  if (!token) return null;
-  const src = NLLB[fromLang], tgt = NLLB[toLang];
-  if (!src || !tgt) return null;
-
-  const out: string[] = [];
-  for (const txt of texts) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000); // 8 s per segment — abort and fall back to Groq
-    try {
-      const res = await fetch(
-        "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M",
-        {
-          method: "POST",
-          signal: ctrl.signal,
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            inputs: txt,
-            parameters: { src_lang: src, tgt_lang: tgt },
-            options: { wait_for_model: true },
-          }),
-        }
-      );
-      clearTimeout(timer);
-      if (!res.ok) return null; // abort entire batch, let caller fall back
-      const data = (await res.json()) as Array<{ translation_text?: string }> | { translation_text?: string };
-      const translated = Array.isArray(data)
-        ? (data[0]?.translation_text || "")
-        : (data.translation_text || "");
-      out.push(translated || txt);
-    } catch {
-      clearTimeout(timer);
-      return null; // timeout or network error → fall back to Groq
-    }
-  }
-  return out;
-}
-
+// ─── Translation backend (Groq) ───────────────────────────────────
 async function translateGroq(texts: string[], fromLang: string, toLang: string): Promise<string[]> {
   const groq = new OpenAI({
     apiKey: process.env.GROQ_API_KEY || "placeholder",
@@ -266,13 +215,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "번역할 텍스트가 없습니다" }, { status: 400 });
     }
 
-    // ── Translate (HF first, Groq fallback) ─────────────────────────
-    let translated = await translateHF(segments, fromLang, toLang);
-    let backend: "hf" | "groq" = "hf";
-    if (!translated) {
-      translated = await translateGroq(segments, fromLang, toLang);
-      backend = "groq";
-    }
+    // ── Translate via Groq ───────────────────────────────────────────
+    const translated = await translateGroq(segments, fromLang, toLang);
+    const backend = "groq";
 
     const map = new Map<string, string>();
     segments.forEach((src, i) => map.set(src, translated![i] || src));
