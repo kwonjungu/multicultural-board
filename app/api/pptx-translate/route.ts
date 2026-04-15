@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { LANGUAGES } from "@/lib/constants";
+import { translateBatch } from "@/lib/groq-translate";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -62,59 +62,14 @@ function adjustedSz(
   const origW  = visualWidth(orig,  fromLang);
   const transW = visualWidth(trans, toLang);
   const ratio  = transW / origW;
-  if (ratio <= 1.0) return szStr;               // 1%라도 늘면 즉시 축소
+  if (ratio <= 1.0) return szStr;
   const sz    = Number(szStr);
-  const scale = Math.max(0.55, (1 / ratio) * 0.85); // 비례 축소 + 15% 안전 여유
-  const newSz = Math.max(700, Math.round(sz * scale)); // 최소 7pt
+  const scale = Math.max(0.55, (1 / ratio) * 0.85);
+  const newSz = Math.max(700, Math.round(sz * scale));
   return String(newSz);
 }
 
-// ─── Translation backend (Groq) ───────────────────────────────────
-async function translateGroq(texts: string[], fromLang: string, toLang: string): Promise<string[]> {
-  const groq = new OpenAI({
-    apiKey: process.env.GROQ_API_KEY || "placeholder",
-    baseURL: "https://api.groq.com/openai/v1",
-  });
-  const fromName = LANGUAGES[fromLang]?.name || fromLang;
-  const toName   = LANGUAGES[toLang]?.name   || toLang;
-  const results: string[] = [];
-  const BATCH = 25;
-
-  for (let i = 0; i < texts.length; i += BATCH) {
-    const chunk = texts.slice(i, i + BATCH);
-    const prompt = `Translate each array element from ${fromName} to ${toName}.
-Return ONLY a raw JSON array of strings with EXACTLY ${chunk.length} elements in the same order.
-Do not add explanation, markdown, or code fences.
-
-Input:
-${JSON.stringify(chunk)}`;
-
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 4000,
-      temperature: 0.2,
-    });
-
-    const raw = (completion.choices[0]?.message?.content || "")
-      .replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-
-    let parsed: string[] = [];
-    try {
-      const json = JSON.parse(raw);
-      if (Array.isArray(json)) parsed = json.map((x) => String(x ?? ""));
-    } catch {
-      parsed = [];
-    }
-    while (parsed.length < chunk.length) parsed.push(chunk[parsed.length]);
-    results.push(...parsed.slice(0, chunk.length));
-  }
-  return results;
-}
-
 // ─── Main handler ──────────────────────────────────────────────────
-// Receives slide XMLs as JSON (client extracts them from PPTX via JSZip).
-// This keeps the request payload tiny (text only, no images/media).
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {
@@ -153,8 +108,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "번역할 텍스트가 없습니다" }, { status: 400 });
     }
 
-    // ── Translate via Groq ───────────────────────────────────────────
-    const translated = await translateGroq(segments, fromLang, toLang);
+    // ── Translate (multi-model fallback) ────────────────────────────
+    const fromName = LANGUAGES[fromLang]?.name || fromLang;
+    const toName   = LANGUAGES[toLang]?.name   || toLang;
+    const translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
+
     const map = new Map<string, string>();
     segments.forEach((src, i) => map.set(src, translated[i] || src));
 

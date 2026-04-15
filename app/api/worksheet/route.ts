@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { LANGUAGES } from "@/lib/constants";
+import { translateBatch } from "@/lib/groq-translate";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -10,6 +11,12 @@ function getGroqClient() {
     apiKey: process.env.GROQ_API_KEY || "placeholder",
     baseURL: "https://api.groq.com/openai/v1",
   });
+}
+
+// 429 감지 헬퍼
+function isRateLimit(err: unknown): boolean {
+  if (err instanceof OpenAI.APIError) return err.status === 429;
+  return String((err as Error)?.message ?? "").includes("429");
 }
 
 export async function POST(req: NextRequest) {
@@ -51,17 +58,13 @@ export async function POST(req: NextRequest) {
       // Truncate to avoid token limits
       const truncated = originalText.slice(0, 3000);
 
-      const completion = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: [{
-          role: "user",
-          content: `Translate the following ${LANGUAGES[fromLang]?.name || fromLang} text to ${LANGUAGES[toLang]?.name || toLang}.\nReturn ONLY the translation, nothing else.\n\n${truncated}`,
-        }],
-        max_tokens: 2000,
-        temperature: 0.3,
-      });
-
-      const translatedText = completion.choices[0]?.message?.content?.trim() || "";
+      // PDF 번역: translateBatch 활용 (모델 폴백 적용)
+      const [translatedText] = await translateBatch(
+        [truncated],
+        fromLang, toLang,
+        LANGUAGES[fromLang]?.name || fromLang,
+        LANGUAGES[toLang]?.name   || toLang,
+      );
       return NextResponse.json({ originalText: truncated, translatedText });
     }
 
@@ -88,7 +91,7 @@ Rules:
 - x, y, w, h must be numbers between 0 and 1
 - If you cannot estimate position, guess reasonably based on visual layout`;
 
-      // Try vision models in order — Scout (Llama 4) first, then Llama 3.2 fallbacks
+      // Vision 모델: 429 포함 모두 폴백
       const VISION_MODELS = [
         "meta-llama/llama-4-scout-17b-16e-instruct",
         "llama-3.2-90b-vision-preview",
@@ -113,10 +116,11 @@ Rules:
           });
           raw = (completion.choices[0]?.message?.content || "{}").replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
           visionErr = null;
-          break; // success
+          break;
         } catch (e) {
           console.error(`Vision model ${model} failed:`, e);
           visionErr = e;
+          if (!isRateLimit(e)) break; // 429 외 오류는 다음 모델 시도 안 함
         }
       }
 

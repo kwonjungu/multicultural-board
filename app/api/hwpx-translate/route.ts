@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { LANGUAGES } from "@/lib/constants";
+import { translateBatch } from "@/lib/groq-translate";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -41,7 +41,6 @@ function visualWidth(text: string, lang: string): number {
 
 // ─── header.xml charPr 폰트 스케일 ───────────────────────────────────
 // HWPX height 단위: centi-pt (height="1000" = 10pt, height="700" = 7pt min)
-// 대상 태그: <hh:charPr>, <charPr>, <hp:charPr>
 function scaleHeaderFonts(headerXml: string, scale: number): string {
   return headerXml.replace(
     /(<(?:[\w]+:)?charPr\b[^>]*?)\bheight="(\d+)"/g,
@@ -52,47 +51,6 @@ function scaleHeaderFonts(headerXml: string, scale: number): string {
   );
 }
 
-// ─── Translation backend (Groq) ───────────────────────────────────
-async function translateGroq(texts: string[], fromLang: string, toLang: string): Promise<string[]> {
-  const groq = new OpenAI({
-    apiKey: process.env.GROQ_API_KEY || "placeholder",
-    baseURL: "https://api.groq.com/openai/v1",
-  });
-  const fromName = LANGUAGES[fromLang]?.name || fromLang;
-  const toName   = LANGUAGES[toLang]?.name   || toLang;
-  const results: string[] = [];
-  const BATCH = 25;
-
-  for (let i = 0; i < texts.length; i += BATCH) {
-    const chunk = texts.slice(i, i + BATCH);
-    const prompt = `Translate each array element from ${fromName} to ${toName}.
-Return ONLY a raw JSON array of strings with EXACTLY ${chunk.length} elements in the same order.
-Do not add explanation, markdown, or code fences.
-
-Input:
-${JSON.stringify(chunk)}`;
-
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 4000,
-      temperature: 0.2,
-    });
-
-    const raw = (completion.choices[0]?.message?.content || "")
-      .replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-
-    let parsed: string[] = [];
-    try {
-      const json = JSON.parse(raw);
-      if (Array.isArray(json)) parsed = json.map((x) => String(x ?? ""));
-    } catch { parsed = []; }
-    while (parsed.length < chunk.length) parsed.push(chunk[parsed.length]);
-    results.push(...parsed.slice(0, chunk.length));
-  }
-  return results;
-}
-
 // ─── Main handler ──────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
@@ -100,7 +58,7 @@ export async function POST(req: NextRequest) {
       sectionXmls: Record<string, string>;
       fromLang: string;
       toLang: string;
-      headerXml?: string;  // header.xml (charPr 폰트 정의)
+      headerXml?: string;
     };
     const { sectionXmls, fromLang, toLang, headerXml } = body;
 
@@ -130,21 +88,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "번역할 텍스트가 없습니다" }, { status: 400 });
     }
 
-    // ── Translate via Groq ─────────────────────────────────────────
-    const translated = await translateGroq(segments, fromLang, toLang);
+    // ── Translate (multi-model fallback) ──────────────────────────
+    const fromName = LANGUAGES[fromLang]?.name || fromLang;
+    const toName   = LANGUAGES[toLang]?.name   || toLang;
+    const translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
+
     const map = new Map<string, string>();
     segments.forEach((src, i) => map.set(src, translated[i] || src));
 
     // ── Compute header.xml font scale ──────────────────────────────
-    // 번역 후 시각적 너비가 늘어난 정도를 90th percentile로 집계
-    // → charPr height 비례 축소 (최소 7pt = 700)
     let translatedHeaderXml: string | undefined;
     if (headerXml) {
       const ratios: number[] = [];
       for (let i = 0; i < segments.length; i++) {
         const src = segments[i];
         const tgt = translated[i] || src;
-        if (src.trim().length < 5) continue; // 짧은 토큰 제외 (비율 신뢰성 낮음)
+        if (src.trim().length < 5) continue;
         const ratio = visualWidth(tgt, toLang) / visualWidth(src, fromLang);
         if (ratio > 0 && isFinite(ratio)) ratios.push(ratio);
       }
@@ -152,7 +111,6 @@ export async function POST(req: NextRequest) {
         ratios.sort((a, b) => a - b);
         const p90 = ratios[Math.min(Math.floor(ratios.length * 0.9), ratios.length - 1)];
         if (p90 > 1.1) {
-          // 1.1배 이상 팽창 시에만 축소 적용 (PPTX와 동일 기준)
           const scale = Math.max(0.55, (1 / p90) * 0.85);
           translatedHeaderXml = scaleHeaderFonts(headerXml, scale);
         }
@@ -177,7 +135,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       translatedXmls,
-      translatedHeaderXml,   // undefined이면 폰트 축소 불필요 (1.1배 미만 팽창)
+      translatedHeaderXml,
       segments: segments.length,
     });
   } catch (err) {
