@@ -62,10 +62,10 @@ function adjustedSz(
   const origW  = visualWidth(orig,  fromLang);
   const transW = visualWidth(trans, toLang);
   const ratio  = transW / origW;
-  if (ratio <= 1.15) return szStr;
+  if (ratio <= 1.0) return szStr;               // 1%라도 늘면 즉시 축소
   const sz    = Number(szStr);
-  const scale = Math.max(0.65, 1 / ratio);
-  const newSz = Math.max(800, Math.round(sz * scale));
+  const scale = Math.max(0.55, (1 / ratio) * 0.85); // 비례 축소 + 15% 안전 여유
+  const newSz = Math.max(700, Math.round(sz * scale)); // 최소 7pt
   return String(newSz);
 }
 
