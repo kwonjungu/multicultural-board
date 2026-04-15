@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { LANGUAGES } from "@/lib/constants";
-import { translateBatch } from "@/lib/groq-translate";
+import { translateBatch, translateLongText } from "@/lib/groq-translate";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -58,10 +58,9 @@ export async function POST(req: NextRequest) {
       // Truncate to avoid token limits
       const truncated = originalText.slice(0, 3000);
 
-      // PDF 번역: translateBatch 활용 (모델 폴백 적용)
-      const [translatedText] = await translateBatch(
-        [truncated],
-        fromLang, toLang,
+      // PDF 번역: 장문 전용 함수 (모델 폴백 적용)
+      const translatedText = await translateLongText(
+        truncated,
         LANGUAGES[fromLang]?.name || fromLang,
         LANGUAGES[toLang]?.name   || toLang,
       );
