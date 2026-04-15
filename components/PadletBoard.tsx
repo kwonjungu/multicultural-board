@@ -8,6 +8,7 @@ import { CardData, UserConfig, PostData, RoomConfig, CardStatus, CommentData } f
 import { t } from "@/lib/i18n";
 import PadletCard from "./PadletCard";
 import PostModal from "./PostModal";
+import PptxTranslateModal from "./PptxTranslateModal";
 import { QRCodeSVG } from "qrcode.react";
 
 type PendingItem =
@@ -68,6 +69,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const [showQR, setShowQR] = useState(false);
   const [showApproval, setShowApproval] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showPptx, setShowPptx] = useState(false);
   const [editModal, setEditModal] = useState<{ card: CardData; colTitle: string; colColor: string } | null>(null);
 
   const boardRef = useRef<HTMLDivElement>(null);
@@ -128,12 +130,13 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         else if (showManage) setShowManage(false);
         else if (showQR) setShowQR(false);
         else if (showApproval) setShowApproval(false);
+        else if (showPptx) setShowPptx(false);
         else if (editModal) setEditModal(null);
       }
     }
     document.addEventListener("keydown", handleEsc);
     return () => document.removeEventListener("keydown", handleEsc);
-  }, [showTeacherModal, showManage, showQR, showApproval, editModal]);
+  }, [showTeacherModal, showManage, showQR, showApproval, showPptx, editModal]);
 
   // ── Firebase: rooms/${roomCode}/cards ──
   useEffect(() => {
@@ -637,6 +640,26 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   </div>
                 )}
               </div>
+
+              {/* PPTX 번역 button */}
+              <button
+                onClick={() => setShowPptx(true)}
+                style={{
+                  background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.3)",
+                  color: "#F9A8D4", borderRadius: 10, padding: "6px 12px",
+                  fontSize: 12, cursor: "pointer", fontWeight: 700, transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(236,72,153,0.3)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "#fff";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(236,72,153,0.15)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "#F9A8D4";
+                }}
+              >
+                📊 PPTX 번역
+              </button>
 
               {/* Manage button */}
               <button
@@ -1171,6 +1194,15 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── PPTX 번역 Modal ── */}
+      {showPptx && isTeacher && (
+        <PptxTranslateModal
+          defaultFromLang={lang === "ko" ? "ko" : lang}
+          defaultToLang={lang === "ko" ? "en" : "ko"}
+          onClose={() => setShowPptx(false)}
+        />
       )}
 
       {/* ── QR Modal ── */}

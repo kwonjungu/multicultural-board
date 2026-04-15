@@ -31,3 +31,7 @@ firebase-admin-key.json
 
 # 설정 메모장
 firebase-setup-notes.txt
+
+
+# Claude Code local settings
+.claude/
