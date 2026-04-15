@@ -9,80 +9,117 @@ interface Props {
   onClose: () => void;
 }
 
+type FileKind = "pptx" | "hwpx";
+
 type Result = {
   blob: Blob;
   fileName: string;
   segments: number;
-  backend: string;
+  kind: FileKind;
 };
+
+function getKind(file: File): FileKind | null {
+  const n = file.name.toLowerCase();
+  if (n.endsWith(".pptx")) return "pptx";
+  if (n.endsWith(".hwpx")) return "hwpx";
+  return null;
+}
 
 export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onClose }: Props) {
   const [fromLang, setFromLang] = useState(defaultFromLang || "ko");
   const [toLang, setToLang]     = useState(defaultToLang   || "en");
   const [processing, setProcessing] = useState(false);
-  const [statusMsg, setStatusMsg] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg]   = useState("");
+  const [error, setError]   = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
-    if (!file.name.toLowerCase().endsWith(".pptx")) {
-      setError("PPTX 파일만 지원합니다");
+    const kind = getKind(file);
+    if (!kind) {
+      setError("PPTX 또는 HWPX 파일만 지원합니다");
       return;
     }
     setError(null);
     setResult(null);
     setProcessing(true);
-    setStatusMsg("📊 PPTX 분석 중...");
 
     try {
-      // ① 클라이언트에서 JSZip으로 PPTX 열기 (이미지/미디어는 그대로 보관)
       const JSZip = (await import("jszip")).default;
-      const zip = await JSZip.loadAsync(await file.arrayBuffer());
+      const zip   = await JSZip.loadAsync(await file.arrayBuffer());
 
-      // ② 슬라이드 XML만 추출 (수십 KB — 이미지 없음)
-      const slideXmls: Record<string, string> = {};
-      const paths: string[] = [];
-      zip.forEach((path) => {
-        if (/^ppt\/slides\/slide\d+\.xml$/i.test(path)) paths.push(path);
-      });
-      for (const p of paths) {
-        const f = zip.file(p);
-        if (f) slideXmls[p] = await f.async("string");
+      if (kind === "pptx") {
+        // ─── PPTX: 슬라이드 XML 추출 ───────────────────────────────
+        setStatusMsg("📊 슬라이드 분석 중...");
+        const slideXmls: Record<string, string> = {};
+        const paths: string[] = [];
+        zip.forEach((p) => { if (/^ppt\/slides\/slide\d+\.xml$/i.test(p)) paths.push(p); });
+        for (const p of paths) {
+          const f = zip.file(p);
+          if (f) slideXmls[p] = await f.async("string");
+        }
+        if (paths.length === 0) throw new Error("슬라이드를 찾을 수 없습니다");
+
+        setStatusMsg("🌐 슬라이드 번역 중...");
+        const res = await fetch("/api/pptx-translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slideXmls, fromLang, toLang }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || "PPTX 번역 실패");
+        }
+        const { translatedXmls, segments } = await res.json() as {
+          translatedXmls: Record<string, string>; segments: number;
+        };
+
+        setStatusMsg("📦 파일 재조립 중...");
+        for (const [p, xml] of Object.entries(translatedXmls)) zip.file(p, xml);
+        const buf = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+        setResult({
+          blob: new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }),
+          fileName: file.name.replace(/\.pptx$/i, "") + `_${toLang}.pptx`,
+          segments,
+          kind,
+        });
+
+      } else {
+        // ─── HWPX: 섹션 XML 추출 ────────────────────────────────────
+        setStatusMsg("📄 문서 분석 중...");
+        const sectionXmls: Record<string, string> = {};
+        const paths: string[] = [];
+        zip.forEach((p) => { if (/[Ss]ection\d+\.xml$/.test(p)) paths.push(p); });
+        for (const p of paths) {
+          const f = zip.file(p);
+          if (f) sectionXmls[p] = await f.async("string");
+        }
+        if (paths.length === 0) throw new Error("섹션 파일을 찾을 수 없습니다 (HWPX 형식인지 확인하세요)");
+
+        setStatusMsg("🌐 문서 번역 중...");
+        const res = await fetch("/api/hwpx-translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sectionXmls, fromLang, toLang }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || "HWPX 번역 실패");
+        }
+        const { translatedXmls, segments } = await res.json() as {
+          translatedXmls: Record<string, string>; segments: number;
+        };
+
+        setStatusMsg("📦 파일 재조립 중...");
+        for (const [p, xml] of Object.entries(translatedXmls)) zip.file(p, xml);
+        const buf = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+        setResult({
+          blob: new Blob([buf], { type: "application/octet-stream" }),
+          fileName: file.name.replace(/\.hwpx$/i, "") + `_${toLang}.hwpx`,
+          segments,
+          kind,
+        });
       }
-      if (paths.length === 0) throw new Error("슬라이드를 찾을 수 없습니다");
-
-      // ③ XML만 서버로 전송 (페이로드 수십 KB)
-      setStatusMsg("🌐 슬라이드 번역 중...");
-      const res = await fetch("/api/pptx-translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slideXmls, fromLang, toLang }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "PPTX 번역 실패");
-      }
-      const { translatedXmls, segments } = await res.json() as {
-        translatedXmls: Record<string, string>;
-        segments: number;
-      };
-
-      // ④ 번역된 XML을 원본 zip에 교체 (이미지/미디어 그대로 유지)
-      setStatusMsg("📦 파일 재조립 중...");
-      for (const [p, xml] of Object.entries(translatedXmls)) {
-        zip.file(p, xml);
-      }
-      const outBuffer = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
-
-      setResult({
-        blob: new Blob([outBuffer], {
-          type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        }),
-        fileName: file.name.replace(/\.pptx$/i, "") + `_${toLang}.pptx`,
-        segments,
-        backend: "groq",
-      });
     } catch (e: unknown) {
       setError((e as Error).message || "처리 중 오류가 발생했습니다");
     }
@@ -127,13 +164,13 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
       }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <div style={{ fontSize: 26 }}>📊</div>
+          <div style={{ fontSize: 26 }}>📄</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 800, fontSize: 16, color: "#111827", letterSpacing: -0.2 }}>
-              PPTX 슬라이드 번역
+              문서 번역
             </div>
             <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>
-              파워포인트 파일의 텍스트를 번역해 새 파일로 저장
+              PPTX · HWPX 파일의 텍스트를 번역해 새 파일로 저장
             </div>
           </div>
           <button
@@ -176,7 +213,7 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+              accept=".pptx,.hwpx"
               style={{ display: "none" }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -212,15 +249,17 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
             >
               <div style={{ fontSize: 40, marginBottom: 10 }}>📤</div>
               <div style={{ fontWeight: 700, fontSize: 14, color: "#374151", marginBottom: 4 }}>
-                PPTX 파일을 올리세요
+                문서 파일을 올리세요
               </div>
               <div style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.7 }}>
                 클릭하거나 드래그 앤 드롭<br />
-                <span style={{ fontWeight: 600, color: "#6B7280" }}>.pptx</span> · 최대 30MB
+                <span style={{ fontWeight: 600, color: "#6B7280" }}>.pptx</span>
+                {" · "}
+                <span style={{ fontWeight: 600, color: "#6B7280" }}>.hwpx</span>
               </div>
             </div>
             <div style={{ marginTop: 12, padding: "10px 14px", background: "#FEF3C7", borderRadius: 10, fontSize: 11, color: "#92400E", lineHeight: 1.6 }}>
-              💡 슬라이드 텍스트만 번역됩니다. 이미지 속 글자, 차트 데이터는 원본 그대로 유지돼요.
+              💡 텍스트만 번역됩니다. 이미지 속 글자·차트 데이터는 원본 그대로 유지돼요.
             </div>
           </>
         )}
@@ -238,8 +277,7 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
             }} />
             <div style={{ fontWeight: 700, fontSize: 14, color: "#374151" }}>{statusMsg}</div>
             <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 8, lineHeight: 1.7 }}>
-              슬라이드 수에 따라 10~60초 걸릴 수 있어요<br />
-              오픈소스 NLLB-200 → 실패 시 Groq 폴백
+              문서 크기에 따라 10~60초 걸릴 수 있어요
             </div>
           </div>
         )}
@@ -274,8 +312,8 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
               {LANGUAGES[fromLang]?.flag} {LANGUAGES[fromLang]?.label} → {LANGUAGES[toLang]?.flag} {LANGUAGES[toLang]?.label}
             </div>
             <div style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 14 }}>
-              {result.segments > 0 ? `${result.segments}개 텍스트 조각 번역` : ""}
-              {result.backend === "hf" ? " · NLLB-200 (오픈소스)" : result.backend === "groq" ? " · Groq Llama" : ""}
+              {result.segments > 0 ? `${result.segments}개 텍스트 조각 번역 · ` : ""}
+              {result.kind === "pptx" ? "PowerPoint" : "한글(HWPX)"} · Groq Llama
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button
@@ -296,7 +334,9 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
               >📥 다운로드</button>
             </div>
             <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 12, lineHeight: 1.6 }}>
-              원본 레이아웃 유지 · PowerPoint, Keynote, Google Slides 호환
+              {result.kind === "pptx"
+                ? "원본 레이아웃 유지 · PowerPoint, Keynote, Google Slides 호환"
+                : "원본 서식 유지 · 한글(HWP) 뷰어에서 확인 가능"}
             </div>
           </div>
         )}

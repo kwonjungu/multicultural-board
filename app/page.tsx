@@ -34,7 +34,7 @@ export default function Home() {
   const [pptxStatus,  setPptxStatus]  = useState("");
   const [pptxError,   setPptxError]   = useState<string | null>(null);
   const [pptxResult,  setPptxResult]  = useState<{
-    blob: Blob; fileName: string; segments: number; backend: string;
+    blob: Blob; fileName: string; segments: number; backend: string; kind: "pptx" | "hwpx";
   } | null>(null);
   const pptxRef = useRef<HTMLInputElement>(null);
 
@@ -77,64 +77,103 @@ export default function Home() {
     );
   }
 
+  function getDocKind(file: File): "pptx" | "hwpx" | null {
+    const n = file.name.toLowerCase();
+    if (n.endsWith(".pptx")) return "pptx";
+    if (n.endsWith(".hwpx")) return "hwpx";
+    return null;
+  }
+
   async function handlePptxFile(file: File) {
-    if (!file.name.toLowerCase().endsWith(".pptx")) {
-      setPptxError("PPTX 파일만 지원합니다");
+    const kind = getDocKind(file);
+    if (!kind) {
+      setPptxError("PPTX 또는 HWPX 파일만 지원합니다");
       return;
     }
     setPptxError(null);
     setPptxResult(null);
     setPptxProcessing(true);
-    setPptxStatus("📊 PPTX 분석 중...");
 
     try {
-      // ① 클라이언트에서 JSZip으로 PPTX 열기
       const JSZip = (await import("jszip")).default;
       const zip = await JSZip.loadAsync(await file.arrayBuffer());
 
-      // ② 슬라이드 XML만 추출 (이미지/미디어 제외 → 수십 KB)
-      const slideXmls: Record<string, string> = {};
-      const paths: string[] = [];
-      zip.forEach((path) => {
-        if (/^ppt\/slides\/slide\d+\.xml$/i.test(path)) paths.push(path);
-      });
-      for (const p of paths) {
-        const f = zip.file(p);
-        if (f) slideXmls[p] = await f.async("string");
-      }
-      if (paths.length === 0) throw new Error("슬라이드를 찾을 수 없습니다");
+      if (kind === "pptx") {
+        // ① 슬라이드 XML 추출
+        setPptxStatus("📊 슬라이드 분석 중...");
+        const slideXmls: Record<string, string> = {};
+        const paths: string[] = [];
+        zip.forEach((path) => {
+          if (/^ppt\/slides\/slide\d+\.xml$/i.test(path)) paths.push(path);
+        });
+        for (const p of paths) {
+          const f = zip.file(p);
+          if (f) slideXmls[p] = await f.async("string");
+        }
+        if (paths.length === 0) throw new Error("슬라이드를 찾을 수 없습니다");
 
-      // ③ XML만 서버로 전송
-      setPptxStatus("🌐 슬라이드 번역 중...");
-      const res = await fetch("/api/pptx-translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slideXmls, fromLang: pptxFrom, toLang: pptxTo }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as { error?: string }).error || "PPTX 번역 실패");
-      }
-      const { translatedXmls, segments } = await res.json() as {
-        translatedXmls: Record<string, string>;
-        segments: number;
-      };
+        setPptxStatus("🌐 슬라이드 번역 중...");
+        const res = await fetch("/api/pptx-translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slideXmls, fromLang: pptxFrom, toLang: pptxTo }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || "PPTX 번역 실패");
+        }
+        const { translatedXmls, segments } = await res.json() as {
+          translatedXmls: Record<string, string>; segments: number;
+        };
 
-      // ④ 번역 XML을 원본 zip에 교체 후 재조립
-      setPptxStatus("📦 파일 재조립 중...");
-      for (const [p, xml] of Object.entries(translatedXmls)) {
-        zip.file(p, xml);
+        setPptxStatus("📦 파일 재조립 중...");
+        for (const [p, xml] of Object.entries(translatedXmls)) zip.file(p, xml);
+        const outBuffer = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+        setPptxResult({
+          blob: new Blob([outBuffer], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }),
+          fileName: file.name.replace(/\.pptx$/i, "") + `_${pptxTo}.pptx`,
+          segments,
+          backend: "groq",
+          kind,
+        });
+
+      } else {
+        // ① 섹션 XML 추출
+        setPptxStatus("📄 문서 분석 중...");
+        const sectionXmls: Record<string, string> = {};
+        const paths: string[] = [];
+        zip.forEach((p) => { if (/[Ss]ection\d+\.xml$/.test(p)) paths.push(p); });
+        for (const p of paths) {
+          const f = zip.file(p);
+          if (f) sectionXmls[p] = await f.async("string");
+        }
+        if (paths.length === 0) throw new Error("섹션 파일을 찾을 수 없습니다 (HWPX 형식인지 확인하세요)");
+
+        setPptxStatus("🌐 문서 번역 중...");
+        const res = await fetch("/api/hwpx-translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sectionXmls, fromLang: pptxFrom, toLang: pptxTo }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || "HWPX 번역 실패");
+        }
+        const { translatedXmls, segments } = await res.json() as {
+          translatedXmls: Record<string, string>; segments: number;
+        };
+
+        setPptxStatus("📦 파일 재조립 중...");
+        for (const [p, xml] of Object.entries(translatedXmls)) zip.file(p, xml);
+        const outBuffer = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+        setPptxResult({
+          blob: new Blob([outBuffer], { type: "application/octet-stream" }),
+          fileName: file.name.replace(/\.hwpx$/i, "") + `_${pptxTo}.hwpx`,
+          segments,
+          backend: "groq",
+          kind,
+        });
       }
-      const outBuffer = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
-      const blob = new Blob([outBuffer], {
-        type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      });
-      setPptxResult({
-        blob,
-        fileName: file.name.replace(/\.pptx$/i, "") + `_${pptxTo}.pptx`,
-        segments,
-        backend: "groq",
-      });
     } catch (e: unknown) {
       setPptxError((e as Error).message || "처리 중 오류가 발생했습니다");
     }
@@ -157,7 +196,7 @@ export default function Home() {
   const TABS = [
     { key: "join"   as const, label: "🚪 방 입장",   sub: "학생 · 교사" },
     { key: "create" as const, label: "✨ 방 만들기",  sub: "선생님 전용" },
-    { key: "pptx"   as const, label: "📊 PPTX 번역", sub: "파일 변환"   },
+    { key: "pptx"   as const, label: "📄 문서 번역",  sub: "PPTX·HWPX"  },
   ];
 
   return (
@@ -361,7 +400,7 @@ export default function Home() {
                 <input
                   ref={pptxRef}
                   type="file"
-                  accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  accept=".pptx,.hwpx"
                   style={{ display: "none" }}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -389,15 +428,17 @@ export default function Home() {
                 >
                   <div style={{ fontSize: 36, marginBottom: 10 }}>📤</div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: "#374151", marginBottom: 4 }}>
-                    PPTX 파일을 올리세요
+                    문서 파일을 올리세요
                   </div>
                   <div style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.7 }}>
                     클릭하거나 드래그 앤 드롭<br />
-                    <span style={{ fontWeight: 600, color: "#6B7280" }}>.pptx</span> · 최대 30MB
+                    <span style={{ fontWeight: 600, color: "#6B7280" }}>.pptx</span>
+                    {" · "}
+                    <span style={{ fontWeight: 600, color: "#6B7280" }}>.hwpx</span>
                   </div>
                 </div>
                 <div style={{ padding: "10px 14px", background: "#FEF3C7", borderRadius: 10, fontSize: 11, color: "#92400E", lineHeight: 1.6 }}>
-                  💡 슬라이드 텍스트만 번역됩니다. 이미지 속 글자·차트 데이터는 원본 그대로 유지돼요.
+                  💡 텍스트만 번역됩니다. 이미지 속 글자·차트 데이터는 원본 그대로 유지돼요.
                 </div>
               </>
             )}
@@ -408,7 +449,7 @@ export default function Home() {
                 <div style={{ width: 40, height: 40, borderRadius: "50%", margin: "0 auto 14px", border: "3px solid #E5E7EB", borderTopColor: "#5B57F5", animation: "spin 0.8s linear infinite" }} />
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#374151" }}>{pptxStatus}</div>
                 <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 6, lineHeight: 1.7 }}>
-                  슬라이드 수에 따라 10~60초 걸릴 수 있어요
+                  문서 크기에 따라 10~60초 걸릴 수 있어요
                 </div>
               </div>
             )}
@@ -430,8 +471,8 @@ export default function Home() {
                   {LANGUAGES[pptxFrom]?.flag} {LANGUAGES[pptxFrom]?.label} → {LANGUAGES[pptxTo]?.flag} {LANGUAGES[pptxTo]?.label}
                 </div>
                 <div style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 14 }}>
-                  {pptxResult.segments > 0 ? `${pptxResult.segments}개 텍스트 조각 번역` : ""}
-                  {pptxResult.backend === "hf" ? " · NLLB-200" : pptxResult.backend === "groq" ? " · Groq Llama" : ""}
+                  {pptxResult.segments > 0 ? `${pptxResult.segments}개 텍스트 조각 번역 · ` : ""}
+                  {pptxResult.kind === "pptx" ? "PowerPoint" : "한글(HWPX)"} · Groq Llama
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
