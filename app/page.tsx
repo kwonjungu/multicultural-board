@@ -82,33 +82,58 @@ export default function Home() {
       setPptxError("PPTX 파일만 지원합니다");
       return;
     }
-    if (file.size > 30 * 1024 * 1024) {
-      setPptxError("파일이 너무 큽니다 (최대 30MB)");
-      return;
-    }
     setPptxError(null);
     setPptxResult(null);
     setPptxProcessing(true);
     setPptxStatus("📊 PPTX 분석 중...");
 
     try {
-      const fd = new FormData();
-      fd.append("file", file, file.name);
-      fd.append("fromLang", pptxFrom);
-      fd.append("toLang",   pptxTo);
+      // ① 클라이언트에서 JSZip으로 PPTX 열기
+      const JSZip = (await import("jszip")).default;
+      const zip = await JSZip.loadAsync(await file.arrayBuffer());
 
+      // ② 슬라이드 XML만 추출 (이미지/미디어 제외 → 수십 KB)
+      const slideXmls: Record<string, string> = {};
+      const paths: string[] = [];
+      zip.forEach((path) => {
+        if (/^ppt\/slides\/slide\d+\.xml$/i.test(path)) paths.push(path);
+      });
+      for (const p of paths) {
+        const f = zip.file(p);
+        if (f) slideXmls[p] = await f.async("string");
+      }
+      if (paths.length === 0) throw new Error("슬라이드를 찾을 수 없습니다");
+
+      // ③ XML만 서버로 전송
       setPptxStatus("🌐 슬라이드 번역 중...");
-      const res = await fetch("/api/pptx-translate", { method: "POST", body: fd });
+      const res = await fetch("/api/pptx-translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slideXmls, fromLang: pptxFrom, toLang: pptxTo }),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "PPTX 번역 실패");
       }
-      const blob = await res.blob();
+      const { translatedXmls, segments } = await res.json() as {
+        translatedXmls: Record<string, string>;
+        segments: number;
+      };
+
+      // ④ 번역 XML을 원본 zip에 교체 후 재조립
+      setPptxStatus("📦 파일 재조립 중...");
+      for (const [p, xml] of Object.entries(translatedXmls)) {
+        zip.file(p, xml);
+      }
+      const outBuffer = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+      const blob = new Blob([outBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      });
       setPptxResult({
         blob,
         fileName: file.name.replace(/\.pptx$/i, "") + `_${pptxTo}.pptx`,
-        segments: Number(res.headers.get("X-Segments-Translated") || 0),
-        backend:  res.headers.get("X-Translation-Backend") || "",
+        segments,
+        backend: "groq",
       });
     } catch (e: unknown) {
       setPptxError((e as Error).message || "처리 중 오류가 발생했습니다");

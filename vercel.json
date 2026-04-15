@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "app/api/pptx-translate/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/worksheet/route.ts": {
+      "maxDuration": 120
+    }
+  }
+}
