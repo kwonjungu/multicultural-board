@@ -1,26 +1,30 @@
 /**
  * Groq 다중 모델 폴백 번역 유틸
  *
- * 2025-04 현재 Groq Production/Preview 모델 기준 (deprecated 모델 제거)
- * 한 모델이 429 또는 사용 불가(404/400) 시 다음 모델로 자동 전환.
+ * 2025-04 현재 Groq Production/Preview 텍스트 모델 전체 등록
+ * 한 모델이 429(rate limit) 또는 400/404(미지원) 시 다음 모델로 자동 전환.
  *
  * Production:
- *   llama-3.3-70b-versatile  300K TPM  ★ 기본 (최고 품질)
- *   openai/gpt-oss-120b      250K TPM    폴백1 (120B, 고품질)
- *   openai/gpt-oss-20b       250K TPM    폴백2
- *   llama-3.1-8b-instant     250K TPM    폴백3 (빠름)
+ *   llama-3.3-70b-versatile              300K TPM  ★ 기본
+ *   openai/gpt-oss-120b                  250K TPM  폴백1
+ *   openai/gpt-oss-20b                   250K TPM  폴백2
+ *   llama-3.1-8b-instant                 250K TPM  폴백3
  * Preview:
- *   qwen/qwen3-32b           300K TPM    폴백4 (다국어 강함)
+ *   qwen/qwen3-32b                       300K TPM  폴백4 (다국어 특화)
+ *   meta-llama/llama-4-scout-17b-16e     300K TPM  폴백5 (비전 겸용)
  */
 
 import OpenAI from "openai";
 
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",    // Production — 최고 품질
-  "openai/gpt-oss-120b",        // Production — 120B, 고품질
-  "openai/gpt-oss-20b",         // Production — 빠름
-  "llama-3.1-8b-instant",       // Production — 경량
-  "qwen/qwen3-32b",             // Preview   — 다국어 특화
+  // ── Production ──────────────────────────────────────────────────
+  "llama-3.3-70b-versatile",                   // 최고 품질
+  "openai/gpt-oss-120b",                        // 120B, 고품질
+  "openai/gpt-oss-20b",                         // 빠름
+  "llama-3.1-8b-instant",                       // 경량
+  // ── Preview ─────────────────────────────────────────────────────
+  "qwen/qwen3-32b",                             // 다국어 특화
+  "meta-llama/llama-4-scout-17b-16e-instruct",  // 비전 겸용 텍스트
 ];
 
 function groqClient() {
@@ -46,7 +50,22 @@ function shouldSkipModel(err: unknown): boolean {
 }
 
 /**
- * 텍스트 배열을 번역한다. 모델 폴백 + 배치 단위(25개).
+ * 번역이 불필요한 세그먼트 판별 (토큰 절약)
+ * - 순수 숫자/기호
+ * - 공백만
+ * - 1~2자 (단일 문자, 숫자 조합)
+ */
+function isUntranslatable(text: string): boolean {
+  const t = text.trim();
+  if (t.length === 0) return true;
+  if (t.length <= 2 && /^[\d\s\p{P}\p{S}]+$/u.test(t)) return true;
+  if (/^\d[\d.,\s%]*$/.test(t)) return true;   // 순수 숫자·퍼센트
+  return false;
+}
+
+/**
+ * 텍스트 배열을 번역한다. 모델 폴백 + 배치 단위(50개).
+ * 번역 불필요 세그먼트는 건너뛰어 토큰을 아낀다.
  * 실패 시 원본 텍스트를 그대로 유지한다.
  */
 export async function translateBatch(
@@ -56,13 +75,21 @@ export async function translateBatch(
   fromName: string,
   toName: string,
 ): Promise<string[]> {
-  const BATCH = 25;
-  const results: string[] = new Array(texts.length);
+  const BATCH = 50;  // 25→50: 배치당 프롬프트 오버헤드 절반으로 줄임
+  const results: string[] = texts.slice(); // 원본으로 초기화
 
-  for (let i = 0; i < texts.length; i += BATCH) {
-    const chunk = texts.slice(i, i + BATCH);
+  // 번역 필요한 인덱스만 추림
+  const needsTranslation = texts
+    .map((t, i) => ({ t, i }))
+    .filter(({ t }) => !isUntranslatable(t));
+
+  for (let i = 0; i < needsTranslation.length; i += BATCH) {
+    const batchItems = needsTranslation.slice(i, i + BATCH);
+    const chunk = batchItems.map(({ t }) => t);
     const translated = await translateChunkWithFallback(chunk, fromName, toName);
-    for (let j = 0; j < chunk.length; j++) results[i + j] = translated[j];
+    batchItems.forEach(({ i: origIdx }, j) => {
+      results[origIdx] = translated[j] ?? texts[origIdx];
+    });
   }
 
   return results;
@@ -94,20 +121,17 @@ async function translateChunkWithFallback(
         if (Array.isArray(json)) parsed = json.map((x) => String(x ?? ""));
       } catch { parsed = []; }
 
-      // 길이 보정: 모자라면 원본으로 채움
       while (parsed.length < chunk.length) parsed.push(chunk[parsed.length]);
       return parsed.slice(0, chunk.length);
     } catch (err) {
       if (shouldSkipModel(err)) {
-        console.warn(`[groq-translate] ${model} rate-limited, trying next model…`);
+        console.warn(`[groq-translate] ${model} skipped (${(err as { status?: number }).status ?? "err"}), trying next…`);
         continue;
       }
-      // 429가 아닌 오류는 바로 던짐
       throw err;
     }
   }
 
-  // 모든 모델 소진 → 원본 반환 (번역 실패지만 파일은 살림)
   console.error("[groq-translate] All models exhausted. Returning originals.");
   return chunk;
 }
@@ -123,7 +147,6 @@ ${JSON.stringify(chunk)}`;
 
 /**
  * 긴 텍스트(PDF 전문 등) 단건 번역. 모델 폴백 적용.
- * JSON 배열 포맷 없이 "번역문만 반환" 프롬프트를 사용.
  */
 export async function translateLongText(
   text: string,
@@ -145,7 +168,7 @@ export async function translateLongText(
       if (result) return result;
     } catch (err) {
       if (shouldSkipModel(err)) {
-        console.warn(`[groq-translate] ${model} rate-limited (long text), trying next…`);
+        console.warn(`[groq-translate] ${model} skipped (long text), trying next…`);
         continue;
       }
       throw err;
