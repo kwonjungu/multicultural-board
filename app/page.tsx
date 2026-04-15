@@ -138,7 +138,7 @@ export default function Home() {
         });
 
       } else {
-        // ① 섹션 XML 추출
+        // ① 섹션 XML + header.xml 추출
         setPptxStatus("📄 문서 분석 중...");
         const sectionXmls: Record<string, string> = {};
         const paths: string[] = [];
@@ -149,22 +149,34 @@ export default function Home() {
         }
         if (paths.length === 0) throw new Error("섹션 파일을 찾을 수 없습니다 (HWPX 형식인지 확인하세요)");
 
+        // header.xml: charPr 폰트 정의 (폰트 크기 조정용)
+        const HEADER_PATHS = ["Contents/header.xml", "header.xml", "Contents/head.xml", "head.xml"];
+        let headerXml: string | undefined;
+        let headerPath: string | undefined;
+        for (const hp of HEADER_PATHS) {
+          const f = zip.file(hp);
+          if (f) { headerXml = await f.async("string"); headerPath = hp; break; }
+        }
+
         setPptxStatus("🌐 문서 번역 중...");
         const res = await fetch("/api/hwpx-translate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sectionXmls, fromLang: pptxFrom, toLang: pptxTo }),
+          body: JSON.stringify({ sectionXmls, fromLang: pptxFrom, toLang: pptxTo, headerXml }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error((err as { error?: string }).error || "HWPX 번역 실패");
         }
-        const { translatedXmls, segments } = await res.json() as {
-          translatedXmls: Record<string, string>; segments: number;
+        const { translatedXmls, translatedHeaderXml, segments } = await res.json() as {
+          translatedXmls: Record<string, string>;
+          translatedHeaderXml?: string;
+          segments: number;
         };
 
         setPptxStatus("📦 파일 재조립 중...");
         for (const [p, xml] of Object.entries(translatedXmls)) zip.file(p, xml);
+        if (translatedHeaderXml && headerPath) zip.file(headerPath, translatedHeaderXml);
         const outBuffer = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
         setPptxResult({
           blob: new Blob([outBuffer], { type: "application/octet-stream" }),
