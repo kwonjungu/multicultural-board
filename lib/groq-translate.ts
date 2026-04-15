@@ -58,8 +58,8 @@ function shouldSkipModel(err: unknown): boolean {
 function isUntranslatable(text: string): boolean {
   const t = text.trim();
   if (t.length === 0) return true;
-  if (t.length <= 2 && /^[\d\s\p{P}\p{S}]+$/u.test(t)) return true;
-  if (/^\d[\d.,\s%]*$/.test(t)) return true;   // 순수 숫자·퍼센트
+  if (/^\d[\d.,\s%±~\-]*$/.test(t)) return true;          // 순수 숫자·퍼센트
+  if (t.length === 1 && /^[!-/:-@[-`{-~]$/.test(t)) return true; // 단일 ASCII 기호
   return false;
 }
 
