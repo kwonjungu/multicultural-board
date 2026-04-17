@@ -209,6 +209,13 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "Export CSV", uz: "Export CSV", hi: "Export CSV",
     id: "Export CSV", ar: "Export CSV", my: "Export CSV",
   },
+  exportImage: {
+    ko: "이미지로 저장", en: "Save as image", vi: "Save as image",
+    zh: "Save as image", fil: "Save as image", ja: "Save as image",
+    th: "Save as image", km: "Save as image", mn: "Save as image",
+    ru: "Save as image", uz: "Save as image", hi: "Save as image",
+    id: "Save as image", ar: "Save as image", my: "Save as image",
+  },
   editCard: {
     ko: "수정", en: "Edit", vi: "Edit",
     zh: "Edit", fil: "Edit", ja: "Edit",

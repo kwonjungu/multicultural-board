@@ -197,12 +197,16 @@ export default function DiscussionSession({
   // ═════════════════════════════ CLOSED: tree view ═════════════════════════════
   if (isClosed) {
     return (
-      <div style={{ ...overlayStyle, overflowY: "auto", padding: "24px 16px" }}>
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 450,
+        background: "#0F0C28",
+        display: "flex", flexDirection: "column",
+        overflow: "hidden",
+      }}>
         <div style={{
-          maxWidth: 1100, margin: "0 auto",
+          flex: 1, minHeight: 0,
           background: "linear-gradient(180deg,#E8F5FF 0%,#FFF9E8 65%,#F0F7E8 100%)",
-          borderRadius: 20, overflow: "hidden",
-          boxShadow: "0 32px 80px rgba(0,0,0,0.3)",
+          display: "flex", flexDirection: "column", overflow: "hidden",
         }}>
           <ClosedHeader
             title={displayTitle}
@@ -563,25 +567,22 @@ function FruitTree({
   question: string; responses: SessionResponse[]; myLang: string;
 }) {
   const n = responses.length;
-  // Ring configuration based on count
-  const ringCount = n <= 6 ? 1 : n <= 14 ? 2 : 3;
+  const ringCount = n <= 8 ? 1 : n <= 18 ? 2 : 3;
   const perRing = Math.ceil(n / ringCount);
-  const ringRadii = [30, 42, 52]; // % of container
+  const ringRadii = [34, 44, 52]; // % spread from center
 
-  // Cap card width so more responses = narrower cards
-  const cardWidth = n <= 6 ? 170 : n <= 12 ? 150 : 130;
+  const cardWidth = n <= 6 ? 170 : n <= 14 ? 150 : 128;
 
   return (
     <div style={{
       position: "relative",
+      flex: 1, minHeight: 0,
       width: "100%",
-      minHeight: 720,
-      padding: "24px 16px 40px",
       overflow: "hidden",
     }}>
-      {/* 🌳 Tree SVG background */}
+      {/* 🌳 Landscape tree SVG */}
       <svg
-        viewBox="0 0 800 720"
+        viewBox="0 0 1600 800"
         preserveAspectRatio="xMidYMid slice"
         style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
@@ -589,45 +590,67 @@ function FruitTree({
         }}
         aria-hidden="true"
       >
+        {/* Sky gradient handled by container */}
         {/* Ground */}
-        <ellipse cx="400" cy="700" rx="360" ry="34" fill="#A4D68B" opacity="0.55" />
+        <ellipse cx="800" cy="790" rx="900" ry="46" fill="#A4D68B" opacity="0.55" />
+        <ellipse cx="800" cy="800" rx="1100" ry="28" fill="#8FC874" opacity="0.4" />
         {/* Trunk */}
         <path
-          d="M378 700 Q370 550 390 420 Q398 360 410 420 Q430 550 422 700 Z"
+          d="M772 790 Q760 620 790 470 Q800 410 812 470 Q840 620 828 790 Z"
           fill="#8B5A3C"
         />
-        {/* Canopy — layered blobs for fluffy look */}
+        <path
+          d="M790 520 Q700 480 640 440" stroke="#8B5A3C" strokeWidth="14" fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d="M810 510 Q900 470 960 430" stroke="#8B5A3C" strokeWidth="14" fill="none"
+          strokeLinecap="round"
+        />
+        {/* Canopy — wide landscape spread */}
         <g>
-          <circle cx="400" cy="330" r="250" fill="#7AB96A" />
-          <circle cx="230" cy="360" r="170" fill="#86C87A" />
-          <circle cx="570" cy="360" r="170" fill="#86C87A" />
-          <circle cx="310" cy="200" r="150" fill="#92D387" />
-          <circle cx="490" cy="200" r="150" fill="#92D387" />
-          <circle cx="400" cy="130" r="130" fill="#9EDD92" />
-          <circle cx="180" cy="270" r="90" fill="#86C87A" />
-          <circle cx="620" cy="270" r="90" fill="#86C87A" />
+          <ellipse cx="800" cy="380" rx="560" ry="260" fill="#7AB96A" />
+          <ellipse cx="380" cy="420" rx="280" ry="180" fill="#86C87A" />
+          <ellipse cx="1220" cy="420" rx="280" ry="180" fill="#86C87A" />
+          <ellipse cx="550" cy="260" rx="220" ry="160" fill="#92D387" />
+          <ellipse cx="1050" cy="260" rx="220" ry="160" fill="#92D387" />
+          <ellipse cx="800" cy="180" rx="180" ry="150" fill="#9EDD92" />
+          <ellipse cx="180" cy="360" rx="150" ry="110" fill="#86C87A" />
+          <ellipse cx="1420" cy="360" rx="150" ry="110" fill="#86C87A" />
         </g>
         {/* Highlights */}
         <g opacity="0.55">
-          <circle cx="340" cy="180" r="48" fill="#B7E8A9" />
-          <circle cx="260" cy="300" r="38" fill="#B7E8A9" />
-          <circle cx="480" cy="250" r="34" fill="#B7E8A9" />
-          <circle cx="560" cy="180" r="32" fill="#B7E8A9" />
+          <ellipse cx="620" cy="230" rx="60" ry="42" fill="#B7E8A9" />
+          <ellipse cx="420" cy="360" rx="50" ry="34" fill="#B7E8A9" />
+          <ellipse cx="980" cy="310" rx="44" ry="30" fill="#B7E8A9" />
+          <ellipse cx="1180" cy="230" rx="52" ry="36" fill="#B7E8A9" />
+          <ellipse cx="760" cy="140" rx="46" ry="32" fill="#B7E8A9" />
+        </g>
+        {/* 🐝 Honeybee mascot flying near tree */}
+        <g transform="translate(1380 170) rotate(-10)">
+          <ellipse cx="0" cy="0" rx="26" ry="18" fill="#FBBF24" />
+          <path d="M-14 -12 Q0 -4 14 -12" fill="none" stroke="#1F2937" strokeWidth="4" strokeLinecap="round"/>
+          <path d="M-8 -14 L-8 14" stroke="#1F2937" strokeWidth="4" />
+          <path d="M0 -16 L0 16" stroke="#1F2937" strokeWidth="4" />
+          <path d="M8 -14 L8 14" stroke="#1F2937" strokeWidth="4" />
+          <ellipse cx="-10" cy="-14" rx="16" ry="10" fill="#fff" opacity="0.82" />
+          <ellipse cx="10" cy="-14" rx="16" ry="10" fill="#fff" opacity="0.82" />
+          <circle cx="-20" cy="-2" r="3" fill="#1F2937" />
         </g>
       </svg>
 
-      {/* 🍎 Fruits (responses) — positioned around center */}
+      {/* 🍎 Fruits — elliptical spread (wider horizontal) */}
       {responses.map((r, i) => {
         const ringIdx = Math.min(Math.floor(i / perRing), ringCount - 1);
         const posInRing = i % perRing;
         const itemsInRing = Math.min(perRing, n - ringIdx * perRing);
-        // Offset alternate rings by half-angle so they don't line up
-        const angleOffset = ringIdx * (Math.PI / itemsInRing);
+        const angleOffset = ringIdx * (Math.PI / Math.max(itemsInRing, 1));
         const angle = ((posInRing + 0.5) / itemsInRing) * Math.PI * 2
           - Math.PI / 2 + angleOffset;
         const radius = ringRadii[ringIdx];
-        const cx = 50 + Math.cos(angle) * radius;
-        const cy = 46 + Math.sin(angle) * radius * 0.78;
+        // Landscape aspect: stretch X, compress Y
+        const cx = 50 + Math.cos(angle) * radius * 1.55;
+        const cy = 48 + Math.sin(angle) * radius * 0.78;
 
         return (
           <div
@@ -638,9 +661,9 @@ function FruitTree({
               top: `${cy}%`,
               transform: "translate(-50%, -50%)",
               width: cardWidth,
-              maxWidth: "44%",
+              maxWidth: "22%",
               zIndex: 2,
-              animation: `fruitPop 0.45s cubic-bezier(.17,.89,.32,1.28) ${i * 0.05}s both`,
+              animation: `fruitPop 0.45s cubic-bezier(.17,.89,.32,1.28) ${i * 0.04}s both`,
             }}
           >
             <ResponseCard resp={r} idx={i} myLang={myLang} />
@@ -652,15 +675,15 @@ function FruitTree({
       <div style={{
         position: "absolute",
         left: "50%",
-        top: "46%",
+        top: "48%",
         transform: "translate(-50%, -50%)",
         zIndex: 3,
         background: "#fff",
         borderRadius: 24,
-        padding: "20px 24px",
+        padding: "22px 28px",
         boxShadow: "0 18px 44px rgba(0,0,0,0.22), 0 0 0 4px rgba(91,87,245,0.15)",
-        maxWidth: 300,
-        minWidth: 220,
+        maxWidth: 360,
+        minWidth: 240,
         textAlign: "center",
         border: "3px solid #5B57F5",
       }}>
@@ -671,7 +694,7 @@ function FruitTree({
           ❓ 질문
         </div>
         <div style={{
-          fontSize: 17, fontWeight: 900, color: "#111827", lineHeight: 1.35,
+          fontSize: 18, fontWeight: 900, color: "#111827", lineHeight: 1.35,
         }}>
           {question}
         </div>
@@ -695,27 +718,23 @@ function ClosedHeader({
 }) {
   return (
     <div style={{
-      padding: "20px 24px 18px", background: BRAND_GRADIENT, color: "#fff",
-      display: "flex", alignItems: "flex-start", gap: 12,
+      position: "sticky", top: 0, zIndex: 10, flexShrink: 0,
+      padding: "14px 20px", background: BRAND_GRADIENT, color: "#fff",
+      display: "flex", alignItems: "center", gap: 12,
+      boxShadow: "0 4px 18px rgba(0,0,0,0.18)",
     }}>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{
-          display: "inline-block",
           padding: "3px 8px", background: "rgba(255,255,255,0.25)",
           borderRadius: 8, fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
-          marginBottom: 8,
+          whiteSpace: "nowrap", flexShrink: 0,
         }}>
-          🏁 세션 종료 · {count}개 응답
+          🏁 {count}개 응답
         </div>
-        <div style={{ fontWeight: 800, fontSize: 20, lineHeight: 1.3 }}>{title}</div>
-        {bodyText && (
-          <div style={{
-            fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 6,
-            whiteSpace: "pre-wrap", lineHeight: 1.5,
-          }}>
-            {bodyText}
-          </div>
-        )}
+        <div style={{
+          fontWeight: 800, fontSize: 16, lineHeight: 1.3,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        }}>{title}</div>
       </div>
       <div style={{ display: "flex", gap: 6 }}>
         {isTeacher && (

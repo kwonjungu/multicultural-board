@@ -11,6 +11,7 @@ import PostModal from "./PostModal";
 import PptxTranslateModal from "./PptxTranslateModal";
 import DiscussionCreateModal from "./DiscussionCreateModal";
 import DiscussionSession from "./DiscussionSession";
+import GameRoom from "./GameRoom";
 import { QRCodeSVG } from "qrcode.react";
 
 type PendingItem =
@@ -70,6 +71,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const [showExport, setShowExport] = useState(false);
   const [showPptx, setShowPptx] = useState(false);
   const [showDiscussionCreate, setShowDiscussionCreate] = useState(false);
+  const [showGameRoom, setShowGameRoom] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionMinimized, setSessionMinimized] = useState(false);
   const [editModal, setEditModal] = useState<{ card: CardData; colTitle: string; colColor: string } | null>(null);
@@ -436,6 +438,49 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     URL.revokeObjectURL(url);
   }
 
+  // ── Image Export (single PNG capture of whole board) ──
+  async function exportImage() {
+    setShowExport(false);
+    const el = boardRef.current;
+    if (!el) return;
+    const { default: html2canvas } = await import("html2canvas");
+    const prevOverflowX = el.style.overflowX;
+    const prevOverflowY = el.style.overflowY;
+    const prevHeight = el.style.height;
+    el.style.overflowX = "visible";
+    el.style.overflowY = "visible";
+    el.style.height = "auto";
+    try {
+      const canvas = await html2canvas(el, {
+        backgroundColor: "#F8F9FE",
+        scale: window.devicePixelRatio > 1 ? 2 : 1.5,
+        useCORS: true,
+        logging: false,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+      });
+      const now = new Date();
+      const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `bee-board-${roomCode}-${stamp}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, "image/png");
+    } finally {
+      el.style.overflowX = prevOverflowX;
+      el.style.overflowY = prevOverflowY;
+      el.style.height = prevHeight;
+    }
+  }
+
   // ── Approval actions ──
   async function approveCard(cardId: string) {
     const db = getClientDb();
@@ -584,13 +629,13 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 34, height: 34, borderRadius: 10,
-            background: BRAND_GRADIENT,
+            background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 17, boxShadow: "0 4px 12px rgba(91,87,245,0.4)", flexShrink: 0,
-          }}>🌏</div>
+            fontSize: 17, boxShadow: "0 4px 12px rgba(245,158,11,0.45)", flexShrink: 0,
+          }}>🐝</div>
           <div>
             <div style={{ fontWeight: 900, fontSize: 14, color: "#F9FAFB", letterSpacing: -0.3 }}>
-              다문화 교실 소통판
+              🐝 꿀벌 소통창
             </div>
             <div style={{ fontSize: 10, color: "#6B7280", marginTop: -1 }}>
               Room <span style={{ color: "#7C7AFF", fontWeight: 700 }}>{roomCode}</span>
@@ -692,6 +737,18 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                     >
                       📊 {t("exportCsv", lang)}
                     </button>
+                    <button
+                      onClick={exportImage}
+                      style={{
+                        width: "100%", padding: "12px 16px", textAlign: "left", border: "none",
+                        background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                        color: "#374151", borderTop: "1px solid #F3F4F6", display: "block",
+                      }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
+                    >
+                      🖼️ {t("exportImage", lang)}
+                    </button>
                   </div>
                 )}
               </div>
@@ -711,6 +768,18 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 }}
               >
                 {activeSessionId ? "🔴 진행 중" : "💭 의견 나누기"}
+              </button>
+
+              {/* 🎮 소통의 방 button */}
+              <button
+                onClick={() => setShowGameRoom(true)}
+                style={{
+                  background: "rgba(245,158,11,0.18)", border: "1px solid rgba(245,158,11,0.45)",
+                  color: "#FCD34D", borderRadius: 10, padding: "6px 12px",
+                  fontSize: 12, cursor: "pointer", fontWeight: 700,
+                }}
+              >
+                🎮 소통의 방
               </button>
 
               {/* PPTX 번역 button */}
@@ -1258,6 +1327,11 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           defaultToLang={lang === "ko" ? "en" : "ko"}
           onClose={() => setShowPptx(false)}
         />
+      )}
+
+      {/* ── 🎮 소통의 방 ── */}
+      {showGameRoom && (
+        <GameRoom myLang={lang} onClose={() => setShowGameRoom(false)} />
       )}
 
       {/* ── 의견 나누기: 생성 모달 (교사) ── */}

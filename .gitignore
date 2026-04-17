@@ -35,3 +35,6 @@ firebase-setup-notes.txt
 
 # Claude Code local settings
 .claude/
+
+# local-only archives (내려받은 스킬 번들 등)
+*.zip

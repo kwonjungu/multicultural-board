@@ -240,13 +240,16 @@ export default function Home() {
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <div style={{
             width: 64, height: 64, borderRadius: 20, margin: "0 auto 14px",
-            background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+            background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 30, boxShadow: "0 10px 30px rgba(91,87,245,0.45)",
-          }}>🌏</div>
+            fontSize: 30, boxShadow: "0 10px 30px rgba(245,158,11,0.5)",
+          }}>🐝</div>
           <h1 style={{ margin: 0, fontSize: 21, fontWeight: 900, color: "#111827", letterSpacing: -0.5 }}>
-            다문화 교실 소통판
+            꿀벌 소통창
           </h1>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9CA3AF", fontWeight: 600 }}>
+            전 세계 어디든, 꿀벌처럼 소식을 나눠요
+          </p>
         </div>
 
         {/* Tab switcher — 3 tabs */}

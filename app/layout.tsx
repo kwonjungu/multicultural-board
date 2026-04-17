@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "다문화 교실 소통판",
-  description: "Multicultural Classroom Board - 자동 번역 실시간 소통 플랫폼",
+  title: "🐝 꿀벌 소통창",
+  description: "꿀벌 소통창 — 전 세계 친구들과 자동 번역으로 실시간 소통해요",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
