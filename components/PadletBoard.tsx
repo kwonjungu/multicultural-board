@@ -48,11 +48,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const lang = user.myLang;
 
   // Teacher state
-  const [isTeacher, setIsTeacher] = useState(user.isTeacher ?? false);
+  const isTeacher = user.isTeacher ?? false;
   const [teacherLangs, setTeacherLangs] = useState<string[]>(roomLangs);
-  const [showTeacherModal, setShowTeacherModal] = useState(false);
-  const [pwInput, setPwInput] = useState("");
-  const [pwError, setPwError] = useState(false);
 
   // Management modal state
   const [showManage, setShowManage] = useState(false);
@@ -162,8 +159,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   useEffect(() => {
     function handleEsc(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (showTeacherModal) setShowTeacherModal(false);
-        else if (showManage) setShowManage(false);
+        if (showManage) setShowManage(false);
         else if (showQR) setShowQR(false);
         else if (showApproval) setShowApproval(false);
         else if (showPptx) setShowPptx(false);
@@ -173,7 +169,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     }
     document.addEventListener("keydown", handleEsc);
     return () => document.removeEventListener("keydown", handleEsc);
-  }, [showTeacherModal, showManage, showQR, showApproval, showPptx, showDiscussionCreate, editModal]);
+  }, [showManage, showQR, showApproval, showPptx, showDiscussionCreate, editModal]);
 
   // ── Firebase: rooms/${roomCode}/activeSession ──
   useEffect(() => {
@@ -231,17 +227,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   // Card visibility
   const visibleCards = isTeacher ? cards : cards.filter((c) => !c.status || c.status === "approved");
   const pendingCount = pendingItems.length;
-
-  function handleTeacherAuth() {
-    if (pwInput === roomCode) {
-      setIsTeacher(true);
-      setShowTeacherModal(false);
-      setPwInput("");
-      setPwError(false);
-    } else {
-      setPwError(true);
-    }
-  }
 
   // ── Column management ──
   function saveColTitle(colId: string) {
@@ -773,22 +758,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             </>
           )}
 
-          {/* Teacher mode button */}
-          {!isTeacher && (
-            <button
-              onClick={() => { setShowTeacherModal(true); setPwInput(""); setPwError(false); }}
-              style={{
-                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-                color: "#9CA3AF", borderRadius: 10, padding: "6px 12px",
-                fontSize: 12, cursor: "pointer", fontWeight: 600, transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#E5E7EB"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF"; }}
-            >
-              {t("teacherBtn", lang)}
-            </button>
-          )}
-
           <button
             onClick={onLogout}
             style={{
@@ -927,53 +896,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           );
         })}
       </main>
-
-      {/* ── Teacher auth modal ── */}
-      {showTeacherModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(9,7,30,0.75)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 300, backdropFilter: "blur(6px)",
-        }}
-          role="dialog" aria-modal="true" aria-labelledby="modal-title-teacher"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowTeacherModal(false); }}
-        >
-          <div style={{
-            background: "#fff", borderRadius: 22, padding: "32px 28px",
-            maxWidth: 340, width: "100%", boxShadow: "0 24px 60px rgba(0,0,0,0.3)",
-            animation: "fadeSlideIn 0.2s ease", textAlign: "center",
-          }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>👩‍🏫</div>
-            <h3 id="modal-title-teacher" style={{ margin: "0 0 6px", fontWeight: 900, fontSize: 18, color: "#111827" }}>선생님 모드</h3>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6B7280" }}>이 방의 비밀번호를 입력하세요</p>
-            <input
-              type="password"
-              value={pwInput}
-              onChange={(e) => { setPwInput(e.target.value); setPwError(false); }}
-              onKeyDown={(e) => e.key === "Enter" && handleTeacherAuth()}
-              placeholder="비밀번호 (숫자 4자리)"
-              maxLength={4}
-              autoFocus
-              style={{
-                width: "100%", padding: "13px 16px", borderRadius: 12, marginBottom: 8,
-                border: `2px solid ${pwError ? "#EF4444" : "#E5E7EB"}`,
-                fontSize: 20, textAlign: "center", letterSpacing: 8,
-                outline: "none", transition: "border-color 0.15s", fontWeight: 700,
-                boxSizing: "border-box",
-              }}
-            />
-            {pwError && (
-              <p style={{ margin: "0 0 12px", fontSize: 12, color: "#EF4444" }}>
-                비밀번호가 틀렸습니다
-              </p>
-            )}
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button onClick={() => setShowTeacherModal(false)} style={{ flex: 1, padding: "11px 0", borderRadius: 12, fontSize: 14, background: "#F3F4F6", color: "#6B7280", fontWeight: 700, border: "none", cursor: "pointer" }}>취소</button>
-              <button onClick={handleTeacherAuth} style={{ flex: 1, padding: "11px 0", borderRadius: 12, fontSize: 14, background: BRAND_GRADIENT, color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(91,87,245,0.4)" }}>확인</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Management modal ── */}
       {showManage && isTeacher && (
@@ -1344,6 +1266,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           roomCode={roomCode}
           teacherClientId={myClientId}
           teacherName={user.myName}
+          teacherLang={lang}
+          roomLangs={teacherLangs}
           onClose={() => setShowDiscussionCreate(false)}
         />
       )}

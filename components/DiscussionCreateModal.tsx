@@ -11,6 +11,8 @@ interface Props {
   roomCode: string;
   teacherClientId: string;
   teacherName: string;
+  teacherLang: string;
+  roomLangs: string[];
   onClose: () => void;
   onCreated?: (sessionId: string) => void;
 }
@@ -19,6 +21,8 @@ export default function DiscussionCreateModal({
   roomCode,
   teacherClientId,
   teacherName,
+  teacherLang,
+  roomLangs,
   onClose,
   onCreated,
 }: Props) {
@@ -48,6 +52,31 @@ export default function DiscussionCreateModal({
     setUploading(false);
   }
 
+  async function translateToAll(text: string): Promise<Record<string, string>> {
+    const targets = roomLangs.filter((l) => l !== teacherLang);
+    if (targets.length === 0 || !text.trim()) return { [teacherLang]: text };
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: text.trim(),
+          fromLang: teacherLang,
+          targetLangs: targets,
+          authorName: teacherName,
+          isTeacher: true,
+          paletteIdx: 0,
+          roomCode,
+          cardType: "comment",
+        }),
+      });
+      const data = await res.json();
+      return data.translations || { [teacherLang]: text };
+    } catch {
+      return { [teacherLang]: text };
+    }
+  }
+
   async function handleStart() {
     if (!title.trim() || creating) return;
     setCreating(true);
@@ -57,15 +86,27 @@ export default function DiscussionCreateModal({
       const sessionsRef = ref(db, `rooms/${roomCode}/sessions`);
       const newSessionRef = push(sessionsRef);
       const sessionId = newSessionRef.key!;
+
+      const [titleTranslations, bodyTextTranslations] = await Promise.all([
+        translateToAll(title.trim()),
+        bodyText.trim() ? translateToAll(bodyText.trim()) : Promise.resolve(undefined),
+      ]);
+
       const meta: Partial<SessionMeta> & { id: string } = {
         id: sessionId,
         title: title.trim(),
+        titleTranslations,
         startedAt: Date.now(),
         status: "active",
         teacherClientId,
+        teacherLang,
         teacherName,
+        targetLangs: roomLangs,
       };
-      if (bodyText.trim()) meta.bodyText = bodyText.trim();
+      if (bodyText.trim()) {
+        meta.bodyText = bodyText.trim();
+        if (bodyTextTranslations) meta.bodyTextTranslations = bodyTextTranslations;
+      }
       if (imageUrl) meta.imageUrl = imageUrl;
 
       await set(ref(db, `rooms/${roomCode}/sessions/${sessionId}/meta`), meta);

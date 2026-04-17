@@ -97,13 +97,17 @@ export type SessionStatus = "active" | "closed";
 export interface SessionMeta {
   id: string;
   title: string;
+  titleTranslations?: Record<string, string>;
   bodyText?: string;
+  bodyTextTranslations?: Record<string, string>;
   imageUrl?: string;
   startedAt: number;
   closedAt?: number;
   status: SessionStatus;
   teacherClientId: string;
+  teacherLang: string;
   teacherName: string;
+  targetLangs: string[];
 }
 
 export interface SessionResponse {

@@ -114,6 +114,30 @@ export default function DiscussionSession({
     setError("");
     setSubmitting(true);
     try {
+      const text = draft.trim();
+      const targets = (meta?.targetLangs || []).filter((l) => l !== myLang);
+      let translations: Record<string, string> = { [myLang]: text };
+      if (targets.length > 0) {
+        try {
+          const tres = await fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text,
+              fromLang: myLang,
+              targetLangs: targets,
+              authorName: myName,
+              isTeacher: false,
+              paletteIdx: 0,
+              roomCode,
+              cardType: "comment",
+            }),
+          });
+          const tdata = await tres.json();
+          if (tdata.translations) translations = tdata.translations;
+        } catch { /* fall back to original */ }
+      }
+
       const db = getClientDb();
       const respRef = ref(db, `${basePath}/responses`);
       const newRef = push(respRef);
@@ -121,7 +145,8 @@ export default function DiscussionSession({
         authorName: myName,
         authorLang: myLang,
         authorClientId: myClientId,
-        text: draft.trim(),
+        text,
+        translations,
         timestamp: Date.now(),
       };
       await set(newRef, body);
@@ -132,6 +157,10 @@ export default function DiscussionSession({
     }
     setSubmitting(false);
   }
+
+  // 현재 언어로 번역된 제목/본문 (없으면 원문)
+  const displayTitle = meta?.titleTranslations?.[myLang] || meta?.title || "";
+  const displayBody = meta?.bodyTextTranslations?.[myLang] || meta?.bodyText || "";
 
   async function handleClose() {
     if (!isTeacher || closing) return;
@@ -165,34 +194,36 @@ export default function DiscussionSession({
     );
   }
 
-  // ═════════════════════════════ CLOSED: grid view ═════════════════════════════
+  // ═════════════════════════════ CLOSED: tree view ═════════════════════════════
   if (isClosed) {
     return (
       <div style={{ ...overlayStyle, overflowY: "auto", padding: "24px 16px" }}>
         <div style={{
-          maxWidth: 1100, margin: "0 auto", background: "#fff", borderRadius: 20,
-          overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.3)",
+          maxWidth: 1100, margin: "0 auto",
+          background: "linear-gradient(180deg,#E8F5FF 0%,#FFF9E8 65%,#F0F7E8 100%)",
+          borderRadius: 20, overflow: "hidden",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.3)",
         }}>
-          <ClosedHeader meta={meta} count={responses.length} isTeacher={isTeacher}
-            onExit={onExit} onDelete={handleDeleteSession} />
+          <ClosedHeader
+            title={displayTitle}
+            bodyText={displayBody}
+            count={responses.length}
+            isTeacher={isTeacher}
+            onExit={onExit}
+            onDelete={handleDeleteSession}
+          />
 
-          <div style={{ padding: "20px 24px 28px" }}>
-            {responses.length === 0 ? (
-              <div style={{ textAlign: "center", color: "#9CA3AF", padding: "40px 0" }}>
-                제출된 응답이 없습니다.
-              </div>
-            ) : (
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                gap: 14,
-              }}>
-                {responses.map((r, i) => (
-                  <ResponseCard key={r.id} resp={r} idx={i} />
-                ))}
-              </div>
-            )}
-          </div>
+          {responses.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#6B7280", padding: "60px 0", fontSize: 14 }}>
+              제출된 응답이 없습니다.
+            </div>
+          ) : (
+            <FruitTree
+              question={displayTitle}
+              responses={responses}
+              myLang={myLang}
+            />
+          )}
         </div>
       </div>
     );
@@ -224,7 +255,7 @@ export default function DiscussionSession({
             }}>
               LIVE
             </div>
-            <div style={{ fontWeight: 800, fontSize: 16, flex: 1 }}>{meta.title}</div>
+            <div style={{ fontWeight: 800, fontSize: 16, flex: 1 }}>{displayTitle}</div>
             <button
               onClick={onExit}
               title="최소화"
@@ -237,12 +268,12 @@ export default function DiscussionSession({
 
           {/* Body */}
           <div style={{ flex: 1, overflowY: "auto", padding: "16px 22px" }}>
-            {meta.bodyText && (
+            {displayBody && (
               <div style={{
                 fontSize: 13, color: "#4B5563", marginBottom: 14,
                 whiteSpace: "pre-wrap", lineHeight: 1.5,
               }}>
-                {meta.bodyText}
+                {displayBody}
               </div>
             )}
             {meta.imageUrl && (
@@ -377,16 +408,16 @@ export default function DiscussionSession({
           }}>
             💭 의견 나누기
           </div>
-          <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.35 }}>{meta.title}</div>
+          <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.35 }}>{displayTitle}</div>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "18px 22px" }}>
-          {meta.bodyText && (
+          {displayBody && (
             <div style={{
               fontSize: 14, color: "#4B5563", marginBottom: 14,
               whiteSpace: "pre-wrap", lineHeight: 1.55,
             }}>
-              {meta.bodyText}
+              {displayBody}
             </div>
           )}
           {meta.imageUrl && (
@@ -499,24 +530,25 @@ const CARD_COLORS = [
   "#FEE2E2", "#FFEDD5", "#E0F2FE", "#F3E8FF", "#FEF9C3",
 ];
 
-function ResponseCard({ resp, idx }: { resp: SessionResponse; idx: number }) {
+function ResponseCard({ resp, idx, myLang }: { resp: SessionResponse; idx: number; myLang: string }) {
   const bg = CARD_COLORS[idx % CARD_COLORS.length];
+  const text = resp.translations?.[myLang] || resp.text;
   return (
     <div style={{
-      background: bg, borderRadius: 14, padding: "14px 14px 12px",
-      border: "1px solid rgba(0,0,0,0.05)",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-      display: "flex", flexDirection: "column", gap: 8,
+      background: bg, borderRadius: 18, padding: "12px 13px 10px",
+      border: "1px solid rgba(0,0,0,0.06)",
+      boxShadow: "0 6px 14px rgba(0,0,0,0.12)",
+      display: "flex", flexDirection: "column", gap: 6,
     }}>
       <div style={{
-        fontSize: 14, color: "#111827", lineHeight: 1.5,
+        fontSize: 13, color: "#111827", lineHeight: 1.45,
         whiteSpace: "pre-wrap", wordBreak: "break-word",
       }}>
-        {resp.text}
+        {text}
       </div>
       <div style={{
-        fontSize: 11, fontWeight: 700, color: "#6B7280",
-        borderTop: "1px dashed rgba(0,0,0,0.1)", paddingTop: 6,
+        fontSize: 10, fontWeight: 800, color: "#6B7280",
+        borderTop: "1px dashed rgba(0,0,0,0.12)", paddingTop: 5,
       }}>
         — {resp.authorName}
       </div>
@@ -524,10 +556,141 @@ function ResponseCard({ resp, idx }: { resp: SessionResponse; idx: number }) {
   );
 }
 
-function ClosedHeader({
-  meta, count, isTeacher, onExit, onDelete,
+// ═════════════════════════════ 🌳 FruitTree ═════════════════════════════
+function FruitTree({
+  question, responses, myLang,
 }: {
-  meta: SessionMeta; count: number; isTeacher: boolean;
+  question: string; responses: SessionResponse[]; myLang: string;
+}) {
+  const n = responses.length;
+  // Ring configuration based on count
+  const ringCount = n <= 6 ? 1 : n <= 14 ? 2 : 3;
+  const perRing = Math.ceil(n / ringCount);
+  const ringRadii = [30, 42, 52]; // % of container
+
+  // Cap card width so more responses = narrower cards
+  const cardWidth = n <= 6 ? 170 : n <= 12 ? 150 : 130;
+
+  return (
+    <div style={{
+      position: "relative",
+      width: "100%",
+      minHeight: 720,
+      padding: "24px 16px 40px",
+      overflow: "hidden",
+    }}>
+      {/* 🌳 Tree SVG background */}
+      <svg
+        viewBox="0 0 800 720"
+        preserveAspectRatio="xMidYMid slice"
+        style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          zIndex: 0,
+        }}
+        aria-hidden="true"
+      >
+        {/* Ground */}
+        <ellipse cx="400" cy="700" rx="360" ry="34" fill="#A4D68B" opacity="0.55" />
+        {/* Trunk */}
+        <path
+          d="M378 700 Q370 550 390 420 Q398 360 410 420 Q430 550 422 700 Z"
+          fill="#8B5A3C"
+        />
+        {/* Canopy — layered blobs for fluffy look */}
+        <g>
+          <circle cx="400" cy="330" r="250" fill="#7AB96A" />
+          <circle cx="230" cy="360" r="170" fill="#86C87A" />
+          <circle cx="570" cy="360" r="170" fill="#86C87A" />
+          <circle cx="310" cy="200" r="150" fill="#92D387" />
+          <circle cx="490" cy="200" r="150" fill="#92D387" />
+          <circle cx="400" cy="130" r="130" fill="#9EDD92" />
+          <circle cx="180" cy="270" r="90" fill="#86C87A" />
+          <circle cx="620" cy="270" r="90" fill="#86C87A" />
+        </g>
+        {/* Highlights */}
+        <g opacity="0.55">
+          <circle cx="340" cy="180" r="48" fill="#B7E8A9" />
+          <circle cx="260" cy="300" r="38" fill="#B7E8A9" />
+          <circle cx="480" cy="250" r="34" fill="#B7E8A9" />
+          <circle cx="560" cy="180" r="32" fill="#B7E8A9" />
+        </g>
+      </svg>
+
+      {/* 🍎 Fruits (responses) — positioned around center */}
+      {responses.map((r, i) => {
+        const ringIdx = Math.min(Math.floor(i / perRing), ringCount - 1);
+        const posInRing = i % perRing;
+        const itemsInRing = Math.min(perRing, n - ringIdx * perRing);
+        // Offset alternate rings by half-angle so they don't line up
+        const angleOffset = ringIdx * (Math.PI / itemsInRing);
+        const angle = ((posInRing + 0.5) / itemsInRing) * Math.PI * 2
+          - Math.PI / 2 + angleOffset;
+        const radius = ringRadii[ringIdx];
+        const cx = 50 + Math.cos(angle) * radius;
+        const cy = 46 + Math.sin(angle) * radius * 0.78;
+
+        return (
+          <div
+            key={r.id}
+            style={{
+              position: "absolute",
+              left: `${cx}%`,
+              top: `${cy}%`,
+              transform: "translate(-50%, -50%)",
+              width: cardWidth,
+              maxWidth: "44%",
+              zIndex: 2,
+              animation: `fruitPop 0.45s cubic-bezier(.17,.89,.32,1.28) ${i * 0.05}s both`,
+            }}
+          >
+            <ResponseCard resp={r} idx={i} myLang={myLang} />
+          </div>
+        );
+      })}
+
+      {/* ❓ Center question */}
+      <div style={{
+        position: "absolute",
+        left: "50%",
+        top: "46%",
+        transform: "translate(-50%, -50%)",
+        zIndex: 3,
+        background: "#fff",
+        borderRadius: 24,
+        padding: "20px 24px",
+        boxShadow: "0 18px 44px rgba(0,0,0,0.22), 0 0 0 4px rgba(91,87,245,0.15)",
+        maxWidth: 300,
+        minWidth: 220,
+        textAlign: "center",
+        border: "3px solid #5B57F5",
+      }}>
+        <div style={{
+          fontSize: 10, fontWeight: 900, color: "#5B57F5",
+          letterSpacing: 1.2, marginBottom: 8,
+        }}>
+          ❓ 질문
+        </div>
+        <div style={{
+          fontSize: 17, fontWeight: 900, color: "#111827", lineHeight: 1.35,
+        }}>
+          {question}
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes fruitPop {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+          100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function ClosedHeader({
+  title, bodyText, count, isTeacher, onExit, onDelete,
+}: {
+  title: string; bodyText: string; count: number; isTeacher: boolean;
   onExit: () => void; onDelete: () => void;
 }) {
   return (
@@ -544,13 +707,13 @@ function ClosedHeader({
         }}>
           🏁 세션 종료 · {count}개 응답
         </div>
-        <div style={{ fontWeight: 800, fontSize: 20, lineHeight: 1.3 }}>{meta.title}</div>
-        {meta.bodyText && (
+        <div style={{ fontWeight: 800, fontSize: 20, lineHeight: 1.3 }}>{title}</div>
+        {bodyText && (
           <div style={{
             fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 6,
             whiteSpace: "pre-wrap", lineHeight: 1.5,
           }}>
-            {meta.bodyText}
+            {bodyText}
           </div>
         )}
       </div>
