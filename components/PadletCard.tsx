@@ -98,6 +98,7 @@ interface Props {
   myClientId?: string;
   authorName?: string;
   onEdit?: () => void;
+  onDelete?: () => void;
   isPending?: boolean;
   roomCode: string;
   roomLangs: string[];
@@ -112,6 +113,7 @@ export default function PadletCard({
   myClientId,
   authorName,
   onEdit,
+  onDelete,
   isPending,
   roomCode,
   roomLangs,
@@ -176,6 +178,7 @@ export default function PadletCard({
   const isMyCard = !!myClientId && card.authorClientId === myClientId;
   const withinEditWindow = now - card.timestamp < EDIT_WINDOW_MS;
   const canEdit = (isTeacher || (isMyCard && withinEditWindow)) && !!onEdit;
+  const canDelete = isTeacher || (isMyCard && withinEditWindow);
 
   const otherLangs = Object.keys(card.translations || {}).filter(
     (l) => l !== card.authorLang && l !== viewerLang
@@ -355,6 +358,29 @@ export default function PadletCard({
               }}
             >
               ✏️
+            </button>
+          )}
+          {/* Delete button */}
+          {canDelete && onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm("이 게시물을 삭제하시겠습니까?")) onDelete();
+              }}
+              title="삭제"
+              style={{
+                background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8,
+                padding: "4px 8px", cursor: "pointer", fontSize: 12, color: "#DC2626",
+                fontWeight: 700, flexShrink: 0, transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "#FEE2E2";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "#FEF2F2";
+              }}
+            >
+              🗑️
             </button>
           )}
         </div>

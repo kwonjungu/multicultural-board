@@ -46,7 +46,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const lang = user.myLang;
 
   // Teacher state
-  const [isTeacher, setIsTeacher] = useState(false);
+  const [isTeacher, setIsTeacher] = useState(user.isTeacher ?? false);
   const [teacherLangs, setTeacherLangs] = useState<string[]>(roomLangs);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [pwInput, setPwInput] = useState("");
@@ -73,6 +73,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const [editModal, setEditModal] = useState<{ card: CardData; colTitle: string; colColor: string } | null>(null);
 
   const boardRef = useRef<HTMLDivElement>(null);
+  const [colDeleteActive, setColDeleteActive] = useState<string | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wasLongPress = useRef(false);
 
   // ── Firebase: rooms/${roomCode}/columns ──
   useEffect(() => {
@@ -222,6 +225,11 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     const theirOrder = columns[swapIdx].order;
     set(ref(db, `rooms/${roomCode}/columns/${colId}/order`), theirOrder);
     set(ref(db, `rooms/${roomCode}/columns/${columns[swapIdx].id}/order`), myOrder);
+  }
+
+  function deleteCard(cardId: string) {
+    const db = getClientDb();
+    remove(ref(db, `rooms/${roomCode}/cards/${cardId}`));
   }
 
   function addColumn() {
@@ -720,6 +728,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       {/* ── Board ── */}
       <main
         ref={boardRef}
+        onClick={() => { if (colDeleteActive) setColDeleteActive(null); }}
         style={{
           flex: 1, overflowX: "auto", overflowY: "hidden",
           display: "flex", gap: 14, padding: "16px 18px",
@@ -769,6 +778,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                       authorName={user.myName}
                       isPending={isTeacher && card.status === "pending"}
                       onEdit={() => setEditModal({ card, colTitle: col.title, colColor: col.color })}
+                      onDelete={isTeacher ? () => deleteCard(card.id) : undefined}
                       roomCode={roomCode}
                       roomLangs={teacherLangs}
                       approvalMode={roomConfigState.approvalMode}
@@ -778,17 +788,61 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               </div>
 
               <button
-                onClick={() => setModal({ colId: col.id, colTitle: col.title, colColor: col.color })}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  if (!isTeacher) return;
+                  wasLongPress.current = false;
+                  longPressTimer.current = setTimeout(() => {
+                    wasLongPress.current = true;
+                    setColDeleteActive(col.id);
+                  }, 600);
+                }}
+                onPointerUp={() => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
+                  }
+                }}
+                onPointerLeave={() => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
+                  }
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (wasLongPress.current) { wasLongPress.current = false; return; }
+                  if (colDeleteActive === col.id) {
+                    deleteCol(col.id);
+                    setColDeleteActive(null);
+                    return;
+                  }
+                  setModal({ colId: col.id, colTitle: col.title, colColor: col.color });
+                }}
                 style={{
                   flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  background: "#fff", border: "none", borderTop: "1px solid #F3F4F8",
-                  padding: "13px 0", cursor: "pointer", color: col.color, fontWeight: 800, fontSize: 13,
-                  transition: "background 0.15s",
+                  background: isTeacher && colDeleteActive === col.id ? "#FEF2F2" : "#fff",
+                  border: "none",
+                  borderTop: isTeacher && colDeleteActive === col.id ? "1px solid #FECACA" : "1px solid #F3F4F8",
+                  padding: "13px 0", cursor: "pointer",
+                  color: isTeacher && colDeleteActive === col.id ? "#EF4444" : col.color,
+                  fontWeight: 800, fontSize: 13,
+                  transition: "background 0.15s, color 0.15s",
+                  userSelect: "none",
                 }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = col.color + "0D")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#fff")}
+                onMouseEnter={(e) => {
+                  const btn = e.currentTarget as HTMLButtonElement;
+                  btn.style.background = isTeacher && colDeleteActive === col.id ? "#FEE2E2" : col.color + "0D";
+                }}
+                onMouseLeave={(e) => {
+                  const btn = e.currentTarget as HTMLButtonElement;
+                  btn.style.background = isTeacher && colDeleteActive === col.id ? "#FEF2F2" : "#fff";
+                }}
               >
-                <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span> {t("addHere", lang)}
+                {isTeacher && colDeleteActive === col.id
+                  ? <><span style={{ fontSize: 17, lineHeight: 1 }}>✕</span> 컬럼 삭제</>
+                  : <><span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span> {t("addHere", lang)}</>
+                }
               </button>
             </div>
           );

@@ -14,10 +14,12 @@ interface Props {
 
 export default function SetupScreen({ onDone, roomCode, availableLangs, roomConfig }: Props) {
   const [myLang, setMyLang] = useState(() => {
-    // Default to first available lang, prefer ko
     return availableLangs.includes("ko") ? "ko" : availableLangs[0] ?? "ko";
   });
   const [myName, setMyName] = useState("");
+  const [role, setRole] = useState<"student" | "teacher">("student");
+  const [teacherCode, setTeacherCode] = useState("");
+  const [codeError, setCodeError] = useState(false);
 
   const rosterList: string[] = Array.isArray(roomConfig.roster)
     ? roomConfig.roster
@@ -26,10 +28,15 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
 
   function handleEnter() {
     if (!myName.trim()) return;
-    onDone({ myLang, myName: myName.trim(), isTeacher: false, teacherLangs: [] });
+    if (role === "teacher") {
+      if (teacherCode !== roomCode) { setCodeError(true); return; }
+      onDone({ myLang, myName: myName.trim(), isTeacher: true, teacherLangs: availableLangs });
+    } else {
+      onDone({ myLang, myName: myName.trim(), isTeacher: false, teacherLangs: [] });
+    }
   }
 
-  const ready = myName.trim().length > 0;
+  const ready = myName.trim().length > 0 && (role === "student" || teacherCode.length > 0);
 
   return (
     <div style={{
@@ -68,7 +75,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
           </p>
         </div>
 
-        {/* Language — pick first so name placeholder updates */}
+        {/* Language */}
         <div style={{ marginBottom: 22 }}>
           <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
             {t("myLang", myLang).toUpperCase()} &nbsp;·&nbsp; MY LANGUAGE
@@ -98,7 +105,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
         </div>
 
         {/* Name */}
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 22 }}>
           <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
             NAME &nbsp;·&nbsp; 이름
           </p>
@@ -153,21 +160,101 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
           )}
         </div>
 
+        {/* Role selection */}
+        <div style={{ marginBottom: 28 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
+            ROLE &nbsp;·&nbsp; 역할
+          </p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={() => { setRole("student"); setCodeError(false); setTeacherCode(""); }}
+              style={{
+                flex: 1, padding: "12px 0", borderRadius: 12, fontSize: 14, fontWeight: 800,
+                border: `2px solid ${role === "student" ? "#5B57F5" : "#E5E7EB"}`,
+                background: role === "student" ? "#EEEEFF" : "#F9FAFB",
+                color: role === "student" ? "#5B57F5" : "#9CA3AF",
+                cursor: "pointer", transition: "all 0.15s",
+              }}
+            >
+              👨‍🎓 학생
+            </button>
+            <button
+              onClick={() => setRole("teacher")}
+              style={{
+                flex: 1, padding: "12px 0", borderRadius: 12, fontSize: 14, fontWeight: 800,
+                border: `2px solid ${role === "teacher" ? "#10B981" : "#E5E7EB"}`,
+                background: role === "teacher" ? "#ECFDF5" : "#F9FAFB",
+                color: role === "teacher" ? "#065F46" : "#9CA3AF",
+                cursor: "pointer", transition: "all 0.15s",
+              }}
+            >
+              👩‍🏫 선생님
+            </button>
+          </div>
+
+          {role === "teacher" && (
+            <div style={{ marginTop: 14 }}>
+              <p style={{ margin: "0 0 8px", fontSize: 12, color: "#6B7280", fontWeight: 600 }}>
+                방 코드를 입력하세요
+              </p>
+              <input
+                type="password"
+                value={teacherCode}
+                onChange={(e) => { setTeacherCode(e.target.value); setCodeError(false); }}
+                onKeyDown={(e) => e.key === "Enter" && handleEnter()}
+                placeholder="코드 4자리"
+                maxLength={4}
+                autoFocus
+                style={{
+                  width: "100%", padding: "13px 16px", borderRadius: 12,
+                  border: `2px solid ${codeError ? "#EF4444" : "#E5E7EB"}`,
+                  fontSize: 22, textAlign: "center", letterSpacing: 10,
+                  color: "#111827", background: "#F9FAFB", outline: "none",
+                  fontWeight: 800, boxSizing: "border-box", transition: "all 0.18s",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = codeError ? "#EF4444" : "#10B981";
+                  e.target.style.background = "#fff";
+                  e.target.style.boxShadow = "0 0 0 4px rgba(16,185,129,0.1)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = codeError ? "#EF4444" : "#E5E7EB";
+                  e.target.style.background = "#F9FAFB";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+              {codeError && (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#EF4444", fontWeight: 600 }}>
+                  코드가 올바르지 않습니다
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Enter */}
         <button
           disabled={!ready}
           onClick={handleEnter}
           style={{
             width: "100%", padding: "15px 0", borderRadius: 14, fontSize: 15,
-            background: ready ? "linear-gradient(135deg, #5B57F5, #8B5CF6)" : "#F3F4F6",
+            background: ready
+              ? role === "teacher"
+                ? "linear-gradient(135deg, #059669, #10B981)"
+                : "linear-gradient(135deg, #5B57F5, #8B5CF6)"
+              : "#F3F4F6",
             color: ready ? "#fff" : "#D1D5DB",
             fontWeight: 800, border: "none",
             cursor: ready ? "pointer" : "not-allowed",
-            boxShadow: ready ? "0 6px 24px rgba(91,87,245,0.4)" : "none",
+            boxShadow: ready
+              ? role === "teacher"
+                ? "0 6px 24px rgba(16,185,129,0.4)"
+                : "0 6px 24px rgba(91,87,245,0.4)"
+              : "none",
             transition: "all 0.2s",
           }}
         >
-          {t("enter", myLang)}
+          {role === "teacher" ? "👩‍🏫 선생님으로 입장" : t("enter", myLang)}
         </button>
       </div>
     </div>
