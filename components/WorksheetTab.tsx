@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { compressToUnder1MB } from "@/lib/imageUtils";
 
@@ -24,83 +24,6 @@ interface Props {
   onClose: () => void;
 }
 
-// ── Canvas overlay helpers ────────────────────────────────────────────
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string, x: number, y: number, maxW: number, lineH: number
-) {
-  // For CJK text, split by character; for Latin split by word
-  const isCJK = /[\u1100-\uD7FF\u2E80-\u9FFF\uAC00-\uD7FF\uF900-\uFAFF\uFF00-\uFFEF]/.test(text);
-  const tokens = isCJK ? Array.from(text) : text.split(" ");
-  let line = "";
-  let cy = y;
-
-  for (const token of tokens) {
-    const test = isCJK ? line + token : line + (line ? " " : "") + token;
-    if (ctx.measureText(test).width > maxW && line) {
-      ctx.fillText(line, x, cy);
-      line = token;
-      cy += lineH;
-    } else {
-      line = test;
-    }
-  }
-  if (line) ctx.fillText(line, x, cy);
-}
-
-async function buildOverlayCanvas(
-  imageUrl: string,
-  blocks: Block[],
-  toLang: string
-): Promise<HTMLCanvasElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width  = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d")!;
-
-      // 1. Draw original image
-      ctx.drawImage(img, 0, 0);
-
-      for (const block of blocks) {
-        if (!block.translated?.trim()) continue;
-
-        const px = block.x * img.naturalWidth;
-        const py = block.y * img.naturalHeight;
-        const pw = block.w * img.naturalWidth;
-        const ph = block.h * img.naturalHeight;
-
-        // 2. Paint over original text with a white/cream box
-        ctx.fillStyle = "#FFFEF5";
-        ctx.fillRect(px, py, pw, ph);
-
-        // 3. Light border so the box is visible
-        ctx.strokeStyle = "rgba(91,87,245,0.25)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(px, py, pw, ph);
-
-        // 4. Draw translated text — auto-size to fit
-        const maxFontPx = Math.max(9, Math.min(ph * 0.72, 20));
-        const lineH     = maxFontPx * 1.25;
-        // Use Noto Sans KR for CJK support (loaded globally in the app)
-        ctx.font        = `${maxFontPx}px 'Noto Sans KR', sans-serif`;
-        ctx.fillStyle   = "#1a1a2e";
-        ctx.textBaseline = "top";
-        wrapText(ctx, block.translated.trim(), px + 3, py + 3, pw - 6, lineH);
-      }
-
-      // Unused toLang suppresses TS warning
-      void toLang;
-
-      resolve(canvas);
-    };
-    img.onerror = reject;
-    img.src = imageUrl;
-  });
-}
-
 export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImage, onClose }: Props) {
   const [fromLang, setFromLang] = useState(userLang === "ko" ? "en" : userLang);
   const [toLang, setToLang]     = useState(userLang === "ko" ? "ko" : "ko");
@@ -108,10 +31,42 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
   const [statusMsg, setStatusMsg]     = useState("");
   const [result, setResult]           = useState<WorksheetResult | null>(null);
   const [showTranslated, setShowTranslated] = useState(true);
-  const [overlayUrl, setOverlayUrl]   = useState<string | null>(null);
   const [error, setError]             = useState<string | null>(null);
   const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [imgDims, setImgDims] = useState({ w: 0, h: 0 });
+  const [activeTtsIdx, setActiveTtsIdx] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Measure rendered image size for block positioning
+  useEffect(() => {
+    if (!result || result.fileType !== "image") return;
+    const img = imgRef.current;
+    if (!img) return;
+    const update = () => setImgDims({ w: img.clientWidth, h: img.clientHeight });
+    if (img.complete) update();
+    img.addEventListener("load", update);
+    const ro = new ResizeObserver(update);
+    ro.observe(img);
+    window.addEventListener("resize", update);
+    return () => {
+      img.removeEventListener("load", update);
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [result]);
+
+  function playBlockTts(block: Block, idx: number) {
+    try { audioRef.current?.pause(); } catch {}
+    const url = `/api/tts?text=${encodeURIComponent(block.original)}&lang=${fromLang}`;
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    setActiveTtsIdx(idx);
+    audio.onended = () => setActiveTtsIdx((v) => (v === idx ? null : v));
+    audio.onerror = () => setActiveTtsIdx((v) => (v === idx ? null : v));
+    audio.play().catch(() => setActiveTtsIdx(null));
+  }
 
   async function handleFile(file: File) {
     const isPDF   = file.type === "application/pdf";
@@ -123,7 +78,6 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
 
     setResult(null);
     setError(null);
-    setOverlayUrl(null);
     setProcessing(true);
     setShowTranslated(true);
 
@@ -158,32 +112,11 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
         blocks:         data.blocks || [],
       };
       setResult(r);
-
-      // Build canvas overlay for images
-      if (isImage && previewUrl && Array.isArray(data.blocks) && data.blocks.length > 0) {
-        setStatusMsg("🎨 번역 덧입히는 중...");
-        try {
-          const canvas = await buildOverlayCanvas(previewUrl, data.blocks, toLang);
-          canvas.toBlob((blob) => {
-            if (blob) setOverlayUrl(URL.createObjectURL(blob));
-          }, "image/png");
-        } catch (e) {
-          console.error("canvas overlay failed:", e);
-        }
-      }
     } catch (e: unknown) {
       setError((e as Error).message || "처리 중 오류가 발생했습니다");
     }
     setProcessing(false);
     setStatusMsg("");
-  }
-
-  function downloadOverlay() {
-    if (!overlayUrl) return;
-    const a = document.createElement("a");
-    a.href = overlayUrl;
-    a.download = `translated_${Date.now()}.png`;
-    document.body.appendChild(a); a.click(); a.remove();
   }
 
   const selectStyle: React.CSSProperties = {
@@ -344,53 +277,93 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
       )}
 
       {/* ── Image OCR Result ── */}
-      {result && result.fileType === "image" && (
+      {result && result.fileType === "image" && result.imagePreviewUrl && (
         <div>
-          {/* Image viewer: toggle original ↔ translated overlay */}
+          {/* Hint */}
+          {showTranslated && (result.blocks?.length ?? 0) > 0 && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              fontSize: 11, color: "#5B57F5", fontWeight: 700,
+              marginBottom: 6, padding: "0 2px",
+            }}>
+              🔊 <span>번역 줄을 탭하면 {LANGUAGES[fromLang]?.flag} {LANGUAGES[fromLang]?.label}(으)로 읽어줘요</span>
+            </div>
+          )}
+
+          {/* Image + overlay container */}
           <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", background: "#F9FAFB" }}>
-            {/* Original image */}
-            {result.imagePreviewUrl && (
-              <img
-                src={result.imagePreviewUrl}
-                alt="원본"
-                style={{
-                  width: "100%", display: "block", maxHeight: 380,
-                  objectFit: "contain",
-                  opacity: showTranslated && overlayUrl ? 0 : 1,
-                  transition: "opacity 0.2s",
-                  position: overlayUrl ? "absolute" : "relative",
-                  top: 0, left: 0,
-                }}
-              />
-            )}
-            {/* Canvas overlay (translated) */}
-            {overlayUrl && (
-              <img
-                src={overlayUrl}
-                alt="번역 적용"
-                style={{
-                  width: "100%", display: "block", maxHeight: 380,
-                  objectFit: "contain",
-                  opacity: showTranslated ? 1 : 0,
-                  transition: "opacity 0.2s",
-                }}
-              />
-            )}
-            {/* Fallback: no blocks — show dark overlay with text */}
-            {!overlayUrl && result.imagePreviewUrl && (
+            {/* Original image (always rendered) */}
+            <img
+              ref={imgRef}
+              src={result.imagePreviewUrl}
+              alt="원본"
+              style={{
+                width: "100%", display: "block", maxHeight: 480,
+                objectFit: "contain",
+                position: "relative",
+              }}
+            />
+
+            {/* DOM overlay: per-block glassmorphism + TTS */}
+            {showTranslated && (result.blocks?.length ?? 0) > 0 && imgDims.w > 0 && (
               <div style={{
                 position: "absolute", inset: 0,
-                background: "rgba(10,8,28,0.75)", backdropFilter: "blur(2px)",
-                opacity: showTranslated ? 1 : 0,
-                transition: "opacity 0.3s",
-                pointerEvents: showTranslated ? "auto" : "none",
-                overflow: "auto", padding: "20px 16px",
+                // Center horizontally if image is narrower than container (objectFit:contain)
+                pointerEvents: "none",
               }}>
-                <div style={{ fontSize: 13, color: "#F9FAFB", lineHeight: 1.9, whiteSpace: "pre-wrap", fontWeight: 500 }}>
-                  <span style={{ display: "block", fontSize: 10, fontWeight: 800, letterSpacing: 1, color: "#A5B4FC", marginBottom: 10 }}>
-                    {LANGUAGES[toLang]?.flag} {LANGUAGES[toLang]?.label?.toUpperCase()} 번역
-                  </span>
-                  {result.translatedText}
+                <div style={{
+                  position: "absolute",
+                  left: "50%", top: "50%",
+                  transform: "translate(-50%, -50%)",
+                  width: imgDims.w, height: imgDims.h,
+                  pointerEvents: "none",
+                }}>
+                  {result.blocks!.map((b, i) => {
+                    if (!b.translated?.trim()) return null;
+                    const pxHeight = b.h * imgDims.h;
+                    const fontSize = Math.max(9, Math.min(pxHeight * 0.58, 22));
+                    const active = activeTtsIdx === i;
+                    return (
+                      <div
+                        key={i}
+                        onClick={() => playBlockTts(b, i)}
+                        title={`🔊 ${b.original}`}
+                        style={{
+                          position: "absolute",
+                          left: `${b.x * 100}%`,
+                          top: `${b.y * 100}%`,
+                          width: `${b.w * 100}%`,
+                          height: `${b.h * 100}%`,
+                          pointerEvents: "auto",
+                          cursor: "pointer",
+                          background: active
+                            ? "rgba(91,87,245,0.32)"
+                            : "rgba(255,255,255,0.45)",
+                          backdropFilter: "blur(5px)",
+                          WebkitBackdropFilter: "blur(5px)",
+                          border: active
+                            ? "1.5px solid rgba(91,87,245,0.7)"
+                            : "1px solid rgba(91,87,245,0.18)",
+                          borderRadius: 4,
+                          color: "#0F172A",
+                          fontSize,
+                          lineHeight: 1.2,
+                          padding: "1px 4px",
+                          display: "flex",
+                          alignItems: "center",
+                          overflow: "hidden",
+                          wordBreak: "break-word",
+                          whiteSpace: "pre-wrap",
+                          fontWeight: 600,
+                          fontFamily: "'Noto Sans KR', sans-serif",
+                          transition: "background 0.15s, border-color 0.15s",
+                          boxShadow: active ? "0 2px 10px rgba(91,87,245,0.35)" : "none",
+                        }}
+                      >
+                        {b.translated}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -408,7 +381,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
                 transition: "background 0.2s",
               }}
             >
-              {showTranslated ? `🖼️ ${LANGUAGES[fromLang]?.flag} 원본` : `🌐 ${LANGUAGES[toLang]?.flag} 번역`}
+              {showTranslated ? `🖼️ ${LANGUAGES[fromLang]?.flag} 원본만` : `🌐 ${LANGUAGES[toLang]?.flag} 번역 보기`}
             </button>
           </div>
 
@@ -427,15 +400,9 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <button
-              onClick={() => { setResult(null); setError(null); setShowTranslated(true); setCompressedBlob(null); setOverlayUrl(null); }}
+              onClick={() => { setResult(null); setError(null); setShowTranslated(true); setCompressedBlob(null); }}
               style={{ flex: 1, padding: "10px 0", borderRadius: 11, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
             >↩ 다시 올리기</button>
-            {overlayUrl && (
-              <button
-                onClick={downloadOverlay}
-                style={{ flex: 1, padding: "10px 0", borderRadius: 11, border: "1.5px solid #5B57F5", background: "#fff", color: "#5B57F5", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-              >📥 번역 이미지 저장</button>
-            )}
             <button
               onClick={() => {
                 if (compressedBlob && onPostWorksheetImage) {
