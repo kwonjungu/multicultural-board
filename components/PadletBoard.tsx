@@ -77,6 +77,34 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasLongPress = useRef(false);
 
+  // Undo snackbar
+  const [undoToast, setUndoToast] = useState<{
+    message: string;
+    onUndo: () => void;
+    timeoutId: ReturnType<typeof setTimeout>;
+  } | null>(null);
+
+  function showUndoToast(message: string, onUndo: () => void) {
+    setUndoToast((prev) => {
+      if (prev) clearTimeout(prev.timeoutId);
+      const timeoutId = setTimeout(() => setUndoToast(null), 8000);
+      return { message, onUndo, timeoutId };
+    });
+  }
+
+  function handleUndo() {
+    if (!undoToast) return;
+    clearTimeout(undoToast.timeoutId);
+    undoToast.onUndo();
+    setUndoToast(null);
+  }
+
+  function dismissToast() {
+    if (!undoToast) return;
+    clearTimeout(undoToast.timeoutId);
+    setUndoToast(null);
+  }
+
   // ── Firebase: rooms/${roomCode}/columns ──
   useEffect(() => {
     const db = getClientDb();
@@ -211,9 +239,14 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   }
 
   function deleteCol(colId: string) {
-    if (!confirm(t("confirmDeleteColumn", lang))) return;
+    const col = columns.find((c) => c.id === colId);
+    if (!col) return;
     const db = getClientDb();
+    const { id: _id, ...colData } = col;
     remove(ref(db, `rooms/${roomCode}/columns/${colId}`));
+    showUndoToast(`"${col.title}" 컬럼을 삭제했습니다`, () => {
+      set(ref(db, `rooms/${roomCode}/columns/${colId}`), colData);
+    });
   }
 
   function moveCol(colId: string, direction: "up" | "down") {
@@ -227,9 +260,20 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     set(ref(db, `rooms/${roomCode}/columns/${columns[swapIdx].id}/order`), myOrder);
   }
 
-  function deleteCard(cardId: string) {
+  async function deleteCard(cardId: string) {
     const db = getClientDb();
-    remove(ref(db, `rooms/${roomCode}/cards/${cardId}`));
+    const { get: dbGet, ref: dbRef } = await import("firebase/database");
+    const snap = await dbGet(dbRef(db, `rooms/${roomCode}/cards/${cardId}`));
+    const fullCard = snap.val();
+    if (!fullCard) return;
+    await remove(ref(db, `rooms/${roomCode}/cards/${cardId}`));
+    const authorName = typeof fullCard.authorName === "string" ? fullCard.authorName : "";
+    showUndoToast(
+      authorName ? `"${authorName}"님의 카드를 삭제했습니다` : "카드를 삭제했습니다",
+      () => {
+        set(ref(db, `rooms/${roomCode}/cards/${cardId}`), fullCard);
+      }
+    );
   }
 
   function addColumn() {
@@ -1434,6 +1478,63 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           myClientId={myClientId}
           roomCode={roomCode}
         />
+      )}
+
+      {/* ── Undo Snackbar ── */}
+      {undoToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: "fixed", bottom: 24, left: "50%",
+            transform: "translateX(-50%)",
+            background: "#111827", color: "#fff",
+            borderRadius: 12, padding: "12px 14px 12px 18px",
+            display: "flex", alignItems: "center", gap: 12,
+            boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
+            zIndex: 600, minWidth: 280, maxWidth: "90vw",
+            fontSize: 14, fontWeight: 600,
+            animation: "fadeSlideIn 0.2s ease",
+          }}
+        >
+          <span style={{ fontSize: 16 }}>🗑</span>
+          <span style={{ flex: 1 }}>{undoToast.message}</span>
+          <button
+            onClick={handleUndo}
+            style={{
+              background: "rgba(91,87,245,0.25)",
+              border: "1px solid rgba(165,180,252,0.5)",
+              color: "#C7D2FE", borderRadius: 8,
+              padding: "6px 12px", cursor: "pointer",
+              fontWeight: 800, fontSize: 13,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.5)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#fff";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.25)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#C7D2FE";
+            }}
+          >
+            ↩ 되돌리기
+          </button>
+          <button
+            onClick={dismissToast}
+            aria-label="닫기"
+            style={{
+              background: "transparent", border: "none",
+              color: "#9CA3AF", cursor: "pointer",
+              fontSize: 14, padding: "4px 6px",
+              lineHeight: 1,
+            }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#fff")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF")}
+          >
+            ✕
+          </button>
+        </div>
       )}
 
       {/* ── Edit Modal ── */}

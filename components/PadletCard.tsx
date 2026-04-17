@@ -365,9 +365,9 @@ export default function PadletCard({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (confirm("이 게시물을 삭제하시겠습니까?")) onDelete();
+                onDelete();
               }}
-              title="삭제"
+              title="삭제 (되돌리기 가능)"
               style={{
                 background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8,
                 padding: "4px 8px", cursor: "pointer", fontSize: 12, color: "#DC2626",
