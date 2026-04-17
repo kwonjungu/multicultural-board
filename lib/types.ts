@@ -91,3 +91,35 @@ export interface TranslateResponse {
   reason?: string;
   error?: boolean;
 }
+
+export type SessionStatus = "active" | "closed";
+
+export interface SessionMeta {
+  id: string;
+  title: string;
+  bodyText?: string;
+  imageUrl?: string;
+  startedAt: number;
+  closedAt?: number;
+  status: SessionStatus;
+  teacherClientId: string;
+  teacherName: string;
+}
+
+export interface SessionResponse {
+  id: string;
+  authorName: string;
+  authorLang: string;
+  authorClientId: string;
+  text: string;
+  translations?: Record<string, string>;
+  timestamp: number;
+  position?: { x: number; y: number };
+}
+
+export interface PresenceEntry {
+  name: string;
+  lang: string;
+  lastSeen: number;
+  submitted: boolean;
+}

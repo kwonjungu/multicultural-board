@@ -9,6 +9,8 @@ import { t } from "@/lib/i18n";
 import PadletCard from "./PadletCard";
 import PostModal from "./PostModal";
 import PptxTranslateModal from "./PptxTranslateModal";
+import DiscussionCreateModal from "./DiscussionCreateModal";
+import DiscussionSession from "./DiscussionSession";
 import { QRCodeSVG } from "qrcode.react";
 
 type PendingItem =
@@ -70,6 +72,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const [showApproval, setShowApproval] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showPptx, setShowPptx] = useState(false);
+  const [showDiscussionCreate, setShowDiscussionCreate] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [sessionMinimized, setSessionMinimized] = useState(false);
   const [editModal, setEditModal] = useState<{ card: CardData; colTitle: string; colColor: string } | null>(null);
 
   const boardRef = useRef<HTMLDivElement>(null);
@@ -162,12 +167,25 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         else if (showQR) setShowQR(false);
         else if (showApproval) setShowApproval(false);
         else if (showPptx) setShowPptx(false);
+        else if (showDiscussionCreate) setShowDiscussionCreate(false);
         else if (editModal) setEditModal(null);
       }
     }
     document.addEventListener("keydown", handleEsc);
     return () => document.removeEventListener("keydown", handleEsc);
-  }, [showTeacherModal, showManage, showQR, showApproval, showPptx, editModal]);
+  }, [showTeacherModal, showManage, showQR, showApproval, showPptx, showDiscussionCreate, editModal]);
+
+  // ── Firebase: rooms/${roomCode}/activeSession ──
+  useEffect(() => {
+    const db = getClientDb();
+    const aRef = ref(db, `rooms/${roomCode}/activeSession`);
+    const cb = onValue(aRef, (snap) => {
+      const id = snap.val() as string | null;
+      setActiveSessionId(id);
+      if (id) setSessionMinimized(false);
+    });
+    return () => off(aRef, "value", cb);
+  }, [roomCode]);
 
   // ── Firebase: rooms/${roomCode}/cards ──
   useEffect(() => {
@@ -692,6 +710,23 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   </div>
                 )}
               </div>
+
+              {/* 의견 나누기 button */}
+              <button
+                onClick={() => {
+                  if (activeSessionId) setSessionMinimized(false);
+                  else setShowDiscussionCreate(true);
+                }}
+                style={{
+                  background: activeSessionId ? "rgba(239,68,68,0.2)" : "rgba(168,85,247,0.15)",
+                  border: `1px solid ${activeSessionId ? "rgba(239,68,68,0.4)" : "rgba(168,85,247,0.3)"}`,
+                  color: activeSessionId ? "#FCA5A5" : "#C4B5FD",
+                  borderRadius: 10, padding: "6px 12px",
+                  fontSize: 12, cursor: "pointer", fontWeight: 700,
+                }}
+              >
+                {activeSessionId ? "🔴 진행 중" : "💭 의견 나누기"}
+              </button>
 
               {/* PPTX 번역 button */}
               <button
@@ -1300,6 +1335,29 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           defaultFromLang={lang === "ko" ? "ko" : lang}
           defaultToLang={lang === "ko" ? "en" : "ko"}
           onClose={() => setShowPptx(false)}
+        />
+      )}
+
+      {/* ── 의견 나누기: 생성 모달 (교사) ── */}
+      {showDiscussionCreate && isTeacher && (
+        <DiscussionCreateModal
+          roomCode={roomCode}
+          teacherClientId={myClientId}
+          teacherName={user.myName}
+          onClose={() => setShowDiscussionCreate(false)}
+        />
+      )}
+
+      {/* ── 의견 나누기: 활성 세션 오버레이 ── */}
+      {activeSessionId && !sessionMinimized && (
+        <DiscussionSession
+          roomCode={roomCode}
+          sessionId={activeSessionId}
+          isTeacher={isTeacher}
+          myClientId={myClientId}
+          myName={user.myName}
+          myLang={lang}
+          onExit={() => setSessionMinimized(true)}
         />
       )}
 
