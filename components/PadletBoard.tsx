@@ -618,27 +618,30 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     <div style={{
       height: "100vh", display: "flex", flexDirection: "column",
       fontFamily: "'Noto Sans KR', sans-serif",
-      background: "#F0F2FA", overflow: "hidden",
+      background: "linear-gradient(180deg, #FEF9E7 0%, #FFFDF3 40%, #FFFAE8 100%)",
+      overflow: "hidden",
     }}>
       {/* ── Header ── */}
       <header style={{
-        height: 58, flexShrink: 0, background: "#0F0C28",
-        borderBottom: "1px solid rgba(255,255,255,0.07)",
-        display: "flex", alignItems: "center", padding: "0 20px",
+        minHeight: 72, flexShrink: 0,
+        background: "#fff",
+        borderBottom: "1px solid #F3EAD0",
+        display: "flex", alignItems: "center", padding: "10px 22px",
+        gap: 14, boxShadow: "0 2px 10px rgba(245,158,11,0.06)",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
-            width: 34, height: 34, borderRadius: 10,
+            width: 46, height: 46, borderRadius: 16,
             background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 17, boxShadow: "0 4px 12px rgba(245,158,11,0.45)", flexShrink: 0,
+            fontSize: 26, boxShadow: "0 6px 16px rgba(245,158,11,0.45)", flexShrink: 0,
           }}>🐝</div>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 14, color: "#F9FAFB", letterSpacing: -0.3 }}>
-              🐝 꿀벌 소통창
+            <div style={{ fontWeight: 900, fontSize: 19, color: "#111827", letterSpacing: -0.4, lineHeight: 1.1 }}>
+              꿀벌 소통창
             </div>
-            <div style={{ fontSize: 10, color: "#6B7280", marginTop: -1 }}>
-              Room <span style={{ color: "#7C7AFF", fontWeight: 700 }}>{roomCode}</span>
+            <div style={{ fontSize: 13, color: "#92400E", marginTop: 3, fontWeight: 700 }}>
+              우리 방 <span style={{ color: "#B45309", fontWeight: 900, letterSpacing: 2, marginLeft: 4 }}>{roomCode}</span>
             </div>
           </div>
         </div>
@@ -646,21 +649,21 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {/* User badge */}
           <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            background: "rgba(91,87,245,0.15)", border: "1px solid rgba(91,87,245,0.3)",
-            borderRadius: 20, padding: "5px 14px 5px 5px",
+            display: "flex", alignItems: "center", gap: 10,
+            background: "#FEF3C7", border: "2px solid #FDE68A",
+            borderRadius: 24, padding: "6px 16px 6px 6px",
           }}>
             <div style={{
-              width: 26, height: 26, borderRadius: "50%",
+              width: 32, height: 32, borderRadius: "50%",
               background: BRAND_GRADIENT,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: isTeacher ? 13 : 11, fontWeight: 800, color: "#fff",
+              fontSize: isTeacher ? 16 : 14, fontWeight: 800, color: "#fff",
             }}>
               {isTeacher ? "👩‍🏫" : user.myName.charAt(0).toUpperCase()}
             </div>
-            <span style={{ color: "#E5E7EB", fontWeight: 700, fontSize: 13 }}>{user.myName}</span>
+            <span style={{ color: "#92400E", fontWeight: 800, fontSize: 15 }}>{user.myName}</span>
             {isTeacher && (
-              <span style={{ fontSize: 9, background: "#5B57F5", color: "#fff", borderRadius: 8, padding: "1px 7px", fontWeight: 700 }}>
+              <span style={{ fontSize: 12, background: "#F59E0B", color: "#fff", borderRadius: 10, padding: "2px 9px", fontWeight: 800 }}>
                 {t("teacherTag", lang)}
               </span>
             )}
@@ -673,10 +676,14 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               <button
                 onClick={() => setShowQR(true)}
                 style={{
-                  background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)",
-                  color: "#6EE7B7", borderRadius: 10, padding: "6px 12px",
-                  fontSize: 12, cursor: "pointer", fontWeight: 700,
+                  background: "#ECFDF5", border: "2px solid #A7F3D0",
+                  color: "#047857", borderRadius: 16, padding: "10px 16px",
+                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                  transition: "transform 0.12s",
                 }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
                 📱 QR
               </button>
@@ -686,9 +693,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 <button
                   onClick={() => setShowApproval(true)}
                   style={{
-                    background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)",
-                    color: "#FCD34D", borderRadius: 10, padding: "6px 12px",
-                    fontSize: 12, cursor: "pointer", fontWeight: 700,
+                    background: "#FEF3C7", border: "2px solid #FBBF24",
+                    color: "#92400E", borderRadius: 16, padding: "10px 16px",
+                    fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
                   }}
                 >
                   🔔 {t("approvalPending", lang)} {pendingCount}
@@ -700,27 +707,31 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 <button
                   onClick={() => setShowExport((v) => !v)}
                   style={{
-                    background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)",
-                    color: "#93C5FD", borderRadius: 10, padding: "6px 12px",
-                    fontSize: 12, cursor: "pointer", fontWeight: 700,
+                    background: "#EFF6FF", border: "2px solid #BFDBFE",
+                    color: "#1D4ED8", borderRadius: 16, padding: "10px 16px",
+                    fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                    transition: "transform 0.12s",
                   }}
+                  onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                  onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                 >
                   📤 {t("exportBtn", lang)} ▾
                 </button>
                 {showExport && (
                   <div style={{
-                    position: "absolute", top: "calc(100% + 6px)", right: 0,
-                    background: "#fff", borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-                    border: "1px solid #E9ECF5", zIndex: 100, minWidth: 160, overflow: "hidden",
+                    position: "absolute", top: "calc(100% + 8px)", right: 0,
+                    background: "#fff", borderRadius: 18, boxShadow: "0 12px 36px rgba(0,0,0,0.18)",
+                    border: "2px solid #FDE68A", zIndex: 100, minWidth: 200, overflow: "hidden",
                   }}>
                     <button
                       onClick={exportPDF}
                       style={{
-                        width: "100%", padding: "12px 16px", textAlign: "left", border: "none",
-                        background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                        width: "100%", padding: "14px 18px", textAlign: "left", border: "none",
+                        background: "transparent", cursor: "pointer", fontSize: 15, fontWeight: 700,
                         color: "#374151", display: "block",
                       }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB")}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#FEF9E7")}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
                     >
                       📄 {t("exportPdf", lang)}
@@ -728,11 +739,11 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                     <button
                       onClick={exportCSV}
                       style={{
-                        width: "100%", padding: "12px 16px", textAlign: "left", border: "none",
-                        background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 600,
-                        color: "#374151", borderTop: "1px solid #F3F4F6", display: "block",
+                        width: "100%", padding: "14px 18px", textAlign: "left", border: "none",
+                        background: "transparent", cursor: "pointer", fontSize: 15, fontWeight: 700,
+                        color: "#374151", borderTop: "1px solid #FEF3C7", display: "block",
                       }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB")}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#FEF9E7")}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
                     >
                       📊 {t("exportCsv", lang)}
@@ -740,11 +751,11 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                     <button
                       onClick={exportImage}
                       style={{
-                        width: "100%", padding: "12px 16px", textAlign: "left", border: "none",
-                        background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 600,
-                        color: "#374151", borderTop: "1px solid #F3F4F6", display: "block",
+                        width: "100%", padding: "14px 18px", textAlign: "left", border: "none",
+                        background: "transparent", cursor: "pointer", fontSize: 15, fontWeight: 700,
+                        color: "#374151", borderTop: "1px solid #FEF3C7", display: "block",
                       }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB")}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#FEF9E7")}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
                     >
                       🖼️ {t("exportImage", lang)}
@@ -760,12 +771,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   else setShowDiscussionCreate(true);
                 }}
                 style={{
-                  background: activeSessionId ? "rgba(239,68,68,0.2)" : "rgba(168,85,247,0.15)",
-                  border: `1px solid ${activeSessionId ? "rgba(239,68,68,0.4)" : "rgba(168,85,247,0.3)"}`,
-                  color: activeSessionId ? "#FCA5A5" : "#C4B5FD",
-                  borderRadius: 10, padding: "6px 12px",
-                  fontSize: 12, cursor: "pointer", fontWeight: 700,
+                  background: activeSessionId ? "#FEE2E2" : "#F5F3FF",
+                  border: `2px solid ${activeSessionId ? "#FCA5A5" : "#DDD6FE"}`,
+                  color: activeSessionId ? "#B91C1C" : "#6D28D9",
+                  borderRadius: 16, padding: "10px 16px",
+                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                  transition: "transform 0.12s",
                 }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
                 {activeSessionId ? "🔴 진행 중" : "💭 의견 나누기"}
               </button>
@@ -774,10 +789,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               <button
                 onClick={() => setShowGameRoom(true)}
                 style={{
-                  background: "rgba(245,158,11,0.18)", border: "1px solid rgba(245,158,11,0.45)",
-                  color: "#FCD34D", borderRadius: 10, padding: "6px 12px",
-                  fontSize: 12, cursor: "pointer", fontWeight: 700,
+                  background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
+                  border: "none",
+                  color: "#fff", borderRadius: 16, padding: "10px 18px",
+                  fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 44,
+                  boxShadow: "0 6px 18px rgba(245,158,11,0.4)",
+                  transition: "transform 0.12s",
                 }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
                 🎮 소통의 방
               </button>
@@ -786,18 +807,14 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               <button
                 onClick={() => setShowPptx(true)}
                 style={{
-                  background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.3)",
-                  color: "#F9A8D4", borderRadius: 10, padding: "6px 12px",
-                  fontSize: 12, cursor: "pointer", fontWeight: 700, transition: "all 0.15s",
+                  background: "#FDF2F8", border: "2px solid #FBCFE8",
+                  color: "#BE185D", borderRadius: 16, padding: "10px 16px",
+                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                  transition: "transform 0.12s",
                 }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(236,72,153,0.3)";
-                  (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(236,72,153,0.15)";
-                  (e.currentTarget as HTMLButtonElement).style.color = "#F9A8D4";
-                }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
                 📊 PPTX 번역
               </button>
@@ -809,20 +826,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   setShowManage(true);
                 }}
                 style={{
-                  background: "rgba(91,87,245,0.2)", border: "1px solid rgba(91,87,245,0.4)",
-                  color: "#A5B4FC", borderRadius: 10, padding: "6px 14px",
-                  fontSize: 12, cursor: "pointer", fontWeight: 700, transition: "all 0.15s",
+                  background: "#EEF2FF", border: "2px solid #C7D2FE",
+                  color: "#4338CA", borderRadius: 16, padding: "10px 18px",
+                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                  transition: "transform 0.12s",
                 }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.35)";
-                  (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.2)";
-                  (e.currentTarget as HTMLButtonElement).style.color = "#A5B4FC";
-                }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
-                {t("manage", lang)}
+                ⚙ {t("manage", lang)}
               </button>
             </>
           )}
@@ -830,14 +843,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           <button
             onClick={onLogout}
             style={{
-              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-              color: "#6B7280", borderRadius: 10, padding: "6px 12px",
-              fontSize: 12, cursor: "pointer", fontWeight: 600, transition: "all 0.15s",
+              background: "#F9FAFB", border: "2px solid #E5E7EB",
+              color: "#6B7280", borderRadius: 16, padding: "10px 16px",
+              fontSize: 15, cursor: "pointer", fontWeight: 700, minHeight: 44,
+              transition: "transform 0.12s",
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#6B7280"; }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            {t("settings", lang)}
+            🚪 나가기
           </button>
         </div>
       </header>
@@ -857,31 +872,31 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           const colCards = visibleCards.filter((c) => c.colId === col.id);
           return (
             <div key={col.id} style={{
-              width: "clamp(260px, 28vw, 320px)", flexShrink: 0, display: "flex", flexDirection: "column",
-              height: "calc(100vh - 74px)", borderRadius: 16, overflow: "hidden",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)",
-              background: "#fff", border: "1px solid #E9ECF5",
+              width: "clamp(270px, 28vw, 330px)", flexShrink: 0, display: "flex", flexDirection: "column",
+              height: "calc(100vh - 90px)", borderRadius: 22, overflow: "hidden",
+              boxShadow: "0 4px 18px rgba(245,158,11,0.12), 0 1px 3px rgba(0,0,0,0.05)",
+              background: "#fff", border: "2px solid #FEF3C7",
               scrollSnapAlign: "start",
             }}>
               <div style={{
-                padding: "14px 16px 12px",
-                borderBottom: `2px solid ${col.color}`,
+                padding: "16px 18px 14px",
+                borderBottom: `3px solid ${col.color}`,
                 display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
-                background: `${col.color}12`,
+                background: `${col.color}14`,
               }}>
-                <div style={{ width: 10, height: 10, borderRadius: "50%", background: col.color, flexShrink: 0, boxShadow: `0 0 0 3px ${col.color}22` }} />
-                <span style={{ flex: 1, fontWeight: 800, fontSize: 13, color: "#111827", letterSpacing: -0.2, lineHeight: 1.35 }}>{col.title}</span>
-                <span style={{ background: col.color + "18", color: col.color, borderRadius: 20, fontSize: 11, fontWeight: 800, padding: "2px 10px", minWidth: 28, textAlign: "center" }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: col.color, flexShrink: 0, boxShadow: `0 0 0 4px ${col.color}22` }} />
+                <span style={{ flex: 1, fontWeight: 900, fontSize: 17, color: "#111827", letterSpacing: -0.3, lineHeight: 1.3 }}>{col.title}</span>
+                <span style={{ background: col.color + "1F", color: col.color, borderRadius: 24, fontSize: 14, fontWeight: 900, padding: "4px 12px", minWidth: 32, textAlign: "center" }}>
                   {colCards.length}
                 </span>
               </div>
 
-              <div style={{ flex: 1, overflowY: "auto", padding: "12px 10px 4px", background: "#F8F9FC", scrollbarWidth: "thin", scrollbarColor: "#D1D5E0 transparent" }}>
+              <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px 6px", background: "#FFFEF7", scrollbarWidth: "thin", scrollbarColor: "#FDE68A transparent" }}>
                 {colCards.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 16px", color: "#CBD5E1" }}>
-                    <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.5 }}>✏️</div>
-                    <div style={{ fontWeight: 600, color: "#9CA3AF", fontSize: 12 }}>{t("noPosts", lang)}</div>
-                    <div style={{ fontSize: 11, marginTop: 4 }}>{t("addBelowHint", lang)}</div>
+                  <div style={{ textAlign: "center", padding: "44px 16px", color: "#D1D5DB" }}>
+                    <div style={{ fontSize: 44, marginBottom: 12, opacity: 0.7 }}>🐝</div>
+                    <div style={{ fontWeight: 800, color: "#6B7280", fontSize: 16 }}>{t("noPosts", lang)}</div>
+                    <div style={{ fontSize: 14, marginTop: 6, color: "#9CA3AF", fontWeight: 600 }}>{t("addBelowHint", lang)}</div>
                   </div>
                 ) : (
                   colCards.map((card) => (
