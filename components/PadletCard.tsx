@@ -127,6 +127,9 @@ export default function PadletCard({
 
   // Comment state
   const [commentsOpen, setCommentsOpen] = useState(false);
+  // Local like state (세션 동안만; Firebase 저장은 추후 과제)
+  const [likedLocal, setLikedLocal] = useState(false);
+  const [likeBump, setLikeBump] = useState(0);
   const [comments, setComments] = useState<CommentData[]>([]);
   const [commentCount, setCommentCount] = useState(0);
   const [commentInput, setCommentInput] = useState("");
@@ -497,32 +500,68 @@ export default function PadletCard({
         )}
       </div>
 
-      {/* ── Comment toggle bar ── */}
-      <button
-        type="button"
-        onClick={() => setCommentsOpen((v) => !v)}
-        aria-expanded={commentsOpen}
+      {/* ── Action row: 🔊 들어봐 · ❤️ 좋아요 · 💬 댓글 ── */}
+      <div
         style={{
-          width: "100%", borderTop: `1px solid ${p.accent}22`,
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "12px 16px", cursor: "pointer",
-          color: commentsOpen ? p.accent : "#6B7280", fontSize: 14, fontWeight: 800,
-          background: commentsOpen ? p.accent + "0A" : "rgba(255,255,255,0.4)",
-          border: "none", transition: "all 0.15s", fontFamily: "inherit",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = p.accent;
-          (e.currentTarget as HTMLButtonElement).style.background = p.accent + "0F";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = commentsOpen ? p.accent : "#6B7280";
-          (e.currentTarget as HTMLButtonElement).style.background = commentsOpen ? p.accent + "0A" : "rgba(255,255,255,0.4)";
+          display: "flex", gap: 8, padding: "10px 12px",
+          borderTop: `1px solid ${p.accent}22`,
+          background: "rgba(255,255,255,0.5)",
         }}
       >
-        <span style={{ fontSize: 18 }}>💬</span>
-        {commentCount > 0 ? `${commentCount}개 댓글` : t("addComment", viewerLang)}
-        {commentsOpen && <span style={{ marginLeft: "auto", fontSize: 12 }}>✕ 닫기</span>}
-      </button>
+        <button
+          type="button"
+          onClick={() => speakText(
+            cardType === "text" ? card.originalText :
+            (card.originalText || card.translations?.[viewerLang] || ""),
+            card.authorLang
+          )}
+          aria-label="원문 읽어주기"
+          style={{
+            flex: 1, minHeight: 44, borderRadius: 12,
+            background: "#fff", border: `2px solid ${p.accent}44`,
+            color: p.accent, fontSize: 14, fontWeight: 900,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = p.accent + "14"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; }}
+        >🔊 들어봐</button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setLikedLocal((v) => !v);
+            setLikeBump((n) => n + 1);
+          }}
+          aria-pressed={likedLocal}
+          aria-label="좋아요"
+          style={{
+            flex: 1, minHeight: 44, borderRadius: 12,
+            background: likedLocal ? "#FEE2E2" : "#fff",
+            border: `2px solid ${likedLocal ? "#FB7185" : "#FECDD3"}`,
+            color: likedLocal ? "#BE123C" : "#FB7185", fontSize: 14, fontWeight: 900,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+            transition: "all 0.15s",
+            animation: likeBump > 0 ? "likeBump 0.45s ease" : undefined,
+          }}
+          onAnimationEnd={() => setLikeBump(0)}
+        >{likedLocal ? "❤️" : "🤍"} <span style={{ fontSize: 13 }}>좋아요</span></button>
+
+        <button
+          type="button"
+          onClick={() => setCommentsOpen((v) => !v)}
+          aria-expanded={commentsOpen}
+          aria-label="댓글"
+          style={{
+            flex: 1, minHeight: 44, borderRadius: 12,
+            background: commentsOpen ? "#EDE9FE" : "#fff",
+            border: `2px solid ${commentsOpen ? "#A78BFA" : "#DDD6FE"}`,
+            color: commentsOpen ? "#6D28D9" : "#8B5CF6", fontSize: 14, fontWeight: 900,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+            transition: "all 0.15s",
+          }}
+        >💬 <span>{commentCount > 0 ? commentCount : "댓글"}</span></button>
+      </div>
 
       {/* ── Expanded comments section ── */}
       {commentsOpen && (

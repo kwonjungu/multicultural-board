@@ -41,6 +41,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             0%, 100% { transform: translateY(0) rotate(-2deg); }
             50%      { transform: translateY(-8px) rotate(3deg); }
           }
+          @keyframes likeBump {
+            0%, 100% { transform: scale(1); }
+            30%      { transform: scale(1.18); }
+            60%      { transform: scale(0.96); }
+          }
 
           ::-webkit-scrollbar { width: 4px; height: 4px; }
           ::-webkit-scrollbar-thumb { background: #FDE68A; border-radius: 4px; }
