@@ -10,7 +10,10 @@ import PadletBoard from "@/components/PadletBoard";
 import HomeHub, { HubView } from "@/components/HomeHub";
 import GameRoom from "@/components/GameRoom";
 import InterpreterDrawer from "@/components/InterpreterDrawer";
-import ClassDashboard from "@/components/ClassDashboard";
+import PraiseHive from "@/components/PraiseHive";
+import StickerGiveModal from "@/components/StickerGiveModal";
+import CosmeticPicker from "@/components/CosmeticPicker";
+import { subscribeStudentStickers } from "@/lib/stickers";
 import { UserConfig, RoomConfig } from "@/lib/types";
 
 const ALL_LANGS = Object.keys(LANGUAGES);
@@ -25,6 +28,18 @@ export default function RoomPage() {
   const [langsLoaded, setLangsLoaded] = useState(false);
   const [hubView, setHubView] = useState<HubView | "hub">("hub");
   const [interpreterOpen, setInterpreterOpen] = useState(false);
+  const [giveModalFor, setGiveModalFor] = useState<{ clientId: string; name: string } | null>(null);
+  const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
+  const [myStickerCount, setMyStickerCount] = useState(0);
+
+  // 내 스티커 개수 구독 (CosmeticPicker에 전달용)
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeStudentStickers(roomCode, user.myName, (list) => {
+      setMyStickerCount(list.length);
+    });
+    return () => unsub();
+  }, [roomCode, user]);
 
   // 재방문 시 저장된 설정으로 바로 보드 입장
   useEffect(() => {
@@ -154,7 +169,35 @@ export default function RoomPage() {
   }
 
   if (hubView === "dashboard") {
-    return <ClassDashboard onBack={() => setHubView("hub")} roomCode={roomCode} />;
+    return (
+      <>
+        <PraiseHive
+          user={user}
+          roomCode={roomCode}
+          roomConfig={roomConfig}
+          myClientId={user.myName}
+          onBack={() => setHubView("hub")}
+          onOpenGive={(clientId, name) => setGiveModalFor({ clientId, name })}
+          onOpenCosmetics={() => setCosmeticsOpen(true)}
+        />
+        <StickerGiveModal
+          roomCode={roomCode}
+          teacherName={user.myName}
+          teacherClientId={myClientId}
+          targetStudent={giveModalFor}
+          lang={user.myLang}
+          onClose={() => setGiveModalFor(null)}
+        />
+        <CosmeticPicker
+          open={cosmeticsOpen}
+          roomCode={roomCode}
+          myClientId={user.myName}
+          stickerCount={myStickerCount}
+          lang={user.myLang}
+          onClose={() => setCosmeticsOpen(false)}
+        />
+      </>
+    );
   }
 
   // 기본: 소통창

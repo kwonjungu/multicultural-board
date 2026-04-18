@@ -54,11 +54,10 @@ const SECTIONS: SectionMeta[] = [
     titleKey: "hubSectionStickers",
     sub: "Praise Hive",
     descKey: "hubSectionStickersDesc",
-    mascot: "/mascot/bee-welcome.png",
+    mascot: "/mascot/bee-celebrate.png",
     color: "#10B981",
     bg: "linear-gradient(135deg, #D1FAE5, #A7F3D0)",
     accent: "#065F46",
-    badge: "SOON",
   },
 ];
 
@@ -147,7 +146,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
           display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14,
         }}>
           {SECTIONS.map((s) => {
-            const locked = s.id === "dashboard";
+            const locked = false;
             return (
               <button
                 key={s.id}
