@@ -7,6 +7,10 @@ import { getClientDb } from "@/lib/firebase-client";
 import { LANGUAGES } from "@/lib/constants";
 import SetupScreen from "@/components/SetupScreen";
 import PadletBoard from "@/components/PadletBoard";
+import HomeHub, { HubView } from "@/components/HomeHub";
+import GameRoom from "@/components/GameRoom";
+import InterpreterDrawer from "@/components/InterpreterDrawer";
+import ClassDashboard from "@/components/ClassDashboard";
 import { UserConfig, RoomConfig } from "@/lib/types";
 
 const ALL_LANGS = Object.keys(LANGUAGES);
@@ -19,6 +23,8 @@ export default function RoomPage() {
   const [roomLangs, setRoomLangs] = useState<string[]>(ALL_LANGS);
   const [roomConfig, setRoomConfig] = useState<RoomConfig>({ languages: ALL_LANGS });
   const [langsLoaded, setLangsLoaded] = useState(false);
+  const [hubView, setHubView] = useState<HubView | "hub">("hub");
+  const [interpreterOpen, setInterpreterOpen] = useState(false);
 
   // 재방문 시 저장된 설정으로 바로 보드 입장
   useEffect(() => {
@@ -111,7 +117,7 @@ export default function RoomPage() {
   if (!user) {
     return (
       <SetupScreen
-        onDone={setUser}
+        onDone={(u) => { setUser(u); setHubView("hub"); }}
         roomCode={roomCode}
         availableLangs={roomLangs}
         roomConfig={roomConfig}
@@ -119,12 +125,45 @@ export default function RoomPage() {
     );
   }
 
+  // 허브 메인 화면
+  if (hubView === "hub") {
+    return (
+      <>
+        <HomeHub
+          user={user}
+          roomCode={roomCode}
+          onSelect={(v) => {
+            if (v === "interpreter") setInterpreterOpen(true);
+            else setHubView(v);
+          }}
+          onLogout={() => setUser(null)}
+        />
+        {/* Interpreter은 drawer 오버레이, hub 위에서 직접 열림 */}
+        <InterpreterDrawer
+          open={interpreterOpen}
+          onClose={() => setInterpreterOpen(false)}
+          viewerLang={user.myLang}
+          availableLangs={roomLangs}
+        />
+      </>
+    );
+  }
+
+  if (hubView === "games") {
+    return <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} />;
+  }
+
+  if (hubView === "dashboard") {
+    return <ClassDashboard onBack={() => setHubView("hub")} roomCode={roomCode} />;
+  }
+
+  // 기본: 소통창
   return (
     <PadletBoard
       user={user}
       roomCode={roomCode}
       roomLangs={roomLangs}
-      onLogout={() => setUser(null)}
+      onLogout={() => setHubView("hub")}
       roomConfig={roomConfig}
       myClientId={myClientId}
     />
