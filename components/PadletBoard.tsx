@@ -12,6 +12,7 @@ import PptxTranslateModal from "./PptxTranslateModal";
 import DiscussionCreateModal from "./DiscussionCreateModal";
 import DiscussionSession from "./DiscussionSession";
 import GameRoom from "./GameRoom";
+import InterpreterDrawer from "./InterpreterDrawer";
 import { QRCodeSVG } from "qrcode.react";
 
 type PendingItem =
@@ -45,6 +46,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     COLUMNS_DEFAULT.map((col, i) => ({ ...col, order: i }))
   );
   const [modal, setModal] = useState<{ colId: string; colTitle: string; colColor: string } | null>(null);
+  const [interpreterOpen, setInterpreterOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const lang = user.myLang;
 
@@ -668,6 +670,30 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               </span>
             )}
           </div>
+
+          {/* 🎙️ 통역 도우미 — available to everyone */}
+          <button
+            onClick={() => setInterpreterOpen(true)}
+            aria-label="통역 도우미 열기"
+            style={{
+              background: "linear-gradient(135deg, #1F2937, #374151)",
+              border: "none", color: "#fff",
+              borderRadius: 16, padding: "10px 16px",
+              fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 44,
+              boxShadow: "0 6px 18px rgba(31,41,55,0.35)",
+              display: "inline-flex", alignItems: "center", gap: 6,
+              transition: "transform 0.12s",
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            🎙️ 통역
+            <span style={{
+              fontSize: 9, fontWeight: 900, background: "#F59E0B", color: "#fff",
+              padding: "2px 6px", borderRadius: 999, letterSpacing: 0.5,
+            }}>BETA</span>
+          </button>
 
           {/* Teacher-only buttons */}
           {isTeacher && (
@@ -1348,6 +1374,14 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       {showGameRoom && (
         <GameRoom myLang={lang} onClose={() => setShowGameRoom(false)} />
       )}
+
+      {/* ── 🎙️ 통역 도우미 Drawer ── */}
+      <InterpreterDrawer
+        open={interpreterOpen}
+        onClose={() => setInterpreterOpen(false)}
+        viewerLang={lang}
+        availableLangs={teacherLangs.length > 0 ? teacherLangs : Object.keys(LANGUAGES)}
+      />
 
       {/* ── 의견 나누기: 생성 모달 (교사) ── */}
       {showDiscussionCreate && isTeacher && (
