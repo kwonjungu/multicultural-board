@@ -1661,6 +1661,31 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           roomCode={roomCode}
         />
       )}
+
+      {/* ── ✏️ FAB: 아무 칼럼에 글쓰기 ── */}
+      {!modal && !editModal && !showPptx && !showGameRoom && !showDiscussionCreate && !activeSessionId && columns.length > 0 && (
+        <button
+          onClick={() => {
+            const first = columns[0];
+            setModal({ colId: first.id, colTitle: first.title, colColor: first.color });
+          }}
+          aria-label="새 글 쓰기"
+          style={{
+            position: "fixed", right: "clamp(16px, 3vw, 28px)", bottom: "clamp(16px, 3vw, 28px)",
+            width: 68, height: 68, borderRadius: "50%", border: "none",
+            background: "linear-gradient(135deg, #F59E0B, #D97706)",
+            color: "#fff", fontSize: 30, fontWeight: 900,
+            boxShadow: "0 12px 32px rgba(245,158,11,0.55), inset 0 -4px 0 rgba(0,0,0,0.15)",
+            cursor: "pointer", zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "transform 0.12s",
+          }}
+          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
+          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          ✏️
+        </button>
+      )}
     </div>
   );
 }
