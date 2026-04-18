@@ -38,3 +38,7 @@ firebase-setup-notes.txt
 
 # local-only archives (내려받은 스킬 번들 등)
 *.zip
+
+# asset generation runtime artifacts
+scripts/.gen_manifest.json
+scripts/.qa_report.json
