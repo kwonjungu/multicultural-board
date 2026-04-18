@@ -6,6 +6,7 @@ import { UserConfig, PostData, CardType, CardData, CardStatus } from "@/lib/type
 import { t } from "@/lib/i18n";
 import DrawingCanvas from "./DrawingCanvas";
 import WorksheetTab from "./WorksheetTab";
+import BeeMascot from "./BeeMascot";
 import { compressToUnder1MB, fmtBytes } from "@/lib/imageUtils";
 
 function extractYouTubeId(url: string): string | null {
@@ -352,35 +353,40 @@ export default function PostModal({
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{
-        background: "#fff", borderRadius: "24px 24px 0 0",
-        width: "100%", maxWidth: "min(560px, 92vw)", padding: "24px clamp(16px, 4vw, 24px) 40px",
-        boxShadow: "0 -16px 60px rgba(0,0,0,0.3)",
+        background: "#FFFBEB", borderRadius: "28px 28px 0 0",
+        width: "100%", maxWidth: "min(560px, 92vw)", padding: "20px clamp(18px, 4vw, 26px) 40px",
+        boxShadow: "0 -16px 60px rgba(180,83,9,0.3)",
         animation: "slideUp 0.22s ease",
         maxHeight: "92vh", overflowY: "auto",
       }}>
         {/* Handle bar */}
         <div style={{
-          width: 36, height: 4, borderRadius: 2, background: "#E5E7EB",
-          margin: "-8px auto 20px",
+          width: 44, height: 5, borderRadius: 999, background: "#FDE68A",
+          margin: "-4px auto 18px",
         }} />
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0, boxShadow: `0 0 0 3px ${accent}22` }} />
-          <span id="post-modal-title" style={{ fontWeight: 800, fontSize: 14, color: "#111827", flex: 1, letterSpacing: -0.2 }}>
-            {isEdit ? `✏️ ${t("editCard", lang)} — ${colTitle}` : colTitle}
-          </span>
+        {/* Header w/ mascot */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+          <BeeMascot size={48} mood={isEdit ? "think" : "cheer"} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div id="post-modal-title" style={{ fontWeight: 900, fontSize: 19, color: "#1F2937", letterSpacing: -0.3, lineHeight: 1.2 }}>
+              {isEdit ? t("editCard", lang) : "무엇을 할까?"}
+            </div>
+            <div style={{ fontSize: 13, color: "#92400E", fontWeight: 700, marginTop: 2 }}>
+              {colTitle}
+            </div>
+          </div>
           <button
             onClick={onClose}
             aria-label="close"
             style={{
-              background: "#F3F4F6", border: "none", borderRadius: "50%",
-              width: 30, height: 30, fontSize: 13, cursor: "pointer", color: "#6B7280",
+              background: "#fff", border: "2px solid #FDE68A", borderRadius: 14,
+              width: 44, height: 44, fontSize: 16, cursor: "pointer", color: "#92400E",
               display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "background 0.15s",
+              transition: "all 0.15s", fontWeight: 900,
             }}
-            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#E5E7EB")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#F3F4F6")}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF3C7"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#F59E0B"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#FDE68A"; }}
           >✕</button>
         </div>
 
@@ -435,7 +441,7 @@ export default function PostModal({
         {/* Tabs */}
         <div
           role="tablist"
-          style={{ display: "flex", gap: 4, marginBottom: 18, background: "#F3F4F6", borderRadius: 12, padding: 4 }}
+          style={{ display: "flex", gap: 4, marginBottom: 18, background: "#FEF3C7", borderRadius: 14, padding: 5 }}
           onKeyDown={(e) => {
             const tabs = TABS.map((t) => t.key);
             const idx = tabs.indexOf(mode);
@@ -451,11 +457,11 @@ export default function PostModal({
               tabIndex={mode === tab.key ? 0 : -1}
               onClick={() => setMode(tab.key)}
               style={{
-                flex: 1, padding: "8px 4px", borderRadius: 9, border: "none", cursor: "pointer",
+                flex: 1, padding: "10px 4px", borderRadius: 11, border: "none", cursor: "pointer",
                 background: mode === tab.key ? "#fff" : "transparent",
-                boxShadow: mode === tab.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-                fontWeight: mode === tab.key ? 800 : 500, fontSize: 12,
-                color: mode === tab.key ? accent : "#9CA3AF",
+                boxShadow: mode === tab.key ? "0 2px 6px rgba(245,158,11,0.25)" : "none",
+                fontWeight: mode === tab.key ? 900 : 700, fontSize: 13,
+                color: mode === tab.key ? "#B45309" : "#92400E99",
                 transition: "all 0.15s",
               }}
             >
@@ -471,24 +477,65 @@ export default function PostModal({
         {mode === "text" && (
           <>
             <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 0.5 }}>{t("writingLang", lang)}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#92400E", letterSpacing: 0.3 }}>{t("writingLang", lang)}</span>
               {langOptions.map((l) => (
                 <button
                   key={l}
                   onClick={() => setWriteLang(l)}
                   style={{
-                    padding: "5px 11px", borderRadius: 16, fontSize: 12,
-                    border: `1.5px solid ${writeLang === l ? accent : "#E5E7EB"}`,
-                    background: writeLang === l ? accent + "15" : "#F9FAFB",
-                    color: writeLang === l ? accent : "#9CA3AF",
-                    fontWeight: writeLang === l ? 700 : 400, cursor: "pointer",
-                    transition: "all 0.12s",
+                    padding: "7px 13px", borderRadius: 999, fontSize: 13,
+                    border: `2px solid ${writeLang === l ? "#F59E0B" : "#FDE68A"}`,
+                    background: writeLang === l ? "#FEF3C7" : "#fff",
+                    color: writeLang === l ? "#B45309" : "#92400E99",
+                    fontWeight: writeLang === l ? 900 : 700, cursor: "pointer",
+                    transition: "all 0.12s", minHeight: 36,
                   }}
                 >
                   {LANGUAGES[l]?.flag} {LANGUAGES[l]?.label}
                 </button>
               ))}
             </div>
+            {/* BIG voice input — priority for non-readers */}
+            <button
+              type="button"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isTranscribing}
+              aria-pressed={isRecording}
+              aria-label={t("voiceInput", lang)}
+              style={{
+                width: "100%", minHeight: 72, borderRadius: 20, marginBottom: 12,
+                border: "none",
+                background: isRecording
+                  ? "linear-gradient(135deg, #EF4444, #DC2626)"
+                  : "linear-gradient(135deg, #FB7185, #EC4899)",
+                color: "#fff",
+                fontWeight: 900, fontSize: 19,
+                cursor: isTranscribing ? "wait" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
+                boxShadow: isRecording ? "0 10px 28px rgba(239,68,68,0.4)" : "0 10px 28px rgba(251,113,133,0.4)",
+                transition: "all 0.15s",
+                opacity: isTranscribing ? 0.6 : 1,
+              }}
+            >
+              {isRecording ? (
+                <>
+                  <span style={{
+                    display: "inline-block", width: 14, height: 14, borderRadius: "50%",
+                    background: "#fff", animation: "pulse 1s infinite",
+                  }} />
+                  {t("recording", lang)}
+                </>
+              ) : isTranscribing ? (
+                <>⟳ {t("transcribing", lang)}</>
+              ) : (
+                <><span style={{ fontSize: 30 }}>🎤</span> {t("voiceInput", lang)}</>
+              )}
+            </button>
+
+            <div style={{ textAlign: "center", margin: "2px 0 10px", fontSize: 13, color: "#92400E99", fontWeight: 700 }}>
+              ─── 또는 글로 쓰기 ───
+            </div>
+
             <textarea
               ref={textareaRef}
               value={inputText}
@@ -497,59 +544,21 @@ export default function PostModal({
               placeholder={`${LANGUAGES[writeLang]?.flag} ${LANGUAGES[writeLang]?.label}...`}
               rows={4}
               style={{
-                width: "100%", padding: "14px 16px", borderRadius: 14,
-                border: "2px solid #E5E7EB", fontSize: 15, resize: "none",
+                width: "100%", padding: "16px 18px", borderRadius: 18,
+                border: "3px solid #FDE68A", fontSize: 17, resize: "none",
                 boxSizing: "border-box", lineHeight: 1.65,
-                outline: "none", transition: "all 0.18s", color: "#111827",
-                background: "#F9FAFB", fontWeight: 500,
+                outline: "none", transition: "all 0.18s", color: "#1F2937",
+                background: "#fff", fontWeight: 500,
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = accent;
-                e.target.style.background = "#fff";
-                e.target.style.boxShadow = `0 0 0 4px ${accent}14`;
+                e.target.style.borderColor = "#F59E0B";
+                e.target.style.boxShadow = "0 0 0 5px rgba(245,158,11,0.18)";
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = "#E5E7EB";
-                e.target.style.background = "#F9FAFB";
+                e.target.style.borderColor = "#FDE68A";
                 e.target.style.boxShadow = "none";
               }}
             />
-
-            {/* Voice input */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-              <button
-                type="button"
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isTranscribing}
-                aria-pressed={isRecording}
-                aria-label={t("voiceInput", lang)}
-                style={{
-                  padding: "9px 14px", borderRadius: 11,
-                  border: `1.5px solid ${isRecording ? "#EF4444" : "#E5E7EB"}`,
-                  background: isRecording ? "#FEF2F2" : "#F9FAFB",
-                  color: isRecording ? "#EF4444" : "#6B7280",
-                  fontWeight: 700, fontSize: 13,
-                  cursor: isTranscribing ? "wait" : "pointer",
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  transition: "all 0.15s",
-                  opacity: isTranscribing ? 0.6 : 1,
-                }}
-              >
-                {isRecording ? (
-                  <>
-                    <span style={{
-                      display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-                      background: "#EF4444", animation: "pulse 1s infinite",
-                    }} />
-                    {t("recording", lang)}
-                  </>
-                ) : isTranscribing ? (
-                  t("transcribing", lang)
-                ) : (
-                  t("voiceInput", lang)
-                )}
-              </button>
-            </div>
           </>
         )}
 
@@ -727,18 +736,18 @@ export default function PostModal({
               disabled={btnDisabled}
               aria-busy={uploading || posting || compressing}
               style={{
-                padding: "12px 28px", borderRadius: 13, fontSize: 14,
+                padding: "18px 28px", borderRadius: 20, fontSize: 19, minHeight: 60,
                 background: btnDisabled
                   ? "#F3F4F6"
-                  : `linear-gradient(135deg, ${accent}, #9B59B6)`,
+                  : "linear-gradient(135deg, #F59E0B, #D97706)",
                 color: btnDisabled ? "#CBD5E1" : "#fff",
-                fontWeight: 800, border: "none",
+                fontWeight: 900, border: "none",
                 cursor: btnDisabled ? "not-allowed" : "pointer",
-                boxShadow: !btnDisabled ? `0 4px 20px ${accent}44` : "none",
+                boxShadow: !btnDisabled ? "0 10px 28px rgba(245,158,11,0.4), inset 0 -3px 0 rgba(0,0,0,0.15)" : "none",
                 transition: "all 0.18s", letterSpacing: -0.2,
               }}
             >
-              {btnLabel}
+              {btnDisabled ? btnLabel : `🐝 ${btnLabel}`}
             </button>
           </div>
         )}
