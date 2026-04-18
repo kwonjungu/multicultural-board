@@ -632,12 +632,12 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         gap: 14, boxShadow: "0 2px 10px rgba(245,158,11,0.06)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{
-            width: 46, height: 46, borderRadius: 16,
-            background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 26, boxShadow: "0 6px 16px rgba(245,158,11,0.45)", flexShrink: 0,
-          }}>🐝</div>
+          <img
+            src="/mascot/bee-cheer.png"
+            alt=""
+            aria-hidden="true"
+            style={{ width: 52, height: 52, flexShrink: 0, filter: "drop-shadow(0 6px 14px rgba(245,158,11,0.35))" }}
+          />
           <div>
             <div style={{ fontWeight: 900, fontSize: 19, color: "#111827", letterSpacing: -0.4, lineHeight: 1.1 }}>
               꿀벌 소통창
@@ -920,7 +920,12 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px 6px", background: "#FFFEF7", scrollbarWidth: "thin", scrollbarColor: "#FDE68A transparent" }}>
                 {colCards.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "44px 16px", color: "#D1D5DB" }}>
-                    <div style={{ fontSize: 44, marginBottom: 12, opacity: 0.7 }}>🐝</div>
+                    <img
+                      src="/mascot/bee-sleep.png"
+                      alt=""
+                      aria-hidden="true"
+                      style={{ width: 92, height: 92, display: "block", margin: "0 auto 12px", opacity: 0.85 }}
+                    />
                     <div style={{ fontWeight: 800, color: "#6B7280", fontSize: 16 }}>{t("noPosts", lang)}</div>
                     <div style={{ fontSize: 14, marginTop: 6, color: "#9CA3AF", fontWeight: 600 }}>{t("addBelowHint", lang)}</div>
                   </div>

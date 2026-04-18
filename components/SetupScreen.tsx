@@ -66,7 +66,16 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
         {/* Top header with mascot */}
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
-            <BeeMascot size={100} mood="welcome" />
+            <img
+              src="/mascot/bee-welcome.png"
+              alt=""
+              aria-hidden="true"
+              style={{
+                width: 128, height: 128, display: "block",
+                filter: "drop-shadow(0 8px 20px rgba(245,158,11,0.35))",
+                animation: "heroBeeFloat 3s ease-in-out infinite",
+              }}
+            />
           </div>
           <h1 style={{ margin: 0, fontSize: 30, fontWeight: 900, color: "#1F2937", letterSpacing: -0.6 }}>
             어서 와요!

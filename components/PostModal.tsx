@@ -367,7 +367,15 @@ export default function PostModal({
 
         {/* Header w/ mascot */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-          <BeeMascot size={48} mood={isEdit ? "think" : "cheer"} />
+          <img
+            src={`/mascot/bee-${isEdit ? "think" : "cheer"}.png`}
+            alt=""
+            aria-hidden="true"
+            style={{
+              width: 60, height: 60, display: "block", flexShrink: 0,
+              filter: "drop-shadow(0 6px 14px rgba(245,158,11,0.3))",
+            }}
+          />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div id="post-modal-title" style={{ fontWeight: 900, fontSize: 19, color: "#1F2937", letterSpacing: -0.3, lineHeight: 1.2 }}>
               {isEdit ? t("editCard", lang) : "무엇을 할까?"}

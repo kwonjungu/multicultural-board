@@ -261,10 +261,19 @@ export default function Home() {
             {/* Hero: big mascot + 2 CTAs */}
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div style={{ display: "inline-block", position: "relative", marginBottom: 10 }}>
-                <BeeMascot size={140} mood="welcome" />
+                <img
+                  src="/mascot/bee-welcome.png"
+                  alt=""
+                  aria-hidden="true"
+                  style={{
+                    width: 180, height: 180, display: "block",
+                    filter: "drop-shadow(0 10px 24px rgba(245,158,11,0.35))",
+                    animation: "heroBeeFloat 3s ease-in-out infinite",
+                  }}
+                />
                 <div style={{
-                  position: "absolute", top: -4, right: -80,
-                  background: "#fff", padding: "9px 14px", borderRadius: 18,
+                  position: "absolute", top: 8, right: -60,
+                  background: "#fff", padding: "10px 16px", borderRadius: 20,
                   borderBottomLeftRadius: 4,
                   boxShadow: "0 6px 20px rgba(180,83,9,0.18)",
                   border: "2px solid #FDE68A",
@@ -348,7 +357,12 @@ export default function Home() {
                   {SUB_TITLE[tab]}
                 </div>
               </div>
-              <BeeMascot size={40} mood={tab === "pptx" ? "loading" : tab === "create" ? "shh" : "cheer"} />
+              <img
+                src={`/mascot/bee-${tab === "pptx" ? "loading" : tab === "create" ? "shh" : "cheer"}.png`}
+                alt=""
+                aria-hidden="true"
+                style={{ width: 52, height: 52, flexShrink: 0, filter: "drop-shadow(0 4px 12px rgba(245,158,11,0.3))" }}
+              />
             </div>
           </>
         )}

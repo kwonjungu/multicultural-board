@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           *, *::before, *::after { box-sizing: border-box; }
           body { color: #111827; }
           button, input, textarea, select { font-family: inherit; }
-          *:focus-visible { outline: 2px solid #6C63FF; outline-offset: 2px; border-radius: 4px; }
+          *:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; border-radius: 4px; }
 
           @keyframes spin { to { transform: rotate(360deg); } }
           @keyframes slideUp {
@@ -37,11 +37,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             0%, 100% { opacity: 1; }
             50%       { opacity: 0.5; }
           }
+          @keyframes heroBeeFloat {
+            0%, 100% { transform: translateY(0) rotate(-2deg); }
+            50%      { transform: translateY(-8px) rotate(3deg); }
+          }
 
           ::-webkit-scrollbar { width: 4px; height: 4px; }
-          ::-webkit-scrollbar-thumb { background: #D1D5E0; border-radius: 4px; }
+          ::-webkit-scrollbar-thumb { background: #FDE68A; border-radius: 4px; }
           ::-webkit-scrollbar-track { background: transparent; }
-          ::selection { background: #5B57F522; }
+          ::selection { background: #F59E0B33; }
         `}</style>
       </body>
     </html>
