@@ -127,8 +127,9 @@ export default function PadletCard({
 
   // Comment state
   const [commentsOpen, setCommentsOpen] = useState(false);
-  // Local like state (세션 동안만; Firebase 저장은 추후 과제)
-  const [likedLocal, setLikedLocal] = useState(false);
+  // Like state (Firebase 영구화)
+  const [likedByMe, setLikedByMe] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const [likeBump, setLikeBump] = useState(0);
   const [comments, setComments] = useState<CommentData[]>([]);
   const [commentCount, setCommentCount] = useState(0);
@@ -142,6 +143,38 @@ export default function PadletCard({
     const interval = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Likes listener — always subscribed so the count is visible
+  useEffect(() => {
+    const db = getClientDb();
+    const likesRef = ref(db, `rooms/${roomCode}/cards/${card.id}/likes`);
+    const unsub = onValue(likesRef, (snap) => {
+      const data = (snap.val() as Record<string, boolean> | null) || {};
+      const count = Object.values(data).filter(Boolean).length;
+      setLikeCount(count);
+      setLikedByMe(!!myClientId && !!data[myClientId]);
+    });
+    return () => { off(likesRef); void unsub; };
+  }, [roomCode, card.id, myClientId]);
+
+  async function toggleLike() {
+    if (!myClientId) return;
+    const db = getClientDb();
+    const myLikeRef = ref(db, `rooms/${roomCode}/cards/${card.id}/likes/${myClientId}`);
+    setLikeBump((n) => n + 1);
+    // optimistic flip
+    const next = !likedByMe;
+    setLikedByMe(next);
+    setLikeCount((c) => c + (next ? 1 : -1));
+    try {
+      if (next) await set(myLikeRef, true);
+      else await remove(myLikeRef);
+    } catch {
+      // revert on failure
+      setLikedByMe(!next);
+      setLikeCount((c) => c + (next ? -1 : 1));
+    }
+  }
 
   // Comment listener (only when open)
   useEffect(() => {
@@ -529,23 +562,23 @@ export default function PadletCard({
 
         <button
           type="button"
-          onClick={() => {
-            setLikedLocal((v) => !v);
-            setLikeBump((n) => n + 1);
-          }}
-          aria-pressed={likedLocal}
-          aria-label="좋아요"
+          onClick={toggleLike}
+          disabled={!myClientId}
+          aria-pressed={likedByMe}
+          aria-label={likedByMe ? "좋아요 취소" : "좋아요"}
           style={{
             flex: 1, minHeight: 44, borderRadius: 12,
-            background: likedLocal ? "#FEE2E2" : "#fff",
-            border: `2px solid ${likedLocal ? "#FB7185" : "#FECDD3"}`,
-            color: likedLocal ? "#BE123C" : "#FB7185", fontSize: 14, fontWeight: 900,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+            background: likedByMe ? "#FEE2E2" : "#fff",
+            border: `2px solid ${likedByMe ? "#FB7185" : "#FECDD3"}`,
+            color: likedByMe ? "#BE123C" : "#FB7185", fontSize: 14, fontWeight: 900,
+            cursor: myClientId ? "pointer" : "not-allowed",
+            opacity: myClientId ? 1 : 0.6,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
             transition: "all 0.15s",
             animation: likeBump > 0 ? "likeBump 0.45s ease" : undefined,
           }}
           onAnimationEnd={() => setLikeBump(0)}
-        >{likedLocal ? "❤️" : "🤍"} <span style={{ fontSize: 13 }}>좋아요</span></button>
+        >{likedByMe ? "❤️" : "🤍"} <span style={{ fontSize: 13 }}>{likeCount > 0 ? likeCount : "좋아요"}</span></button>
 
         <button
           type="button"
