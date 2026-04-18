@@ -127,3 +127,40 @@ export interface PresenceEntry {
   lastSeen: number;
   submitted: boolean;
 }
+
+// === Praise Sticker ("칭찬 스티커") system ===
+export type StickerType = "helpful" | "brave" | "creative" | "cooperative" | "persistent" | "curious";
+export type Stage = "egg" | "larva" | "pupa" | "bee" | "queen";
+export type SkinId = "classic" | "orange" | "green" | "sky" | "pink" | "purple";
+export type HatId = "top" | "cap" | "ribbon" | "crown" | null;
+export type PetId = "dog" | "cat" | "rabbit" | "butterfly" | null;
+export type TrophyId = "gold" | "star" | null;
+
+export interface IndividualSticker {
+  id: string;
+  type: StickerType;
+  fromTeacherName: string;
+  fromTeacherId: string;
+  timestamp: number;
+}
+
+export interface TeamSticker {
+  id: string;
+  type: StickerType;
+  fromTeacherName: string;
+  fromTeacherId: string;
+  contributorClientId: string;
+  timestamp: number;
+}
+
+export interface StickerGoal {
+  target: number;
+  seasonStart: number;
+}
+
+export interface StudentCosmetics {
+  skin: SkinId;
+  hat: HatId;
+  pet: PetId;
+  trophy: TrophyId;
+}

@@ -1,14 +1,15 @@
 "use client";
 
 import { UserConfig } from "@/lib/types";
+import { t, tFmt } from "@/lib/i18n";
 
 export type HubView = "board" | "interpreter" | "games" | "dashboard";
 
 interface SectionMeta {
   id: HubView;
-  title: string;
+  titleKey: string;
   sub: string;
-  description: string;
+  descKey: string;
   mascot: string;
   color: string;
   bg: string;
@@ -19,9 +20,9 @@ interface SectionMeta {
 const SECTIONS: SectionMeta[] = [
   {
     id: "board",
-    title: "소통창",
+    titleKey: "hubSectionBoard",
     sub: "Padlet",
-    description: "친구들과 이야기를 나눠요",
+    descKey: "hubSectionBoardDesc",
     mascot: "/mascot/bee-cheer.png",
     color: "#F59E0B",
     bg: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
@@ -29,9 +30,9 @@ const SECTIONS: SectionMeta[] = [
   },
   {
     id: "interpreter",
-    title: "실시간 통역",
+    titleKey: "hubSectionInterp",
     sub: "Interpreter",
-    description: "말하면 친구 말로 바꿔줘요",
+    descKey: "hubSectionInterpDesc",
     mascot: "/mascot/bee-think.png",
     color: "#3B82F6",
     bg: "linear-gradient(135deg, #DBEAFE, #BFDBFE)",
@@ -40,9 +41,9 @@ const SECTIONS: SectionMeta[] = [
   },
   {
     id: "games",
-    title: "소통의 게임",
+    titleKey: "hubSectionGames",
     sub: "Games",
-    description: "같이 놀면서 친해져요",
+    descKey: "hubSectionGamesDesc",
     mascot: "/mascot/bee-celebrate.png",
     color: "#FB7185",
     bg: "linear-gradient(135deg, #FFE4E6, #FECDD3)",
@@ -50,9 +51,9 @@ const SECTIONS: SectionMeta[] = [
   },
   {
     id: "dashboard",
-    title: "우리반 현황판",
-    sub: "Dashboard",
-    description: "준비 중이에요",
+    titleKey: "hubSectionStickers",
+    sub: "Praise Hive",
+    descKey: "hubSectionStickersDesc",
     mascot: "/mascot/bee-welcome.png",
     color: "#10B981",
     bg: "linear-gradient(135deg, #D1FAE5, #A7F3D0)",
@@ -69,6 +70,7 @@ interface Props {
 }
 
 export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
+  const lang = user.myLang;
   return (
     <div style={{
       minHeight: "100vh",
@@ -104,14 +106,19 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-              안녕, {user.myName}!
+              {tFmt("hubGreeting", lang, { name: user.myName })}
             </div>
             <div style={{ fontSize: 12, color: "#92400E", fontWeight: 700, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ background: "#FEF3C7", padding: "2px 8px", borderRadius: 999, fontWeight: 900, color: "#B45309" }}>
                 🚪 {roomCode}
               </span>
-              {user.isTeacher ? <span style={{ background: "#ECFDF5", color: "#065F46", padding: "2px 8px", borderRadius: 999, fontWeight: 900 }}>👩‍🏫 선생님</span>
-                              : <span>🎒 학생</span>}
+              {user.isTeacher ? (
+                <span style={{ background: "#ECFDF5", color: "#065F46", padding: "2px 8px", borderRadius: 999, fontWeight: 900 }}>
+                  👩‍🏫 {t("roleTeacher", lang)}
+                </span>
+              ) : (
+                <span>🎒 {t("roleStudent", lang)}</span>
+              )}
             </div>
           </div>
           <button
@@ -128,10 +135,10 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
         {/* Greeting */}
         <div style={{ textAlign: "center", marginBottom: 22 }}>
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: "#1F2937", letterSpacing: -0.4 }}>
-            오늘은 뭐 할까?
+            {t("hubToday", lang)}
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 14, color: "#92400E", fontWeight: 700 }}>
-            하고 싶은 걸 골라봐요 🐝
+            {t("hubPrompt", lang)}
           </p>
         </div>
 
@@ -185,7 +192,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
                 {/* Title + sub */}
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 22, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-                    {s.title}
+                    {t(s.titleKey, lang)}
                   </div>
                   <div style={{ fontSize: 11, fontWeight: 900, color: s.accent, letterSpacing: 1, marginTop: 2 }}>
                     {s.sub}
@@ -197,7 +204,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
                   textAlign: "center", fontSize: 13, color: s.accent, fontWeight: 700,
                   marginTop: "auto", lineHeight: 1.5,
                 }}>
-                  {s.description}
+                  {t(s.descKey, lang)}
                 </div>
 
                 {/* Badge */}
@@ -217,7 +224,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
                     fontSize: 10, fontWeight: 900, color: "#6B7280",
                     background: "#F3F4F6", padding: "3px 8px", borderRadius: 999,
                     letterSpacing: 0.5,
-                  }}>🔒 곧 나와요</div>
+                  }}>{t("hubSoon", lang)}</div>
                 )}
               </button>
             );

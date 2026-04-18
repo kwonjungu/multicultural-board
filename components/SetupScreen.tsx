@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { UserConfig, RoomConfig } from "@/lib/types";
-import { t } from "@/lib/i18n";
+import { t, tFmt } from "@/lib/i18n";
 import { landmarkFor } from "@/lib/assets";
 
 interface Props {
@@ -97,7 +97,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
           )}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 900, color: "#92400E", letterSpacing: 1 }}>
-              {stepNum}/3 단계
+              {tFmt("stepOfN", myLang, { n: stepNum, total: 3 })}
             </div>
             <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
               {[1,2,3].map((i) => (
@@ -128,7 +128,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                     animation: "heroBeeFloat 3s ease-in-out infinite" }}/>
               </div>
               <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: "#1F2937", letterSpacing: -0.5 }}>
-                어느 나라 말을 쓰니?
+                {t("langStepTitle", myLang)}
               </h1>
               <p style={{ margin: "6px 0 0", fontSize: 15, color: "#92400E", fontWeight: 700 }}>
                 {LANGUAGES[myLang]?.greet || "안녕!"} 👋
@@ -188,7 +188,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 color: "#fff", fontSize: 20, fontWeight: 900, cursor: "pointer",
                 boxShadow: "0 10px 28px rgba(245,158,11,0.42), inset 0 -3px 0 rgba(0,0,0,0.15)",
               }}
-            >다음 →</button>
+            >{t("nextBtn", myLang)}</button>
           </>
         )}
 
@@ -201,10 +201,10 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                   style={{ width: 96, height: 96, filter: "drop-shadow(0 6px 16px rgba(245,158,11,0.35))" }}/>
               </div>
               <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: "#1F2937", letterSpacing: -0.5 }}>
-                누구예요?
+                {t("roleStepTitle", myLang)}
               </h1>
               <p style={{ margin: "6px 0 0", fontSize: 15, color: "#92400E", fontWeight: 700 }}>
-                하나만 골라요
+                {t("rolePickOne", myLang)}
               </p>
             </div>
 
@@ -227,9 +227,10 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                   boxShadow: role === "student" ? "0 8px 20px rgba(245,158,11,0.3)" : "0 2px 6px rgba(0,0,0,0.04)",
                 }}
               >
-                <div style={{ fontSize: 48 }}>🎒</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937" }}>학생</div>
-                <div style={{ fontSize: 12, color: "#92400E", fontWeight: 700 }}>친구들과 이야기해요</div>
+                <img src="/mascot/bee-student.png" alt="" aria-hidden="true"
+                  style={{ width: 68, height: 68, filter: "drop-shadow(0 4px 10px rgba(245,158,11,0.3))" }}/>
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937" }}>🎒 {t("roleStudent", myLang)}</div>
+                <div style={{ fontSize: 12, color: "#92400E", fontWeight: 700 }}>{t("roleStudentDesc", myLang)}</div>
               </button>
               <button
                 onClick={() => setRole("teacher")}
@@ -243,16 +244,17 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                   boxShadow: role === "teacher" ? "0 8px 20px rgba(16,185,129,0.3)" : "0 2px 6px rgba(0,0,0,0.04)",
                 }}
               >
-                <div style={{ fontSize: 48 }}>👩‍🏫</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937" }}>선생님</div>
-                <div style={{ fontSize: 12, color: "#065F46", fontWeight: 700 }}>교실을 관리해요</div>
+                <img src="/mascot/bee-teacher.png" alt="" aria-hidden="true"
+                  style={{ width: 68, height: 68, filter: "drop-shadow(0 4px 10px rgba(16,185,129,0.3))" }}/>
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937" }}>👩‍🏫 {t("roleTeacher", myLang)}</div>
+                <div style={{ fontSize: 12, color: "#065F46", fontWeight: 700 }}>{t("roleTeacherDesc", myLang)}</div>
               </button>
             </div>
 
             {role === "teacher" && (
               <div style={{ marginBottom: 16 }}>
                 <p style={{ margin: "0 0 10px", fontSize: 14, color: "#6B7280", fontWeight: 700 }}>
-                  🔐 선생님 암호
+                  {t("teacherCodeLabel", myLang)}
                 </p>
                 <input
                   type="password"
@@ -272,7 +274,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 />
                 {codeError && (
                   <p style={{ margin: "8px 0 0", fontSize: 14, color: "#EF4444", fontWeight: 800 }}>
-                    앗, 암호가 달라요. 다시 확인해 주세요 🔍
+                    {t("teacherCodeError", myLang)}
                   </p>
                 )}
               </div>
@@ -296,7 +298,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                     ? "0 10px 28px rgba(16,185,129,0.4), inset 0 -3px 0 rgba(0,0,0,0.15)"
                     : "0 10px 28px rgba(245,158,11,0.42), inset 0 -3px 0 rgba(0,0,0,0.15)",
               }}
-            >다음 →</button>
+            >{t("nextBtn", myLang)}</button>
           </>
         )}
 
@@ -309,10 +311,10 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                   style={{ width: 96, height: 96, filter: "drop-shadow(0 6px 16px rgba(245,158,11,0.35))" }}/>
               </div>
               <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: "#1F2937", letterSpacing: -0.5 }}>
-                내 이름은?
+                {t("nameStepTitle", myLang)}
               </h1>
               <p style={{ margin: "6px 0 0", fontSize: 15, color: "#92400E", fontWeight: 700 }}>
-                친구들이 이 이름을 볼 거예요
+                {t("nameStepSub", myLang)}
               </p>
             </div>
 
@@ -322,14 +324,14 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 background: "#FEF2F2", border: "2px dashed #FCA5A5",
                 textAlign: "center", fontSize: 14, color: "#B91C1C", fontWeight: 800, lineHeight: 1.55,
               }}>
-                😥 선생님이 아직 학생 이름을 설정하지 않았어요.
-                <br/>선생님께 알려 주세요!
+                {t("noRoster", myLang)}
+                <br/>{t("noRosterSub", myLang)}
               </div>
             )}
             {role === "student" && rosterList.length > 0 ? (
               <div style={{ marginBottom: 18 }}>
                 <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: "#92400E" }}>
-                  우리 반 친구들 ({rosterList.length}명) — 내 이름을 눌러봐
+                  {t("classmatesHint", myLang)} ({rosterList.length})
                 </p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 320, overflowY: "auto" }}>
                   {rosterList.map((name) => {
@@ -362,7 +364,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 value={myName}
                 onChange={(e) => setMyName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && finish()}
-                placeholder="선생님 이름 (예: 김선생)"
+                placeholder={t("teacherNamePlaceholder", myLang)}
                 autoFocus
                 style={{
                   width: "100%", padding: "18px 22px", borderRadius: 20,
@@ -408,7 +410,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                     : "0 10px 28px rgba(245,158,11,0.45), inset 0 -4px 0 rgba(0,0,0,0.15)",
               }}
             >
-              {role === "teacher" ? "👩‍🏫 선생님으로 들어가기" : "🐝 놀러 가기!"}
+              {role === "teacher" ? t("enterAsTeacher", myLang) : t("enterAsStudent", myLang)}
             </button>
           </>
         )}
