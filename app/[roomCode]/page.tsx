@@ -14,10 +14,35 @@ const ALL_LANGS = Object.keys(LANGUAGES);
 export default function RoomPage() {
   const params = useParams();
   const roomCode = params.roomCode as string;
-  const [user, setUser] = useState<UserConfig | null>(null);
+  const setupKey = `setup:${roomCode}`;
+  const [user, setUserState] = useState<UserConfig | null>(null);
   const [roomLangs, setRoomLangs] = useState<string[]>(ALL_LANGS);
   const [roomConfig, setRoomConfig] = useState<RoomConfig>({ languages: ALL_LANGS });
   const [langsLoaded, setLangsLoaded] = useState(false);
+
+  // 재방문 시 저장된 설정으로 바로 보드 입장
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem(setupKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as UserConfig;
+        if (parsed && parsed.myLang && parsed.myName) {
+          setUserState(parsed);
+        }
+      }
+    } catch {/* ignore */}
+  }, [setupKey]);
+
+  function setUser(next: UserConfig | null) {
+    setUserState(next);
+    if (typeof window === "undefined") return;
+    if (next) {
+      try { localStorage.setItem(setupKey, JSON.stringify(next)); } catch {}
+    } else {
+      try { localStorage.removeItem(setupKey); } catch {}
+    }
+  }
 
   const [myClientId] = useState(() => {
     if (typeof window === "undefined") return "";
