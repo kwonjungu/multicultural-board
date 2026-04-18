@@ -564,7 +564,7 @@ function ResponseCard({ resp, idx, myLang }: { resp: SessionResponse; idx: numbe
 type FruitKind = {
   id: string; bg: string; edge: string; shine: string; stem: string; leaf: string;
   w: number; h: number;
-  path: (s: { bg: string; edge: string }) => React.ReactElement;
+  path: (s: { bg: string; edge: string; stem: string }) => React.ReactElement;
 };
 
 const FRUIT_KINDS: FruitKind[] = [
@@ -628,7 +628,7 @@ function Fruit({ kind, scale = 1 }: { kind: FruitKind; scale?: number }) {
         <path d="M0 0 Q10 -2 14 6 Q8 8 0 0 Z" fill={leaf}/>
       </g>
       <g transform="translate(0 8)">
-        {path({ bg, edge })}
+        {path({ bg, edge, stem })}
         <ellipse cx={w / 2} cy={h / 2 + 10} rx={w * 0.38} ry={5} fill={edge} opacity="0.15"/>
         <ellipse cx={w * 0.38} cy={h * 0.35} rx={w * 0.12} ry={h * 0.16} fill={shine} opacity="0.75"/>
         <circle cx={w * 0.28} cy={h * 0.26} r={2} fill="#fff" opacity="0.9"/>
