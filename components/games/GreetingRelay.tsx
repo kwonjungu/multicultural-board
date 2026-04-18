@@ -74,11 +74,11 @@ export default function GreetingRelay({ langA, langB }: { langA: string; langB: 
         padding: "26px 20px", borderRadius: 18, textAlign: "center",
         marginBottom: 18, boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
       }}>
-        <div style={{ fontSize: 10, color: "#5B57F5", fontWeight: 800, letterSpacing: 1 }}>
+        <div style={{ fontSize: 10, color: "#F59E0B", fontWeight: 800, letterSpacing: 1 }}>
           🎧 {cur.askLang.toUpperCase()}로 들려요 → {cur.answerLang.toUpperCase()}로 고르세요
         </div>
         <button onClick={replay} style={{
-          marginTop: 10, background: "#5B57F5", color: "#fff", border: "none",
+          marginTop: 10, background: "#F59E0B", color: "#fff", border: "none",
           padding: "10px 24px", borderRadius: 99, cursor: "pointer",
           fontSize: 14, fontWeight: 800,
         }}>🔊 다시 듣기</button>

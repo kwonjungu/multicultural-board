@@ -185,7 +185,7 @@ export default function AdminPage() {
             >← 돌아가기</button>
             <button
               onClick={handleLogin}
-              style={{ flex: 1, padding: "12px 0", borderRadius: 12, background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", fontSize: 14, boxShadow: "0 4px 16px rgba(91,87,245,0.4)" }}
+              style={{ flex: 1, padding: "12px 0", borderRadius: 12, background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", fontSize: 14, boxShadow: "0 4px 16px rgba(245,158,11,0.4)" }}
             >로그인</button>
           </div>
         </div>
@@ -205,7 +205,7 @@ export default function AdminPage() {
         borderBottom: "1px solid rgba(255,255,255,0.07)",
         display: "flex", alignItems: "center", padding: "0 24px", gap: 12,
       }}>
-        <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>🔧</div>
+        <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg, #F59E0B, #D97706)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>🔧</div>
         <div>
           <div style={{ fontWeight: 900, fontSize: 14, color: "#F9FAFB" }}>관리자 패널</div>
           <div style={{ fontSize: 10, color: "#6B7280" }}>다문화 교실 소통판</div>
@@ -270,7 +270,7 @@ export default function AdminPage() {
                 fontSize: 16, textAlign: "center", letterSpacing: 8, fontWeight: 700, outline: "none",
                 transition: "border-color 0.15s",
               }}
-              onFocus={(e) => (e.target.style.borderColor = "#5B57F5")}
+              onFocus={(e) => (e.target.style.borderColor = "#F59E0B")}
               onBlur={(e) => (e.target.style.borderColor = "#E5E7EB")}
             />
             <button
@@ -278,10 +278,10 @@ export default function AdminPage() {
               disabled={newCode.length !== 4 || loading === "create"}
               style={{
                 padding: "11px 22px", borderRadius: 12, fontSize: 14,
-                background: newCode.length === 4 ? "linear-gradient(135deg, #5B57F5, #8B5CF6)" : "#F3F4F6",
+                background: newCode.length === 4 ? "linear-gradient(135deg, #F59E0B, #D97706)" : "#F3F4F6",
                 color: newCode.length === 4 ? "#fff" : "#D1D5DB",
                 fontWeight: 800, border: "none", cursor: newCode.length === 4 ? "pointer" : "not-allowed",
-                boxShadow: newCode.length === 4 ? "0 4px 16px rgba(91,87,245,0.4)" : "none",
+                boxShadow: newCode.length === 4 ? "0 4px 16px rgba(245,158,11,0.4)" : "none",
                 whiteSpace: "nowrap",
               }}
             >
@@ -306,9 +306,9 @@ export default function AdminPage() {
                     )}
                     style={{
                       padding: "5px 10px", borderRadius: 20, fontSize: 11,
-                      border: `1.5px solid ${active ? "#5B57F5" : "#E5E7EB"}`,
+                      border: `1.5px solid ${active ? "#F59E0B" : "#E5E7EB"}`,
                       background: active ? "#EEEEFF" : "#fff",
-                      color: active ? "#5B57F5" : "#9CA3AF",
+                      color: active ? "#F59E0B" : "#9CA3AF",
                       fontWeight: active ? 700 : 400, cursor: "pointer",
                       transition: "all 0.12s",
                     }}
@@ -349,7 +349,7 @@ export default function AdminPage() {
               >
                 <div style={{
                   width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                  background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+                  background: "linear-gradient(135deg, #F59E0B, #D97706)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontWeight: 900, fontSize: 14, color: "#fff", marginRight: 14,
                   boxShadow: "0 4px 12px rgba(91,87,245,0.3)",
@@ -389,7 +389,7 @@ export default function AdminPage() {
                     onClick={() => router.push(`/${room.code}`)}
                     style={{
                       padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      background: "#EEF0FF", color: "#5B57F5", border: "none", cursor: "pointer",
+                      background: "#EEF0FF", color: "#F59E0B", border: "none", cursor: "pointer",
                     }}
                   >
                     열기
@@ -450,9 +450,9 @@ export default function AdminPage() {
             <button
               onClick={() => setQrModal(null)}
               style={{
-                padding: "12px 32px", borderRadius: 12, background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+                padding: "12px 32px", borderRadius: 12, background: "linear-gradient(135deg, #F59E0B, #D97706)",
                 color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", fontSize: 14,
-                boxShadow: "0 4px 16px rgba(91,87,245,0.4)",
+                boxShadow: "0 4px 16px rgba(245,158,11,0.4)",
               }}
             >닫기</button>
           </div>
@@ -496,7 +496,7 @@ export default function AdminPage() {
                   onClick={() => setConfigForm((prev) => ({ ...prev, [item.key]: !prev[item.key] }))}
                   style={{
                     width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                    background: configForm[item.key] ? "#5B57F5" : "#E5E7EB",
+                    background: configForm[item.key] ? "#F59E0B" : "#E5E7EB",
                     position: "relative", transition: "background 0.2s", flexShrink: 0,
                   }}
                 >
@@ -526,7 +526,7 @@ export default function AdminPage() {
                     boxSizing: "border-box", outline: "none", fontFamily: "inherit",
                     color: "#111827", background: "#F9FAFB",
                   }}
-                  onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; }}
+                  onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; }}
                   onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
                 />
               </div>
@@ -542,9 +542,9 @@ export default function AdminPage() {
                 disabled={savingConfig}
                 style={{
                   flex: 2, padding: "12px 0", borderRadius: 12,
-                  background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+                  background: "linear-gradient(135deg, #F59E0B, #D97706)",
                   color: "#fff", fontWeight: 800, border: "none", cursor: savingConfig ? "not-allowed" : "pointer",
-                  fontSize: 14, boxShadow: "0 4px 16px rgba(91,87,245,0.4)",
+                  fontSize: 14, boxShadow: "0 4px 16px rgba(245,158,11,0.4)",
                   opacity: savingConfig ? 0.7 : 1,
                 }}
               >{savingConfig ? "저장 중..." : "저장"}</button>

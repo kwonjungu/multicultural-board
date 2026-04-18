@@ -244,7 +244,7 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
             />
             <div
               onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); (e.currentTarget as HTMLDivElement).style.borderColor = "#5B57F5"; }}
+              onDragOver={(e) => { e.preventDefault(); (e.currentTarget as HTMLDivElement).style.borderColor = "#F59E0B"; }}
               onDragLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#D1D5DB"; }}
               onDrop={(e) => {
                 e.preventDefault();
@@ -259,8 +259,8 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
               }}
               onMouseEnter={(e) => {
                 const el = e.currentTarget as HTMLDivElement;
-                el.style.borderColor = "#5B57F5";
-                el.style.background = "rgba(91,87,245,0.03)";
+                el.style.borderColor = "#F59E0B";
+                el.style.background = "rgba(245,158,11,0.06)";
               }}
               onMouseLeave={(e) => {
                 const el = e.currentTarget as HTMLDivElement;
@@ -293,7 +293,7 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
           }}>
             <div style={{
               width: 44, height: 44, borderRadius: "50%", margin: "0 auto 16px",
-              border: "3px solid #E5E7EB", borderTopColor: "#5B57F5",
+              border: "3px solid #E5E7EB", borderTopColor: "#F59E0B",
               animation: "spin 0.8s linear infinite",
             }} />
             <div style={{ fontWeight: 700, fontSize: 14, color: "#374151" }}>{statusMsg}</div>
@@ -348,9 +348,9 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
                 onClick={download}
                 style={{
                   flex: 2, padding: "11px 0", borderRadius: 11, border: "none",
-                  background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+                  background: "linear-gradient(135deg, #F59E0B, #D97706)",
                   color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer",
-                  boxShadow: "0 4px 16px rgba(91,87,245,0.35)",
+                  boxShadow: "0 4px 16px rgba(245,158,11,0.35)",
                 }}
               >📥 다운로드</button>
             </div>

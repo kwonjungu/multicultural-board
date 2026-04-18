@@ -153,7 +153,7 @@ export default function MarketRolePlay({ langA, langB }: { langA: string; langB:
         <button
           onClick={() => setIdx((i) => i + 1)}
           style={{
-            width: "100%", background: "#5B57F5", color: "#fff", border: "none",
+            width: "100%", background: "#F59E0B", color: "#fff", border: "none",
             padding: 12, borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: "pointer",
           }}
         >다음 →</button>

@@ -172,7 +172,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
           />
           <div
             onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); (e.currentTarget as HTMLDivElement).style.borderColor = "#5B57F5"; }}
+            onDragOver={(e) => { e.preventDefault(); (e.currentTarget as HTMLDivElement).style.borderColor = "#F59E0B"; }}
             onDragLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#D1D5DB"; }}
             onDrop={(e) => {
               e.preventDefault();
@@ -187,8 +187,8 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLDivElement;
-              el.style.borderColor = "#5B57F5";
-              el.style.background = "rgba(91,87,245,0.03)";
+              el.style.borderColor = "#F59E0B";
+              el.style.background = "rgba(245,158,11,0.06)";
             }}
             onMouseLeave={(e) => {
               const el = e.currentTarget as HTMLDivElement;
@@ -217,7 +217,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
         }}>
           <div style={{
             width: 40, height: 40, borderRadius: "50%", margin: "0 auto 14px",
-            border: "3px solid #E5E7EB", borderTopColor: "#5B57F5",
+            border: "3px solid #E5E7EB", borderTopColor: "#F59E0B",
             animation: "spin 0.8s linear infinite",
           }} />
           <div style={{ fontWeight: 700, fontSize: 14, color: "#374151" }}>{statusMsg}</div>
@@ -255,7 +255,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
               </div>
             </div>
             <div style={{ background: "#F0EEFF", borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <div style={{ padding: "8px 12px", fontWeight: 800, fontSize: 11, color: "#5B57F5", background: "#EEF0FF", borderBottom: "1px solid #DDD9FF", letterSpacing: 1 }}>
+              <div style={{ padding: "8px 12px", fontWeight: 800, fontSize: 11, color: "#F59E0B", background: "#EEF0FF", borderBottom: "1px solid #DDD9FF", letterSpacing: 1 }}>
                 {LANGUAGES[toLang]?.flag} 번역
               </div>
               <div style={{ padding: "12px", fontSize: 12, color: "#1E1B4B", lineHeight: 1.8, overflowY: "auto", flex: 1, maxHeight: 250, whiteSpace: "pre-wrap" }}>
@@ -270,7 +270,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
             >↩ 다시 올리기</button>
             <button
               onClick={() => { onPostText(result.translatedText, toLang); onClose(); }}
-              style={{ flex: 2, padding: "10px 0", borderRadius: 11, border: "none", background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 16px rgba(91,87,245,0.35)" }}
+              style={{ flex: 2, padding: "10px 0", borderRadius: 11, border: "none", background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 16px rgba(245,158,11,0.35)" }}
             >📌 번역 게시하기</button>
           </div>
         </div>
@@ -283,7 +283,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
           {showTranslated && (result.blocks?.length ?? 0) > 0 && (
             <div style={{
               display: "flex", alignItems: "center", gap: 6,
-              fontSize: 11, color: "#5B57F5", fontWeight: 700,
+              fontSize: 11, color: "#F59E0B", fontWeight: 700,
               marginBottom: 6, padding: "0 2px",
             }}>
               🔊 <span>번역 줄을 탭하면 {LANGUAGES[fromLang]?.flag} {LANGUAGES[fromLang]?.label}(으)로 읽어줘요</span>
@@ -357,7 +357,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
                           fontWeight: 600,
                           fontFamily: "'Noto Sans KR', sans-serif",
                           transition: "background 0.15s, border-color 0.15s",
-                          boxShadow: active ? "0 2px 10px rgba(91,87,245,0.35)" : "none",
+                          boxShadow: active ? "0 2px 10px rgba(245,158,11,0.35)" : "none",
                         }}
                       >
                         {b.translated}
@@ -412,7 +412,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
                 }
                 onClose();
               }}
-              style={{ flex: 2, padding: "10px 0", borderRadius: 11, border: "none", background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 16px rgba(91,87,245,0.35)" }}
+              style={{ flex: 2, padding: "10px 0", borderRadius: 11, border: "none", background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 16px rgba(245,158,11,0.35)" }}
             >📌 이미지+번역 게시하기</button>
           </div>
         </div>

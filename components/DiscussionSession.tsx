@@ -290,7 +290,7 @@ export default function DiscussionSession({
             {/* Stats */}
             <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
               <StatBox label="접속 중" value={connected.length} color="#10B981" />
-              <StatBox label="제출" value={submittedCount} color="#5B57F5" />
+              <StatBox label="제출" value={submittedCount} color="#F59E0B" />
               <StatBox
                 label="제출률"
                 value={connected.length > 0 ? `${Math.round((submittedCount / connected.length) * 100)}%` : "—"}
@@ -372,7 +372,7 @@ export default function DiscussionSession({
                 background: closing ? "#9CA3AF" : BRAND_GRADIENT,
                 color: "#fff", fontWeight: 800, border: "none",
                 cursor: closing ? "wait" : "pointer",
-                boxShadow: "0 4px 16px rgba(91,87,245,0.4)",
+                boxShadow: "0 4px 16px rgba(245,158,11,0.4)",
               }}
             >
               {closing ? "종료 중..." : `🏁 세션 종료 · 응답 공개 (${submittedCount})`}
@@ -471,7 +471,7 @@ export default function DiscussionSession({
                   background: "#F9FAFB", outline: "none", boxSizing: "border-box",
                   resize: "vertical", fontFamily: "inherit", lineHeight: 1.5,
                 }}
-                onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; }}
+                onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; }}
                 onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
               />
               {error && (
@@ -499,7 +499,7 @@ export default function DiscussionSession({
                 color: !draft.trim() || submitting ? "#D1D5DB" : "#fff",
                 fontWeight: 800, border: "none",
                 cursor: !draft.trim() || submitting ? "not-allowed" : "pointer",
-                boxShadow: !draft.trim() || submitting ? "none" : "0 4px 16px rgba(91,87,245,0.4)",
+                boxShadow: !draft.trim() || submitting ? "none" : "0 4px 16px rgba(245,158,11,0.4)",
               }}
             >
               {submitting ? "제출 중..." : "📨 제출하기"}
@@ -681,14 +681,14 @@ function FruitTree({
         background: "#fff",
         borderRadius: 24,
         padding: "22px 28px",
-        boxShadow: "0 18px 44px rgba(0,0,0,0.22), 0 0 0 4px rgba(91,87,245,0.15)",
+        boxShadow: "0 18px 44px rgba(0,0,0,0.22), 0 0 0 4px rgba(245,158,11,0.18)",
         maxWidth: 360,
         minWidth: 240,
         textAlign: "center",
-        border: "3px solid #5B57F5",
+        border: "3px solid #F59E0B",
       }}>
         <div style={{
-          fontSize: 10, fontWeight: 900, color: "#5B57F5",
+          fontSize: 10, fontWeight: 900, color: "#F59E0B",
           letterSpacing: 1.2, marginBottom: 8,
         }}>
           ❓ 질문

@@ -35,8 +35,8 @@ interface Props {
 }
 
 const COL_COLORS = [
-  "#6C63FF", "#FF6584", "#43C59E", "#F59E0B", "#3B82F6",
-  "#8B5CF6", "#EC4899", "#14B8A6", "#F97316", "#10B981",
+  "#F59E0B", "#FF6584", "#43C59E", "#F59E0B", "#3B82F6",
+  "#D97706", "#EC4899", "#14B8A6", "#F97316", "#10B981",
 ];
 
 export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomConfig, myClientId }: Props) {
@@ -826,8 +826,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   setShowManage(true);
                 }}
                 style={{
-                  background: "#EEF2FF", border: "2px solid #C7D2FE",
-                  color: "#4338CA", borderRadius: 16, padding: "10px 18px",
+                  background: "#FEF3C7", border: "2px solid #FDE68A",
+                  color: "#B45309", borderRadius: 16, padding: "10px 18px",
                   fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
                   transition: "transform 0.12s",
                 }}
@@ -880,13 +880,13 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             }}>
               <div style={{
                 padding: "16px 18px 14px",
-                borderBottom: `3px solid ${col.color}`,
                 display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
-                background: `${col.color}14`,
+                background: `linear-gradient(135deg, ${col.color}, ${col.color}dd)`,
+                color: "#fff",
+                boxShadow: `0 6px 16px ${col.color}55`,
               }}>
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: col.color, flexShrink: 0, boxShadow: `0 0 0 4px ${col.color}22` }} />
-                <span style={{ flex: 1, fontWeight: 900, fontSize: 17, color: "#111827", letterSpacing: -0.3, lineHeight: 1.3 }}>{col.title}</span>
-                <span style={{ background: col.color + "1F", color: col.color, borderRadius: 24, fontSize: 14, fontWeight: 900, padding: "4px 12px", minWidth: 32, textAlign: "center" }}>
+                <span style={{ flex: 1, fontWeight: 900, fontSize: 18, color: "#fff", letterSpacing: -0.3, lineHeight: 1.3, textShadow: "0 1px 2px rgba(0,0,0,0.12)" }}>{col.title}</span>
+                <span style={{ background: "rgba(255,255,255,0.3)", color: "#fff", borderRadius: 999, fontSize: 14, fontWeight: 900, padding: "4px 12px", minWidth: 32, textAlign: "center" }}>
                   {colCards.length}
                 </span>
               </div>
@@ -955,7 +955,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   background: isTeacher && colDeleteActive === col.id ? "#FEF2F2" : "#fff",
                   border: "none",
-                  borderTop: isTeacher && colDeleteActive === col.id ? "1px solid #FECACA" : "1px solid #F3F4F8",
+                  borderTop: isTeacher && colDeleteActive === col.id ? "1px solid #FECACA" : "1px solid #FEF3C7",
                   padding: "13px 0", cursor: "pointer",
                   color: isTeacher && colDeleteActive === col.id ? "#EF4444" : col.color,
                   fontWeight: 800, fontSize: 13,
@@ -1000,7 +1000,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             {/* Modal header */}
             <div style={{
               display: "flex", alignItems: "center", padding: "20px 24px 16px",
-              borderBottom: "1px solid #F3F4F8", position: "sticky", top: 0, background: "#fff", zIndex: 1,
+              borderBottom: "1px solid #FEF3C7", position: "sticky", top: 0, background: "#fff", zIndex: 1,
             }}>
               <div>
                 <div id="modal-title-manage" style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🛠 관리 패널</div>
@@ -1026,7 +1026,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 {/* QR Entry Toggle */}
                 <div style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 0", borderBottom: "1px solid #F3F4F8",
+                  padding: "12px 0", borderBottom: "1px solid #FEF3C7",
                 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{t("qrEntryToggle", lang)}</div>
@@ -1038,7 +1038,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                     }}
                     style={{
                       width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                      background: roomConfigState.qrEntry ? "#5B57F5" : "#E5E7EB",
+                      background: roomConfigState.qrEntry ? "#F59E0B" : "#E5E7EB",
                       position: "relative", transition: "background 0.2s", flexShrink: 0,
                     }}
                   >
@@ -1053,7 +1053,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 {/* Approval Mode Toggle */}
                 <div style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 0", borderBottom: "1px solid #F3F4F8",
+                  padding: "12px 0", borderBottom: "1px solid #FEF3C7",
                 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{t("approvalMode", lang)}</div>
@@ -1065,7 +1065,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                     }}
                     style={{
                       width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                      background: roomConfigState.approvalMode ? "#5B57F5" : "#E5E7EB",
+                      background: roomConfigState.approvalMode ? "#F59E0B" : "#E5E7EB",
                       position: "relative", transition: "background 0.2s", flexShrink: 0,
                     }}
                   >
@@ -1080,7 +1080,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 {/* Roster Mode Toggle */}
                 <div style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 0", borderBottom: "1px solid #F3F4F8",
+                  padding: "12px 0", borderBottom: "1px solid #FEF3C7",
                 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{t("rosterMode", lang)}</div>
@@ -1092,7 +1092,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                     }}
                     style={{
                       width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                      background: roomConfigState.rosterMode ? "#5B57F5" : "#E5E7EB",
+                      background: roomConfigState.rosterMode ? "#F59E0B" : "#E5E7EB",
                       position: "relative", transition: "background 0.2s", flexShrink: 0,
                     }}
                   >
@@ -1121,7 +1121,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                         boxSizing: "border-box", outline: "none", fontFamily: "inherit",
                         color: "#111827", background: "#F9FAFB",
                       }}
-                      onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; }}
+                      onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; }}
                       onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
                     />
                     <button
@@ -1134,7 +1134,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                         marginTop: 8, padding: "9px 20px", borderRadius: 10, border: "none",
                         background: BRAND_GRADIENT, color: "#fff",
                         fontWeight: 800, fontSize: 13, cursor: "pointer",
-                        boxShadow: "0 4px 14px rgba(91,87,245,0.35)",
+                        boxShadow: "0 4px 14px rgba(245,158,11,0.35)",
                       }}
                     >
                       저장
@@ -1151,7 +1151,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
                 {columns.map((col, idx) => (
                   <div key={col.id} style={{
-                    background: "#F8F9FC", borderRadius: 14, padding: "12px 14px",
+                    background: "#FFFBEB", borderRadius: 14, padding: "12px 14px",
                     border: "1px solid #E9ECF5",
                   }}>
                     {/* Row 1: order controls + title */}
@@ -1257,9 +1257,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                         }}
                         style={{
                           padding: "5px 11px", borderRadius: 20, fontSize: 12,
-                          border: `1.5px solid ${active ? "#5B57F5" : "#E5E7EB"}`,
+                          border: `1.5px solid ${active ? "#F59E0B" : "#E5E7EB"}`,
                           background: active ? "#EEEEFF" : "#F9FAFB",
-                          color: active ? "#5B57F5" : "#9CA3AF",
+                          color: active ? "#F59E0B" : "#9CA3AF",
                           fontWeight: active ? 700 : 400, cursor: "pointer",
                           transition: "all 0.12s",
                         }}
@@ -1291,7 +1291,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                       background: "#F9FAFB", outline: "none",
                     }}
                     onFocus={(e) => {
-                      e.target.style.borderColor = "#5B57F5";
+                      e.target.style.borderColor = "#F59E0B";
                       e.target.style.background = "#fff";
                     }}
                     onBlur={(e) => {
@@ -1307,7 +1307,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                       background: newColTitle.trim() ? BRAND_GRADIENT : "#F3F4F6",
                       color: newColTitle.trim() ? "#fff" : "#D1D5DB",
                       fontWeight: 800, fontSize: 13, cursor: newColTitle.trim() ? "pointer" : "not-allowed",
-                      boxShadow: newColTitle.trim() ? "0 4px 14px rgba(91,87,245,0.35)" : "none",
+                      boxShadow: newColTitle.trim() ? "0 4px 14px rgba(245,158,11,0.35)" : "none",
                       whiteSpace: "nowrap",
                     }}
                   >+ 추가</button>
@@ -1410,7 +1410,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               style={{
                 padding: "12px 32px", borderRadius: 12, background: BRAND_GRADIENT,
                 color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", fontSize: 14,
-                boxShadow: "0 4px 16px rgba(91,87,245,0.4)",
+                boxShadow: "0 4px 16px rgba(245,158,11,0.4)",
               }}
             >닫기</button>
           </div>
@@ -1435,7 +1435,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           }}>
             <div style={{
               display: "flex", alignItems: "center", padding: "20px 24px 16px",
-              borderBottom: "1px solid #F3F4F8", position: "sticky", top: 0, background: "#fff", zIndex: 1,
+              borderBottom: "1px solid #FEF3C7", position: "sticky", top: 0, background: "#fff", zIndex: 1,
             }}>
               <div>
                 <div id="modal-title-approval" style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🔔 {t("approvalPending", lang)}</div>
@@ -1573,20 +1573,20 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           <button
             onClick={handleUndo}
             style={{
-              background: "rgba(91,87,245,0.25)",
+              background: "rgba(245,158,11,0.25)",
               border: "1px solid rgba(165,180,252,0.5)",
-              color: "#C7D2FE", borderRadius: 8,
+              color: "#FDE68A", borderRadius: 8,
               padding: "6px 12px", cursor: "pointer",
               fontWeight: 800, fontSize: 13,
               transition: "all 0.15s",
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.5)";
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(245,158,11,0.5)";
               (e.currentTarget as HTMLButtonElement).style.color = "#fff";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(91,87,245,0.25)";
-              (e.currentTarget as HTMLButtonElement).style.color = "#C7D2FE";
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(245,158,11,0.25)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#FDE68A";
             }}
           >
             ↩ 되돌리기

@@ -52,7 +52,7 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
         padding: 22, borderRadius: 18, marginBottom: 18,
         boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
       }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: "#5B57F5", letterSpacing: 1.2, marginBottom: 8 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#F59E0B", letterSpacing: 1.2, marginBottom: 8 }}>
           💭 상황
         </div>
         <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.5 }}>

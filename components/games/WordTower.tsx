@@ -76,7 +76,7 @@ export default function WordTower({ langA, langB }: { langA: string; langB: stri
           padding: "26px 18px", borderRadius: 18, textAlign: "center",
           marginBottom: 14, boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
         }}>
-          <div style={{ fontSize: 11, color: "#5B57F5", fontWeight: 800, letterSpacing: 1, marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: "#F59E0B", fontWeight: 800, letterSpacing: 1, marginBottom: 6 }}>
             {cur.askLang.toUpperCase()} → {cur.ansLang.toUpperCase()}
           </div>
           <div style={{ fontSize: 32 }}>{cur.correct.emoji}</div>

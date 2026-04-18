@@ -116,7 +116,7 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
 }
 
 const pillButton: React.CSSProperties = {
-  background: "#fff", border: "2px solid #5B57F5", color: "#5B57F5",
+  background: "#fff", border: "2px solid #F59E0B", color: "#F59E0B",
   padding: "8px 14px", borderRadius: 99, cursor: "pointer",
   fontSize: 13, fontWeight: 800,
 };

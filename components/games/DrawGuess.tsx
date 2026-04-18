@@ -66,7 +66,7 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
           <button
             onClick={() => { setRound((r) => r + 1); setRevealed(false); }}
             style={{
-              marginTop: 14, background: "#5B57F5", color: "#fff", border: "none",
+              marginTop: 14, background: "#F59E0B", color: "#fff", border: "none",
               padding: "10px 24px", borderRadius: 99, cursor: "pointer",
               fontSize: 14, fontWeight: 800,
             }}

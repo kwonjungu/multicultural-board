@@ -67,7 +67,7 @@ export default function PostModal({
   roomCode,
 }: Props) {
   const lang = user.myLang;
-  const accent = colColor || "#5B57F5";
+  const accent = colColor || "#F59E0B";
 
   const draftKey = editCard ? null : `draft_${roomCode}_${colId}`;
 

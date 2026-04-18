@@ -176,7 +176,7 @@ export default function DiscussionCreateModal({
                 background: "#F9FAFB", outline: "none", boxSizing: "border-box",
                 fontWeight: 600,
               }}
-              onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; }}
+              onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; }}
               onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
             />
           </div>
@@ -197,7 +197,7 @@ export default function DiscussionCreateModal({
                 background: "#F9FAFB", outline: "none", boxSizing: "border-box",
                 resize: "vertical", fontFamily: "inherit",
               }}
-              onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; }}
+              onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; }}
               onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
             />
           </div>
@@ -232,7 +232,7 @@ export default function DiscussionCreateModal({
                   <>
                     <div style={{
                       width: 16, height: 16, borderRadius: "50%",
-                      border: "2px solid rgba(91,87,245,0.25)", borderTopColor: "#5B57F5",
+                      border: "2px solid rgba(245,158,11,0.25)", borderTopColor: "#F59E0B",
                       animation: "spin 0.8s linear infinite",
                     }} />
                     업로드 중...
@@ -283,7 +283,7 @@ export default function DiscussionCreateModal({
                 color: !title.trim() || creating || uploading ? "#D1D5DB" : "#fff",
                 fontWeight: 800, border: "none",
                 cursor: !title.trim() || creating || uploading ? "not-allowed" : "pointer",
-                boxShadow: !title.trim() || creating || uploading ? "none" : "0 4px 16px rgba(91,87,245,0.4)",
+                boxShadow: !title.trim() || creating || uploading ? "none" : "0 4px 16px rgba(245,158,11,0.4)",
               }}
             >
               {creating ? "시작 중..." : "🚀 세션 시작"}

@@ -176,7 +176,7 @@ export default function DrawingCanvas({ onDone }: Props) {
         }}
         style={{
           marginTop: 10, width: "100%", padding: "11px 0", borderRadius: 12,
-          background: "linear-gradient(135deg, #6C63FF, #9B59B6)",
+          background: "linear-gradient(135deg, #F59E0B, #9B59B6)",
           color: "#fff", fontWeight: 900, fontSize: 14, border: "none", cursor: "pointer",
         }}
       >
