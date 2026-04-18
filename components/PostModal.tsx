@@ -84,6 +84,7 @@ export default function PostModal({
     : "text";
 
   const [mode, setMode] = useState<ModalMode>(initialMode);
+  const [showEntry, setShowEntry] = useState<boolean>(!editCard);
   const [inputText, setInputText] = useState(() => {
     if (editCard) return editCard.originalText || "";
     return "";
@@ -446,7 +447,76 @@ export default function PostModal({
           </div>
         )}
 
+        {/* Entry tile selector — "무엇을 할까?" */}
+        {showEntry && !isEdit && (
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+              {[
+                { icon: "✏️", label: "글쓰기", sub: "내 이야기", color: "#F59E0B", bg: "#FEF3C7", target: "text" as ModalMode, voice: false },
+                { icon: "🎤", label: "말하기", sub: "목소리로",   color: "#FB7185", bg: "#FFE4E6", target: "text" as ModalMode, voice: true  },
+                { icon: "📷", label: "사진",   sub: "찰칵!",       color: "#10B981", bg: "#D1FAE5", target: "image" as ModalMode, voice: false },
+                { icon: "🎨", label: "그림",   sub: "쓱쓱",        color: "#A78BFA", bg: "#EDE9FE", target: "drawing" as ModalMode, voice: false },
+              ].map((a) => (
+                <button
+                  key={a.label}
+                  onClick={() => {
+                    setMode(a.target);
+                    setShowEntry(false);
+                    if (a.voice) setTimeout(() => startRecording(), 200);
+                  }}
+                  style={{
+                    minHeight: 124, borderRadius: 22,
+                    background: a.bg, border: `3px solid ${a.color}33`,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    gap: 6, cursor: "pointer", transition: "transform 0.15s",
+                    padding: "10px 8px",
+                  }}
+                  onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                  onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                >
+                  <div style={{ fontSize: 42 }}>{a.icon}</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937" }}>{a.label}</div>
+                  <div style={{ fontSize: 12, color: a.color, fontWeight: 800 }}>{a.sub}</div>
+                </button>
+              ))}
+            </div>
+            {/* 활동지 (worksheet) 진입 — 전체 폭 보조 카드 */}
+            <button
+              onClick={() => { setMode("worksheet"); setShowEntry(false); }}
+              style={{
+                width: "100%", minHeight: 60, borderRadius: 18,
+                background: "#fff", border: "2px dashed #FDE68A",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                cursor: "pointer", fontSize: 15, fontWeight: 800, color: "#B45309",
+                marginBottom: 8, transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#FEF3C7")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#fff")}
+            >📋 활동지 번역</button>
+          </div>
+        )}
+
+        {/* Tabs — 진입 타일 후에만 보임 */}
+        {!showEntry && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          {!isEdit && (
+            <button
+              onClick={() => { setShowEntry(true); }}
+              aria-label="뒤로"
+              style={{
+                width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                background: "#fff", border: "2px solid #FDE68A",
+                fontSize: 16, fontWeight: 900, color: "#92400E", cursor: "pointer",
+              }}
+            >←</button>
+          )}
+          <div style={{ flex: 1 }}/>
+        </div>
+        )}
+
         {/* Tabs */}
+        {!showEntry && (
         <div
           role="tablist"
           style={{ display: "flex", gap: 4, marginBottom: 18, background: "#FEF3C7", borderRadius: 14, padding: 5 }}
@@ -477,8 +547,10 @@ export default function PostModal({
             </button>
           ))}
         </div>
+        )}
 
         {/* Tab panel */}
+        {!showEntry && (
         <div role="tabpanel">
 
         {/* ── 텍스트 모드 ── */}
@@ -731,10 +803,11 @@ export default function PostModal({
             onClose={onClose}
           />
         )}
-        </div>{/* end tabpanel */}
+        </div>
+        )}{/* end tabpanel */}
 
         {/* Bottom submit */}
-        {!(mode === "drawing" && !drawingDataUrl) && mode !== "worksheet" && (
+        {!showEntry && !(mode === "drawing" && !drawingDataUrl) && mode !== "worksheet" && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
             <span style={{ fontSize: 11, color: "#CBD5E1" }}>
               {mode === "text" ? "Ctrl+Enter" : ""}
