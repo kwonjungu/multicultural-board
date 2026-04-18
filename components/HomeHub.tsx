@@ -152,7 +152,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
                 key={s.id}
                 onClick={() => !locked && onSelect(s.id)}
                 disabled={locked}
-                aria-label={`${s.title} 열기`}
+                aria-label={`${t(s.titleKey, lang)} 열기`}
                 style={{
                   position: "relative",
                   background: s.bg,
