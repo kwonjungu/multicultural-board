@@ -13,6 +13,7 @@ import DiscussionCreateModal from "./DiscussionCreateModal";
 import DiscussionSession from "./DiscussionSession";
 import GameRoom from "./GameRoom";
 import InterpreterDrawer from "./InterpreterDrawer";
+import { columnIconFor } from "@/lib/assets";
 import { QRCodeSVG } from "qrcode.react";
 
 type PendingItem =
@@ -905,13 +906,31 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               scrollSnapAlign: "start",
             }}>
               <div style={{
-                padding: "16px 18px 14px",
-                display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
+                padding: "14px 18px 12px",
+                display: "flex", alignItems: "center", gap: 12, flexShrink: 0,
                 background: `linear-gradient(135deg, ${col.color}, ${col.color}dd)`,
                 color: "#fff",
                 boxShadow: `0 6px 16px ${col.color}55`,
               }}>
-                <span style={{ flex: 1, fontWeight: 900, fontSize: 18, color: "#fff", letterSpacing: -0.3, lineHeight: 1.3, textShadow: "0 1px 2px rgba(0,0,0,0.12)" }}>{col.title}</span>
+                {(() => {
+                  const iconSrc = columnIconFor(col.title);
+                  if (iconSrc) {
+                    return (
+                      <img
+                        src={iconSrc}
+                        alt=""
+                        aria-hidden="true"
+                        style={{
+                          width: 42, height: 42, flexShrink: 0,
+                          background: "rgba(255,255,255,0.9)", borderRadius: 12,
+                          padding: 4, boxShadow: "0 3px 8px rgba(0,0,0,0.1)",
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })()}
+                <span style={{ flex: 1, fontWeight: 900, fontSize: 18, color: "#fff", letterSpacing: -0.3, lineHeight: 1.3, textShadow: "0 1px 2px rgba(0,0,0,0.12)" }}>{col.title.replace(/^[^A-Za-z가-힣]+/, "").trim()}</span>
                 <span style={{ background: "rgba(255,255,255,0.3)", color: "#fff", borderRadius: 999, fontSize: 14, fontWeight: 900, padding: "4px 12px", minWidth: 32, textAlign: "center" }}>
                   {colCards.length}
                 </span>

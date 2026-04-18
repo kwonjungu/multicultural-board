@@ -4,6 +4,7 @@ import { useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { t } from "@/lib/i18n";
+import { landmarkFor } from "@/lib/assets";
 import BeeMascot from "./BeeMascot";
 
 interface Props {
@@ -123,9 +124,23 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                   onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                   onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                 >
-                  <div style={{ fontSize: 34, flexShrink: 0 }}>{info.flag}</div>
+                  {(() => {
+                    const lm = landmarkFor(code);
+                    if (lm) {
+                      return (
+                        <img
+                          src={lm}
+                          alt=""
+                          aria-hidden="true"
+                          style={{ width: 48, height: 48, flexShrink: 0, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.08))" }}
+                        />
+                      );
+                    }
+                    return <div style={{ fontSize: 34, flexShrink: 0 }}>{info.flag}</div>;
+                  })()}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: 16 }}>{info.flag}</span>
                       {info.label}
                     </div>
                     {info.romanized && (
