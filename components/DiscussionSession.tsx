@@ -11,7 +11,7 @@ import {
   onDisconnect,
 } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
-import { BRAND_GRADIENT } from "@/lib/constants";
+import { BRAND_GRADIENT, LANGUAGES } from "@/lib/constants";
 import { SessionMeta, SessionResponse, PresenceEntry } from "@/lib/types";
 
 interface Props {
