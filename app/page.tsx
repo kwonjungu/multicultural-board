@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LANGUAGES } from "@/lib/constants";
+import BeeMascot from "@/components/BeeMascot";
 
 const DEFAULT_LANGS = ["ko", "en", "vi", "zh", "fil"];
 
@@ -222,33 +223,36 @@ export default function Home() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #0d0b26 0%, #1e1b4b 50%, #16133a 100%)",
+      background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 60%, #FDE68A 100%)",
       display: "flex", alignItems: "center", justifyContent: "center",
       fontFamily: "'Noto Sans KR', sans-serif", padding: 20,
       position: "relative", overflow: "hidden",
     }}>
-      <div style={{ position: "fixed", top: "-15%", right: "-8%", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(91,87,245,0.18) 0%, transparent 65%)", pointerEvents: "none" }} />
-      <div style={{ position: "fixed", bottom: "-15%", left: "-8%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.14) 0%, transparent 65%)", pointerEvents: "none" }} />
+      <svg style={{ position: "fixed", top: 0, right: 0, opacity: 0.18, pointerEvents: "none" }} width="360" height="360" viewBox="0 0 300 300">
+        {[0,1,2,3].flatMap(i => [0,1,2,3].map(j => {
+          const x = i*80 + (j%2)*40;
+          const y = j*70;
+          return <polygon key={`${i}-${j}`} points={`${x+30},${y} ${x+60},${y+17} ${x+60},${y+52} ${x+30},${y+70} ${x},${y+52} ${x},${y+17}`} fill="none" stroke="#F59E0B" strokeWidth="2"/>;
+        }))}
+      </svg>
+      <div style={{ position: "fixed", bottom: "-20%", left: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.35) 0%, transparent 65%)", pointerEvents: "none" }} />
 
       <div style={{
-        background: "#fff", borderRadius: 28, padding: "36px 32px 32px",
+        background: "#fff", borderRadius: 28, padding: "32px 28px 28px",
         maxWidth: "min(480px, 92vw)", width: "100%",
-        boxShadow: "0 40px 100px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)",
+        boxShadow: "0 30px 80px rgba(180,83,9,0.18), 0 0 0 1px rgba(253,230,138,0.6)",
         animation: "fadeSlideIn 0.4s ease", position: "relative", zIndex: 1,
       }}>
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 20, margin: "0 auto 14px",
-            background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 30, boxShadow: "0 10px 30px rgba(245,158,11,0.5)",
-          }}>🐝</div>
-          <h1 style={{ margin: 0, fontSize: 21, fontWeight: 900, color: "#111827", letterSpacing: -0.5 }}>
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
+          <div style={{ display: "inline-block", marginBottom: 6 }}>
+            <BeeMascot size={96} mood="welcome" />
+          </div>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: "#1F2937", letterSpacing: -0.5 }}>
             꿀벌 소통창
           </h1>
-          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9CA3AF", fontWeight: 600 }}>
-            전 세계 어디든, 꿀벌처럼 소식을 나눠요
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: "#92400E", fontWeight: 700 }}>
+            안녕! 친구들과 이야기 나눠볼까?
           </p>
         </div>
 
@@ -298,7 +302,7 @@ export default function Home() {
                 background: "#F9FAFB", outline: "none", transition: "all 0.18s",
                 boxSizing: "border-box",
               }}
-              onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(91,87,245,0.12)"; }}
+              onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(245,158,11,0.18)"; }}
               onBlur={(e)  => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; e.target.style.boxShadow = "none"; }}
             />
             <button
@@ -306,11 +310,11 @@ export default function Home() {
               disabled={!joinReady}
               style={{
                 width: "100%", padding: "15px 0", borderRadius: 14, fontSize: 15,
-                background: joinReady ? "linear-gradient(135deg, #5B57F5, #8B5CF6)" : "#F3F4F6",
+                background: joinReady ? "linear-gradient(135deg, #F59E0B, #D97706)" : "#F3F4F6",
                 color: joinReady ? "#fff" : "#D1D5DB",
                 fontWeight: 800, border: "none",
                 cursor: joinReady ? "pointer" : "not-allowed",
-                boxShadow: joinReady ? "0 6px 24px rgba(91,87,245,0.4)" : "none",
+                boxShadow: joinReady ? "0 6px 24px rgba(245,158,11,0.4)" : "none",
                 transition: "all 0.2s",
               }}
             >입장하기 →</button>
@@ -338,7 +342,7 @@ export default function Home() {
                   background: "#F9FAFB", outline: "none", transition: "all 0.18s",
                   boxSizing: "border-box",
                 }}
-                onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(91,87,245,0.12)"; }}
+                onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(245,158,11,0.18)"; }}
                 onBlur={(e)  => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; e.target.style.boxShadow = "none"; }}
               />
             </div>
@@ -356,9 +360,9 @@ export default function Home() {
                       onClick={() => toggleLang(code)}
                       style={{
                         padding: "6px 12px", borderRadius: 20, fontSize: 12,
-                        border: `1.5px solid ${active ? "#5B57F5" : "#E5E7EB"}`,
-                        background: active ? "#EEEEFF" : "#F9FAFB",
-                        color: active ? "#5B57F5" : "#6B7280",
+                        border: `1.5px solid ${active ? "#F59E0B" : "#E5E7EB"}`,
+                        background: active ? "#FEF3C7" : "#F9FAFB",
+                        color: active ? "#F59E0B" : "#6B7280",
                         fontWeight: active ? 700 : 400, cursor: "pointer",
                         transition: "all 0.12s", whiteSpace: "nowrap",
                       }}
@@ -376,11 +380,11 @@ export default function Home() {
               disabled={!createReady || creating}
               style={{
                 width: "100%", padding: "15px 0", borderRadius: 14, fontSize: 15,
-                background: createReady ? "linear-gradient(135deg, #5B57F5, #8B5CF6)" : "#F3F4F6",
+                background: createReady ? "linear-gradient(135deg, #F59E0B, #D97706)" : "#F3F4F6",
                 color: createReady ? "#fff" : "#D1D5DB",
                 fontWeight: 800, border: "none",
                 cursor: createReady ? "pointer" : "not-allowed",
-                boxShadow: createReady ? "0 6px 24px rgba(91,87,245,0.4)" : "none",
+                boxShadow: createReady ? "0 6px 24px rgba(245,158,11,0.4)" : "none",
                 transition: "all 0.2s",
               }}
             >{creating ? "⟳ 생성 중..." : "방 만들기 →"}</button>
@@ -398,7 +402,7 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
             {/* 언어 방향 */}
-            <div style={{ background: "#F8F9FC", borderRadius: 14, padding: "14px 16px", border: "1px solid #E9ECF5" }}>
+            <div style={{ background: "#FFFBEB", borderRadius: 14, padding: "14px 16px", border: "1px solid #FDE68A" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1, marginBottom: 10 }}>
                 번역 방향
               </div>
@@ -433,7 +437,7 @@ export default function Home() {
                 />
                 <div
                   onClick={() => pptxRef.current?.click()}
-                  onDragOver={(e) => { e.preventDefault(); (e.currentTarget as HTMLDivElement).style.borderColor = "#5B57F5"; }}
+                  onDragOver={(e) => { e.preventDefault(); (e.currentTarget as HTMLDivElement).style.borderColor = "#F59E0B"; }}
                   onDragLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#D1D5DB"; }}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -446,7 +450,7 @@ export default function Home() {
                     padding: "40px 20px", textAlign: "center", cursor: "pointer",
                     transition: "all 0.18s",
                   }}
-                  onMouseEnter={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#5B57F5"; el.style.background = "rgba(91,87,245,0.03)"; }}
+                  onMouseEnter={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#F59E0B"; el.style.background = "rgba(245,158,11,0.06)"; }}
                   onMouseLeave={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#D1D5DB"; el.style.background = "transparent"; }}
                 >
                   <div style={{ fontSize: 36, marginBottom: 10 }}>📤</div>
@@ -468,8 +472,8 @@ export default function Home() {
 
             {/* 처리 중 */}
             {pptxProcessing && (
-              <div style={{ textAlign: "center", padding: "36px 20px", background: "#F8F9FC", borderRadius: 14, border: "1px solid #E9ECF5" }}>
-                <div style={{ width: 40, height: 40, borderRadius: "50%", margin: "0 auto 14px", border: "3px solid #E5E7EB", borderTopColor: "#5B57F5", animation: "spin 0.8s linear infinite" }} />
+              <div style={{ textAlign: "center", padding: "36px 20px", background: "#FFFBEB", borderRadius: 14, border: "1px solid #FDE68A" }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", margin: "0 auto 14px", border: "3px solid #E5E7EB", borderTopColor: "#F59E0B", animation: "spin 0.8s linear infinite" }} />
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#374151" }}>{pptxStatus}</div>
                 <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 6, lineHeight: 1.7 }}>
                   문서 크기에 따라 10~60초 걸릴 수 있어요
@@ -487,9 +491,9 @@ export default function Home() {
 
             {/* 완료 */}
             {pptxResult && (
-              <div style={{ background: "linear-gradient(135deg, #F0EEFF, #FFF7ED)", borderRadius: 14, padding: "20px 18px", border: "1px solid #DDD9FF", textAlign: "center" }}>
+              <div style={{ background: "linear-gradient(135deg, #FEF3C7, #FFF7ED)", borderRadius: 14, padding: "20px 18px", border: "1px solid #FDE68A", textAlign: "center" }}>
                 <div style={{ fontSize: 38, marginBottom: 8 }}>✅</div>
-                <div style={{ fontWeight: 800, fontSize: 15, color: "#1E1B4B", marginBottom: 6 }}>번역 완료</div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: "#B45309", marginBottom: 6 }}>번역 완료</div>
                 <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 4 }}>
                   {LANGUAGES[pptxFrom]?.flag} {LANGUAGES[pptxFrom]?.label} → {LANGUAGES[pptxTo]?.flag} {LANGUAGES[pptxTo]?.label}
                 </div>
@@ -504,7 +508,7 @@ export default function Home() {
                   >↩ 다른 파일</button>
                   <button
                     onClick={pptxDownload}
-                    style={{ flex: 2, padding: "11px 0", borderRadius: 11, border: "none", background: "linear-gradient(135deg, #5B57F5, #8B5CF6)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 16px rgba(91,87,245,0.35)" }}
+                    style={{ flex: 2, padding: "11px 0", borderRadius: 11, border: "none", background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 16px rgba(245,158,11,0.35)" }}
                   >📥 번역 파일 다운로드</button>
                 </div>
               </div>
