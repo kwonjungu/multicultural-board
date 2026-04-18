@@ -210,7 +210,13 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
               <button
-                onClick={() => { setRole("student"); setCodeError(false); setTeacherCode(""); }}
+                onClick={() => {
+                  setRole("student");
+                  setCodeError(false);
+                  setTeacherCode("");
+                  // 학생은 바로 이름 고르기 화면으로
+                  setTimeout(() => setStep("name"), 160);
+                }}
                 aria-pressed={role === "student"}
                 style={{
                   minHeight: 130, borderRadius: 22, padding: "14px 10px",
@@ -310,27 +316,62 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
               </p>
             </div>
 
-            {isRosterMode ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 260, overflowY: "auto", marginBottom: 18 }}>
-                {rosterList.map((name) => {
-                  const active = myName === name;
-                  return (
-                    <button
-                      key={name}
-                      onClick={() => setMyName(name)}
-                      style={{
-                        padding: "14px 22px", borderRadius: 24, fontSize: 18,
-                        border: `3px solid ${active ? "#F59E0B" : "#FDE68A"}`,
-                        background: active ? "#FEF3C7" : "#fff",
-                        color: active ? "#92400E" : "#374151",
-                        fontWeight: active ? 900 : 700, cursor: "pointer",
-                        minHeight: 56,
-                      }}
-                    >{name}</button>
-                  );
-                })}
+            {role === "student" && rosterList.length === 0 && (
+              <div style={{
+                padding: "16px 18px", borderRadius: 16, marginBottom: 16,
+                background: "#FEF2F2", border: "2px dashed #FCA5A5",
+                textAlign: "center", fontSize: 14, color: "#B91C1C", fontWeight: 800, lineHeight: 1.55,
+              }}>
+                😥 선생님이 아직 학생 이름을 설정하지 않았어요.
+                <br/>선생님께 알려 주세요!
               </div>
-            ) : (
+            )}
+            {role === "student" && rosterList.length > 0 ? (
+              <div style={{ marginBottom: 18 }}>
+                <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: "#92400E" }}>
+                  우리 반 친구들 ({rosterList.length}명) — 내 이름을 눌러봐
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 320, overflowY: "auto" }}>
+                  {rosterList.map((name) => {
+                    const active = myName === name;
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => setMyName(name)}
+                        style={{
+                          padding: "16px 14px", borderRadius: 20, fontSize: 17,
+                          border: `3px solid ${active ? "#F59E0B" : "#FDE68A"}`,
+                          background: active ? "#FEF3C7" : "#fff",
+                          color: active ? "#92400E" : "#1F2937",
+                          fontWeight: active ? 900 : 800, cursor: "pointer",
+                          minHeight: 60, display: "flex", alignItems: "center",
+                          justifyContent: "center", gap: 6,
+                          boxShadow: active ? "0 6px 14px rgba(245,158,11,0.3)" : "0 2px 6px rgba(0,0,0,0.04)",
+                          transition: "all 0.12s",
+                        }}
+                      >
+                        {active && <span style={{ fontSize: 18 }}>🐝</span>}
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : isRosterMode && role === "teacher" ? (
+              <input
+                value={myName}
+                onChange={(e) => setMyName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && finish()}
+                placeholder="선생님 이름 (예: 김선생)"
+                autoFocus
+                style={{
+                  width: "100%", padding: "18px 22px", borderRadius: 20,
+                  border: "3px solid #D1FAE5", fontSize: 22, color: "#1F2937",
+                  background: "#F0FDF4", outline: "none", fontWeight: 800,
+                  boxSizing: "border-box", marginBottom: 18, textAlign: "center",
+                }}
+              />
+            ) : !isRosterMode ? (
               <input
                 value={myName}
                 onChange={(e) => setMyName(e.target.value)}
@@ -347,11 +388,11 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 5px rgba(245,158,11,0.18)"; }}
                 onBlur={(e) => { e.target.style.borderColor = "#FDE68A"; e.target.style.background = "#FFFBEB"; e.target.style.boxShadow = "none"; }}
               />
-            )}
+            ) : null}
 
             <button
               onClick={finish}
-              disabled={!myName.trim()}
+              disabled={!myName.trim() || (role === "student" && rosterList.length === 0)}
               style={{
                 width: "100%", minHeight: 68, borderRadius: 24, border: "none",
                 background: !myName.trim() ? "#F3F4F6"

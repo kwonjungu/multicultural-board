@@ -26,6 +26,7 @@ export default function Home() {
   // ── Create ────────────────────────────────────────────────────────
   const [createCode, setCreateCode] = useState("");
   const [createLangs, setCreateLangs] = useState<string[]>(DEFAULT_LANGS);
+  const [createRosterText, setCreateRosterText] = useState("");
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -46,8 +47,20 @@ export default function Home() {
     if (room.length === 4) router.push(`/${room}`);
   }
 
+  function parsedRoster(): string[] {
+    return createRosterText
+      .split(/[,\n]+/)
+      .map((n) => n.trim())
+      .filter(Boolean);
+  }
+
   async function handleCreate() {
     if (createCode.length !== 4 || creating) return;
+    const roster = parsedRoster();
+    if (roster.length < 1) {
+      setCreateMsg({ text: "학생 이름을 최소 1명 입력해 주세요", ok: false });
+      return;
+    }
     setCreating(true);
     setCreateMsg(null);
     try {
@@ -59,6 +72,7 @@ export default function Home() {
           password: "4321",
           roomCode: createCode,
           languages: createLangs,
+          roster,
         }),
       });
       const data = await res.json();
@@ -213,7 +227,7 @@ export default function Home() {
   }
 
   const joinReady   = joinCode.replace(/\D/g, "").length === 4;
-  const createReady = createCode.length === 4 && createLangs.length > 0;
+  const createReady = createCode.length === 4 && createLangs.length > 0 && parsedRoster().length >= 1;
 
   function enterView(next: "join" | "create" | "pptx") {
     setTab(next);
@@ -510,6 +524,31 @@ export default function Home() {
               </div>
               <p style={{ margin: "8px 0 0", fontSize: 11, color: "#9CA3AF" }}>
                 학생 입장 시 선택한 언어만 표시됩니다
+              </p>
+            </div>
+
+            {/* Roster — 최소 1명 필수 */}
+            <div style={{ marginBottom: 22 }}>
+              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#B45309", letterSpacing: 1 }}>
+                학생 이름 (최소 1명, 쉼표 또는 줄바꿈으로 구분)
+              </p>
+              <textarea
+                value={createRosterText}
+                onChange={(e) => setCreateRosterText(e.target.value)}
+                placeholder="예시:&#10;김민지&#10;응우엔 란&#10;웨이"
+                rows={4}
+                style={{
+                  width: "100%", padding: "12px 14px", borderRadius: 14,
+                  border: "2px solid #FDE68A", fontSize: 15, color: "#1F2937",
+                  background: "#FFFBEB", outline: "none", resize: "vertical",
+                  boxSizing: "border-box", fontFamily: "inherit", lineHeight: 1.55,
+                  fontWeight: 500,
+                }}
+                onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(245,158,11,0.18)"; }}
+                onBlur={(e) => { e.target.style.borderColor = "#FDE68A"; e.target.style.background = "#FFFBEB"; e.target.style.boxShadow = "none"; }}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: 11, color: parsedRoster().length >= 1 ? "#10B981" : "#92400E", fontWeight: 700 }}>
+                {parsedRoster().length >= 1 ? `✓ ${parsedRoster().length}명 등록됨` : "⚠ 최소 1명의 학생 이름이 필요해요"}
               </p>
             </div>
 
