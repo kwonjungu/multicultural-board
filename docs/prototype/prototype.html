@@ -1,0 +1,3028 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<title>꿀벌 소통창 · 통합 프로토타입</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+body, html { margin:0; padding:0; font-family:'Noto Sans KR', sans-serif; background:#E7E5E4; min-height:100vh; }
+* { box-sizing:border-box; }
+.stage { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+
+/* ── Phone frame (iPhone 14 Pro) ── */
+.device-wrap.phone {
+  width: 402px; height: 874px;
+  border-radius: 48px;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.25), 0 0 0 12px #1a1a1a, 0 0 0 14px #333;
+}
+.device-wrap.phone .device-screen { border-radius: 40px; }
+.device-wrap.phone .notch { display: block; }
+
+/* ── iPad portrait (iPad 11, 820×1180 @ 0.72 scale = 591×850) ── */
+.device-wrap.tablet-portrait {
+  width: 768px; height: 1024px;
+  border-radius: 38px;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.28), 0 0 0 14px #1a1a1a, 0 0 0 16px #2a2a2a;
+  transform: scale(0.72); transform-origin: center center;
+  margin: -140px 0;
+}
+.device-wrap.tablet-portrait .device-screen { border-radius: 26px; }
+
+/* ── iPad landscape ── */
+.device-wrap.tablet-landscape {
+  width: 1180px; height: 820px;
+  border-radius: 38px;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.28), 0 0 0 14px #1a1a1a, 0 0 0 16px #2a2a2a;
+  transform: scale(0.72); transform-origin: center center;
+  margin: 0 -180px;
+}
+.device-wrap.tablet-landscape .device-screen { border-radius: 26px; }
+
+.device-wrap {
+  overflow: hidden;
+  position: relative; background: #000;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.device-screen {
+  position: absolute; inset: 0; overflow: hidden; background: #FFFBEB;
+}
+.notch { display: none; position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 126px; height: 37px; border-radius: 24px; background: #000; z-index: 100; pointer-events: none; }
+.home-indicator { display: none; }
+.device-wrap.phone .home-indicator { display: block; position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 139px; height: 5px; border-radius: 100px; background: rgba(0,0,0,0.25); z-index: 100; pointer-events: none; }
+
+.label { position: fixed; top: 16px; left: 16px; z-index: 999; font-size: 13px; font-weight: 700; color: #57534E; background: #fff; padding: 8px 14px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+/* ── Device switcher ── */
+.device-switcher {
+  position: fixed; top: 16px; right: 16px; z-index: 999;
+  background: #fff; border-radius: 999px; padding: 4px;
+  display: flex; gap: 2px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+}
+.device-switcher button {
+  border: none; background: transparent;
+  padding: 8px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; color: #6B7280;
+  cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; gap: 5px;
+  transition: all 0.18s;
+}
+.device-switcher button.active {
+  background: linear-gradient(135deg, #F59E0B, #D97706); color: #fff;
+  box-shadow: 0 3px 10px rgba(245,158,11,0.4);
+}
+.device-switcher button:hover:not(.active) { background: #FEF3C7; color: #92400E; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div class="label">🐝 꿀벌 소통창 · 태블릿 반응형 프로토타입</div>
+<div class="device-switcher" id="deviceSwitcher">
+  <button data-device="phone">📱 폰</button>
+  <button data-device="tablet-portrait" class="active">📱 iPad 세로</button>
+  <button data-device="tablet-landscape">📱 iPad 가로</button>
+</div>
+<div class="stage">
+  <div class="device-wrap tablet-portrait" id="device">
+    <div class="notch"></div>
+    <div class="device-screen" id="root"></div>
+    <div class="home-indicator"></div>
+  </div>
+</div>
+
+<script>
+// Device switcher — controls frame size AND broadcasts viewport mode to React via window event
+(function() {
+  const switcher = document.getElementById('deviceSwitcher');
+  const device = document.getElementById('device');
+  const current = () => {
+    const c = device.className.match(/(phone|tablet-portrait|tablet-landscape)/);
+    return c ? c[1] : 'tablet-portrait';
+  };
+  const apply = (kind) => {
+    device.className = 'device-wrap ' + kind;
+    [...switcher.querySelectorAll('button')].forEach(b => {
+      b.classList.toggle('active', b.dataset.device === kind);
+    });
+    localStorage.setItem('bee_device', kind);
+    window.dispatchEvent(new CustomEvent('bee:device', { detail: { kind } }));
+  };
+  // Restore
+  const saved = localStorage.getItem('bee_device');
+  if (saved) apply(saved);
+  switcher.addEventListener('click', e => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    apply(btn.dataset.device);
+  });
+  // Expose helper
+  window.getDeviceKind = current;
+})();
+</script>
+
+<script>
+// gameData.js — 게임용 더미 데이터 (다국어)
+// COUNTRIES (국기 + 이름), EMOTIONS (상황 + 이모지), GREETINGS (인사말), VOCAB (단어 카드)
+
+window.COUNTRIES = [
+  { code: "kr", flag: "🇰🇷", names: { ko: "한국",     en: "Korea",       vi: "Hàn Quốc",    zh: "韩国",   fil: "Korea",     ja: "韓国",   th: "เกาหลี",    ru: "Корея" } },
+  { code: "vn", flag: "🇻🇳", names: { ko: "베트남",   en: "Vietnam",     vi: "Việt Nam",    zh: "越南",   fil: "Vietnam",   ja: "ベトナム", th: "เวียดนาม",  ru: "Вьетнам" } },
+  { code: "cn", flag: "🇨🇳", names: { ko: "중국",     en: "China",       vi: "Trung Quốc",  zh: "中国",   fil: "Tsina",     ja: "中国",   th: "จีน",      ru: "Китай" } },
+  { code: "ph", flag: "🇵🇭", names: { ko: "필리핀",   en: "Philippines", vi: "Philippines", zh: "菲律宾", fil: "Pilipinas", ja: "フィリピン", th: "ฟิลิปปินส์", ru: "Филиппины" } },
+  { code: "jp", flag: "🇯🇵", names: { ko: "일본",     en: "Japan",       vi: "Nhật Bản",    zh: "日本",   fil: "Japan",     ja: "日本",   th: "ญี่ปุ่น",   ru: "Япония" } },
+  { code: "th", flag: "🇹🇭", names: { ko: "태국",     en: "Thailand",    vi: "Thái Lan",    zh: "泰国",   fil: "Thailand",  ja: "タイ",   th: "ไทย",      ru: "Таиланд" } },
+  { code: "us", flag: "🇺🇸", names: { ko: "미국",     en: "USA",         vi: "Hoa Kỳ",      zh: "美国",   fil: "Amerika",   ja: "アメリカ", th: "อเมริกา",  ru: "США" } },
+  { code: "mn", flag: "🇲🇳", names: { ko: "몽골",     en: "Mongolia",    vi: "Mông Cổ",     zh: "蒙古",   fil: "Mongolia",  ja: "モンゴル", th: "มองโกเลีย", ru: "Монголия" } },
+  { code: "ru", flag: "🇷🇺", names: { ko: "러시아",   en: "Russia",      vi: "Nga",         zh: "俄罗斯", fil: "Russia",    ja: "ロシア", th: "รัสเซีย",   ru: "Россия" } },
+  { code: "in", flag: "🇮🇳", names: { ko: "인도",     en: "India",       vi: "Ấn Độ",       zh: "印度",   fil: "India",     ja: "インド", th: "อินเดีย",   ru: "Индия" } },
+];
+
+window.EMOTIONS = [
+  { emoji: "😊", situation: { ko: "친구가 같이 놀자고 했어요.",           en: "A friend asked to play together.",              vi: "Bạn rủ chơi cùng.",                 zh: "朋友叫一起玩。",         fil: "Niyaya ng kaibigan na maglaro." } },
+  { emoji: "😢", situation: { ko: "아끼던 연필을 잃어버렸어요.",           en: "I lost a pencil I liked.",                       vi: "Tôi làm mất cây bút chì yêu thích.",   zh: "弄丢了喜欢的铅笔。",     fil: "Nawala ko ang paborito kong lapis." } },
+  { emoji: "😠", situation: { ko: "누가 내 자리에 앉아있어요.",             en: "Someone is sitting in my seat.",                 vi: "Có người ngồi chỗ của tôi.",         zh: "有人坐了我的位子。",     fil: "May nakaupo sa upuan ko." } },
+  { emoji: "😨", situation: { ko: "천둥소리가 엄청 커요.",                 en: "The thunder is super loud.",                     vi: "Tiếng sấm rất to.",                  zh: "打雷声音很大。",         fil: "Napakalakas ng kulog." } },
+  { emoji: "😳", situation: { ko: "모두 앞에서 발표해야 해요.",             en: "I have to present in front of everyone.",        vi: "Tôi phải thuyết trình trước cả lớp.", zh: "要在大家面前发表。",     fil: "Kailangan kong mag-present sa harap." } },
+  { emoji: "🤗", situation: { ko: "새 친구가 인사해줬어요.",               en: "A new friend said hi to me.",                    vi: "Bạn mới chào tôi.",                 zh: "新朋友跟我打招呼。",     fil: "Kumusta sa akin ang bagong kaibigan." } },
+  { emoji: "😴", situation: { ko: "체육 수업 끝나고 많이 피곤해요.",         en: "I'm tired after P.E. class.",                   vi: "Mệt sau giờ thể dục.",              zh: "体育课后很累。",         fil: "Pagod ako pagkatapos ng P.E." } },
+  { emoji: "🥳", situation: { ko: "오늘이 내 생일이에요!",                 en: "Today is my birthday!",                          vi: "Hôm nay là sinh nhật tôi!",          zh: "今天是我的生日!",        fil: "Kaarawan ko ngayon!" } },
+];
+
+window.GREETINGS = [
+  { ko: "안녕하세요",       en: "Hello",                  vi: "Xin chào",         zh: "你好",       fil: "Kumusta",         ja: "こんにちは",    th: "สวัสดี" },
+  { ko: "고마워요",         en: "Thank you",              vi: "Cảm ơn",           zh: "谢谢",       fil: "Salamat",         ja: "ありがとう",    th: "ขอบคุณ" },
+  { ko: "미안해요",         en: "I'm sorry",              vi: "Xin lỗi",          zh: "对不起",     fil: "Paumanhin",       ja: "ごめんなさい",  th: "ขอโทษ" },
+  { ko: "잘 자요",          en: "Good night",             vi: "Chúc ngủ ngon",    zh: "晚安",       fil: "Magandang gabi",  ja: "おやすみ",      th: "ราตรีสวัสดิ์" },
+  { ko: "반가워요",         en: "Nice to meet you",       vi: "Rất vui được gặp", zh: "很高兴见到你", fil: "Ikinagagalak",    ja: "はじめまして",  th: "ยินดีที่ได้รู้จัก" },
+  { ko: "잘 지내요?",       en: "How are you?",           vi: "Bạn khỏe không?",  zh: "你好吗?",    fil: "Kamusta ka?",     ja: "元気ですか?", th: "สบายดีไหม" },
+  { ko: "또 만나요",         en: "See you again",          vi: "Hẹn gặp lại",      zh: "再见",       fil: "Hanggang sa muli", ja: "またね",       th: "แล้วเจอกัน" },
+  { ko: "잘 먹겠습니다",     en: "Thanks for the meal",    vi: "Cảm ơn vì bữa ăn", zh: "我开动了",   fil: "Salamat sa pagkain", ja: "いただきます", th: "ขอทานก่อน" },
+];
+
+window.VOCAB = [
+  { key: "apple",  emoji: "🍎", translations: { ko: "사과",   en: "apple",   vi: "quả táo",  zh: "苹果",  fil: "mansanas" } },
+  { key: "book",   emoji: "📚", translations: { ko: "책",     en: "book",    vi: "sách",     zh: "书",    fil: "libro" } },
+  { key: "school", emoji: "🏫", translations: { ko: "학교",   en: "school",  vi: "trường",   zh: "学校",  fil: "paaralan" } },
+  { key: "water",  emoji: "💧", translations: { ko: "물",     en: "water",   vi: "nước",     zh: "水",    fil: "tubig" } },
+  { key: "friend", emoji: "👫", translations: { ko: "친구",   en: "friend",  vi: "bạn bè",   zh: "朋友",  fil: "kaibigan" } },
+  { key: "dog",    emoji: "🐶", translations: { ko: "강아지", en: "dog",     vi: "con chó",  zh: "狗",    fil: "aso" } },
+  { key: "cat",    emoji: "🐱", translations: { ko: "고양이", en: "cat",     vi: "con mèo",  zh: "猫",    fil: "pusa" } },
+  { key: "sun",    emoji: "☀️", translations: { ko: "해",     en: "sun",     vi: "mặt trời", zh: "太阳",  fil: "araw" } },
+  { key: "moon",   emoji: "🌙", translations: { ko: "달",     en: "moon",    vi: "mặt trăng",zh: "月亮",  fil: "buwan" } },
+  { key: "flower", emoji: "🌸", translations: { ko: "꽃",     en: "flower",  vi: "hoa",      zh: "花",    fil: "bulaklak" } },
+];
+
+// Helpers
+window.tr = function tr(obj, lang, fallback = "ko") {
+  if (!obj) return "";
+  return obj[lang] || obj[fallback] || obj.en || Object.values(obj)[0] || "";
+};
+
+window.pickN = function pickN(arr, n) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(n, arr.length));
+};
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// GameRoom.jsx — 꿀벌 게임룸
+// 목적: 두 친구가 서로 다른 언어를 선택해서 함께 작은 게임을 즐기며 친해지기
+// 구조:
+//   1) GameLobby — 언어 2개 선택 + 10개 게임 그리드
+//   2) 각 게임 화면 (3개 구현 + 7개 placeholder)
+//
+// 전제: gameData.js 가 먼저 로드되어 window.COUNTRIES, EMOTIONS, GREETINGS, VOCAB, tr, pickN 제공
+
+const { useState, useEffect, useRef, useMemo } = React;
+const GameBeeMascot = (props) => window.BeeMascot ? React.createElement(window.BeeMascot, props) : null;
+
+// ─────────────────────────────────────────────────────────────
+// 게임 카탈로그 (10개)
+// ─────────────────────────────────────────────────────────────
+const GAME_LIST = [
+  { id: "country",   icon: "🌍", name: "이 나라는 어디?",     sub: "국기 맞추기",     color: "#F59E0B", bg: "#FEF3C7", status: "ready" },
+  { id: "emotion",   icon: "💗", name: "이 마음은?",           sub: "감정 알아채기",   color: "#FB7185", bg: "#FFE4E6", status: "ready" },
+  { id: "word",      icon: "🎴", name: "기억 카드",            sub: "짝 맞추기",       color: "#A78BFA", bg: "#EDE9FE", status: "ready" },
+  { id: "greeting",  icon: "👋", name: "인사말 배우기",        sub: "발음 따라하기",   color: "#10B981", bg: "#D1FAE5", status: "soon" },
+  { id: "food",      icon: "🍜", name: "우리나라 음식",        sub: "사진으로 배우기", color: "#EF4444", bg: "#FEE2E2", status: "soon" },
+  { id: "draw",      icon: "🎨", name: "같이 그리기",          sub: "합동 낙서",       color: "#3B82F6", bg: "#DBEAFE", status: "soon" },
+  { id: "story",     icon: "📖", name: "이야기 이어가기",      sub: "한 줄씩 쓰기",    color: "#6366F1", bg: "#E0E7FF", status: "soon" },
+  { id: "guess",     icon: "🤔", name: "스무고개",             sub: "질문하며 맞추기", color: "#F472B6", bg: "#FCE7F3", status: "soon" },
+  { id: "rhythm",    icon: "🎵", name: "리듬 따라하기",        sub: "박자 맞추기",     color: "#FACC15", bg: "#FEF9C3", status: "soon" },
+  { id: "map",       icon: "🗺️", name: "세계 지도 여행",       sub: "같이 여행하기",   color: "#14B8A6", bg: "#CCFBF1", status: "soon" },
+];
+
+// ─────────────────────────────────────────────────────────────
+// 공용: 작은 언어 배지
+// ─────────────────────────────────────────────────────────────
+function LangBadge({ lang, label, color }) {
+  const L = window.KIDS_LANGUAGES;
+  const info = L[lang];
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 6,
+      background: "#fff", borderRadius: 999,
+      padding: "5px 11px 5px 8px",
+      border: `2px solid ${color || "#FDE68A"}`,
+      fontSize: 12, fontWeight: 800, color: "#1F2937",
+    }}>
+      <span style={{ fontSize: 16 }}>{info?.flag}</span>
+      {label && <span style={{ fontSize: 9, color: color || "#92400E", fontWeight: 900, letterSpacing: 0.5 }}>{label}</span>}
+      <span>{info?.label}</span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// GameLobby — 게임룸 메인 (언어 2개 선택 + 게임 그리드)
+// ─────────────────────────────────────────────────────────────
+function GameLobby({ viewerLang, friendLang, setFriendLang, onStart, onClose }) {
+  const L = window.KIDS_LANGUAGES;
+  const availableFriendLangs = ["ko","en","vi","zh","fil","ja","th"].filter(c => c !== viewerLang);
+  const [showLangPick, setShowLangPick] = useState(false);
+
+  return (
+    <div style={{
+      position: "absolute", inset: 0, zIndex: 48,
+      background: "linear-gradient(180deg, #FFFBEB 0%, #FDE68A 60%, #FCD34D 100%)",
+      display: "flex", flexDirection: "column",
+      fontFamily: "'Noto Sans KR', sans-serif",
+      animation: "fadeIn 0.25s ease",
+    }}>
+      {/* Honeycomb pattern (PNG) */}
+      <div aria-hidden="true" style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 260,
+        backgroundImage: "url('assets/patterns/honeycomb.png')",
+        backgroundSize: "300px auto", backgroundRepeat: "repeat",
+        opacity: 0.45, pointerEvents: "none",
+      }}/>
+
+      {/* Header */}
+      <div style={{
+        padding: "52px 16px 12px",
+        display: "flex", alignItems: "center", gap: 10,
+        flexShrink: 0, position: "relative", zIndex: 2,
+      }}>
+        <button onClick={onClose} style={{
+          width: 40, height: 40, borderRadius: 12, border: "2px solid rgba(180,83,9,0.3)",
+          background: "rgba(255,255,255,0.9)", fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
+        }}>←</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 19, fontWeight: 900, color: "#1F2937", display: "flex", alignItems: "center", gap: 6 }}>
+            🎮 꿀벌 게임룸
+          </div>
+          <div style={{ fontSize: 12, color: "#78350F", fontWeight: 700 }}>친구랑 같이 놀면서 친해져요</div>
+        </div>
+        <GameBeeMascot size={48} mood="celebrate"/>
+      </div>
+
+      {/* 언어 쌍 선택 카드 */}
+      <div style={{ padding: "4px 16px 0", position: "relative", zIndex: 2 }}>
+        <div style={{
+          background: "#fff",
+          borderRadius: 22,
+          padding: "14px 16px",
+          border: "3px solid rgba(180,83,9,0.12)",
+          boxShadow: "0 10px 28px rgba(180,83,9,0.15)",
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 900, color: "#92400E", letterSpacing: 1, marginBottom: 10 }}>
+            👫 함께 놀 친구의 언어
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* 나 */}
+            <div style={{
+              flex: 1, padding: "12px 10px", borderRadius: 16,
+              background: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
+              border: "2px solid #FBBF24",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 900, color: "#92400E", letterSpacing: 1 }}>나</div>
+              <div style={{ fontSize: 32, marginTop: 2 }}>{L[viewerLang].flag}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#1F2937", marginTop: 2 }}>{L[viewerLang].label}</div>
+            </div>
+            {/* arrows */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              <div style={{ fontSize: 16 }}>⇄</div>
+              <div style={{ fontSize: 9, fontWeight: 900, color: "#92400E" }}>서로 알려줘</div>
+            </div>
+            {/* 친구 */}
+            <button
+              onClick={() => setShowLangPick(v => !v)}
+              style={{
+                flex: 1, padding: "12px 10px", borderRadius: 16,
+                background: showLangPick ? "linear-gradient(135deg, #DBEAFE, #BFDBFE)" : "linear-gradient(135deg, #E0E7FF, #DBEAFE)",
+                border: `2px solid ${showLangPick ? "#3B82F6" : "#60A5FA"}`,
+                textAlign: "center", cursor: "pointer",
+              }}
+            >
+              <div style={{ fontSize: 9, fontWeight: 900, color: "#1E40AF", letterSpacing: 1 }}>친구 {showLangPick ? "▴" : "▾"}</div>
+              <div style={{ fontSize: 32, marginTop: 2 }}>{L[friendLang].flag}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#1F2937", marginTop: 2 }}>{L[friendLang].label}</div>
+            </button>
+          </div>
+
+          {/* 펼쳐지는 언어 선택 */}
+          {showLangPick && (
+            <div style={{
+              marginTop: 12, display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)", gap: 6,
+              animation: "fadeIn 0.2s",
+            }}>
+              {availableFriendLangs.map(c => {
+                const active = c === friendLang;
+                return (
+                  <button key={c} onClick={() => { setFriendLang(c); setShowLangPick(false); }} style={{
+                    padding: "8px 4px", borderRadius: 12,
+                    background: active ? "#3B82F6" : "#F3F4F6",
+                    border: active ? "2px solid #1E40AF" : "2px solid transparent",
+                    color: active ? "#fff" : "#1F2937",
+                    fontSize: 11, fontWeight: 800, cursor: "pointer",
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                  }}>
+                    <span style={{ fontSize: 20 }}>{L[c].flag}</span>
+                    <span>{L[c].label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 게임 그리드 */}
+      <div style={{ flex: 1, overflow: "auto", padding: "16px 16px 24px", position: "relative", zIndex: 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 900, color: "#78350F", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+          🎯 어떤 놀이를 할까? <span style={{ color: "#92400E", fontSize: 11, fontWeight: 700 }}>· {GAME_LIST.filter(g => g.status === "ready").length}개 준비됨</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {GAME_LIST.map(g => {
+            const locked = g.status !== "ready";
+            return (
+              <button key={g.id}
+                onClick={() => !locked && onStart(g.id)}
+                style={{
+                  minHeight: 128, borderRadius: 20,
+                  background: locked ? "#fff" : g.bg,
+                  border: `2px solid ${locked ? "rgba(0,0,0,0.08)" : g.color + "55"}`,
+                  cursor: locked ? "default" : "pointer",
+                  padding: "14px 12px", textAlign: "left",
+                  display: "flex", flexDirection: "column", gap: 4,
+                  position: "relative", opacity: locked ? 0.75 : 1,
+                  boxShadow: locked ? "0 2px 6px rgba(0,0,0,0.04)" : `0 6px 16px ${g.color}33`,
+                  transition: "transform 0.12s",
+                }}
+                onMouseDown={e => !locked && (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+              >
+                <div style={{ fontSize: 40, lineHeight: 1 }}>{g.icon}</div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", marginTop: 6 }}>{g.name}</div>
+                <div style={{ fontSize: 11, color: g.color, fontWeight: 800 }}>{g.sub}</div>
+                {locked && (
+                  <div style={{
+                    position: "absolute", top: 10, right: 10,
+                    fontSize: 9, fontWeight: 900, color: "#6B7280",
+                    background: "#F3F4F6", padding: "3px 7px", borderRadius: 999,
+                    letterSpacing: 0.5,
+                  }}>🔒 곧 나와요</div>
+                )}
+                {!locked && (
+                  <div style={{
+                    position: "absolute", top: 10, right: 10,
+                    fontSize: 9, fontWeight: 900, color: "#fff",
+                    background: g.color, padding: "3px 8px", borderRadius: 999,
+                    letterSpacing: 0.5, boxShadow: `0 2px 6px ${g.color}66`,
+                  }}>PLAY ▶</div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Game Wrapper — 공통 헤더 + 진행 + 점수
+// ─────────────────────────────────────────────────────────────
+function GameShell({ game, viewerLang, friendLang, progress, total, score, onExit, children, footer }) {
+  const L = window.KIDS_LANGUAGES;
+  const pct = total ? Math.min(100, (progress / total) * 100) : 0;
+  return (
+    <div style={{
+      position: "absolute", inset: 0, zIndex: 49,
+      background: game.bg,
+      display: "flex", flexDirection: "column",
+      fontFamily: "'Noto Sans KR', sans-serif",
+      animation: "fadeIn 0.2s",
+    }}>
+      <div style={{
+        padding: "52px 14px 10px",
+        display: "flex", alignItems: "center", gap: 8,
+        borderBottom: `2px solid ${game.color}22`, flexShrink: 0,
+        background: "rgba(255,255,255,0.6)", backdropFilter: "blur(10px)",
+      }}>
+        <button onClick={onExit} style={{
+          width: 38, height: 38, borderRadius: 11, border: `2px solid ${game.color}44`,
+          background: "#fff", fontSize: 16, fontWeight: 900, color: game.color, cursor: "pointer",
+        }}>✕</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", display: "flex", alignItems: "center", gap: 6 }}>
+            <span>{game.icon}</span> {game.name}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+            <span style={{ fontSize: 14 }}>{L[viewerLang].flag}</span>
+            <span style={{ fontSize: 9, color: game.color, fontWeight: 900 }}>↔</span>
+            <span style={{ fontSize: 14 }}>{L[friendLang].flag}</span>
+            {typeof score === "number" && (
+              <span style={{
+                marginLeft: 8, fontSize: 11, fontWeight: 900, color: game.color,
+                background: "#fff", padding: "2px 8px", borderRadius: 999,
+                border: `1.5px solid ${game.color}55`,
+              }}>⭐ {score}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* progress */}
+      {total > 0 && (
+        <div style={{
+          height: 6, background: "rgba(0,0,0,0.06)", flexShrink: 0,
+        }}>
+          <div style={{
+            height: "100%", width: pct + "%",
+            background: `linear-gradient(90deg, ${game.color}, ${game.color}cc)`,
+            transition: "width 0.4s cubic-bezier(0.4,0,0.2,1)",
+          }}/>
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflow: "auto", padding: "14px 16px" }}>
+        {children}
+      </div>
+
+      {footer && (
+        <div style={{ padding: "10px 16px 20px", flexShrink: 0 }}>
+          {footer}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Game 1: CountryGuess — 두 언어로 나라 이름 듣고 국기 맞추기
+// ─────────────────────────────────────────────────────────────
+function CountryGuess({ game, viewerLang, friendLang, onExit }) {
+  const [round, setRound] = useState(0);
+  const [score, setScore] = useState(0);
+  const [picked, setPicked] = useState(null);
+  const [flash, setFlash] = useState(null); // "right" | "wrong" | null
+  const TOTAL = 5;
+
+  // 한 판에 5라운드
+  const rounds = useMemo(() => {
+    const picks = window.pickN(window.COUNTRIES, TOTAL);
+    return picks.map(answer => {
+      const distractors = window.pickN(window.COUNTRIES.filter(c => c.code !== answer.code), 3);
+      const options = window.pickN([answer, ...distractors], 4);
+      return { answer, options };
+    });
+  }, []);
+
+  const cur = rounds[round];
+  const done = round >= TOTAL;
+
+  const pick = (c) => {
+    if (picked) return;
+    setPicked(c);
+    const right = c.code === cur.answer.code;
+    setFlash(right ? "right" : "wrong");
+    if (right) setScore(s => s + 1);
+    setTimeout(() => {
+      setPicked(null); setFlash(null);
+      setRound(r => r + 1);
+    }, 1200);
+  };
+
+  if (done) {
+    return (
+      <GameShell game={game} viewerLang={viewerLang} friendLang={friendLang}
+        progress={TOTAL} total={TOTAL} score={score} onExit={onExit}>
+        <div style={{ textAlign: "center", paddingTop: 40 }}>
+          <GameBeeMascot size={140} mood={score >= 4 ? "celebrate" : "cheer"}/>
+          <div style={{ fontSize: 26, fontWeight: 900, color: "#1F2937", marginTop: 18 }}>
+            {score === TOTAL ? "완벽해!" : score >= 3 ? "잘했어!" : "다시 해볼까?"} 🎉
+          </div>
+          <div style={{ fontSize: 16, color: "#92400E", fontWeight: 700, marginTop: 8 }}>
+            ⭐ {score} / {TOTAL}
+          </div>
+          <div style={{ marginTop: 28, display: "flex", gap: 10, justifyContent: "center" }}>
+            <button onClick={() => { setRound(0); setScore(0); }} style={{
+              padding: "14px 24px", borderRadius: 16, border: "none",
+              background: `linear-gradient(135deg, ${game.color}, ${game.color}cc)`,
+              color: "#fff", fontSize: 15, fontWeight: 900, cursor: "pointer",
+              boxShadow: `0 8px 20px ${game.color}66`,
+            }}>🔄 다시 하기</button>
+            <button onClick={onExit} style={{
+              padding: "14px 24px", borderRadius: 16, border: `2px solid ${game.color}55`,
+              background: "#fff", color: game.color, fontSize: 15, fontWeight: 900, cursor: "pointer",
+            }}>🏠 게임룸으로</button>
+          </div>
+        </div>
+      </GameShell>
+    );
+  }
+
+  // 문제 문장: 친구의 언어로 "이 나라는 어디?" + 답을 친구 언어로 보여줌
+  // 이렇게 하면 '친구 언어 → 내 언어'로 연결되는 학습 효과
+  return (
+    <GameShell game={game} viewerLang={viewerLang} friendLang={friendLang}
+      progress={round} total={TOTAL} score={score} onExit={onExit}>
+      <div style={{
+        background: "#fff", borderRadius: 20, padding: "20px 18px",
+        border: `2px solid ${game.color}22`, textAlign: "center",
+        boxShadow: "0 6px 20px rgba(0,0,0,0.06)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 900, color: game.color, letterSpacing: 1, marginBottom: 6 }}>
+          {round + 1} / {TOTAL}
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#6B7280", marginBottom: 8 }}>
+          이 나라는 어디일까?
+        </div>
+        {/* 친구 언어로 */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: "#DBEAFE", borderRadius: 14, padding: "10px 18px",
+          border: "2px solid #60A5FA", marginBottom: 6,
+        }}>
+          <span style={{ fontSize: 14 }}>{window.KIDS_LANGUAGES[friendLang].flag}</span>
+          <span style={{ fontSize: 24, fontWeight: 900, color: "#1E40AF" }}>
+            {window.tr(cur.answer.names, friendLang)}
+          </span>
+          <button style={{
+            background: "#fff", border: "1.5px solid #93C5FD", borderRadius: 10,
+            padding: "4px 8px", fontSize: 14, cursor: "pointer",
+          }}>🔊</button>
+        </div>
+        {/* 내 언어로 힌트 (토글) */}
+        <div style={{ fontSize: 12, color: "#6B7280", fontWeight: 700 }}>
+          {window.KIDS_LANGUAGES[viewerLang].flag} {window.tr(cur.answer.names, viewerLang)}
+        </div>
+      </div>
+
+      <div style={{
+        marginTop: 16, display: "grid",
+        gridTemplateColumns: "1fr 1fr", gap: 10,
+      }}>
+        {cur.options.map(opt => {
+          const isPicked = picked?.code === opt.code;
+          const isAnswer = opt.code === cur.answer.code;
+          let bg = "#fff", border = game.color + "33";
+          if (flash) {
+            if (isAnswer) { bg = "#D1FAE5"; border = "#10B981"; }
+            else if (isPicked) { bg = "#FEE2E2"; border = "#EF4444"; }
+          } else if (isPicked) { bg = game.bg; border = game.color; }
+          return (
+            <button key={opt.code} onClick={() => pick(opt)}
+              style={{
+                minHeight: 96, borderRadius: 18,
+                background: bg, border: `3px solid ${border}`,
+                cursor: picked ? "default" : "pointer",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                gap: 4, transition: "all 0.18s",
+                boxShadow: "0 3px 10px rgba(0,0,0,0.05)",
+              }}>
+              <div style={{ fontSize: 48 }}>{opt.flag}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#1F2937" }}>
+                {window.tr(opt.names, viewerLang)}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {flash && (
+        <div style={{
+          marginTop: 14, padding: "12px 14px", borderRadius: 14,
+          background: flash === "right" ? "#D1FAE5" : "#FEE2E2",
+          border: `2px solid ${flash === "right" ? "#10B981" : "#EF4444"}`,
+          textAlign: "center", fontSize: 14, fontWeight: 900,
+          color: flash === "right" ? "#065F46" : "#991B1B",
+        }}>
+          {flash === "right" ? "🎉 맞았어! " : "💡 정답은 "} 
+          <span>{cur.answer.flag} {window.tr(cur.answer.names, viewerLang)}</span>
+        </div>
+      )}
+    </GameShell>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Game 2: EmotionQuiz — 상황을 읽고 어울리는 감정 고르기
+// ─────────────────────────────────────────────────────────────
+function EmotionQuiz({ game, viewerLang, friendLang, onExit }) {
+  const TOTAL = 5;
+  const rounds = useMemo(() => {
+    const picks = window.pickN(window.EMOTIONS, TOTAL);
+    return picks.map(answer => {
+      const distractors = window.pickN(window.EMOTIONS.filter(e => e.emoji !== answer.emoji), 3);
+      const options = window.pickN([answer, ...distractors], 4);
+      return { answer, options };
+    });
+  }, []);
+
+  const [round, setRound] = useState(0);
+  const [score, setScore] = useState(0);
+  const [picked, setPicked] = useState(null);
+  const [flash, setFlash] = useState(null);
+  const [showFriendLang, setShowFriendLang] = useState(false);
+  const cur = rounds[round];
+  const done = round >= TOTAL;
+
+  const pick = (o) => {
+    if (picked) return;
+    setPicked(o);
+    const right = o.emoji === cur.answer.emoji;
+    setFlash(right ? "right" : "wrong");
+    if (right) setScore(s => s + 1);
+    setTimeout(() => {
+      setPicked(null); setFlash(null); setShowFriendLang(false);
+      setRound(r => r + 1);
+    }, 1400);
+  };
+
+  if (done) {
+    return (
+      <GameShell game={game} viewerLang={viewerLang} friendLang={friendLang}
+        progress={TOTAL} total={TOTAL} score={score} onExit={onExit}>
+        <div style={{ textAlign: "center", paddingTop: 30 }}>
+          <GameBeeMascot size={140} mood="success"/>
+          <div style={{ fontSize: 24, fontWeight: 900, color: "#1F2937", marginTop: 18 }}>
+            친구 마음을 잘 알아챘어! 💗
+          </div>
+          <div style={{ fontSize: 16, color: "#BE123C", fontWeight: 800, marginTop: 8 }}>⭐ {score} / {TOTAL}</div>
+          <div style={{ marginTop: 24, display: "flex", gap: 10, justifyContent: "center" }}>
+            <button onClick={() => { setRound(0); setScore(0); }} style={{
+              padding: "14px 24px", borderRadius: 16, border: "none",
+              background: `linear-gradient(135deg, ${game.color}, ${game.color}cc)`,
+              color: "#fff", fontSize: 15, fontWeight: 900, cursor: "pointer",
+              boxShadow: `0 8px 20px ${game.color}66`,
+            }}>🔄 다시 하기</button>
+            <button onClick={onExit} style={{
+              padding: "14px 24px", borderRadius: 16, border: `2px solid ${game.color}55`,
+              background: "#fff", color: game.color, fontSize: 15, fontWeight: 900, cursor: "pointer",
+            }}>🏠 게임룸으로</button>
+          </div>
+        </div>
+      </GameShell>
+    );
+  }
+
+  return (
+    <GameShell game={game} viewerLang={viewerLang} friendLang={friendLang}
+      progress={round} total={TOTAL} score={score} onExit={onExit}>
+      {/* 상황 카드 */}
+      <div style={{
+        background: "#fff", borderRadius: 22, padding: "18px 16px",
+        border: `3px solid ${game.color}33`, textAlign: "center",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 900, color: game.color, letterSpacing: 1, marginBottom: 8 }}>
+          이 친구는 어떤 마음일까? · {round + 1}/{TOTAL}
+        </div>
+        <div style={{ fontSize: 56, marginBottom: 10 }}>👦</div>
+        <div style={{
+          fontSize: 17, fontWeight: 700, color: "#1F2937", lineHeight: 1.5,
+          padding: "10px 14px", background: "#FFF1F2", borderRadius: 14,
+          border: "2px dashed #FCA5A5",
+        }}>
+          "{window.tr(cur.answer.situation, viewerLang)}"
+        </div>
+        {/* 친구 언어로 보기 토글 */}
+        <button onClick={() => setShowFriendLang(v => !v)} style={{
+          marginTop: 8, background: "transparent", border: "none", cursor: "pointer",
+          fontSize: 11, fontWeight: 800, color: "#BE123C", textDecoration: "underline",
+        }}>
+          {window.KIDS_LANGUAGES[friendLang].flag} 친구 언어로 {showFriendLang ? "접기" : "보기"}
+        </button>
+        {showFriendLang && (
+          <div style={{
+            marginTop: 6, fontSize: 13, fontWeight: 600, color: "#7F1D1D",
+            fontStyle: "italic",
+          }}>
+            "{window.tr(cur.answer.situation, friendLang)}"
+          </div>
+        )}
+      </div>
+
+      {/* 감정 옵션 */}
+      <div style={{
+        marginTop: 16, display: "grid",
+        gridTemplateColumns: "1fr 1fr", gap: 10,
+      }}>
+        {cur.options.map(opt => {
+          const isPicked = picked?.emoji === opt.emoji;
+          const isAnswer = opt.emoji === cur.answer.emoji;
+          let bg = "#fff", border = game.color + "33";
+          if (flash) {
+            if (isAnswer) { bg = "#D1FAE5"; border = "#10B981"; }
+            else if (isPicked) { bg = "#FEE2E2"; border = "#EF4444"; }
+          }
+          return (
+            <button key={opt.emoji} onClick={() => pick(opt)}
+              style={{
+                minHeight: 100, borderRadius: 18,
+                background: bg, border: `3px solid ${border}`,
+                cursor: picked ? "default" : "pointer",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                gap: 4, transition: "all 0.18s",
+              }}>
+              <div style={{ fontSize: 52 }}>{opt.emoji}</div>
+            </button>
+          );
+        })}
+      </div>
+    </GameShell>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Game 3: WordMemory — 메모리 카드 짝 맞추기 (한쪽=내 언어, 한쪽=친구 언어)
+// ─────────────────────────────────────────────────────────────
+function WordMemory({ game, viewerLang, friendLang, onExit }) {
+  const PAIRS = 6;
+  const cards = useMemo(() => {
+    const picks = window.pickN(window.VOCAB, PAIRS);
+    const deck = [];
+    picks.forEach(v => {
+      deck.push({ id: v.key + "-me",    word: v.key, lang: viewerLang, text: v.translations[viewerLang] || v.key, emoji: v.emoji });
+      deck.push({ id: v.key + "-fr",    word: v.key, lang: friendLang, text: v.translations[friendLang] || v.key, emoji: v.emoji });
+    });
+    return deck.sort(() => Math.random() - 0.5);
+  }, [viewerLang, friendLang]);
+
+  const [flipped, setFlipped] = useState([]);   // indices currently flipped
+  const [matched, setMatched] = useState([]);   // words already matched
+  const [tries, setTries] = useState(0);
+  const locked = flipped.length === 2;
+
+  const flip = (i) => {
+    if (locked) return;
+    if (flipped.includes(i)) return;
+    if (matched.includes(cards[i].word)) return;
+    const next = [...flipped, i];
+    setFlipped(next);
+    if (next.length === 2) {
+      setTries(t => t + 1);
+      const [a, b] = next;
+      if (cards[a].word === cards[b].word) {
+        setTimeout(() => {
+          setMatched(m => [...m, cards[a].word]);
+          setFlipped([]);
+        }, 500);
+      } else {
+        setTimeout(() => setFlipped([]), 900);
+      }
+    }
+  };
+
+  const done = matched.length === PAIRS;
+  const L = window.KIDS_LANGUAGES;
+
+  if (done) {
+    return (
+      <GameShell game={game} viewerLang={viewerLang} friendLang={friendLang}
+        progress={PAIRS} total={PAIRS} score={tries} onExit={onExit}>
+        <div style={{ textAlign: "center", paddingTop: 30 }}>
+          <GameBeeMascot size={140} mood="celebrate"/>
+          <div style={{ fontSize: 24, fontWeight: 900, color: "#1F2937", marginTop: 18 }}>짝을 다 찾았어! 🎉</div>
+          <div style={{ fontSize: 15, color: "#6D28D9", fontWeight: 800, marginTop: 8 }}>
+            {tries}번 만에 성공!
+          </div>
+          <div style={{ marginTop: 24, display: "flex", gap: 10, justifyContent: "center" }}>
+            <button onClick={() => { setMatched([]); setFlipped([]); setTries(0); }} style={{
+              padding: "14px 24px", borderRadius: 16, border: "none",
+              background: `linear-gradient(135deg, ${game.color}, ${game.color}cc)`,
+              color: "#fff", fontSize: 15, fontWeight: 900, cursor: "pointer",
+              boxShadow: `0 8px 20px ${game.color}66`,
+            }}>🔄 다시 하기</button>
+            <button onClick={onExit} style={{
+              padding: "14px 24px", borderRadius: 16, border: `2px solid ${game.color}55`,
+              background: "#fff", color: game.color, fontSize: 15, fontWeight: 900, cursor: "pointer",
+            }}>🏠 게임룸으로</button>
+          </div>
+        </div>
+      </GameShell>
+    );
+  }
+
+  return (
+    <GameShell game={game} viewerLang={viewerLang} friendLang={friendLang}
+      progress={matched.length} total={PAIRS} score={tries} onExit={onExit}>
+      <div style={{
+        textAlign: "center", marginBottom: 12,
+        fontSize: 13, fontWeight: 800, color: "#6D28D9",
+      }}>
+        같은 뜻의 카드 두 장을 찾아봐! · {matched.length}/{PAIRS} 짝
+      </div>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)", gap: 8,
+      }}>
+        {cards.map((c, i) => {
+          const isFlipped = flipped.includes(i) || matched.includes(c.word);
+          const isMatched = matched.includes(c.word);
+          const isMyLang = c.lang === viewerLang;
+          return (
+            <button key={c.id} onClick={() => flip(i)}
+              style={{
+                aspectRatio: "3/4", borderRadius: 14, padding: 0,
+                border: "none", cursor: locked ? "default" : "pointer",
+                background: "transparent", perspective: 600,
+              }}>
+              <div style={{
+                width: "100%", height: "100%", position: "relative",
+                transformStyle: "preserve-3d",
+                transition: "transform 0.4s",
+                transform: isFlipped ? "rotateY(180deg)" : "none",
+              }}>
+                {/* back */}
+                <div style={{
+                  position: "absolute", inset: 0, borderRadius: 14,
+                  background: `linear-gradient(135deg, ${game.color}, ${game.color}cc)`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  backfaceVisibility: "hidden",
+                  boxShadow: `0 4px 12px ${game.color}55`,
+                  fontSize: 32, color: "#fff",
+                }}>🐝</div>
+                {/* front */}
+                <div style={{
+                  position: "absolute", inset: 0, borderRadius: 14,
+                  background: isMatched ? "#D1FAE5" : "#fff",
+                  border: `3px solid ${isMatched ? "#10B981" : isMyLang ? "#F59E0B" : "#3B82F6"}`,
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  backfaceVisibility: "hidden", transform: "rotateY(180deg)",
+                  padding: 6, gap: 2,
+                }}>
+                  <div style={{ fontSize: 28 }}>{c.emoji}</div>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: "#1F2937", textAlign: "center", lineHeight: 1.15 }}>
+                    {c.text}
+                  </div>
+                  <div style={{
+                    fontSize: 8, fontWeight: 900,
+                    color: isMyLang ? "#92400E" : "#1E40AF",
+                    background: isMyLang ? "#FEF3C7" : "#DBEAFE",
+                    padding: "1px 5px", borderRadius: 999, marginTop: 2,
+                  }}>{L[c.lang].flag} {L[c.lang].label}</div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </GameShell>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Placeholder — "곧 나와요" 화면 (7개 게임 공통)
+// ─────────────────────────────────────────────────────────────
+function ComingSoon({ game, viewerLang, friendLang, onExit }) {
+  return (
+    <GameShell game={game} viewerLang={viewerLang} friendLang={friendLang} progress={0} total={0} onExit={onExit}>
+      <div style={{ textAlign: "center", paddingTop: 50 }}>
+        <div style={{ fontSize: 90, marginBottom: 8 }}>{game.icon}</div>
+        <GameBeeMascot size={90} mood="think"/>
+        <div style={{ fontSize: 22, fontWeight: 900, color: "#1F2937", marginTop: 16 }}>
+          곧 나와요!
+        </div>
+        <div style={{ fontSize: 14, color: game.color, fontWeight: 800, marginTop: 6 }}>
+          {game.name} · {game.sub}
+        </div>
+        <div style={{
+          marginTop: 22, padding: "14px 18px",
+          background: "#fff", borderRadius: 16, maxWidth: 300, margin: "22px auto 0",
+          border: `2px solid ${game.color}33`, fontSize: 13, color: "#374151", lineHeight: 1.6, fontWeight: 600,
+        }}>
+          🐝 꿀벌이 지금 이 놀이를 만들고 있어요.<br/>
+          다른 놀이 먼저 해볼까?
+        </div>
+        <button onClick={onExit} style={{
+          marginTop: 22, padding: "14px 30px", borderRadius: 16, border: "none",
+          background: `linear-gradient(135deg, ${game.color}, ${game.color}cc)`,
+          color: "#fff", fontSize: 15, fontWeight: 900, cursor: "pointer",
+          boxShadow: `0 8px 20px ${game.color}66`,
+        }}>← 다른 놀이 고르기</button>
+      </div>
+    </GameShell>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// GameRoom — 전체 컨테이너 (lobby + game 라우팅)
+// ─────────────────────────────────────────────────────────────
+function GameRoom({ open, onClose, viewerLang }) {
+  const [friendLang, setFriendLang] = useState(viewerLang === "vi" ? "ko" : "vi");
+  const [activeGame, setActiveGame] = useState(null);
+
+  useEffect(() => { if (!open) setActiveGame(null); }, [open]);
+  useEffect(() => {
+    if (friendLang === viewerLang) {
+      setFriendLang(viewerLang === "ko" ? "vi" : "ko");
+    }
+  }, [viewerLang]);
+
+  if (!open) return null;
+
+  if (!activeGame) {
+    return (
+      <GameLobby
+        viewerLang={viewerLang}
+        friendLang={friendLang}
+        setFriendLang={setFriendLang}
+        onStart={(id) => setActiveGame(id)}
+        onClose={onClose}
+      />
+    );
+  }
+
+  const game = GAME_LIST.find(g => g.id === activeGame);
+  const exit = () => setActiveGame(null);
+  const common = { game, viewerLang, friendLang, onExit: exit };
+
+  switch (activeGame) {
+    case "country": return <CountryGuess {...common}/>;
+    case "emotion": return <EmotionQuiz {...common}/>;
+    case "word":    return <WordMemory {...common}/>;
+    default:        return <ComingSoon {...common}/>;
+  }
+}
+
+window.GameRoom = GameRoom;
+
+</script>
+
+<script type="text/babel" data-presets="react">
+// DesignTokens.jsx — Honey palette + Kids-First scale
+// Reflects the report's Phase 1 spec: honey tones, 18px body, 56px buttons.
+
+const TOKENS = {
+  // Core honey palette
+  honey50: "#FFFBEB",
+  honey100: "#FEF3C7",
+  honey200: "#FDE68A",
+  honey300: "#FCD34D",
+  honey400: "#FBBF24",
+  honey500: "#F59E0B",
+  honey600: "#D97706",
+  honey700: "#B45309",
+
+  // Category pastels (카드 bg)
+  sky100: "#DBEAFE",
+  sky400: "#60A5FA",
+  mint100: "#D1FAE5",
+  mint500: "#10B981",
+  blush100: "#FCE7F3",
+  blush400: "#F472B6",
+  coral100: "#FFE4E6",
+  coral400: "#FB7185",
+  lilac100: "#EDE9FE",
+  lilac400: "#A78BFA",
+
+  // Neutrals
+  ink900: "#1F2937",
+  ink700: "#374151",
+  ink500: "#6B7280",
+  ink300: "#D1D5DB",
+  ink100: "#F3F4F6",
+  ink50: "#F9FAFB",
+
+  // Brand (기존 유지)
+  brandPurple: "#5B57F5",
+  brandViolet: "#8B5CF6",
+};
+
+// Kids-first type scale
+const TYPE = {
+  h1: { size: 36, weight: 900, lh: 1.2 },
+  h2: { size: 28, weight: 800, lh: 1.3 },
+  h3: { size: 22, weight: 800, lh: 1.35 },
+  body: { size: 18, weight: 500, lh: 1.7 },
+  bodyBold: { size: 18, weight: 700, lh: 1.7 },
+  button: { size: 20, weight: 800, lh: 1.2 },
+  caption: { size: 14, weight: 600, lh: 1.5 },
+  label: { size: 13, weight: 700, lh: 1.4 },
+};
+
+// 국가별 인삿말 + 한글 발음 (Kids-First UX)
+const LANGUAGES = {
+  ko: { label: "한국어", flag: "🇰🇷", greet: "안녕!", romanized: "안녕!", name: "Korean", landmark: "assets/landmarks/korea.png" },
+  en: { label: "English", flag: "🇺🇸", greet: "Hello!", romanized: "헬로우!", name: "English", landmark: "assets/landmarks/usa.png" },
+  vi: { label: "Tiếng Việt", flag: "🇻🇳", greet: "Xin chào!", romanized: "신짜오!", name: "Vietnamese", landmark: "assets/landmarks/vietnam.png" },
+  zh: { label: "中文", flag: "🇨🇳", greet: "你好!", romanized: "니하오!", name: "Chinese", landmark: "assets/landmarks/china.png" },
+  fil: { label: "Filipino", flag: "🇵🇭", greet: "Kumusta!", romanized: "쿠무스타!", name: "Filipino", landmark: "assets/landmarks/philippines.png" },
+  ja: { label: "日本語", flag: "🇯🇵", greet: "こんにちは!", romanized: "콘니치와!", name: "Japanese", landmark: "assets/landmarks/japan.png" },
+  th: { label: "ภาษาไทย", flag: "🇹🇭", greet: "สวัสดี!", romanized: "사와디!", name: "Thai", landmark: null },
+  ru: { label: "Русский", flag: "🇷🇺", greet: "Привет!", romanized: "프리벳!", name: "Russian", landmark: null },
+  uz: { label: "O'zbek", flag: "🇺🇿", greet: "Salom!", romanized: "살롬!", name: "Uzbek", landmark: null },
+  mn: { label: "Монгол", flag: "🇲🇳", greet: "Сайн уу!", romanized: "새노우!", name: "Mongolian", landmark: null },
+};
+
+window.TOKENS = TOKENS;
+window.TYPE = TYPE;
+window.KIDS_LANGUAGES = LANGUAGES;
+
+
+// BeeMascot.jsx — extended mascot with 12 moods (v2)
+// Original had 5 moods; we add: welcome, loading, success, oops, confused, celebrate, shh
+// Pure SVG, no deps.
+
+function BeeMascot({ size = 96, mood = "happy", flying = true, style = {} }) {
+  const moodMap = {
+    happy: "bee-welcome",
+    welcome: "bee-welcome",
+    wave: "bee-welcome",
+    cheer: "bee-cheer",
+    celebrate: "bee-celebrate",
+    success: "bee-celebrate",
+    think: "bee-think",
+    confused: "bee-think",
+    oops: "bee-oops",
+    shh: "bee-shh",
+    sleep: "bee-sleep",
+    loading: "bee-loading",
+  };
+  const img = moodMap[mood] || "bee-welcome";
+  return (
+    <div style={{
+      width: size, height: size, display: "inline-block",
+      animation: flying ? "beeFloat 2.4s ease-in-out infinite" : "none",
+      ...style,
+    }}>
+      <img
+        src={`assets/mascot/${img}.png`}
+        alt=""
+        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block",
+                 filter: "drop-shadow(0 6px 14px rgba(245,158,11,0.35))" }}
+      />
+      <style>{`
+        @keyframes beeFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+window.BeeMascot = BeeMascot;
+
+
+// Prototype.jsx — Integrated clickable prototype
+// Flow: Welcome → Numpad → LangPicker → Board (mobile feed + realtime chat drawer) → Post Modal
+
+// (hooks already destructured in earlier babel script)
+
+// ─────────────────────────────────────────────────────────────
+// useDevice — listens for the bee:device custom event from the
+// frame switcher + initial reads from localStorage. All layouts
+// in the app call this to pick phone/tabletPortrait/tabletLandscape
+// variants. Also exposes convenience `isTablet`, `isLandscape`.
+// ─────────────────────────────────────────────────────────────
+function useDevice() {
+  const [kind, setKind] = useState(() =>
+    (typeof window !== "undefined" && window.getDeviceKind?.()) ||
+    localStorage.getItem("bee_device") || "tablet-portrait"
+  );
+  useEffect(() => {
+    const h = (e) => setKind(e.detail.kind);
+    window.addEventListener("bee:device", h);
+    return () => window.removeEventListener("bee:device", h);
+  }, []);
+  return {
+    kind,
+    isPhone: kind === "phone",
+    isTablet: kind !== "phone",
+    isLandscape: kind === "tablet-landscape",
+    isPortrait: kind === "tablet-portrait" || kind === "phone",
+  };
+}
+window.useDevice = useDevice;
+
+// ─────────────────────────────────────────────────────────────
+// Screen 1: Welcome (Landing A — hero with mascot + 2 CTAs)
+// ─────────────────────────────────────────────────────────────
+function WelcomeScreen({ onJoin, onCreate }) {
+  return (
+    <div style={{
+      width: "100%", height: "100%",
+      background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 100%)",
+      position: "relative", overflow: "hidden",
+      fontFamily: "'Noto Sans KR', sans-serif",
+      display: "flex", flexDirection: "column",
+      padding: "56px 24px 32px",
+    }}>
+      {/* flowers pattern backdrop */}
+      <div aria-hidden="true" style={{
+        position: "absolute", inset: 0,
+        backgroundImage: "url('assets/patterns/flowers.png')",
+        backgroundSize: "contain", backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        opacity: 0.4, pointerEvents: "none", zIndex: 0,
+      }}/>
+      <svg style={{ position: "absolute", top: 0, right: 0, opacity: 0.18, pointerEvents: "none", zIndex: 1 }} width="300" height="300" viewBox="0 0 300 300">
+        {[0,1,2,3].map(i => [0,1,2,3].map(j => {
+          const x = i*80 + (j%2)*40;
+          const y = j*70;
+          return <polygon key={`${i}-${j}`} points={`${x+30},${y} ${x+60},${y+17} ${x+60},${y+52} ${x+30},${y+70} ${x},${y+52} ${x},${y+17}`} fill="none" stroke="#F59E0B" strokeWidth="2"/>;
+        }))}
+      </svg>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <BeeMascot size={40} mood="happy"/>
+          <span style={{ fontWeight: 900, fontSize: 18, color: "#B45309" }}>꿀벌 소통창</span>
+        </div>
+        <button style={{
+          background: "#fff", border: "2px solid #FDE68A",
+          borderRadius: 999, padding: "8px 14px", fontSize: 13, fontWeight: 700,
+          color: "#B45309", cursor: "pointer",
+        }}>🔊</button>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, zIndex: 2 }}>
+        <div style={{ position: "relative" }}>
+          <BeeMascot size={150} mood="welcome"/>
+          <div style={{
+            position: "absolute", top: -4, right: -88,
+            background: "#fff", padding: "10px 16px", borderRadius: 20,
+            borderBottomLeftRadius: 4,
+            boxShadow: "0 6px 20px rgba(180,83,9,0.15)",
+            fontSize: 15, fontWeight: 800, color: "#B45309",
+            whiteSpace: "nowrap",
+          }}>안녕, 친구야! 👋</div>
+        </div>
+        <div style={{ textAlign: "center", marginTop: 4 }}>
+          <h1 style={{ margin: 0, fontSize: 30, fontWeight: 900, color: "#1F2937", lineHeight: 1.25 }}>
+            우리 반에<br/>놀러 갈까?
+          </h1>
+          <p style={{ margin: "10px 0 0", fontSize: 15, color: "#78350F", fontWeight: 600 }}>
+            방 번호를 눌러서 들어가요
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, zIndex: 2 }}>
+        <button onClick={onJoin} style={{
+          width: "100%", minHeight: 70, borderRadius: 24, border: "none",
+          background: "linear-gradient(135deg, #F59E0B, #D97706)",
+          color: "#fff", fontSize: 21, fontWeight: 900,
+          boxShadow: "0 10px 28px rgba(245,158,11,0.4), inset 0 -4px 0 rgba(0,0,0,0.15)",
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+        }}>
+          <span style={{ fontSize: 26 }}>🚪</span> 방에 들어가기
+        </button>
+        <button onClick={onCreate} style={{
+          width: "100%", minHeight: 60, borderRadius: 22,
+          background: "#fff", border: "3px solid #FDE68A",
+          color: "#B45309", fontSize: 17, fontWeight: 800,
+          boxShadow: "0 6px 16px rgba(180,83,9,0.1)",
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        }}>
+          ✨ 새 방 만들기 <span style={{ fontSize: 11, background: "#FEF3C7", padding: "3px 8px", borderRadius: 999, color: "#92400E" }}>선생님</span>
+        </button>
+        <button style={{
+          background: "none", border: "none", color: "#92400E",
+          fontSize: 13, fontWeight: 700, cursor: "pointer", marginTop: 2,
+          textDecoration: "underline", textUnderlineOffset: 4,
+        }}>📄 문서 번역하기</button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Screen 2: Numpad (Landing B)
+// ─────────────────────────────────────────────────────────────
+function NumpadScreen({ onBack, onDone }) {
+  const [code, setCode] = useState("");
+  const keys = [1,2,3,4,5,6,7,8,9,"",0,"⌫"];
+
+  const press = (k) => {
+    if (k === "") return;
+    if (k === "⌫") { setCode(c => c.slice(0, -1)); return; }
+    if (code.length < 4) {
+      const next = code + k;
+      setCode(next);
+      if (next.length === 4) setTimeout(() => onDone(next), 300);
+    }
+  };
+
+  const digits = [0,1,2,3].map(i => code[i] || "");
+
+  return (
+    <div style={{
+      width: "100%", height: "100%",
+      background: "linear-gradient(180deg, #FFFBEB 0%, #FDE68A 100%)",
+      fontFamily: "'Noto Sans KR', sans-serif",
+      display: "flex", flexDirection: "column", padding: "56px 22px 32px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <button onClick={onBack} style={{
+          width: 40, height: 40, borderRadius: 12, border: "2px solid #FDE68A",
+          background: "#fff", fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
+        }}>←</button>
+        <div style={{ flex: 1 }}/>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <BeeMascot size={72} mood="welcome"/>
+        <div>
+          <div style={{ fontSize: 19, fontWeight: 900, color: "#1F2937" }}>방 번호가 뭐야?</div>
+          <div style={{ fontSize: 13, color: "#92400E", fontWeight: 600, marginTop: 2 }}>선생님이 알려준 4자리 숫자</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 20 }}>
+        {digits.map((d, i) => (
+          <div key={i} style={{
+            width: 58, height: 70, borderRadius: 16,
+            background: d ? "#fff" : "rgba(255,255,255,0.5)",
+            border: `3px solid ${d ? "#F59E0B" : "#FDE68A"}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 32, fontWeight: 900, color: "#B45309",
+            boxShadow: d ? "0 4px 0 rgba(180,83,9,0.15)" : "none",
+            transition: "all 0.15s",
+          }}>{d}</div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+        {keys.map((k, i) => (
+          <button key={i} disabled={k === ""} onClick={() => press(k)} style={{
+            height: 62, borderRadius: 20,
+            background: k === "⌫" ? "#FEF3C7" : k === "" ? "transparent" : "#fff",
+            border: k === "" ? "none" : "2px solid #FDE68A",
+            fontSize: 26, fontWeight: 900, color: "#B45309",
+            cursor: k === "" ? "default" : "pointer",
+            boxShadow: k !== "" ? "0 3px 0 rgba(180,83,9,0.1)" : "none",
+            transition: "transform 0.08s",
+          }} onMouseDown={e => k !== "" && (e.currentTarget.style.transform = "scale(0.94)")}
+             onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+             onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>{k}</button>
+        ))}
+      </div>
+
+      <button onClick={() => code.length === 4 && onDone(code)} disabled={code.length !== 4} style={{
+        width: "100%", minHeight: 66, borderRadius: 22, border: "none",
+        background: code.length === 4 ? "linear-gradient(135deg, #F59E0B, #D97706)" : "#FEF3C7",
+        color: code.length === 4 ? "#fff" : "#D1D5DB", fontSize: 21, fontWeight: 900,
+        boxShadow: code.length === 4 ? "0 8px 24px rgba(245,158,11,0.4), inset 0 -3px 0 rgba(0,0,0,0.15)" : "none",
+        cursor: code.length === 4 ? "pointer" : "not-allowed",
+      }}>들어가기 →</button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Screen 3: Language Picker
+// ─────────────────────────────────────────────────────────────
+function LangScreen({ onBack, onDone }) {
+  const L = window.KIDS_LANGUAGES;
+  const codes = ["ko","en","vi","zh","fil","ja","th","ru"];
+  const [picked, setPicked] = useState("vi");
+
+  return (
+    <div style={{
+      width: "100%", height: "100%", background: "#FFFBEB",
+      padding: "56px 18px 24px", fontFamily: "'Noto Sans KR', sans-serif",
+      display: "flex", flexDirection: "column",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <button onClick={onBack} style={{
+          width: 40, height: 40, borderRadius: 12, border: "2px solid #FDE68A",
+          background: "#fff", fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
+        }}>←</button>
+        <div style={{ flex: 1 }}/>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <BeeMascot size={52} mood="wave"/>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937" }}>어느 나라 말을 쓰니?</div>
+          <div style={{ fontSize: 12, color: "#92400E", fontWeight: 600 }}>한 개만 골라!</div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, flex: 1, overflow: "auto" }}>
+        {codes.map(c => {
+          const active = c === picked;
+          return (
+            <button key={c} onClick={() => setPicked(c)} style={{
+              minHeight: 90, borderRadius: 18,
+              background: active ? "#FEF3C7" : "#fff",
+              border: `3px solid ${active ? "#F59E0B" : "#FDE68A"}`,
+              display: "flex", alignItems: "center", gap: 10, padding: "0 12px",
+              cursor: "pointer", textAlign: "left",
+              boxShadow: active ? "0 6px 16px rgba(245,158,11,0.25)" : "0 2px 6px rgba(0,0,0,0.04)",
+              transition: "all 0.15s",
+            }}>
+              {L[c].landmark ? (
+                <img src={L[c].landmark} alt="" style={{
+                  width: 80, height: 80, objectFit: "contain", flexShrink: 0,
+                  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.1))",
+                }}/>
+              ) : (
+                <div style={{ fontSize: 38 }}>{L[c].flag}</div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 900, color: "#1F2937", display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 16 }}>{L[c].flag}</span>{L[c].label}
+                </div>
+                <div style={{ fontSize: 11, color: "#92400E", fontWeight: 700, marginTop: 2 }}>"{L[c].romanized}"</div>
+              </div>
+              {active && <div style={{ fontSize: 22, color: "#F59E0B" }}>✓</div>}
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={() => onDone(picked)} style={{
+        width: "100%", minHeight: 62, borderRadius: 20, border: "none", marginTop: 14,
+        background: "linear-gradient(135deg, #F59E0B, #D97706)",
+        color: "#fff", fontSize: 19, fontWeight: 900,
+        boxShadow: "0 8px 24px rgba(245,158,11,0.4)", cursor: "pointer",
+      }}>다음 →</button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Card (mobile feed — honey warm)
+// ─────────────────────────────────────────────────────────────
+function FeedCard({ post, viewerLang, noMargin }) {
+  const colorMap = {
+    intro: { accent: "#F59E0B", bg: "#FFFBEB", icon: "🙋", label: "자기소개" },
+    today: { accent: "#FB7185", bg: "#FFF1F2", icon: "💬", label: "오늘 이야기" },
+    praise: { accent: "#10B981", bg: "#F0FDF4", icon: "🌟", label: "칭찬해요" },
+  };
+  const c = colorMap[post.column];
+  const L = window.KIDS_LANGUAGES;
+  const [liked, setLiked] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const translated = post.translations[viewerLang] || post.translations.ko;
+  const showTranslation = post.lang !== viewerLang;
+
+  return (
+    <div style={{
+      background: c.bg, borderRadius: 20,
+      border: `2px solid ${c.accent}33`,
+      boxShadow: "0 4px 14px rgba(0,0,0,0.04)",
+      padding: "14px 16px 12px", marginBottom: noMargin ? 0 : 12,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <div style={{
+          width: 42, height: 42, borderRadius: 14,
+          background: c.accent, color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 20, fontWeight: 900,
+        }}>{post.avatar}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 800, fontSize: 15, color: "#1F2937" }}>{post.author}</div>
+          <div style={{ fontSize: 11, color: "#6B7280", fontWeight: 600 }}>{L[post.lang].flag} {L[post.lang].label} · {post.time}</div>
+        </div>
+        <span style={{
+          fontSize: 10, fontWeight: 800, color: c.accent,
+          background: "#fff", padding: "3px 8px", borderRadius: 999, border: `1.5px solid ${c.accent}44`,
+        }}>{c.icon} {c.label}</span>
+      </div>
+
+      <div style={{
+        fontSize: 17, lineHeight: 1.65, color: "#1F2937", fontWeight: 500,
+        padding: "10px 12px", background: "#fff", borderRadius: 12,
+        border: "1px solid #F3F4F6",
+      }}>
+        {showTranslation ? translated : post.text}
+      </div>
+
+      {showTranslation && expanded && (
+        <div style={{
+          marginTop: 8, padding: "8px 12px",
+          background: c.accent + "14", borderLeft: `4px solid ${c.accent}`,
+          borderRadius: "0 10px 10px 0",
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: c.accent, marginBottom: 3 }}>{L[post.lang].flag} {L[post.lang].label} (원문)</div>
+          <div style={{ fontSize: 14, color: "#374151", lineHeight: 1.6 }}>{post.text}</div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button style={{
+          flex: 1, minHeight: 42, borderRadius: 12,
+          background: "#fff", border: "2px solid #FDE68A",
+          color: "#92400E", fontSize: 13, fontWeight: 800,
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+        }}>🔊 들어봐</button>
+        <button onClick={() => setLiked(l => !l)} style={{
+          flex: 1, minHeight: 42, borderRadius: 12,
+          background: liked ? "#FFE4E6" : "#fff", border: `2px solid ${liked ? "#FB7185" : "#FECDD3"}`,
+          color: "#BE123C", fontSize: 13, fontWeight: 800,
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+          transition: "all 0.15s",
+        }}>{liked ? "❤️" : "🤍"} {post.likes + (liked ? 1 : 0)}</button>
+        {showTranslation && (
+          <button onClick={() => setExpanded(e => !e)} style={{
+            flex: 1, minHeight: 42, borderRadius: 12,
+            background: "#fff", border: "2px solid #DDD6FE",
+            color: "#6D28D9", fontSize: 13, fontWeight: 800,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+          }}>🌐 {expanded ? "접기" : "원문"}</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// InterpreterDrawer — Papago-style voice translation helper (no server)
+// Two-sided mirror UI: each side taps mic → STT → translate → TTS for the other.
+// Not chat history. Not multi-user. Just a conversation aid, like 파파고 대화모드.
+// ─────────────────────────────────────────────────────────────
+
+// Demo voice samples — what STT would "hear"
+const VOICE_SAMPLES = {
+  ko: [
+    { orig: "안녕! 너 이름이 뭐야?", to: { vi: "Xin chào! Bạn tên là gì?", en: "Hi! What's your name?", zh: "你好!你叫什么名字?", fil: "Kumusta! Ano ang pangalan mo?" } },
+    { orig: "오늘 같이 놀래?", to: { vi: "Hôm nay chơi cùng nhau nhé?", en: "Want to play together today?", zh: "今天一起玩吗?", fil: "Gusto mo bang maglaro ngayon?" } },
+    { orig: "이거 진짜 맛있어!", to: { vi: "Cái này ngon thật!", en: "This is really yummy!", zh: "这个真的很好吃!", fil: "Sobrang sarap nito!" } },
+  ],
+  vi: [
+    { orig: "Mình tên là Lan. Còn bạn?", to: { ko: "내 이름은 란이야. 너는?", en: "My name is Lan. And you?", zh: "我叫Lan。你呢?", fil: "Ang pangalan ko ay Lan. Ikaw?" } },
+    { orig: "Mình thích học tiếng Hàn lắm!", to: { ko: "나 한국어 공부하는 거 좋아해!", en: "I love studying Korean!", zh: "我很喜欢学韩语!", fil: "Mahilig akong mag-aral ng Korean!" } },
+  ],
+  en: [
+    { orig: "Can you help me with homework?", to: { ko: "숙제 좀 도와줄래?", vi: "Bạn giúp mình làm bài tập được không?", zh: "你能帮我做作业吗?", fil: "Pwede mo ba akong tulungan sa homework?" } },
+  ],
+  zh: [
+    { orig: "你今天过得怎么样?", to: { ko: "오늘 어떻게 지냈어?", vi: "Hôm nay bạn thế nào?", en: "How was your day?", fil: "Kumusta ang araw mo?" } },
+  ],
+  fil: [
+    { orig: "Salamat sa tulong mo!", to: { ko: "도와줘서 고마워!", vi: "Cảm ơn bạn đã giúp đỡ!", en: "Thanks for your help!", zh: "谢谢你的帮助!" } },
+  ],
+};
+
+function pickSample(lang) {
+  const arr = VOICE_SAMPLES[lang] || VOICE_SAMPLES.ko;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// A single "side" in the mirror UI — shown from one participant's perspective
+function InterpreterSide({ side, lang, otherLang, value, state, onStart, onStop, onReplay, flipped }) {
+  const L = window.KIDS_LANGUAGES;
+  const info = L[lang] || L.ko;
+  const otherInfo = L[otherLang] || L.ko;
+  const isMe = side === "me";
+
+  const tint = isMe
+    ? { bg: "linear-gradient(160deg, #FEF3C7 0%, #FDE68A 100%)", pri: "#F59E0B", priDark: "#D97706", ink: "#B45309", border: "#FCD34D" }
+    : { bg: "linear-gradient(160deg, #DBEAFE 0%, #BFDBFE 100%)", pri: "#3B82F6", priDark: "#2563EB", ink: "#1E40AF", border: "#60A5FA" };
+
+  const listening = state === "listening";
+  const translating = state === "translating";
+  const done = state === "done";
+
+  return (
+    <div style={{
+      flex: 1, background: tint.bg, position: "relative", overflow: "hidden",
+      display: "flex", flexDirection: "column", justifyContent: "space-between",
+      padding: "16px 14px",
+      transform: flipped ? "rotate(180deg)" : "none",
+    }}>
+      {/* soft honeycomb accent */}
+      <svg style={{ position: "absolute", top: -10, right: -10, opacity: 0.18, pointerEvents: "none" }} width="140" height="140" viewBox="0 0 140 140">
+        {[0,1,2].map(i => [0,1,2].map(j => {
+          const x = i*44 + (j%2)*22 + 10; const y = j*38 + 10;
+          return <polygon key={`${i}-${j}`} points={`${x+16},${y} ${x+32},${y+9} ${x+32},${y+28} ${x+16},${y+37} ${x},${y+28} ${x},${y+9}`} fill="none" stroke={tint.pri} strokeWidth="1.5"/>;
+        }))}
+      </svg>
+
+      {/* Top: language indicator */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, zIndex: 2 }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 14, background: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
+          border: `2px solid ${tint.border}`, boxShadow: "0 3px 8px rgba(0,0,0,0.06)",
+        }}>{info.flag}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: tint.ink, letterSpacing: 0.5 }}>
+            {isMe ? "나 · 내 언어" : "친구 · 상대방 언어"}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937" }}>{info.label}</div>
+        </div>
+        <button style={{
+          background: "#fff", border: `2px solid ${tint.border}`, borderRadius: 10,
+          padding: "6px 10px", fontSize: 11, fontWeight: 800, color: tint.ink, cursor: "pointer",
+        }}>{info.flag} ▾</button>
+      </div>
+
+      {/* Middle: transcript bubble */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 4px", zIndex: 2 }}>
+        {listening ? (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ display: "flex", gap: 4, justifyContent: "center", marginBottom: 10, height: 44, alignItems: "center" }}>
+              {Array.from({length: 16}).map((_, i) => (
+                <div key={i} style={{
+                  width: 4, borderRadius: 2, background: tint.pri,
+                  animation: `wave ${0.7 + (i%4)*0.1}s ease-in-out ${i*0.05}s infinite alternate`,
+                }}/>
+              ))}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: tint.ink }}>
+              🎧 듣고 있어요...
+            </div>
+          </div>
+        ) : translating ? (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {[0,1,2].map(i => (
+                <div key={i} style={{
+                  width: 9, height: 9, borderRadius: "50%", background: tint.pri,
+                  animation: `typingDot 1.1s infinite ${i*0.15}s`,
+                }}/>
+              ))}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, color: tint.ink }}>
+              🐝 꿀벌이 번역 중...
+            </div>
+          </div>
+        ) : done && value ? (
+          <div style={{ width: "100%" }}>
+            {/* Translation (BIG — this is what the other side just said, translated to my language) */}
+            <div style={{
+              background: "#fff", borderRadius: 16, padding: "14px 14px",
+              border: `2px solid ${tint.border}`,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+              fontSize: 19, fontWeight: 700, color: "#1F2937", lineHeight: 1.5,
+              textAlign: "center",
+            }}>
+              {value.translation}
+            </div>
+            {/* Original (small, italic) */}
+            <div style={{
+              marginTop: 8, padding: "6px 10px", textAlign: "center",
+              fontSize: 12, color: tint.ink, fontWeight: 500, fontStyle: "italic", opacity: 0.85,
+            }}>
+              "{value.original}"
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", opacity: 0.8, padding: "0 10px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: tint.ink, lineHeight: 1.6, whiteSpace: "pre-line" }}>
+              {isMe
+                ? `마이크를 누르고\n${info.label}로 말해봐!`
+                : `${info.flag} ${info.label}\n친구가 말할 차례예요`}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom: mic + replay */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, zIndex: 2 }}>
+        {done && (
+          <button onClick={onReplay} style={{
+            width: 48, height: 48, borderRadius: 14, border: `2px solid ${tint.border}`,
+            background: "#fff", color: tint.ink, fontSize: 20, cursor: "pointer",
+            boxShadow: "0 3px 8px rgba(0,0,0,0.08)",
+          }}>🔊</button>
+        )}
+        <button
+          onClick={listening ? onStop : onStart}
+          disabled={translating || (!isMe && state === "idle" && false)}
+          style={{
+            width: 76, height: 76, borderRadius: "50%", border: "none",
+            background: listening
+              ? "linear-gradient(135deg, #EF4444, #DC2626)"
+              : `linear-gradient(135deg, ${tint.pri}, ${tint.priDark})`,
+            color: "#fff", fontSize: 32, cursor: translating ? "wait" : "pointer",
+            boxShadow: `0 12px 28px ${tint.pri}66, inset 0 -4px 0 rgba(0,0,0,0.15)`,
+            animation: listening ? "recPulse 1.2s infinite" : "none",
+            transition: "transform 0.12s",
+          }}
+          onMouseDown={e => !translating && (e.currentTarget.style.transform = "scale(0.94)")}
+          onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+          onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+        >
+          {listening ? "⏹" : "🎤"}
+        </button>
+        {done && <div style={{ width: 48 }}/>}
+      </div>
+    </div>
+  );
+}
+
+function InterpreterDrawer({ open, onClose, viewerLang }) {
+  const [partnerLang, setPartnerLang] = useState(viewerLang === "vi" ? "ko" : "vi");
+  // state per side: idle | listening | translating | done
+  const [meState, setMeState] = useState("idle");
+  const [otherState, setOtherState] = useState("idle");
+  const [meValue, setMeValue] = useState(null);       // what "나" said → shown on FRIEND's side (translated)
+  const [otherValue, setOtherValue] = useState(null); // what friend said → shown on MY side (translated)
+  const timers = useRef([]);
+  const L = window.KIDS_LANGUAGES;
+  const { isPhone, isTablet, isLandscape } = useDevice();
+
+  // Layout mode:
+  //   phone/portrait tablet → vertical mirror (top side flipped 180°)
+  //   landscape tablet      → horizontal split (both sides upright, facing each other)
+  const horizontal = isLandscape;
+
+  const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+  useEffect(() => () => clearTimers(), []);
+
+  // When ME taps mic: I speak my language → friend's side shows it translated to THEIR language
+  const startMe = () => {
+    if (meState !== "idle" && meState !== "done") return;
+    clearTimers();
+    setMeState("listening"); setMeValue(null);
+    timers.current.push(setTimeout(() => stopMe(), 2600));
+  };
+  const stopMe = () => {
+    setMeState("translating");
+    timers.current.push(setTimeout(() => {
+      const s = pickSample(viewerLang);
+      // meValue = what ME produced, displayed on the FRIEND's side
+      setMeValue({ original: s.orig, translation: s.to[partnerLang] || s.orig });
+      setMeState("done"); setOtherState("done");
+    }, 900));
+  };
+
+  // When FRIEND taps mic: they speak partner lang → my side shows it translated to MY language
+  const startOther = () => {
+    if (otherState !== "idle" && otherState !== "done") return;
+    clearTimers();
+    setOtherState("listening"); setOtherValue(null);
+    timers.current.push(setTimeout(() => stopOther(), 2600));
+  };
+  const stopOther = () => {
+    setOtherState("translating");
+    timers.current.push(setTimeout(() => {
+      const s = pickSample(partnerLang);
+      // otherValue = what FRIEND produced, displayed on MY side
+      setOtherValue({ original: s.orig, translation: s.to[viewerLang] || s.orig });
+      setOtherState("done"); setMeState("done");
+    }, 900));
+  };
+
+  const reset = () => {
+    clearTimers();
+    setMeState("idle"); setOtherState("idle");
+    setMeValue(null); setOtherValue(null);
+  };
+
+  useEffect(() => { if (!open) reset(); }, [open]);
+
+  const partnerLangs = Object.keys(L).filter(k => k !== viewerLang);
+
+  return (
+    <>
+      <div onClick={onClose} style={{
+        position: "absolute", inset: 0, background: "rgba(31,41,55,0.5)",
+        opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none",
+        transition: "opacity 0.25s", zIndex: 40,
+      }}/>
+      <div style={{
+        position: "absolute", top: 0, right: 0, bottom: 0,
+        width: isPhone ? "92%" : isLandscape ? "100%" : "86%",
+        background: "#1F2937",
+        transform: open ? "translateX(0)" : "translateX(100%)",
+        transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        zIndex: 41, display: "flex", flexDirection: "column",
+        boxShadow: "-10px 0 40px rgba(0,0,0,0.25)",
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: "52px 14px 10px",
+          background: "#1F2937",
+          display: "flex", alignItems: "center", gap: 10,
+          flexShrink: 0,
+        }}>
+          <button onClick={onClose} style={{
+            width: 40, height: 40, borderRadius: 12, border: "none",
+            background: "rgba(255,255,255,0.12)", fontSize: 18, fontWeight: 900, color: "#fff", cursor: "pointer",
+          }}>→</button>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
+              🎙️ 통역 도우미 <span style={{
+                fontSize: 9, fontWeight: 800, background: "#F59E0B", color: "#fff",
+                padding: "2px 6px", borderRadius: 999,
+              }}>BETA</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 600 }}>
+              말하면 상대방 말로 바꿔줘요 · 서버에 저장 안 해요
+            </div>
+          </div>
+          <button onClick={reset} style={{
+            background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 10,
+            padding: "8px 10px", fontSize: 13, fontWeight: 800, color: "#fff", cursor: "pointer",
+          }}>↻</button>
+        </div>
+
+        {/* Lang pair selector */}
+        <div style={{
+          padding: "8px 14px 10px", background: "#1F2937", borderBottom: "1px solid rgba(255,255,255,0.08)",
+          display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
+        }}>
+          <div style={{
+            flex: 1, background: "rgba(245,158,11,0.2)", border: "1.5px solid rgba(245,158,11,0.4)",
+            borderRadius: 10, padding: "7px 10px", display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <span style={{ fontSize: 16 }}>{L[viewerLang].flag}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "#FEF3C7" }}>{L[viewerLang].label}</span>
+            <span style={{ fontSize: 9, fontWeight: 800, color: "#FCD34D", marginLeft: "auto" }}>나</span>
+          </div>
+          <div style={{ color: "#9CA3AF", fontSize: 16, fontWeight: 900 }}>⇅</div>
+          <select
+            value={partnerLang}
+            onChange={e => { setPartnerLang(e.target.value); reset(); }}
+            style={{
+              flex: 1, background: "rgba(59,130,246,0.2)", border: "1.5px solid rgba(59,130,246,0.4)",
+              borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 800, color: "#DBEAFE",
+              fontFamily: "inherit", cursor: "pointer", outline: "none",
+              appearance: "none", WebkitAppearance: "none",
+            }}>
+            {partnerLangs.map(k => (
+              <option key={k} value={k} style={{ color: "#1F2937" }}>
+                {L[k].flag} {L[k].label} (친구)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Mirror layout — two sides.
+            Vertical mode (phone/portrait): top side rotated 180° so friend across the table reads upright.
+            Horizontal mode (landscape): both upright, sitting side-by-side on a table. */}
+        <div style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: horizontal ? "row" : "column",
+          position: "relative",
+        }}>
+          {/* Other side (friend).
+              Shows meValue = what I said, translated into friend's language.
+              Vertical: goes on top, flipped 180°.
+              Horizontal: goes on left, upright. */}
+          <InterpreterSide
+            side="other"
+            lang={partnerLang}
+            otherLang={viewerLang}
+            value={meValue}
+            state={otherState}
+            onStart={startOther}
+            onStop={stopOther}
+            onReplay={() => {}}
+            flipped={!horizontal}
+          />
+
+          {/* Divider — horizontal bar in vertical mode, vertical bar in horizontal mode */}
+          <div style={{
+            ...(horizontal
+              ? { width: 36, height: "auto", flexShrink: 0 }
+              : { height: 32, width: "auto", flexShrink: 0 }),
+            background: "#1F2937", position: "relative",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <div style={{
+              position: "absolute", inset: 0, display: "flex",
+              alignItems: "center", justifyContent: "center",
+              padding: horizontal ? "20px 0" : "0 20px",
+              flexDirection: horizontal ? "column" : "row",
+            }}>
+              <div style={{
+                flex: 1,
+                ...(horizontal
+                  ? { width: 1, height: "auto" }
+                  : { height: 1, width: "auto" }),
+                background: "rgba(255,255,255,0.12)", borderStyle: "dashed"
+              }}/>
+            </div>
+            <div style={{
+              background: "#1F2937",
+              padding: horizontal ? "10px 0" : "0 12px",
+              display: "flex", alignItems: "center", gap: 6, color: "#9CA3AF",
+              fontSize: 10, fontWeight: 800, letterSpacing: 1,
+              position: "relative",
+              flexDirection: horizontal ? "column" : "row",
+              writingMode: horizontal ? "vertical-rl" : "horizontal-tb",
+              textOrientation: horizontal ? "mixed" : "initial",
+            }}>
+              <BeeMascot size={26} mood="happy" flying={false}/>
+              서로 마주 보고 사용해요
+            </div>
+          </div>
+
+          {/* Me side (bottom / right — always upright for me).
+              Shows otherValue = what friend said, translated into my language. */}
+          <InterpreterSide
+            side="me"
+            lang={viewerLang}
+            otherLang={partnerLang}
+            value={otherValue}
+            state={meState}
+            onStart={startMe}
+            onStop={stopMe}
+            onReplay={() => {}}
+            flipped={false}
+          />
+        </div>
+
+        {/* Footer hint */}
+        <div style={{
+          padding: "8px 14px 16px", background: "#1F2937", flexShrink: 0,
+          textAlign: "center", fontSize: 10, color: "#6B7280", fontWeight: 600,
+        }}>
+          💡 파파고처럼 내 목소리를 친구 말로 바꿔 주는 도구예요
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Board (mobile feed — B)
+// ─────────────────────────────────────────────────────────────
+const SAMPLE_POSTS = [
+  { id: 1, author: "민지", avatar: "🐻", lang: "ko", time: "방금", column: "intro", likes: 5,
+    text: "저는 떡볶이를 제일 좋아해요! 매운데 달아서 맛있어요.",
+    translations: { vi: "Tôi thích bánh tteokbokki nhất! Cay nhưng ngọt nên rất ngon.", en: "I love tteokbokki! It's spicy but sweet, so yummy." } },
+  { id: 2, author: "란", avatar: "🐰", lang: "vi", time: "3분 전", column: "today", likes: 8,
+    text: "Mẹ tôi làm bánh mì ngon lắm! Sáng nay tôi ăn hai cái.",
+    translations: { ko: "우리 엄마가 반미를 너무 맛있게 만들어요! 오늘 아침에 두 개 먹었어요.", en: "My mom makes great banh mi! I ate two this morning." } },
+  { id: 3, author: "웨이", avatar: "🐼", lang: "zh", time: "10분 전", column: "praise", likes: 12,
+    text: "지호가 오늘 나에게 한국어를 가르쳐줬어요. 너무 고마워요!",
+    translations: { ko: "지호가 오늘 저에게 한국어를 가르쳐줬어요. 너무 고마워요!", vi: "Jiho đã dạy tôi tiếng Hàn hôm nay. Cảm ơn nhiều!", en: "Jiho taught me Korean today. Thank you so much!" } },
+  { id: 4, author: "마리아", avatar: "🦊", lang: "fil", time: "1시간 전", column: "intro", likes: 3,
+    text: "Ako si Maria, galing ako sa Pilipinas. Mahilig ako sa pagsayaw!",
+    translations: { ko: "저는 마리아예요, 필리핀에서 왔어요. 춤추는 거 좋아해요!", vi: "Tôi là Maria, đến từ Philippines. Tôi thích nhảy múa!", en: "I'm Maria from the Philippines. I love dancing!" } },
+];
+
+function BoardScreen({ roomCode, viewerLang, role, onWrite, onBack, onOpenInterpreter, onOpenDiscussion, onOpenGameRoom }) {
+  const [filter, setFilter] = useState("all");
+  const filtered = filter === "all" ? SAMPLE_POSTS : SAMPLE_POSTS.filter(p => p.column === filter);
+  const L = window.KIDS_LANGUAGES;
+  const { isPhone, isTablet, isLandscape } = useDevice();
+
+  // Responsive tokens
+  const s = {
+    padX: isPhone ? 14 : isLandscape ? 32 : 24,
+    headerPadTop: isPhone ? 56 : 28,
+    headerPadBottom: isPhone ? 12 : 18,
+    logo: isPhone ? 36 : 48,
+    titleFz: isPhone ? 15 : 22,
+    subFz: isPhone ? 11 : 14,
+    backSz: isPhone ? 36 : 48,
+    filterMinH: isPhone ? 36 : 48,
+    filterFz: isPhone ? 13 : 16,
+    gridCols: isLandscape ? 2 : isPhone ? 1 : 2,
+    gridGap: isPhone ? 0 : 16,
+    actionBarBottom: isPhone ? 24 : 28,
+    actionMinH: isPhone ? 60 : 72,
+    actionFz: isPhone ? 17 : 20,
+  };
+
+  return (
+    <div style={{
+      width: "100%", height: "100%",
+      background: "#FFFBEB",
+      fontFamily: "'Noto Sans KR', sans-serif",
+      display: "flex", flexDirection: "column", position: "relative",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: `${s.headerPadTop}px ${s.padX}px ${s.headerPadBottom}px`,
+        borderBottom: "2px solid #FEF3C7",
+        background: "#FFFBEB", display: "flex", alignItems: "center", gap: isPhone ? 10 : 14,
+        flexShrink: 0,
+      }}>
+        <button onClick={onBack} style={{
+          width: s.backSz, height: s.backSz, borderRadius: isPhone ? 11 : 14,
+          border: "2px solid #FDE68A",
+          background: "#fff", fontSize: isPhone ? 16 : 20, fontWeight: 900, color: "#92400E", cursor: "pointer",
+        }}>←</button>
+        <BeeMascot size={s.logo} mood="happy"/>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 900, fontSize: s.titleFz, color: "#1F2937" }}>3학년 2반</div>
+          <div style={{ fontSize: s.subFz, color: "#92400E", fontWeight: 600 }}>
+            방 {roomCode} · 28명 참여중
+            {isTablet && <span style={{ marginLeft: 10, color: "#10B981" }}>● 실시간</span>}
+          </div>
+        </div>
+        <button style={{
+          background: "#fff", border: "2px solid #FDE68A", borderRadius: isPhone ? 12 : 14,
+          padding: isPhone ? "7px 10px" : "10px 14px",
+          fontSize: isPhone ? 15 : 18, fontWeight: 700, color: "#B45309",
+          cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+        }}>
+          {L[viewerLang].flag} <span style={{ fontSize: isPhone ? 10 : 12 }}>▾</span>
+        </button>
+      </div>
+
+      {/* Filter pills */}
+      <div style={{
+        display: "flex", gap: isPhone ? 6 : 10,
+        padding: `${isPhone ? 12 : 16}px ${s.padX}px 6px`,
+        overflow: "auto", flexShrink: 0,
+      }}>
+        {[
+          { key: "all", label: "전체", color: "#F59E0B" },
+          { key: "intro", label: "🙋 자기소개", color: "#F59E0B" },
+          { key: "today", label: "💬 오늘", color: "#FB7185" },
+          { key: "praise", label: "🌟 칭찬", color: "#10B981" },
+        ].map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)} style={{
+            minHeight: s.filterMinH, padding: isPhone ? "0 14px" : "0 20px",
+            borderRadius: 999,
+            background: filter === f.key ? f.color : "#fff",
+            border: `2px solid ${f.color}`,
+            color: filter === f.key ? "#fff" : f.color,
+            fontWeight: 800, fontSize: s.filterFz, cursor: "pointer", whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}>{f.label}</button>
+        ))}
+      </div>
+
+      {/* Feed — phone: stacked. tablet: grid with masonry-like columns. */}
+      <div style={{
+        flex: 1, overflow: "auto", position: "relative",
+        padding: isPhone
+          ? "6px 14px 110px"
+          : `12px ${s.padX}px ${s.actionMinH + s.actionBarBottom + 24}px`,
+      }}>
+        {/* honeycomb pattern backdrop */}
+        <div aria-hidden="true" style={{
+          position: "absolute", inset: 0,
+          backgroundImage: "url('assets/patterns/honeycomb.png')",
+          backgroundSize: "300px auto", backgroundRepeat: "repeat",
+          opacity: 0.35, pointerEvents: "none", zIndex: 0,
+        }}/>
+        <div style={{ position: "relative", zIndex: 1 }}>
+        {s.gridCols === 1 ? (
+          <div>
+            {filtered.map(p => <FeedCard key={p.id} post={p} viewerLang={viewerLang}/>)}
+          </div>
+        ) : (
+          <div style={{
+            columnCount: s.gridCols, columnGap: s.gridGap,
+          }}>
+            {filtered.map(p => (
+              <div key={p.id} style={{ breakInside: "avoid", marginBottom: s.gridGap }}>
+                <FeedCard post={p} viewerLang={viewerLang} noMargin/>
+              </div>
+            ))}
+          </div>
+        )}
+        {filtered.length === 0 && (
+          <div style={{ textAlign: "center", padding: 40 }}>
+            <BeeMascot size={80} mood="confused"/>
+            <div style={{ marginTop: 10, fontSize: 14, fontWeight: 700, color: "#92400E" }}>
+              아직 글이 없어요. 첫 글을 써볼까?
+            </div>
+          </div>
+        )}
+        </div>
+      </div>
+
+      {/* Bottom action bar */}
+      <div style={{
+        position: "absolute", bottom: s.actionBarBottom,
+        left: s.padX, right: s.padX,
+        display: "flex", gap: isPhone ? 6 : 14, zIndex: 5,
+        maxWidth: isTablet ? 720 : "none",
+        marginLeft: isTablet ? "auto" : undefined,
+        marginRight: isTablet ? "auto" : undefined,
+      }}>
+        <button onClick={onWrite} style={{
+          flex: 1, minHeight: s.actionMinH, borderRadius: isPhone ? 20 : 24, border: "none",
+          background: "linear-gradient(135deg, #F59E0B, #D97706)",
+          color: "#fff", fontSize: s.actionFz, fontWeight: 900,
+          boxShadow: "0 12px 28px rgba(245,158,11,0.4), inset 0 -3px 0 rgba(0,0,0,0.15)",
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          padding: isPhone ? "0 8px" : "0 18px",
+        }}>{isPhone ? "✏️ 쓰기" : "✏️ 내 이야기 쓰기"}</button>
+        <button onClick={onOpenDiscussion} style={{
+          minWidth: isPhone ? 62 : 104, minHeight: s.actionMinH, borderRadius: isPhone ? 20 : 24, border: "none",
+          background: "linear-gradient(135deg, #5B57F5, #8B5CF6)",
+          color: "#fff",
+          fontSize: isPhone ? 11 : 13, fontWeight: 900, cursor: "pointer", position: "relative",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+          boxShadow: "0 12px 28px rgba(91,87,245,0.4), inset 0 -3px 0 rgba(0,0,0,0.2)",
+          padding: isPhone ? "0 4px" : "0 14px",
+        }}>
+          <span style={{ fontSize: isPhone ? 20 : 28 }}>💭</span>
+          <span style={{ fontSize: isPhone ? 10 : 13, lineHeight: 1 }}>{role === "teacher" ? "세션" : "의견"}</span>
+          {/* LIVE badge when in teacher mode & session hypothetically running */}
+          {role === "teacher" && (
+            <span style={{
+              position: "absolute", top: -4, right: -4,
+              background: "#F59E0B", color: "#78350F",
+              fontSize: 8, fontWeight: 900, padding: "2px 5px",
+              borderRadius: 999, letterSpacing: 0.5,
+              border: "2px solid #fff",
+            }}>T</span>
+          )}
+        </button>
+        <button onClick={onOpenInterpreter} style={{
+          minWidth: isPhone ? 62 : 96, minHeight: s.actionMinH, borderRadius: isPhone ? 20 : 24, border: "none",
+          background: "linear-gradient(135deg, #1F2937, #374151)",
+          color: "#fff",
+          fontSize: isPhone ? 11 : 13, fontWeight: 900, cursor: "pointer", position: "relative",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+          boxShadow: "0 12px 28px rgba(31,41,55,0.3), inset 0 -3px 0 rgba(0,0,0,0.25)",
+          padding: isPhone ? "0 4px" : "0 14px",
+        }}>
+          <span style={{ fontSize: isPhone ? 20 : 28 }}>🎙️</span>
+          <span style={{ fontSize: isPhone ? 10 : 13, lineHeight: 1 }}>통역</span>
+        </button>
+        <button onClick={onOpenGameRoom} style={{
+          minWidth: isPhone ? 62 : 96, minHeight: s.actionMinH, borderRadius: isPhone ? 20 : 24, border: "none",
+          background: "linear-gradient(135deg, #EC4899, #F97316)",
+          color: "#fff",
+          fontSize: isPhone ? 11 : 13, fontWeight: 900, cursor: "pointer", position: "relative",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+          boxShadow: "0 12px 28px rgba(236,72,153,0.4), inset 0 -3px 0 rgba(0,0,0,0.2)",
+          padding: isPhone ? "0 4px" : "0 14px",
+        }}>
+          <span style={{ fontSize: isPhone ? 20 : 28 }}>🎮</span>
+          <span style={{ fontSize: isPhone ? 10 : 13, lineHeight: 1 }}>게임룸</span>
+          {/* sparkle NEW badge */}
+          <span style={{
+            position: "absolute", top: -6, right: -6,
+            background: "#FACC15", color: "#78350F",
+            fontSize: 8, fontWeight: 900, padding: "2px 5px",
+            borderRadius: 999, letterSpacing: 0.5,
+            border: "2px solid #fff",
+          }}>NEW</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Post Modal (action selector + write screen)
+// ─────────────────────────────────────────────────────────────
+function PostModal({ open, onClose, onSent }) {
+  const [step, setStep] = useState("action"); // action | write | success
+  const [category, setCategory] = useState("today");
+  const [text, setText] = useState("");
+
+  useEffect(() => { if (!open) { setStep("action"); setText(""); } }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div style={{
+      position: "absolute", inset: 0, background: "rgba(31,41,55,0.5)",
+      display: "flex", alignItems: "flex-end", zIndex: 50,
+      animation: "fadeIn 0.2s",
+    }}>
+      <div style={{
+        background: "#FFFBEB", width: "100%",
+        borderTopLeftRadius: 28, borderTopRightRadius: 28,
+        padding: "14px 20px 24px",
+        boxShadow: "0 -10px 40px rgba(0,0,0,0.15)",
+        maxHeight: "88%",
+        display: "flex", flexDirection: "column",
+        animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+      }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+          <div style={{ width: 40, height: 5, background: "#FDE68A", borderRadius: 999 }}/>
+        </div>
+
+        {step === "action" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+              <BeeMascot size={52} mood="cheer"/>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 19, fontWeight: 900, color: "#1F2937" }}>무엇을 할까?</div>
+                <div style={{ fontSize: 12, color: "#92400E", fontWeight: 600 }}>하고 싶은 걸 골라봐!</div>
+              </div>
+              <button onClick={onClose} style={{
+                width: 36, height: 36, borderRadius: 12, border: "2px solid #FDE68A",
+                background: "#fff", fontSize: 16, color: "#92400E", cursor: "pointer", fontWeight: 900,
+              }}>✕</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {[
+                { icon: "✏️", label: "글쓰기", sub: "내 이야기", color: "#F59E0B", bg: "#FEF3C7", action: () => setStep("write") },
+                { icon: "🎤", label: "말하기", sub: "목소리로", color: "#FB7185", bg: "#FFE4E6", action: () => setStep("write") },
+                { icon: "📷", label: "사진", sub: "찰칵!", color: "#10B981", bg: "#D1FAE5", action: () => setStep("write") },
+                { icon: "🎨", label: "그림", sub: "쓱쓱", color: "#A78BFA", bg: "#EDE9FE", action: () => setStep("write") },
+              ].map((a, i) => (
+                <button key={i} onClick={a.action} style={{
+                  minHeight: 118, borderRadius: 20,
+                  background: a.bg, border: `2px solid ${a.color}33`,
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  gap: 4, cursor: "pointer", transition: "transform 0.15s",
+                }} onMouseDown={e => e.currentTarget.style.transform = "scale(0.96)"}
+                   onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+                   onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
+                  <div style={{ fontSize: 38 }}>{a.icon}</div>
+                  <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937" }}>{a.label}</div>
+                  <div style={{ fontSize: 11, color: a.color, fontWeight: 700 }}>{a.sub}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Category picker */}
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#92400E", letterSpacing: 0.5, marginBottom: 8 }}>
+                어디에 올릴까?
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[
+                  { key: "intro", label: "🙋 자기소개", color: "#F59E0B" },
+                  { key: "today", label: "💬 오늘", color: "#FB7185" },
+                  { key: "praise", label: "🌟 칭찬", color: "#10B981" },
+                ].map(c => (
+                  <button key={c.key} onClick={() => setCategory(c.key)} style={{
+                    flex: 1, minHeight: 40, borderRadius: 12,
+                    background: category === c.key ? c.color : "#fff",
+                    border: `2px solid ${c.color}`,
+                    color: category === c.key ? "#fff" : c.color,
+                    fontWeight: 800, fontSize: 12, cursor: "pointer",
+                  }}>{c.label}</button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {step === "write" && (
+          <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 400 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <button onClick={() => setStep("action")} style={{
+                width: 38, height: 38, borderRadius: 12, border: "2px solid #FDE68A",
+                background: "#fff", fontSize: 16, fontWeight: 900, color: "#92400E", cursor: "pointer",
+              }}>←</button>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937" }}>내 이야기 쓰기</div>
+                <div style={{ fontSize: 11, color: "#92400E", fontWeight: 600 }}>💬 오늘의 이야기</div>
+              </div>
+              <BeeMascot size={40} mood="think"/>
+            </div>
+
+            <button style={{
+              width: "100%", minHeight: 72, borderRadius: 20,
+              background: "linear-gradient(135deg, #FB7185, #EC4899)",
+              color: "#fff", fontSize: 19, fontWeight: 900, border: "none",
+              boxShadow: "0 10px 24px rgba(251,113,133,0.4)",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+              cursor: "pointer", marginBottom: 10,
+            }}>
+              <span style={{ fontSize: 30 }}>🎤</span> 말로 해볼래요
+            </button>
+
+            <div style={{ textAlign: "center", margin: "4px 0 10px", fontSize: 12, color: "#9CA3AF", fontWeight: 600 }}>
+              ─── 또는 글로 쓰기 ───
+            </div>
+
+            <div style={{
+              background: "#fff", borderRadius: 18, border: "3px solid #FDE68A",
+              padding: "14px 16px", flex: 1, minHeight: 120,
+              display: "flex", flexDirection: "column",
+            }}>
+              <textarea
+                autoFocus
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder="여기에 적어봐..."
+                style={{
+                  flex: 1, border: "none", outline: "none", resize: "none",
+                  fontSize: 18, lineHeight: 1.6, color: "#1F2937", fontFamily: "inherit",
+                  background: "transparent", fontWeight: 500,
+                }}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 10, borderTop: "1px solid #F3F4F6" }}>
+                <button style={{ width: 38, height: 38, borderRadius: 12, border: "2px solid #FDE68A", background: "#FFFBEB", fontSize: 16, cursor: "pointer" }}>📷</button>
+                <button style={{ width: 38, height: 38, borderRadius: 12, border: "2px solid #FDE68A", background: "#FFFBEB", fontSize: 16, cursor: "pointer" }}>🎨</button>
+                <div style={{ flex: 1 }}/>
+                <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 700 }}>{text.length}자</div>
+              </div>
+            </div>
+
+            <button onClick={() => { if (text.trim()) { setStep("success"); setTimeout(() => { onSent(); }, 1600); } }} disabled={!text.trim()} style={{
+              width: "100%", minHeight: 62, borderRadius: 20, border: "none",
+              background: text.trim() ? "linear-gradient(135deg, #F59E0B, #D97706)" : "#FEF3C7",
+              color: text.trim() ? "#fff" : "#D1D5DB",
+              fontSize: 19, fontWeight: 900,
+              boxShadow: text.trim() ? "0 8px 24px rgba(245,158,11,0.4), inset 0 -3px 0 rgba(0,0,0,0.15)" : "none",
+              cursor: text.trim() ? "pointer" : "not-allowed",
+              marginTop: 12,
+            }}>🐝 꿀벌에게 보내기</button>
+          </div>
+        )}
+
+        {step === "success" && (
+          <div style={{ padding: "30px 20px 20px", textAlign: "center", minHeight: 360, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <BeeMascot size={140} mood="celebrate"/>
+            <div style={{ fontSize: 24, fontWeight: 900, color: "#1F2937", marginTop: 18 }}>잘했어요! 🎉</div>
+            <div style={{ fontSize: 15, color: "#92400E", fontWeight: 600, marginTop: 8, lineHeight: 1.5 }}>
+              친구들이 네 이야기를 읽고 있어!<br/>
+              꿀벌이 5개 언어로 번역 중이에요 🐝
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// 💭 Discussion (의견 나누기) — 실시간 세션 + 🌳 열매나무 공개
+// ═════════════════════════════════════════════════════════════
+
+// Sample session: question + rich multilingual responses
+const SAMPLE_SESSION = {
+  id: "sess_abc",
+  title: "오늘 배운 내용 중 가장 인상 깊었던 것은?",
+  titleTranslations: {
+    ko: "오늘 배운 내용 중 가장 인상 깊었던 것은?",
+    en: "What was the most memorable thing you learned today?",
+    vi: "Điều ấn tượng nhất bạn học được hôm nay là gì?",
+    zh: "今天学到的最难忘的是什么?",
+    fil: "Ano ang pinaka-memorable na natutunan mo ngayon?",
+  },
+  bodyText: "자유롭게 한 문장으로 적어봐요. 다 같이 나무에 매달아 볼 거예요 🌳",
+  bodyTextTranslations: {
+    ko: "자유롭게 한 문장으로 적어봐요. 다 같이 나무에 매달아 볼 거예요 🌳",
+    en: "Write freely in one sentence. We'll hang them on the tree together 🌳",
+    vi: "Hãy viết tự do một câu. Chúng ta sẽ treo chúng lên cây cùng nhau 🌳",
+    zh: "自由地写一句话。我们会一起挂在树上 🌳",
+    fil: "Magsulat ng malaya sa isang pangungusap. Ibibitin natin sa puno 🌳",
+  },
+  teacherName: "김선생님",
+  startedAt: Date.now() - 1000 * 60 * 4, // 4 minutes ago
+  targetLangs: ["ko","en","vi","zh","fil"],
+  status: "active",
+};
+
+const SAMPLE_RESPONSES = [
+  { id: "r1", authorName: "민지",  authorLang: "ko", text: "다른 나라 친구들의 인사말을 배운 게 제일 재밌었어요!",
+    translations: { ko: "다른 나라 친구들의 인사말을 배운 게 제일 재밌었어요!", en: "Learning greetings from friends from different countries was the most fun!", vi: "Học lời chào từ các bạn nước khác là thú vị nhất!", zh: "学习其他国家朋友的问候语最有趣!", fil: "Ang pinaka-masaya ay matutunan ang pagbati mula sa ibang bansa!" } },
+  { id: "r2", authorName: "란",    authorLang: "vi", text: "Tôi đã biết thêm về văn hóa Hàn Quốc.",
+    translations: { ko: "한국 문화에 대해 더 많이 알게 됐어요.", en: "I learned more about Korean culture.", vi: "Tôi đã biết thêm về văn hóa Hàn Quốc.", zh: "我更了解韩国文化了。", fil: "Mas natutunan ko ang kultura ng Korea." } },
+  { id: "r3", authorName: "웨이",  authorLang: "zh", text: "每个人的名字都很特别,我记住了!",
+    translations: { ko: "모두의 이름이 특별해서 기억했어요!", en: "Everyone's names are special, and I remembered them!", vi: "Tên mọi người đều đặc biệt, tôi nhớ hết rồi!", zh: "每个人的名字都很特别,我记住了!", fil: "Natatandaan ko ang mga pangalan ng lahat, ang ganda!" } },
+  { id: "r4", authorName: "마리아", authorLang: "fil", text: "Masaya ako na may kaibigan mula sa iba't ibang bansa.",
+    translations: { ko: "여러 나라에서 온 친구가 있어서 기뻐요.", en: "I'm happy to have friends from different countries.", vi: "Tôi vui vì có bạn từ nhiều nước khác nhau.", zh: "很开心有来自不同国家的朋友。", fil: "Masaya ako na may kaibigan mula sa iba't ibang bansa." } },
+  { id: "r5", authorName: "지호",  authorLang: "ko", text: "친구랑 같이 한국어 공부한 거요!",
+    translations: { ko: "친구랑 같이 한국어 공부한 거요!", en: "Studying Korean together with my friend!", vi: "Học tiếng Hàn cùng bạn!", zh: "和朋友一起学韩语!", fil: "Ang pag-aaral ng Korean kasama ang kaibigan ko!" } },
+  { id: "r6", authorName: "소피아", authorLang: "en", text: "I loved making friends who speak different languages.",
+    translations: { ko: "다른 언어를 쓰는 친구를 사귄 게 좋았어요.", en: "I loved making friends who speak different languages.", vi: "Tôi thích kết bạn với những người nói ngôn ngữ khác.", zh: "我喜欢交到说不同语言的朋友。", fil: "Gustong-gusto kong magkaroon ng kaibigang ibang wika." } },
+  { id: "r7", authorName: "하루",  authorLang: "ja", text: "いろんな国の食べ物の話が楽しかったです。",
+    translations: { ko: "여러 나라 음식 이야기가 재밌었어요.", en: "Talking about foods from different countries was fun.", vi: "Nói về món ăn của nhiều nước rất vui.", zh: "聊各国美食很有意思。", fil: "Masayang mag-usap tungkol sa pagkain ng iba't ibang bansa." } },
+  { id: "r8", authorName: "카일",  authorLang: "en", text: "We all smile the same way — that's cool.",
+    translations: { ko: "우리 모두 똑같이 웃는 게 멋져요.", en: "We all smile the same way — that's cool.", vi: "Chúng ta đều cười giống nhau — thật tuyệt.", zh: "我们都一样地微笑,很棒。", fil: "Parehas tayong ngumingiti — ang galing!" } },
+  { id: "r9", authorName: "투언",  authorLang: "vi", text: "Cô giáo kể chuyện về Tết Hàn Quốc rất hay.",
+    translations: { ko: "선생님이 설날 이야기 해주신 게 재밌었어요.", en: "Teacher's story about Korean New Year was great.", vi: "Cô giáo kể chuyện về Tết Hàn Quốc rất hay.", zh: "老师讲的韩国新年故事很有趣。", fil: "Maganda ang kwento ng guro tungkol sa Bagong Taon ng Korea." } },
+  { id: "r10", authorName: "차오", authorLang: "zh", text: "我喜欢大家一起合唱的时候。",
+    translations: { ko: "다 같이 노래할 때가 좋았어요.", en: "I liked when we all sang together.", vi: "Tôi thích lúc chúng ta cùng hát.", zh: "我喜欢大家一起合唱的时候。", fil: "Gusto ko kapag magkakasama tayong kumakanta." } },
+  { id: "r11", authorName: "에밀",  authorLang: "en", text: "The honeybee mascot is super cute!",
+    translations: { ko: "꿀벌 마스코트 너무 귀여워요!", en: "The honeybee mascot is super cute!", vi: "Chú ong mật rất dễ thương!", zh: "蜜蜂吉祥物太可爱了!", fil: "Ang cute ng honeybee mascot!" } },
+  { id: "r12", authorName: "쑤언",  authorLang: "vi", text: "Bài học về sự tôn trọng lẫn nhau.",
+    translations: { ko: "서로 존중하는 법을 배웠어요.", en: "The lesson about mutual respect.", vi: "Bài học về sự tôn trọng lẫn nhau.", zh: "关于互相尊重的课程。", fil: "Ang aral tungkol sa paggalang sa isa't isa." } },
+];
+
+// Presence for teacher live panel
+const SAMPLE_PRESENCE = [
+  { cid: "c1",  name: "민지",  submitted: true },
+  { cid: "c2",  name: "란",    submitted: true },
+  { cid: "c3",  name: "웨이",  submitted: true },
+  { cid: "c4",  name: "마리아", submitted: true },
+  { cid: "c5",  name: "지호",   submitted: true },
+  { cid: "c6",  name: "소피아", submitted: true },
+  { cid: "c7",  name: "하루",   submitted: true },
+  { cid: "c8",  name: "카일",   submitted: true },
+  { cid: "c9",  name: "투언",   submitted: true },
+  { cid: "c10", name: "차오",   submitted: true },
+  { cid: "c11", name: "에밀",   submitted: true },
+  { cid: "c12", name: "쑤언",   submitted: true },
+  { cid: "c13", name: "지민",   submitted: false },
+  { cid: "c14", name: "은우",   submitted: false },
+  { cid: "c15", name: "나연",   submitted: false },
+];
+
+// Fruit palette for responses on the tree
+const FRUIT_COLORS = [
+  { bg: "#FEF3C7", border: "#FBBF24", stem: "#D97706" }, // 🍯 honey
+  { bg: "#FECACA", border: "#F87171", stem: "#B45309" }, // 🍎 apple
+  { bg: "#DBEAFE", border: "#60A5FA", stem: "#1E40AF" }, // 💙 blueberry
+  { bg: "#D1FAE5", border: "#34D399", stem: "#065F46" }, // 🍐 pear
+  { bg: "#FCE7F3", border: "#F472B6", stem: "#9D174D" }, // 🍑 peach
+  { bg: "#EDE9FE", border: "#A78BFA", stem: "#5B21B6" }, // 🍇 grape
+  { bg: "#FFEDD5", border: "#FB923C", stem: "#9A3412" }, // 🍊 orange
+  { bg: "#E0F2FE", border: "#38BDF8", stem: "#075985" }, // 🌊 sky
+];
+
+// ─────────────────────────────────────────────────────────────
+// StudentSubmitView — 학생 질문 + 답변 입력/완료 바텀시트
+// ─────────────────────────────────────────────────────────────
+function StudentSubmitView({ session, viewerLang, onClose, submitted, onSubmit, myResponse }) {
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const { isPhone } = useDevice();
+  const L = window.KIDS_LANGUAGES;
+
+  const title = session.titleTranslations?.[viewerLang] || session.title;
+  const body = session.bodyTextTranslations?.[viewerLang] || session.bodyText;
+
+  function handleSubmit() {
+    if (!draft.trim() || sending) return;
+    setSending(true);
+    setTimeout(() => { onSubmit(draft.trim()); setSending(false); }, 600);
+  }
+
+  return (
+    <div style={{
+      position: "absolute", inset: 0, background: "rgba(15,12,40,0.55)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 50, animation: "fadeIn 0.2s", padding: isPhone ? 0 : 24,
+    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: "#fff",
+        width: "100%", maxWidth: 560,
+        maxHeight: isPhone ? "95%" : "90%",
+        borderRadius: isPhone ? "28px 28px 0 0" : 24,
+        alignSelf: isPhone ? "flex-end" : "center",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+        boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
+        animation: isPhone ? "slideUp 0.3s cubic-bezier(0.16,1,0.3,1)" : "fadeIn 0.25s",
+      }}>
+        {/* Header — purple gradient */}
+        <div style={{
+          padding: "20px 22px 18px",
+          background: "linear-gradient(135deg, #5B57F5 0%, #8B5CF6 50%, #A855F7 100%)",
+          color: "#fff", position: "relative",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{
+              padding: "3px 10px", background: "rgba(255,255,255,0.22)",
+              borderRadius: 999, fontSize: 11, fontWeight: 900, letterSpacing: 0.5,
+              display: "flex", alignItems: "center", gap: 5,
+            }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: "50%", background: "#FBBF24",
+                animation: "pulse 1.4s infinite",
+              }}/>
+              LIVE · 💭 의견 나누기
+            </div>
+            <div style={{ marginLeft: "auto", fontSize: 11, opacity: 0.85, fontWeight: 700 }}>
+              {session.teacherName}
+            </div>
+            <button onClick={onClose} style={{
+              background: "rgba(255,255,255,0.18)", border: "none", color: "#fff",
+              width: 30, height: 30, borderRadius: 10, cursor: "pointer", fontSize: 15, fontWeight: 700,
+            }}>✕</button>
+          </div>
+          <div style={{ fontWeight: 900, fontSize: 20, lineHeight: 1.35, textWrap: "pretty" }}>
+            {title}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 22px" }}>
+          {body && (
+            <div style={{
+              fontSize: 14, color: "#4B5563", marginBottom: 18,
+              whiteSpace: "pre-wrap", lineHeight: 1.6, fontWeight: 500,
+            }}>
+              {body}
+            </div>
+          )}
+
+          {submitted ? (
+            <div style={{
+              padding: "22px 18px", background: "linear-gradient(180deg, #ECFDF5, #D1FAE5)",
+              border: "2px solid #A7F3D0", borderRadius: 16, textAlign: "center",
+            }}>
+              <div style={{ fontSize: 44, marginBottom: 8 }}>🌱</div>
+              <div style={{ fontWeight: 900, color: "#065F46", fontSize: 18, marginBottom: 6 }}>
+                잘 심었어요!
+              </div>
+              <div style={{ fontSize: 13, color: "#047857", marginBottom: 16, lineHeight: 1.5 }}>
+                선생님이 세션을 끝내면<br/>모두의 의견이 🌳 나무에 매달려요
+              </div>
+              <div style={{
+                background: "#fff", padding: "14px 14px", borderRadius: 12,
+                fontSize: 14, color: "#111827", textAlign: "left", lineHeight: 1.55,
+                border: "1px solid #D1FAE5", fontWeight: 500,
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 900, color: "#6B7280", marginBottom: 6, letterSpacing: 0.5 }}>
+                  🌱 내 씨앗
+                </div>
+                {myResponse || draft}
+              </div>
+            </div>
+          ) : (
+            <>
+              <label style={{ fontSize: 12, fontWeight: 900, color: "#374151", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <span>✍️ 내 생각</span>
+                <span style={{
+                  fontSize: 10, fontWeight: 800, color: "#5B57F5",
+                  background: "#EDE9FE", padding: "2px 7px", borderRadius: 999,
+                }}>{L[viewerLang]?.flag} {L[viewerLang]?.label}</span>
+              </label>
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={`${L[viewerLang]?.label}로 자유롭게 적어봐요...`}
+                rows={5}
+                autoFocus
+                style={{
+                  width: "100%", padding: "14px 16px", borderRadius: 14,
+                  border: "2px solid #E5E7EB", fontSize: 15, color: "#111827",
+                  background: "#F9FAFB", outline: "none", boxSizing: "border-box",
+                  resize: "none", fontFamily: "inherit", lineHeight: 1.55, fontWeight: 500,
+                }}
+                onFocus={(e) => { e.target.style.borderColor = "#5B57F5"; e.target.style.background = "#fff"; }}
+                onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
+              />
+              <div style={{
+                fontSize: 11, color: "#9CA3AF", marginTop: 8, fontWeight: 600,
+                display: "flex", gap: 6, alignItems: "center",
+              }}>
+                <span>🐝</span> 꿀벌이 5개 언어로 번역해서 모두에게 보여줄 거예요
+              </div>
+            </>
+          )}
+        </div>
+
+        {!submitted && (
+          <div style={{
+            padding: "14px 22px 22px", borderTop: "1px solid #F3F4F6",
+            display: "flex", gap: 10,
+          }}>
+            <button onClick={handleSubmit} disabled={!draft.trim() || sending} style={{
+              flex: 1, minHeight: 56, borderRadius: 16, border: "none",
+              background: !draft.trim() || sending ? "#F3F4F6" : "linear-gradient(135deg,#5B57F5,#8B5CF6)",
+              color: !draft.trim() || sending ? "#D1D5DB" : "#fff",
+              fontSize: 17, fontWeight: 900,
+              cursor: !draft.trim() || sending ? "not-allowed" : "pointer",
+              boxShadow: !draft.trim() || sending ? "none" : "0 8px 22px rgba(91,87,245,0.4), inset 0 -3px 0 rgba(0,0,0,0.15)",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}>
+              {sending ? "🌱 심는 중..." : "🌱 씨앗 심기"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// TeacherLivePanel — 교사 LIVE 진행 패널 (접속/제출 현황)
+// ─────────────────────────────────────────────────────────────
+function TeacherLivePanel({ session, viewerLang, responses, presence, onClose, onRevealTree }) {
+  const { isPhone } = useDevice();
+  const submittedCount = responses.length;
+  const totalCount = presence.length;
+  const rate = totalCount > 0 ? Math.round((submittedCount / totalCount) * 100) : 0;
+
+  const title = session.titleTranslations?.[viewerLang] || session.title;
+
+  return (
+    <div style={{
+      position: "absolute", inset: 0, background: "rgba(15,12,40,0.55)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 50, animation: "fadeIn 0.2s", padding: isPhone ? 0 : 24,
+    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: "#fff",
+        width: "100%", maxWidth: 680,
+        maxHeight: isPhone ? "95%" : "90%",
+        borderRadius: isPhone ? "28px 28px 0 0" : 24,
+        alignSelf: isPhone ? "flex-end" : "center",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+        boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
+        animation: isPhone ? "slideUp 0.3s cubic-bezier(0.16,1,0.3,1)" : "fadeIn 0.25s",
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: "18px 22px",
+          background: "linear-gradient(135deg, #5B57F5 0%, #8B5CF6 100%)",
+          color: "#fff", display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <div style={{
+            padding: "3px 9px", background: "#FBBF24", color: "#78350F",
+            borderRadius: 8, fontSize: 10, fontWeight: 900, letterSpacing: 0.6,
+            display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#DC2626", animation: "pulse 1.4s infinite" }}/>
+            LIVE
+          </div>
+          <div style={{ fontWeight: 900, fontSize: 16, flex: 1, lineHeight: 1.35 }}>{title}</div>
+          <button onClick={onClose} style={{
+            background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
+            width: 32, height: 32, borderRadius: 10, cursor: "pointer", fontSize: 15, fontWeight: 700,
+          }}>—</button>
+        </div>
+
+        {/* Stats */}
+        <div style={{ padding: "18px 22px 14px", display: "flex", gap: 10 }}>
+          <StatChip label="접속" value={totalCount} accent="#10B981" icon="👥"/>
+          <StatChip label="제출" value={submittedCount} accent="#5B57F5" icon="📨"/>
+          <StatChip label="참여율" value={`${rate}%`} accent="#F59E0B" icon="📊"/>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ padding: "0 22px 8px" }}>
+          <div style={{
+            height: 10, background: "#F3F4F6", borderRadius: 999, overflow: "hidden",
+            boxShadow: "inset 0 1px 2px rgba(0,0,0,0.05)",
+          }}>
+            <div style={{
+              width: `${rate}%`, height: "100%",
+              background: "linear-gradient(90deg, #5B57F5, #8B5CF6, #F59E0B)",
+              borderRadius: 999, transition: "width 0.4s",
+            }}/>
+          </div>
+        </div>
+
+        {/* Submitter roster */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 22px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 900, color: "#9CA3AF", margin: "10px 0 8px", letterSpacing: 0.5 }}>
+            제출 현황 · {submittedCount}/{totalCount}
+          </div>
+          <div style={{
+            display: "grid", gap: 6,
+            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+          }}>
+            {presence.map((p) => (
+              <div key={p.cid} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "9px 12px",
+                background: p.submitted ? "#ECFDF5" : "#F9FAFB",
+                borderRadius: 10,
+                border: `1.5px solid ${p.submitted ? "#A7F3D0" : "#E5E7EB"}`,
+                minWidth: 0,
+              }}>
+                <div style={{
+                  width: 9, height: 9, borderRadius: "50%",
+                  background: p.submitted ? "#10B981" : "#D1D5DB",
+                  flexShrink: 0,
+                }}/>
+                <div style={{
+                  fontSize: 13, fontWeight: 700, color: "#111827", flex: 1,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>{p.name}</div>
+                <div style={{
+                  fontSize: 10, color: p.submitted ? "#059669" : "#9CA3AF",
+                  fontWeight: 800, letterSpacing: 0.3, flexShrink: 0,
+                }}>{p.submitted ? "✓" : "…"}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Reveal action */}
+        <div style={{
+          padding: "14px 22px 22px", borderTop: "1px solid #F3F4F6",
+        }}>
+          <button onClick={onRevealTree} style={{
+            width: "100%", minHeight: 60, borderRadius: 16, border: "none",
+            background: "linear-gradient(135deg, #10B981 0%, #059669 50%, #F59E0B 100%)",
+            color: "#fff", fontSize: 17, fontWeight: 900,
+            boxShadow: "0 12px 28px rgba(16,185,129,0.4), inset 0 -3px 0 rgba(0,0,0,0.2)",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          }}>
+            🌳 나무 공개하기 ({submittedCount}개 열매)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatChip({ label, value, accent, icon }) {
+  return (
+    <div style={{
+      flex: 1, padding: "10px 12px", borderRadius: 14,
+      background: `${accent}12`, border: `1.5px solid ${accent}33`,
+    }}>
+      <div style={{
+        fontSize: 10, fontWeight: 900, color: accent, letterSpacing: 0.5,
+        display: "flex", alignItems: "center", gap: 4,
+      }}>
+        <span style={{ fontSize: 11 }}>{icon}</span> {label}
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 900, color: "#111827", marginTop: 2, lineHeight: 1 }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 🌳 FruitTreeReveal — now defined in FruitTreeReveal.jsx (loaded via <script>)
+// window.FruitTreeReveal is used directly in JSX below.
+// ─────────────────────────────────────────────────────────────
+const FruitTreeReveal = (props) =>
+  window.FruitTreeRevealImpl
+    ? React.createElement(window.FruitTreeRevealImpl, props)
+    : null;
+// ─────────────────────────────────────────────────────────────
+// DiscussionCreateSheet — 교사용 세션 시작 (간소화)
+// ─────────────────────────────────────────────────────────────
+function DiscussionCreateSheet({ open, onClose, onStart }) {
+  const [title, setTitle] = useState("오늘 배운 내용 중 가장 인상 깊었던 것은?");
+  const [body, setBody] = useState("자유롭게 한 문장으로 적어봐요. 다 같이 나무에 매달아 볼 거예요 🌳");
+  const { isPhone } = useDevice();
+
+  useEffect(() => { if (!open) return; }, [open]);
+
+  if (!open) return null;
+
+  const PRESETS = [
+    "오늘 배운 내용 중 가장 인상 깊었던 것은?",
+    "우리 반 친구 한 명에게 고마운 점은?",
+    "다른 나라 친구에게 알려주고 싶은 우리 나라 문화는?",
+    "오늘 기분을 한 단어로 표현하면?",
+  ];
+
+  return (
+    <div style={{
+      position: "absolute", inset: 0, background: "rgba(15,12,40,0.55)",
+      display: "flex", alignItems: "flex-end", justifyContent: "center",
+      zIndex: 55, animation: "fadeIn 0.2s",
+    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: "#fff",
+        width: "100%", maxWidth: 560,
+        maxHeight: "92%",
+        borderRadius: "28px 28px 0 0",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+        boxShadow: "0 -20px 60px rgba(0,0,0,0.3)",
+        animation: "slideUp 0.3s cubic-bezier(0.16,1,0.3,1)",
+      }}>
+        <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 6px" }}>
+          <div style={{ width: 44, height: 5, background: "#E5E7EB", borderRadius: 999 }}/>
+        </div>
+        <div style={{ padding: "6px 22px 16px" }}>
+          <div style={{ fontWeight: 900, fontSize: 19, color: "#1F2937", marginBottom: 2 }}>
+            💭 의견 나누기 시작
+          </div>
+          <div style={{ fontSize: 13, color: "#6B7280", fontWeight: 600 }}>
+            질문을 던지면 모두가 자기 언어로 답해요
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 22px 20px" }}>
+          {/* Question presets */}
+          <div style={{ fontSize: 11, fontWeight: 900, color: "#9CA3AF", margin: "6px 0 8px", letterSpacing: 0.5 }}>
+            빠른 질문 템플릿
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18 }}>
+            {PRESETS.map((p, i) => (
+              <button key={i} onClick={() => setTitle(p)} style={{
+                padding: "8px 12px", borderRadius: 999,
+                border: title === p ? "2px solid #5B57F5" : "2px solid #E5E7EB",
+                background: title === p ? "#EDE9FE" : "#fff",
+                color: title === p ? "#5B21B6" : "#4B5563",
+                fontSize: 12, fontWeight: 700, cursor: "pointer",
+                fontFamily: "inherit", lineHeight: 1.3,
+                textAlign: "left", maxWidth: "100%",
+              }}>{p}</button>
+            ))}
+          </div>
+
+          <label style={{ fontSize: 12, fontWeight: 900, color: "#374151", marginBottom: 6, display: "block" }}>
+            주제 <span style={{ color: "#EF4444" }}>*</span>
+          </label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} style={{
+            width: "100%", padding: "13px 15px", borderRadius: 14,
+            border: "2px solid #E5E7EB", fontSize: 15, color: "#111827",
+            background: "#F9FAFB", outline: "none", boxSizing: "border-box",
+            fontWeight: 700, marginBottom: 16, fontFamily: "inherit",
+          }}/>
+
+          <label style={{ fontSize: 12, fontWeight: 900, color: "#374151", marginBottom: 6, display: "block" }}>
+            설명 (선택)
+          </label>
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} style={{
+            width: "100%", padding: "12px 15px", borderRadius: 14,
+            border: "2px solid #E5E7EB", fontSize: 14, color: "#111827",
+            background: "#F9FAFB", outline: "none", boxSizing: "border-box",
+            resize: "none", fontFamily: "inherit", lineHeight: 1.5, fontWeight: 500,
+          }}/>
+
+          <div style={{
+            marginTop: 16, padding: "12px 14px",
+            background: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
+            borderRadius: 14, border: "1.5px solid #FBBF24",
+            display: "flex", gap: 10, alignItems: "center",
+          }}>
+            <span style={{ fontSize: 24 }}>🐝</span>
+            <div style={{ flex: 1, fontSize: 12, color: "#78350F", fontWeight: 700, lineHeight: 1.4 }}>
+              질문이 5개 언어로 자동 번역돼서 모든 친구가 자기 언어로 볼 수 있어요.
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          padding: "14px 22px 22px", borderTop: "1px solid #F3F4F6",
+          display: "flex", gap: 10,
+        }}>
+          <button onClick={onClose} style={{
+            padding: "14px 22px", borderRadius: 14, fontSize: 14,
+            background: "#F3F4F6", color: "#6B7280", fontWeight: 800,
+            border: "none", cursor: "pointer",
+          }}>취소</button>
+          <button onClick={() => onStart(title, body)} disabled={!title.trim()} style={{
+            flex: 1, minHeight: 54, borderRadius: 14, border: "none",
+            background: !title.trim() ? "#F3F4F6" : "linear-gradient(135deg,#5B57F5,#8B5CF6)",
+            color: !title.trim() ? "#D1D5DB" : "#fff",
+            fontSize: 16, fontWeight: 900,
+            cursor: !title.trim() ? "not-allowed" : "pointer",
+            boxShadow: !title.trim() ? "none" : "0 8px 22px rgba(91,87,245,0.4), inset 0 -3px 0 rgba(0,0,0,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          }}>
+            🚀 세션 시작하기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// Tweaks — host-toggled panel for switching views & roles
+// ═════════════════════════════════════════════════════════════
+function useTweaks() {
+  const [tweaksOn, setTweaksOn] = useState(false);
+
+  // Protocol: listener first, then announce availability
+  useEffect(() => {
+    const handler = (e) => {
+      const d = e.data || {};
+      if (d.type === "__activate_edit_mode") setTweaksOn(true);
+      else if (d.type === "__deactivate_edit_mode") setTweaksOn(false);
+    };
+    window.addEventListener("message", handler);
+    window.parent?.postMessage({ type: "__edit_mode_available" }, "*");
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  return tweaksOn;
+}
+
+function TweaksPanel({ role, setRole, discussionView, setDiscussionView, viewerLang, setViewerLang }) {
+  const L = window.KIDS_LANGUAGES;
+  const VIEW_OPTS = [
+    { id: "closed",       label: "닫힘",       emoji: "—" },
+    { id: "submit",       label: "학생 입력",  emoji: "✍️" },
+    { id: "submitted",    label: "학생 완료",  emoji: "🌱" },
+    { id: "create",       label: "교사 생성",  emoji: "📝" },
+    { id: "live-teacher", label: "교사 LIVE",  emoji: "📊" },
+    { id: "reveal",       label: "🌳 공개",    emoji: "🌳" },
+  ];
+  return (
+    <div style={{
+      position: "fixed", bottom: 18, right: 18, zIndex: 9999,
+      width: 280, background: "rgba(17,24,39,0.96)",
+      border: "1px solid rgba(255,255,255,0.12)",
+      borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+      padding: 14, backdropFilter: "blur(14px)",
+      color: "#fff", fontFamily: "'Noto Sans KR', sans-serif",
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 0.6, color: "#FBBF24", marginBottom: 10 }}>
+        ⚙️ TWEAKS
+      </div>
+
+      {/* Role */}
+      <div style={{ fontSize: 10, fontWeight: 800, color: "#9CA3AF", marginBottom: 6 }}>역할</div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        {["student", "teacher"].map((r) => (
+          <button key={r} onClick={() => setRole(r)} style={{
+            flex: 1, padding: "8px 0", borderRadius: 10, cursor: "pointer",
+            background: role === r ? "linear-gradient(135deg,#5B57F5,#8B5CF6)" : "rgba(255,255,255,0.08)",
+            border: role === r ? "none" : "1px solid rgba(255,255,255,0.12)",
+            color: "#fff", fontSize: 12, fontWeight: 800, fontFamily: "inherit",
+          }}>{r === "student" ? "🧒 학생" : "👩‍🏫 교사"}</button>
+        ))}
+      </div>
+
+      {/* Discussion view */}
+      <div style={{ fontSize: 10, fontWeight: 800, color: "#9CA3AF", marginBottom: 6 }}>💭 의견 나누기 화면</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 12 }}>
+        {VIEW_OPTS.map((o) => (
+          <button key={o.id} onClick={() => setDiscussionView(o.id)} style={{
+            padding: "8px 6px", borderRadius: 9, cursor: "pointer",
+            background: discussionView === o.id ? "#F59E0B" : "rgba(255,255,255,0.06)",
+            border: discussionView === o.id ? "none" : "1px solid rgba(255,255,255,0.1)",
+            color: discussionView === o.id ? "#78350F" : "#E5E7EB",
+            fontSize: 11, fontWeight: 800, fontFamily: "inherit",
+            display: "flex", alignItems: "center", gap: 4, justifyContent: "center",
+          }}>
+            <span>{o.emoji}</span>
+            <span>{o.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Viewer lang */}
+      <div style={{ fontSize: 10, fontWeight: 800, color: "#9CA3AF", marginBottom: 6 }}>내 언어</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        {["ko","en","vi","zh","fil","ja"].map((c) => (
+          <button key={c} onClick={() => setViewerLang(c)} style={{
+            padding: "6px 9px", borderRadius: 999, cursor: "pointer",
+            background: viewerLang === c ? "#FBBF24" : "rgba(255,255,255,0.06)",
+            border: viewerLang === c ? "none" : "1px solid rgba(255,255,255,0.12)",
+            color: viewerLang === c ? "#78350F" : "#E5E7EB",
+            fontSize: 11, fontWeight: 800, fontFamily: "inherit",
+          }}>{L[c]?.flag} {c.toUpperCase()}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Main Prototype (routing via state)
+// ─────────────────────────────────────────────────────────────
+function Prototype() {
+  // Allow deep-linking via hash OR sessionStorage (preview harness strips query string + sometimes hash on reload)
+  const hashParams = typeof window !== "undefined"
+    ? new URLSearchParams((location.hash || "").replace(/^#/, ""))
+    : null;
+  const ss = typeof window !== "undefined" ? window.sessionStorage : null;
+  const initScreen = hashParams?.get("screen") || ss?.getItem("bee_screen") || "board";
+  const initView   = hashParams?.get("view")   || ss?.getItem("bee_view")   || "reveal";
+  const initRole   = hashParams?.get("role")   || ss?.getItem("bee_role")   || "student";
+  const [screen, setScreen] = useState(initScreen); // welcome | numpad | lang | board
+  const [roomCode, setRoomCode] = useState("1234");
+  const [viewerLang, setViewerLang] = useState("ko");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [interpreterOpen, setInterpreterOpen] = useState(false);
+  const [gameRoomOpen, setGameRoomOpen] = useState(false);
+
+  // ── Discussion state ──
+  // Role can be toggled via Tweaks
+  const [role, setRole] = useState(initRole); // student | teacher
+  // Discussion view state (controlled; can be forced via Tweaks)
+  const [discussionView, setDiscussionView] = useState(initView);
+  // closed | create (teacher) | live-teacher (teacher live panel) | submit (student) | submitted (student) | reveal (🌳)
+  const [myResponseText, setMyResponseText] = useState("");
+  const [responses, setResponses] = useState(SAMPLE_RESPONSES);
+  const [presence, setPresence] = useState(SAMPLE_PRESENCE);
+
+  // Open the correct discussion screen based on role (called from board action bar)
+  function openDiscussion() {
+    if (role === "teacher") {
+      // If no session yet, create one; else show live panel
+      setDiscussionView("create");
+    } else {
+      // Student: go to submit (or submitted if already done)
+      setDiscussionView(myResponseText ? "submitted" : "submit");
+    }
+  }
+
+  function handleStartSession() {
+    setDiscussionView("live-teacher");
+  }
+
+  function handleSubmitResponse(text) {
+    setMyResponseText(text);
+    // Append student-added response so tree reveal feels personal
+    setResponses((prev) => [
+      ...prev,
+      { id: "me", authorName: "나", authorLang: viewerLang, text,
+        translations: { [viewerLang]: text } },
+    ]);
+    setPresence((prev) => [
+      ...prev.filter((p) => p.cid !== "me"),
+      { cid: "me", name: "나", submitted: true },
+    ]);
+    setDiscussionView("submitted");
+  }
+
+  function handleRevealTree() { setDiscussionView("reveal"); }
+  function closeDiscussion() { setDiscussionView("closed"); }
+
+  // Tweaks — role & forced discussion view
+  const tweaksOn = useTweaks();
+
+  let screenEl;
+  switch (screen) {
+    case "welcome":
+      screenEl = <WelcomeScreen onJoin={() => setScreen("numpad")} onCreate={() => setScreen("numpad")}/>;
+      break;
+    case "numpad":
+      screenEl = <NumpadScreen onBack={() => setScreen("welcome")} onDone={c => { setRoomCode(c); setScreen("lang"); }}/>;
+      break;
+    case "lang":
+      screenEl = <LangScreen onBack={() => setScreen("numpad")} onDone={l => { setViewerLang(l); setScreen("board"); }}/>;
+      break;
+    case "board":
+      screenEl = <BoardScreen
+        roomCode={roomCode} viewerLang={viewerLang} role={role}
+        onWrite={() => setModalOpen(true)}
+        onBack={() => setScreen("welcome")}
+        onOpenInterpreter={() => setInterpreterOpen(true)}
+        onOpenDiscussion={openDiscussion}
+        onOpenGameRoom={() => setGameRoomOpen(true)}
+      />;
+      break;
+    default: screenEl = null;
+  }
+
+  return (
+    <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
+      {screenEl}
+      {tweaksOn && (
+        <TweaksPanel
+          role={role} setRole={setRole}
+          discussionView={discussionView} setDiscussionView={setDiscussionView}
+          viewerLang={viewerLang} setViewerLang={setViewerLang}
+        />
+      )}
+      {screen === "board" && (
+        <>
+          <InterpreterDrawer open={interpreterOpen} onClose={() => setInterpreterOpen(false)} viewerLang={viewerLang}/>
+          {window.GameRoom && <window.GameRoom open={gameRoomOpen} onClose={() => setGameRoomOpen(false)} viewerLang={viewerLang}/>}
+          <PostModal open={modalOpen} onClose={() => setModalOpen(false)} onSent={() => setModalOpen(false)}/>
+
+          {/* 💭 Discussion overlays */}
+          <DiscussionCreateSheet
+            open={discussionView === "create"}
+            onClose={closeDiscussion}
+            onStart={(t, b) => handleStartSession(t, b)}
+          />
+          {(discussionView === "submit" || discussionView === "submitted") && (
+            <StudentSubmitView
+              session={SAMPLE_SESSION}
+              viewerLang={viewerLang}
+              onClose={closeDiscussion}
+              submitted={discussionView === "submitted"}
+              onSubmit={handleSubmitResponse}
+              myResponse={myResponseText}
+            />
+          )}
+          {discussionView === "live-teacher" && (
+            <TeacherLivePanel
+              session={SAMPLE_SESSION}
+              viewerLang={viewerLang}
+              responses={responses}
+              presence={presence}
+              onClose={closeDiscussion}
+              onRevealTree={handleRevealTree}
+            />
+          )}
+          {discussionView === "reveal" && (
+            <FruitTreeReveal
+              session={SAMPLE_SESSION}
+              responses={responses}
+              viewerLang={viewerLang}
+              onClose={closeDiscussion}
+            />
+          )}
+        </>
+      )}
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes typingDot {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-4px); opacity: 1; }
+        }
+        @keyframes wave {
+          from { height: 6px; } to { height: 44px; }
+        }
+        @keyframes recPulse {
+          0%, 100% { box-shadow: 0 12px 28px rgba(239,68,68,0.5), inset 0 -4px 0 rgba(0,0,0,0.15), 0 0 0 0 rgba(239,68,68,0.6); }
+          50% { box-shadow: 0 12px 28px rgba(239,68,68,0.5), inset 0 -4px 0 rgba(0,0,0,0.15), 0 0 0 14px rgba(239,68,68,0); }
+        }
+        @keyframes fruitPop {
+          0% { opacity: 0; }
+          60% { opacity: 1; }
+          100% { opacity: 1; }
+        }
+        .fruit-drop { animation-name: fruitPop; }
+      `}</style>
+    </div>
+  );
+}
+
+window.Prototype = Prototype;
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<Prototype/>);
+</script>
+</body>
+</html>
