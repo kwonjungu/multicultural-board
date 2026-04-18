@@ -560,12 +560,201 @@ function ResponseCard({ resp, idx, myLang }: { resp: SessionResponse; idx: numbe
   );
 }
 
+// ═════════════════════════════ 🍎 Fruit shapes (v2 reveal) ═════════════════════════════
+type FruitKind = {
+  id: string; bg: string; edge: string; shine: string; stem: string; leaf: string;
+  w: number; h: number;
+  path: (s: { bg: string; edge: string }) => React.ReactElement;
+};
+
+const FRUIT_KINDS: FruitKind[] = [
+  { id: "apple",  bg: "#EF4444", edge: "#B91C1C", shine: "#FCA5A5", stem: "#78350F", leaf: "#16A34A",
+    w: 72, h: 78,
+    path: (s) => <ellipse cx="36" cy="42" rx="30" ry="30" fill={s.bg}/>,
+  },
+  { id: "peach",  bg: "#FDBA74", edge: "#C2410C", shine: "#FED7AA", stem: "#78350F", leaf: "#22C55E",
+    w: 70, h: 74,
+    path: (s) => (<g>
+      <ellipse cx="36" cy="44" rx="28" ry="28" fill={s.bg}/>
+      <path d="M36 16 Q30 30 36 44" stroke={s.edge} strokeWidth="1.5" fill="none" opacity="0.4"/>
+    </g>),
+  },
+  { id: "grape",  bg: "#8B5CF6", edge: "#5B21B6", shine: "#C4B5FD", stem: "#78350F", leaf: "#16A34A",
+    w: 74, h: 82,
+    path: (s) => (<g>
+      <circle cx="28" cy="36" r="11" fill={s.bg}/>
+      <circle cx="44" cy="36" r="11" fill={s.bg}/>
+      <circle cx="36" cy="50" r="11" fill={s.bg}/>
+      <circle cx="22" cy="52" r="10" fill={s.edge}/>
+      <circle cx="50" cy="52" r="10" fill={s.edge}/>
+      <circle cx="36" cy="64" r="10" fill={s.bg}/>
+    </g>),
+  },
+  { id: "lemon",  bg: "#FDE047", edge: "#CA8A04", shine: "#FEF08A", stem: "#78350F", leaf: "#84CC16",
+    w: 76, h: 70,
+    path: (s) => (<g>
+      <ellipse cx="36" cy="42" rx="32" ry="26" fill={s.bg}/>
+      <ellipse cx="4"  cy="42" rx="5" ry="3" fill={s.edge}/>
+      <ellipse cx="68" cy="42" rx="5" ry="3" fill={s.edge}/>
+    </g>),
+  },
+  { id: "berry",  bg: "#3B82F6", edge: "#1E40AF", shine: "#93C5FD", stem: "#78350F", leaf: "#22C55E",
+    w: 68, h: 72,
+    path: (s) => (<g>
+      <circle cx="36" cy="42" r="28" fill={s.bg}/>
+      <path d="M26 30 L36 24 L46 30" stroke={s.edge} strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+      <path d="M30 26 L36 18 L42 26" stroke={s.edge} strokeWidth="2"   fill="none" strokeLinecap="round" opacity="0.6"/>
+    </g>),
+  },
+  { id: "cherry", bg: "#DC2626", edge: "#7F1D1D", shine: "#FCA5A5", stem: "#78350F", leaf: "#16A34A",
+    w: 78, h: 84,
+    path: (s) => (<g>
+      <circle cx="22" cy="56" r="16" fill={s.bg}/>
+      <circle cx="52" cy="56" r="16" fill={s.bg}/>
+      <path d="M22 40 Q32 16 40 14" stroke={s.stem} strokeWidth="3" fill="none" strokeLinecap="round"/>
+      <path d="M52 40 Q42 16 40 14" stroke={s.stem} strokeWidth="3" fill="none" strokeLinecap="round"/>
+    </g>),
+  },
+];
+
+function Fruit({ kind, scale = 1 }: { kind: FruitKind; scale?: number }) {
+  const { w, h, bg, edge, shine, stem, leaf, path } = kind;
+  const W = w * scale, H = h * scale;
+  return (
+    <svg viewBox={`0 0 ${w} ${h + 14}`} width={W} height={H + 14 * scale} style={{ display: "block", overflow: "visible" }}>
+      <ellipse cx={w / 2} cy={h + 8} rx={w * 0.32} ry={4} fill="#000" opacity="0.12"/>
+      <path d={`M${w / 2} 14 Q${w / 2 - 2} 8 ${w / 2 + 1} 2`} stroke={stem} strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+      <g transform={`translate(${w / 2 + 2} 6) rotate(30)`}>
+        <path d="M0 0 Q10 -2 14 6 Q8 8 0 0 Z" fill={leaf}/>
+      </g>
+      <g transform="translate(0 8)">
+        {path({ bg, edge })}
+        <ellipse cx={w / 2} cy={h / 2 + 10} rx={w * 0.38} ry={5} fill={edge} opacity="0.15"/>
+        <ellipse cx={w * 0.38} cy={h * 0.35} rx={w * 0.12} ry={h * 0.16} fill={shine} opacity="0.75"/>
+        <circle cx={w * 0.28} cy={h * 0.26} r={2} fill="#fff" opacity="0.9"/>
+      </g>
+    </svg>
+  );
+}
+
+function RevealConfetti() {
+  const pieces = useMemo(() => {
+    const arr: { id: number; left: number; delay: number; dur: number; size: number; color: string }[] = [];
+    for (let i = 0; i < 22; i++) {
+      arr.push({
+        id: i,
+        left: (i * 37 + 11) % 100,
+        delay: (i * 0.11) % 2.2,
+        dur: 2.6 + ((i * 0.19) % 1.4),
+        size: 10 + ((i * 7) % 12),
+        color: ["#F59E0B", "#F472B6", "#34D399", "#60A5FA", "#FCD34D", "#FB923C"][i % 6],
+      });
+    }
+    return arr;
+  }, []);
+  return (
+    <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5, overflow: "hidden" }}>
+      {pieces.map((p) => (
+        <div key={p.id} style={{
+          position: "absolute", left: `${p.left}%`, top: -30,
+          width: p.size, height: p.size, borderRadius: "50%", background: p.color,
+          animation: `revealFall ${p.dur}s ease-in ${p.delay}s 1 both`,
+        }}/>
+      ))}
+    </div>
+  );
+}
+
+function FruitDetailModal({
+  resp, kind, myLang, onClose,
+}: {
+  resp: SessionResponse; kind: FruitKind; myLang: string; onClose: () => void;
+}) {
+  const native = resp.text;
+  const translated = resp.translations?.[myLang] || native;
+  const sameLang = resp.authorLang === myLang;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "absolute", inset: 0, zIndex: 70,
+        background: "rgba(17,24,39,0.55)", backdropFilter: "blur(6px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24, animation: "fadeIn 0.2s",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff", borderRadius: 28, maxWidth: 440, width: "100%",
+          overflow: "hidden", boxShadow: "0 40px 80px rgba(0,0,0,0.4)",
+          animation: "fruitBloom 0.35s cubic-bezier(.17,.89,.32,1.28)",
+        }}
+      >
+        <div style={{
+          background: `radial-gradient(circle at 50% 40%, ${kind.shine} 0%, ${kind.bg} 55%, ${kind.edge} 100%)`,
+          padding: "26px 20px 20px", display: "flex", justifyContent: "center",
+          position: "relative",
+        }}>
+          <div style={{ position: "absolute", top: 14, left: 30, fontSize: 22 }}>✨</div>
+          <div style={{ position: "absolute", top: 30, right: 28, fontSize: 18 }}>⭐</div>
+          <div style={{ position: "absolute", bottom: 14, left: 40, fontSize: 14 }}>🌟</div>
+          <Fruit kind={kind} scale={1.8}/>
+        </div>
+        <div style={{ padding: "18px 22px 22px" }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+            paddingBottom: 14, borderBottom: "1px dashed #E5E7EB",
+          }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 14,
+              background: "#FEF3C7", display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: 22, border: "2px solid #FDE68A",
+            }}>{LANGUAGES[resp.authorLang]?.flag || "🌐"}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937" }}>
+                {resp.authorName}
+              </div>
+              <div style={{ fontSize: 12, color: "#6B7280", fontWeight: 700 }}>
+                {LANGUAGES[resp.authorLang]?.label || resp.authorLang}
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: "#1F2937", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+            {translated}
+          </div>
+          {!sameLang && (
+            <div style={{
+              marginTop: 12, padding: "10px 14px",
+              background: "#FFFBEB", border: "1px dashed #FDE68A",
+              borderRadius: 12, fontSize: 13, color: "#92400E",
+              fontStyle: "italic", lineHeight: 1.55,
+            }}>
+              &quot;{native}&quot;
+            </div>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              width: "100%", marginTop: 14, minHeight: 52, borderRadius: 16,
+              background: "linear-gradient(135deg, #F59E0B, #D97706)",
+              color: "#fff", fontSize: 16, fontWeight: 900, border: "none",
+              cursor: "pointer", boxShadow: "0 8px 20px rgba(245,158,11,0.4)",
+            }}
+          >🐝 닫기</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═════════════════════════════ 🌳 FruitTree ═════════════════════════════
 function FruitTree({
   question, responses, myLang,
 }: {
   question: string; responses: SessionResponse[]; myLang: string;
 }) {
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const n = responses.length;
   const ringCount = n <= 8 ? 1 : n <= 18 ? 2 : 3;
   const perRing = Math.ceil(n / ringCount);
@@ -639,7 +828,10 @@ function FruitTree({
         </g>
       </svg>
 
-      {/* 🍎 Fruits — elliptical spread (wider horizontal) */}
+      {/* 🎉 Confetti burst on reveal */}
+      <RevealConfetti />
+
+      {/* 🍎 Fruits — elliptical spread, tap to expand */}
       {responses.map((r, i) => {
         const ringIdx = Math.min(Math.floor(i / perRing), ringCount - 1);
         const posInRing = i % perRing;
@@ -648,28 +840,49 @@ function FruitTree({
         const angle = ((posInRing + 0.5) / itemsInRing) * Math.PI * 2
           - Math.PI / 2 + angleOffset;
         const radius = ringRadii[ringIdx];
-        // Landscape aspect: stretch X, compress Y
         const cx = 50 + Math.cos(angle) * radius * 1.55;
         const cy = 48 + Math.sin(angle) * radius * 0.78;
+        const kind = FRUIT_KINDS[i % FRUIT_KINDS.length];
 
         return (
-          <div
+          <button
             key={r.id}
+            onClick={() => setSelectedIdx(i)}
+            aria-label={`${r.authorName} 응답 펼치기`}
             style={{
               position: "absolute",
               left: `${cx}%`,
               top: `${cy}%`,
               transform: "translate(-50%, -50%)",
-              width: cardWidth,
-              maxWidth: "22%",
               zIndex: 2,
               animation: `fruitPop 0.45s cubic-bezier(.17,.89,.32,1.28) ${i * 0.04}s both`,
+              background: "transparent", border: "none", padding: 0, cursor: "pointer",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+              filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.25))",
             }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "translate(-50%, -55%) scale(1.08)")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "translate(-50%, -50%) scale(1)")}
           >
-            <ResponseCard resp={r} idx={i} myLang={myLang} />
-          </div>
+            <Fruit kind={kind} scale={Math.max(0.85, Math.min(1.15, cardWidth / 140))} />
+            <div style={{
+              background: "rgba(255,255,255,0.95)", color: "#1F2937",
+              padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 800,
+              boxShadow: "0 2px 6px rgba(0,0,0,0.15)", whiteSpace: "nowrap",
+              maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis",
+            }}>{r.authorName}</div>
+          </button>
         );
       })}
+
+      {/* Tap-to-expand modal */}
+      {selectedIdx !== null && responses[selectedIdx] && (
+        <FruitDetailModal
+          resp={responses[selectedIdx]}
+          kind={FRUIT_KINDS[selectedIdx % FRUIT_KINDS.length]}
+          myLang={myLang}
+          onClose={() => setSelectedIdx(null)}
+        />
+      )}
 
       {/* ❓ Center question */}
       <div style={{
@@ -700,10 +913,23 @@ function FruitTree({
         </div>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes fruitPop {
           0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
           100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+        @keyframes revealFall {
+          0%   { transform: translateY(-20px) rotate(0deg);   opacity: 0; }
+          15%  { opacity: 1; }
+          100% { transform: translateY(90vh) rotate(540deg);  opacity: 0; }
+        }
+        @keyframes fruitBloom {
+          0%   { transform: scale(0.3); opacity: 0; }
+          100% { transform: scale(1);   opacity: 1; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
       `}</style>
     </div>
