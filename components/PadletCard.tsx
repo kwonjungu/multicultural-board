@@ -63,28 +63,28 @@ function TranslationRow({ lang, text, accent }: { lang: string; text: string; ac
   return (
     <div style={{
       position: "relative",
-      background: accent + "0A",
-      borderLeft: "3px solid " + accent,
-      padding: "8px 12px",
-      borderRadius: 8,
-      marginTop: 6,
+      background: accent + "14",
+      borderLeft: "4px solid " + accent,
+      padding: "10px 14px",
+      borderRadius: "0 10px 10px 0",
+      marginTop: 8,
     }}>
-      <span style={{ fontSize: 10, opacity: 0.7, display: "block", marginBottom: 4, color: accent, fontWeight: 700 }}>
+      <span style={{ fontSize: 12, display: "block", marginBottom: 4, color: accent, fontWeight: 800 }}>
         {LANGUAGES[lang]?.flag} {LANGUAGES[lang]?.label}
       </span>
-      <span style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{text}</span>
+      <span style={{ fontSize: 15, color: "#374151", lineHeight: 1.65, fontWeight: 500 }}>{text}</span>
       <button
         onClick={() => speakText(text, lang)}
         title="읽어주기"
         aria-label={`${LANGUAGES[lang]?.label} 읽어주기`}
         style={{
           position: "absolute", top: 8, right: 8,
-          background: "none", border: "none", cursor: "pointer",
-          fontSize: 12, color: "#CBD5E1", padding: "2px",
-          transition: "color 0.15s", lineHeight: 1,
+          background: "rgba(255,255,255,0.8)", border: `1.5px solid ${accent}44`, cursor: "pointer",
+          fontSize: 13, color: accent, padding: "4px 8px",
+          transition: "all 0.15s", lineHeight: 1, borderRadius: 10, fontWeight: 700,
         }}
-        onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = accent)}
-        onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#CBD5E1")}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.08)"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.8)"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
       >🔊</button>
     </div>
   );
@@ -258,39 +258,40 @@ export default function PadletCard({
     <div
       style={{
         background: isPending ? "#FFFBEB" : p.bg,
-        borderRadius: 14,
-        border: isPending ? "2px solid #F59E0B" : "1px solid #EEF0F6",
-        borderLeft: isPending ? "4px solid #F59E0B" : `4px solid ${p.accent}`,
-        boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 2px 6px rgba(0,0,0,0.04)",
-        marginBottom: 10,
+        borderRadius: 18,
+        border: isPending ? "2px solid #F59E0B" : "1px solid " + p.accent + "22",
+        borderLeft: isPending ? "5px solid #F59E0B" : `5px solid ${p.accent}`,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.03)",
+        marginBottom: 12,
         transition: "box-shadow 0.2s, transform 0.2s",
         overflow: "hidden",
         ...pendingBorderStyle,
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 24px rgba(0,0,0,0.1)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 10px 28px rgba(180,83,9,0.12), 0 4px 8px rgba(0,0,0,0.04)";
         (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.05), 0 2px 6px rgba(0,0,0,0.04)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.03)";
         (e.currentTarget as HTMLDivElement).style.transform = "none";
       }}
     >
-      <div style={{ padding: "12px 14px 14px" }}>
+      <div style={{ padding: "14px 16px 12px" }}>
         {/* Author row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <div style={{
-            width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-            background: `linear-gradient(135deg, ${p.accent}cc, ${p.accent}66)`,
+            width: 40, height: 40, borderRadius: 14, flexShrink: 0,
+            background: `linear-gradient(135deg, ${p.accent}, ${p.accent}aa)`,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: card.isTeacher ? 15 : 13, fontWeight: 900, color: "#fff",
+            fontSize: card.isTeacher ? 18 : 16, fontWeight: 900, color: "#fff",
+            boxShadow: `0 4px 10px ${p.accent}44`,
           }}>
             {card.isTeacher ? "👩‍🏫" : card.authorName.charAt(0).toUpperCase()}
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 700, fontSize: 14, color: "#1F2937" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 800, fontSize: 15, color: "#1F2937" }}>
                 {card.authorName}
               </span>
               {card.isTeacher && (
@@ -332,7 +333,7 @@ export default function PadletCard({
                 }}>수정됨</span>
               )}
             </div>
-            <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 3, display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }}>
               {LANGUAGES[card.authorLang]?.flag}
               <span>{LANGUAGES[card.authorLang]?.label}</span>
               <span style={{ color: "#E5E7EB" }}>·</span>
@@ -433,18 +434,19 @@ export default function PadletCard({
         {cardType === "text" && (
           <>
             <div style={{
-              fontSize: 14, fontWeight: 600, color: "#111827", lineHeight: 1.7,
-              padding: "9px 11px",
-              background: "rgba(255,255,255,0.75)",
-              borderRadius: 9, border: "1px solid #F3F4F6",
-              display: "flex", gap: 8, alignItems: "flex-start",
+              fontSize: 17, fontWeight: 500, color: "#1F2937", lineHeight: 1.65,
+              padding: "12px 14px",
+              background: "#fff",
+              borderRadius: 12, border: "1px solid " + p.accent + "22",
+              display: "flex", gap: 10, alignItems: "flex-start",
             }}>
               <span style={{ flex: 1 }}>{card.originalText}</span>
               <button
                 onClick={() => speakText(card.originalText, card.authorLang)}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#CBD5E1", flexShrink: 0, padding: "2px", transition: "color 0.15s" }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = p.accent)}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#CBD5E1")}
+                aria-label="원문 읽어주기"
+                style={{ background: p.accent + "14", border: `1.5px solid ${p.accent}33`, cursor: "pointer", fontSize: 13, color: p.accent, flexShrink: 0, padding: "4px 8px", transition: "all 0.15s", borderRadius: 10, fontWeight: 700 }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = p.accent + "22"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.08)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = p.accent + "14"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
               >🔊</button>
             </div>
 
@@ -474,10 +476,13 @@ export default function PadletCard({
                 <button
                   onClick={() => setOpen((v) => !v)}
                   style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    fontSize: 11, color: p.accent, fontWeight: 700,
-                    padding: "6px 0 0", display: "flex", alignItems: "center", gap: 3,
+                    background: "rgba(255,255,255,0.7)", border: `1.5px dashed ${p.accent}55`, cursor: "pointer",
+                    fontSize: 13, color: p.accent, fontWeight: 800,
+                    padding: "8px 14px", marginTop: 8, borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 4,
+                    transition: "all 0.15s",
                   }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = p.accent + "14")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.7)")}
                 >
                   {open ? "▲ 접기" : `▼ +${otherLangs.length}개 언어 더보기`}
                 </button>
@@ -493,28 +498,38 @@ export default function PadletCard({
       </div>
 
       {/* ── Comment toggle bar ── */}
-      <div
-        style={{
-          borderTop: "1px solid rgba(0,0,0,0.06)",
-          display: "flex", alignItems: "center",
-          padding: "8px 14px", cursor: "pointer",
-          color: "#6B7280", fontSize: 12,
-        }}
+      <button
+        type="button"
         onClick={() => setCommentsOpen((v) => !v)}
-        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.color = colColor)}
-        onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.color = "#6B7280")}
+        aria-expanded={commentsOpen}
+        style={{
+          width: "100%", borderTop: `1px solid ${p.accent}22`,
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "12px 16px", cursor: "pointer",
+          color: commentsOpen ? p.accent : "#6B7280", fontSize: 14, fontWeight: 800,
+          background: commentsOpen ? p.accent + "0A" : "rgba(255,255,255,0.4)",
+          border: "none", transition: "all 0.15s", fontFamily: "inherit",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color = p.accent;
+          (e.currentTarget as HTMLButtonElement).style.background = p.accent + "0F";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color = commentsOpen ? p.accent : "#6B7280";
+          (e.currentTarget as HTMLButtonElement).style.background = commentsOpen ? p.accent + "0A" : "rgba(255,255,255,0.4)";
+        }}
       >
-        <span style={{ marginRight: 6 }}>💬</span>
-        {commentCount > 0 ? `${commentCount}` : t("addComment", viewerLang)}
-        {commentsOpen && <span style={{ marginLeft: "auto", fontSize: 11 }}>✕ 닫기</span>}
-      </div>
+        <span style={{ fontSize: 18 }}>💬</span>
+        {commentCount > 0 ? `${commentCount}개 댓글` : t("addComment", viewerLang)}
+        {commentsOpen && <span style={{ marginLeft: "auto", fontSize: 12 }}>✕ 닫기</span>}
+      </button>
 
       {/* ── Expanded comments section ── */}
       {commentsOpen && (
         <div style={{
-          padding: "12px 14px",
-          background: "#F8F9FC",
-          borderTop: "1px solid rgba(0,0,0,0.04)",
+          padding: "14px 16px",
+          background: "#FFFBEB",
+          borderTop: `1px solid ${p.accent}22`,
         }}>
           {/* Header */}
           <div style={{ fontWeight: 700, fontSize: 12, color: "#374151", marginBottom: 10 }}>
@@ -617,7 +632,7 @@ export default function PadletCard({
           )}
 
           {/* Input area */}
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <input
               value={commentInput}
               onChange={(e) => {
@@ -637,25 +652,26 @@ export default function PadletCard({
               placeholder={t("commentPlaceholder", viewerLang)}
               disabled={submittingComment}
               style={{
-                flex: 1, height: 40, borderRadius: 20, padding: "0 14px",
-                border: "1.5px solid #E5E7EB", fontSize: 13, outline: "none",
+                flex: 1, height: 48, borderRadius: 24, padding: "0 18px",
+                border: "2px solid #FDE68A", fontSize: 15, outline: "none",
                 background: submittingComment ? "#F3F4F6" : "#fff",
-                color: "#111827",
+                color: "#1F2937", fontWeight: 500,
               }}
               onFocus={(e) => (e.target.style.borderColor = colColor)}
-              onBlur={(e) => (e.target.style.borderColor = "#E5E7EB")}
+              onBlur={(e) => (e.target.style.borderColor = "#FDE68A")}
             />
             <button
               onClick={submitComment}
               disabled={!commentInput.trim() || submittingComment}
               aria-busy={submittingComment}
               style={{
-                padding: "0 16px", height: 40, borderRadius: 20, border: "none",
-                background: commentInput.trim() && !submittingComment ? colColor : "#E5E7EB",
+                padding: "0 20px", height: 48, borderRadius: 24, border: "none",
+                background: commentInput.trim() && !submittingComment ? `linear-gradient(135deg, ${colColor}, ${colColor}dd)` : "#E5E7EB",
                 color: commentInput.trim() && !submittingComment ? "#fff" : "#9CA3AF",
-                fontWeight: 700, fontSize: 13,
+                fontWeight: 800, fontSize: 15,
                 cursor: commentInput.trim() && !submittingComment ? "pointer" : "not-allowed",
                 whiteSpace: "nowrap", transition: "all 0.15s", flexShrink: 0,
+                boxShadow: commentInput.trim() && !submittingComment ? `0 6px 16px ${colColor}44` : "none",
               }}
             >
               {submittingComment ? t("commentTranslating", viewerLang) : t("submitComment", viewerLang)}
