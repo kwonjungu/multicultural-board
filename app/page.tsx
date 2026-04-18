@@ -18,6 +18,7 @@ const selectStyle: React.CSSProperties = {
 export default function Home() {
   const router = useRouter();
   const [tab, setTab] = useState<"join" | "create" | "pptx">("join");
+  const [view, setView] = useState<"hero" | "sub">("hero");
 
   // ── Join ──────────────────────────────────────────────────────────
   const [joinCode, setJoinCode] = useState("");
@@ -214,11 +215,23 @@ export default function Home() {
   const joinReady   = joinCode.replace(/\D/g, "").length === 4;
   const createReady = createCode.length === 4 && createLangs.length > 0;
 
-  const TABS = [
-    { key: "join"   as const, label: "🚪 방 입장",   sub: "학생 · 교사" },
-    { key: "create" as const, label: "✨ 방 만들기",  sub: "선생님 전용" },
-    { key: "pptx"   as const, label: "📄 문서 번역",  sub: "PPTX·HWPX"  },
-  ];
+  function enterView(next: "join" | "create" | "pptx") {
+    setTab(next);
+    setView("sub");
+    setCreateMsg(null);
+    setPptxError(null);
+  }
+  function backToHero() {
+    setView("hero");
+    setCreateMsg(null);
+    setPptxError(null);
+  }
+
+  const SUB_TITLE: Record<"join" | "create" | "pptx", string> = {
+    join: "🚪 방에 들어가기",
+    create: "✨ 새 방 만들기",
+    pptx: "📄 문서 번역하기",
+  };
 
   return (
     <div style={{
@@ -238,52 +251,111 @@ export default function Home() {
       <div style={{ position: "fixed", bottom: "-20%", left: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.35) 0%, transparent 65%)", pointerEvents: "none" }} />
 
       <div style={{
-        background: "#fff", borderRadius: 28, padding: "32px 28px 28px",
+        background: "#fff", borderRadius: 28, padding: view === "hero" ? "40px 28px 28px" : "22px 28px 28px",
         maxWidth: "min(480px, 92vw)", width: "100%",
         boxShadow: "0 30px 80px rgba(180,83,9,0.18), 0 0 0 1px rgba(253,230,138,0.6)",
         animation: "fadeSlideIn 0.4s ease", position: "relative", zIndex: 1,
       }}>
-        {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 22 }}>
-          <div style={{ display: "inline-block", marginBottom: 6 }}>
-            <BeeMascot size={96} mood="welcome" />
-          </div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: "#1F2937", letterSpacing: -0.5 }}>
-            꿀벌 소통창
-          </h1>
-          <p style={{ margin: "6px 0 0", fontSize: 13, color: "#92400E", fontWeight: 700 }}>
-            안녕! 친구들과 이야기 나눠볼까?
-          </p>
-        </div>
+        {view === "hero" ? (
+          <>
+            {/* Hero: big mascot + 2 CTAs */}
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
+              <div style={{ display: "inline-block", position: "relative", marginBottom: 10 }}>
+                <BeeMascot size={140} mood="welcome" />
+                <div style={{
+                  position: "absolute", top: -4, right: -80,
+                  background: "#fff", padding: "9px 14px", borderRadius: 18,
+                  borderBottomLeftRadius: 4,
+                  boxShadow: "0 6px 20px rgba(180,83,9,0.18)",
+                  border: "2px solid #FDE68A",
+                  fontSize: 15, fontWeight: 900, color: "#B45309",
+                  whiteSpace: "nowrap",
+                }}>안녕, 친구야! 👋</div>
+              </div>
+              <h1 style={{ margin: "8px 0 0", fontSize: 28, fontWeight: 900, color: "#1F2937", letterSpacing: -0.6, lineHeight: 1.25 }}>
+                우리 반에<br/>놀러 갈까?
+              </h1>
+              <p style={{ margin: "10px 0 0", fontSize: 15, color: "#92400E", fontWeight: 700 }}>
+                방 번호를 눌러서 들어가요
+              </p>
+            </div>
 
-        {/* Tab switcher — 3 tabs */}
-        <div style={{
-          display: "flex", background: "#F3F4F6", borderRadius: 14,
-          padding: 4, marginBottom: 26, gap: 3,
-        }}>
-          {TABS.map((t) => (
+            {/* Two giant CTAs */}
             <button
-              key={t.key}
-              onClick={() => { setTab(t.key); setCreateMsg(null); setPptxError(null); }}
+              onClick={() => enterView("join")}
               style={{
-                flex: 1, padding: "9px 4px", borderRadius: 11, border: "none",
-                background: tab === t.key ? "#fff" : "transparent",
-                boxShadow: tab === t.key ? "0 1px 6px rgba(0,0,0,0.1)" : "none",
-                cursor: "pointer", transition: "all 0.15s",
+                width: "100%", minHeight: 76, borderRadius: 22, border: "none",
+                background: "linear-gradient(135deg, #F59E0B, #D97706)",
+                color: "#fff", fontSize: 22, fontWeight: 900,
+                boxShadow: "0 10px 28px rgba(245,158,11,0.4), inset 0 -4px 0 rgba(0,0,0,0.15)",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
+                marginBottom: 12, transition: "transform 0.12s",
               }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
+              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
             >
-              <div style={{ fontWeight: 800, fontSize: 12, color: tab === t.key ? "#111827" : "#9CA3AF" }}>
-                {t.label}
-              </div>
-              <div style={{ fontSize: 10, color: tab === t.key ? "#6B7280" : "#C4C4C4", marginTop: 1 }}>
-                {t.sub}
-              </div>
+              <span style={{ fontSize: 30 }}>🚪</span> 방에 들어가기
             </button>
-          ))}
-        </div>
+
+            <button
+              onClick={() => enterView("create")}
+              style={{
+                width: "100%", minHeight: 66, borderRadius: 20,
+                background: "#fff", border: "3px solid #FDE68A",
+                color: "#B45309", fontSize: 18, fontWeight: 900,
+                boxShadow: "0 6px 16px rgba(180,83,9,0.1)",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                transition: "transform 0.12s, background 0.15s, border-color 0.15s",
+              }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
+              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF3C7"; e.currentTarget.style.borderColor = "#F59E0B"; }}
+            >
+              ✨ 새 방 만들기
+              <span style={{ fontSize: 12, background: "#FEF3C7", padding: "3px 10px", borderRadius: 999, color: "#92400E", fontWeight: 800 }}>선생님</span>
+            </button>
+
+            <button
+              onClick={() => enterView("pptx")}
+              style={{
+                width: "100%", marginTop: 14, background: "none", border: "none",
+                color: "#92400E", fontSize: 14, fontWeight: 800, cursor: "pointer",
+                textDecoration: "underline", textUnderlineOffset: 4, padding: "6px 0",
+              }}
+            >📄 문서 번역하기</button>
+          </>
+        ) : (
+          <>
+            {/* Sub header with back button */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+              <button
+                onClick={backToHero}
+                aria-label="뒤로"
+                style={{
+                  width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+                  background: "#fff", border: "2px solid #FDE68A",
+                  fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF3C7"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#F59E0B"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#FDE68A"; }}
+              >←</button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
+                  {SUB_TITLE[tab]}
+                </div>
+              </div>
+              <BeeMascot size={40} mood={tab === "pptx" ? "loading" : tab === "create" ? "shh" : "cheer"} />
+            </div>
+          </>
+        )}
+
 
         {/* ── 방 입장 ── */}
-        {tab === "join" && (
+        {view === "sub" && tab === "join" && (
           <>
             <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1, textAlign: "center" }}>
               방 번호 ROOM CODE
@@ -322,7 +394,7 @@ export default function Home() {
         )}
 
         {/* ── 방 만들기 ── */}
-        {tab === "create" && (
+        {view === "sub" && tab === "create" && (
           <>
             <div style={{ marginBottom: 20 }}>
               <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
@@ -398,7 +470,7 @@ export default function Home() {
         )}
 
         {/* ── PPTX 번역 ── */}
-        {tab === "pptx" && (
+        {view === "sub" && tab === "pptx" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
             {/* 언어 방향 */}
