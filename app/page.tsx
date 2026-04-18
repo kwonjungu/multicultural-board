@@ -368,43 +368,95 @@ export default function Home() {
         )}
 
 
-        {/* ── 방 입장 ── */}
+        {/* ── 방 입장: 터치 키패드 ── */}
         {view === "sub" && tab === "join" && (
-          <>
-            <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1, textAlign: "center" }}>
-              방 번호 ROOM CODE
+          <div
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key >= "0" && e.key <= "9" && joinCode.length < 4) {
+                setJoinCode((c) => (c + e.key).slice(0, 4));
+              } else if (e.key === "Backspace") {
+                setJoinCode((c) => c.slice(0, -1));
+              } else if (e.key === "Enter" && joinReady) {
+                handleJoin();
+              }
+            }}
+            style={{ outline: "none" }}
+          >
+            <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, color: "#92400E", textAlign: "center" }}>
+              방 번호 4자리를 눌러 주세요
             </p>
-            <input
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-              placeholder="0000"
-              maxLength={4}
-              autoFocus
-              style={{
-                width: "100%", padding: "18px 0", borderRadius: 16, marginBottom: 16,
-                border: "2px solid #E5E7EB", fontSize: 36, fontWeight: 900,
-                textAlign: "center", letterSpacing: 16, color: "#111827",
-                background: "#F9FAFB", outline: "none", transition: "all 0.18s",
-                boxSizing: "border-box",
-              }}
-              onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(245,158,11,0.18)"; }}
-              onBlur={(e)  => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; e.target.style.boxShadow = "none"; }}
-            />
+
+            {/* 4 digit display boxes */}
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 22 }}>
+              {[0, 1, 2, 3].map((i) => {
+                const d = joinCode[i];
+                const filled = !!d;
+                const nextSlot = !filled && i === joinCode.length;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      width: 56, height: 68, borderRadius: 16,
+                      background: filled ? "#fff" : nextSlot ? "rgba(255,255,255,0.85)" : "rgba(255,251,235,0.6)",
+                      border: `3px solid ${filled ? "#F59E0B" : nextSlot ? "#FBBF24" : "#FDE68A"}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 34, fontWeight: 900, color: "#B45309",
+                      boxShadow: filled ? "0 4px 0 rgba(180,83,9,0.15)" : "none",
+                      transition: "all 0.12s",
+                    }}
+                  >
+                    {d || (nextSlot ? <span style={{ width: 4, height: 36, background: "#FBBF24", borderRadius: 2, animation: "pulse 1s ease-in-out infinite" }}/> : "")}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 3×4 touch keypad */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+              {([1, 2, 3, 4, 5, 6, 7, 8, 9, "clear", 0, "del"] as const).map((k) => {
+                const label = k === "del" ? "⌫" : k === "clear" ? "초기화" : String(k);
+                const isAction = k === "del" || k === "clear";
+                return (
+                  <button
+                    key={String(k)}
+                    onClick={() => {
+                      if (k === "del") setJoinCode((c) => c.slice(0, -1));
+                      else if (k === "clear") setJoinCode("");
+                      else if (joinCode.length < 4) setJoinCode((c) => (c + k).slice(0, 4));
+                    }}
+                    aria-label={k === "del" ? "지우기" : k === "clear" ? "모두 지우기" : `숫자 ${k}`}
+                    style={{
+                      minHeight: 64, borderRadius: 20,
+                      background: isAction ? "#FEF3C7" : "#fff",
+                      border: `2px solid ${isAction ? "#FBBF24" : "#FDE68A"}`,
+                      fontSize: isAction ? 14 : 26, fontWeight: 900, color: "#B45309",
+                      cursor: "pointer",
+                      boxShadow: "0 3px 0 rgba(180,83,9,0.12)",
+                      transition: "transform 0.1s, background 0.12s",
+                    }}
+                    onMouseDown={(e) => (e.currentTarget.style.transform = "translateY(2px)")}
+                    onMouseUp={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+                  >{label}</button>
+                );
+              })}
+            </div>
+
             <button
               onClick={handleJoin}
               disabled={!joinReady}
               style={{
-                width: "100%", padding: "15px 0", borderRadius: 14, fontSize: 15,
+                width: "100%", minHeight: 68, borderRadius: 22, fontSize: 22,
                 background: joinReady ? "linear-gradient(135deg, #F59E0B, #D97706)" : "#F3F4F6",
                 color: joinReady ? "#fff" : "#D1D5DB",
-                fontWeight: 800, border: "none",
+                fontWeight: 900, border: "none",
                 cursor: joinReady ? "pointer" : "not-allowed",
-                boxShadow: joinReady ? "0 6px 24px rgba(245,158,11,0.4)" : "none",
-                transition: "all 0.2s",
+                boxShadow: joinReady ? "0 10px 28px rgba(245,158,11,0.45), inset 0 -4px 0 rgba(0,0,0,0.15)" : "none",
+                transition: "all 0.15s",
               }}
-            >입장하기 →</button>
-          </>
+            >🐝 들어가기 →</button>
+          </div>
         )}
 
         {/* ── 방 만들기 ── */}
