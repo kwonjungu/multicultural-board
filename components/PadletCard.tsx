@@ -316,7 +316,7 @@ export default function PadletCard({
     >
       <div style={{ padding: "14px 16px 12px" }}>
         {/* Author row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
           <div style={{
             width: 40, height: 40, borderRadius: 14, flexShrink: 0,
             background: `linear-gradient(135deg, ${p.accent}, ${p.accent}aa)`,
@@ -371,73 +371,85 @@ export default function PadletCard({
                 }}>수정됨</span>
               )}
             </div>
-            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 3, display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }}>
-              {LANGUAGES[card.authorLang]?.flag}
-              <span>{LANGUAGES[card.authorLang]?.label}</span>
+            <div style={{
+              fontSize: 12, color: "#6B7280", marginTop: 3,
+              display: "flex", alignItems: "center", gap: 5, fontWeight: 600,
+              flexWrap: "wrap",
+            }}>
+              <span style={{ whiteSpace: "nowrap" }}>
+                {LANGUAGES[card.authorLang]?.flag} {LANGUAGES[card.authorLang]?.label}
+              </span>
               <span style={{ color: "#E5E7EB" }}>·</span>
-              <span>{timeAgo(card.timestamp)}</span>
+              <span style={{ whiteSpace: "nowrap" }}>{timeAgo(card.timestamp)}</span>
             </div>
           </div>
 
-          {/* Edit button */}
-          {canEdit && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
-              title={isTeacher ? "수정" : "5분 내 수정 가능"}
+          {/* Action buttons — grouped together, icon-only, can wrap below author
+              info on narrow cards without squeezing the "lang · time" line. */}
+          {(canEdit || canDelete || (isTeacher && onPraise && !card.isTeacher)) && (
+            <div
               style={{
-                background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8,
-                padding: "4px 8px", cursor: "pointer", fontSize: 12, color: "#0369A1",
-                fontWeight: 700, flexShrink: 0, transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "#E0F2FE";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "#F0F9FF";
+                display: "flex",
+                gap: 4,
+                flexShrink: 0,
+                alignSelf: "flex-start",
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+                maxWidth: 108,
               }}
             >
-              ✏️
-            </button>
-          )}
-          {/* Praise (teacher-only, can't praise teacher-authored cards) */}
-          {isTeacher && onPraise && !card.isTeacher && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onPraise(); }}
-              title={`${t("praiseAction", viewerLang)} — ${card.authorName}`}
-              style={{
-                background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8,
-                padding: "4px 8px", cursor: "pointer", fontSize: 12, color: "#B45309",
-                fontWeight: 800, flexShrink: 0, transition: "all 0.15s",
-                display: "inline-flex", alignItems: "center", gap: 4,
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF3C7"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FFFBEB"; }}
-            >
-              🌟 {t("praiseAction", viewerLang)}
-            </button>
-          )}
-          {/* Delete button */}
-          {canDelete && onDelete && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              title="삭제 (되돌리기 가능)"
-              style={{
-                background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8,
-                padding: "4px 8px", cursor: "pointer", fontSize: 12, color: "#DC2626",
-                fontWeight: 700, flexShrink: 0, transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "#FEE2E2";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "#FEF2F2";
-              }}
-            >
-              🗑️
-            </button>
+              {canEdit && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
+                  title={isTeacher ? "수정" : "5분 내 수정 가능"}
+                  aria-label="수정"
+                  style={{
+                    background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8,
+                    width: 32, height: 32, padding: 0, cursor: "pointer", fontSize: 14, color: "#0369A1",
+                    fontWeight: 700, transition: "all 0.15s",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#E0F2FE"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F0F9FF"; }}
+                >
+                  ✏️
+                </button>
+              )}
+              {isTeacher && onPraise && !card.isTeacher && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onPraise(); }}
+                  title={`${t("praiseAction", viewerLang)} — ${card.authorName}`}
+                  aria-label={t("praiseAction", viewerLang)}
+                  style={{
+                    background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8,
+                    width: 32, height: 32, padding: 0, cursor: "pointer", fontSize: 15, color: "#B45309",
+                    fontWeight: 800, transition: "all 0.15s",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF3C7"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FFFBEB"; }}
+                >
+                  🌟
+                </button>
+              )}
+              {canDelete && onDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                  title="삭제 (되돌리기 가능)"
+                  aria-label="삭제"
+                  style={{
+                    background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8,
+                    width: 32, height: 32, padding: 0, cursor: "pointer", fontSize: 14, color: "#DC2626",
+                    fontWeight: 700, transition: "all 0.15s",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEE2E2"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF2F2"; }}
+                >
+                  🗑️
+                </button>
+              )}
+            </div>
           )}
         </div>
 
