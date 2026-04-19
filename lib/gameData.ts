@@ -91,3 +91,202 @@ export function pickN<T>(arr: T[], n: number): T[] {
 export function tr(map: LangMap, lang: string, fallback = "en"): string {
   return map[lang] ?? map[fallback] ?? Object.values(map)[0] ?? "";
 }
+
+// ============================================================
+// Twenty Questions (스무고개)
+// ============================================================
+
+export type TwentyQCategory = "country" | "food" | "person";
+
+export interface HintFlags {
+  // region / location
+  isAsian?: boolean;
+  isEuropean?: boolean;
+  isAmerican?: boolean;
+  // taste / temperature
+  isHot?: boolean;
+  isCold?: boolean;
+  isSweet?: boolean;
+  isSpicy?: boolean;
+  // nature / composition
+  isDrink?: boolean;
+  isFood?: boolean;
+  hasRice?: boolean;
+  hasFlour?: boolean;
+  hasMeat?: boolean;
+  isFried?: boolean;
+  // living / man-made
+  livingThing?: boolean;
+  manMade?: boolean;
+  // job-specific
+  wearsUniform?: boolean;
+  helpsPeople?: boolean;
+  worksIndoors?: boolean;
+  worksWithKids?: boolean;
+  famous?: boolean;
+}
+
+export type HintFlag = keyof HintFlags;
+export type HintGroup = "region" | "taste" | "use" | "form" | "misc";
+
+export interface TwentyQItem {
+  id: string;
+  category: TwentyQCategory;
+  emoji: string;
+  names: LangMap;
+  hints: HintFlags;
+}
+
+export interface HintCard {
+  flag: HintFlag;
+  emoji: string;
+  group: HintGroup;
+  label: LangMap; // question shown to the guesser in langA (kid-friendly)
+}
+
+export const TWENTYQ_ITEMS: TwentyQItem[] = [
+  // ----- country (10) -----
+  { id: "c-kr", category: "country", emoji: "🇰🇷", names: { ko: "대한민국", en: "South Korea", vi: "Hàn Quốc", zh: "韩国", ja: "韓国", th: "เกาหลีใต้", id: "Korea Selatan", hi: "कोरिया", ru: "Корея", ar: "كوريا", fil: "Korea", km: "កូរ៉េ", mn: "Солонгос", uz: "Koreya", my: "ကိုရီးယား" }, hints: { isAsian: true, famous: true, manMade: false, livingThing: false } },
+  { id: "c-vn", category: "country", emoji: "🇻🇳", names: { ko: "베트남", en: "Vietnam", vi: "Việt Nam", zh: "越南", ja: "ベトナム", th: "เวียดนาม", id: "Vietnam", hi: "वियतनाम", ru: "Вьетнам", ar: "فيتنام", fil: "Biyetnam", km: "វៀតណាម", mn: "Вьетнам", uz: "Vetnam", my: "ဗီယက်နမ်" }, hints: { isAsian: true, famous: true } },
+  { id: "c-cn", category: "country", emoji: "🇨🇳", names: { ko: "중국", en: "China", vi: "Trung Quốc", zh: "中国", ja: "中国", th: "จีน", id: "Tiongkok", hi: "चीन", ru: "Китай", ar: "الصين", fil: "Tsina", km: "ចិន", mn: "Хятад", uz: "Xitoy", my: "တရုတ်" }, hints: { isAsian: true, famous: true } },
+  { id: "c-jp", category: "country", emoji: "🇯🇵", names: { ko: "일본", en: "Japan", vi: "Nhật Bản", zh: "日本", ja: "日本", th: "ญี่ปุ่น", id: "Jepang", hi: "जापान", ru: "Япония", ar: "اليابان", fil: "Hapon", km: "ជប៉ុន", mn: "Япон", uz: "Yaponiya", my: "ဂျပန်" }, hints: { isAsian: true, famous: true } },
+  { id: "c-th", category: "country", emoji: "🇹🇭", names: { ko: "태국", en: "Thailand", vi: "Thái Lan", zh: "泰国", ja: "タイ", th: "ประเทศไทย", id: "Thailand", hi: "थाईलैंड", ru: "Таиланд", ar: "تايلاند", fil: "Thailand", km: "ថៃ", mn: "Тайланд", uz: "Tayland", my: "ထိုင်း" }, hints: { isAsian: true, famous: true } },
+  { id: "c-ph", category: "country", emoji: "🇵🇭", names: { ko: "필리핀", en: "Philippines", vi: "Philippines", zh: "菲律宾", ja: "フィリピン", th: "ฟิลิปปินส์", id: "Filipina", hi: "फिलीपींस", ru: "Филиппины", ar: "الفلبين", fil: "Pilipinas", km: "ហ្វីលីពីន", mn: "Филиппин", uz: "Filippin", my: "ဖိလစ်ပိုင်" }, hints: { isAsian: true } },
+  { id: "c-us", category: "country", emoji: "🇺🇸", names: { ko: "미국", en: "United States", vi: "Hoa Kỳ", zh: "美国", ja: "アメリカ", th: "สหรัฐฯ", id: "Amerika", hi: "अमेरिका", ru: "США", ar: "أمريكا", fil: "Amerika", km: "អាមេរិក", mn: "АНУ", uz: "AQSH", my: "အမေရိကန်" }, hints: { isAmerican: true, famous: true } },
+  { id: "c-ru", category: "country", emoji: "🇷🇺", names: { ko: "러시아", en: "Russia", vi: "Nga", zh: "俄罗斯", ja: "ロシア", th: "รัสเซีย", id: "Rusia", hi: "रूस", ru: "Россия", ar: "روسيا", fil: "Rusya", km: "រុស្ស៊ី", mn: "Орос", uz: "Rossiya", my: "ရုရှား" }, hints: { isEuropean: true, isCold: true, famous: true } },
+  { id: "c-id", category: "country", emoji: "🇮🇩", names: { ko: "인도네시아", en: "Indonesia", vi: "Indonesia", zh: "印度尼西亚", ja: "インドネシア", th: "อินโดนีเซีย", id: "Indonesia", hi: "इंडोनेशिया", ru: "Индонезия", ar: "إندونيسيا", fil: "Indonesia", km: "ឥណ្ឌូណេស៊ី", mn: "Индонез", uz: "Indoneziya", my: "အင်ဒိုနီးရှား" }, hints: { isAsian: true } },
+  { id: "c-in", category: "country", emoji: "🇮🇳", names: { ko: "인도", en: "India", vi: "Ấn Độ", zh: "印度", ja: "インド", th: "อินเดีย", id: "India", hi: "भारत", ru: "Индия", ar: "الهند", fil: "India", km: "ឥណ្ឌា", mn: "Энэтхэг", uz: "Hindiston", my: "အိန္ဒိယ" }, hints: { isAsian: true, famous: true } },
+
+  // ----- food (10) -----
+  { id: "f-rice", category: "food", emoji: "🍚", names: { ko: "쌀밥", en: "rice", vi: "cơm", zh: "米饭", ja: "ごはん", th: "ข้าว", id: "nasi", hi: "चावल", ru: "рис", ar: "أرز", fil: "kanin", km: "បាយ", mn: "будаа", uz: "guruch", my: "ထမင်း" }, hints: { isFood: true, hasRice: true, isHot: true, manMade: true } },
+  { id: "f-ramen", category: "food", emoji: "🍜", names: { ko: "라면", en: "ramen", vi: "mì ăn liền", zh: "拉面", ja: "ラーメン", th: "ราเมง", id: "ramen", hi: "रामेन", ru: "рамэн", ar: "رامين", fil: "ramen", km: "រ៉ាមេន", mn: "рамен", uz: "ramen", my: "ရာမိန်" }, hints: { isFood: true, hasFlour: true, isHot: true, isSpicy: true, manMade: true } },
+  { id: "f-kimchi", category: "food", emoji: "🥬", names: { ko: "김치", en: "kimchi", vi: "kim chi", zh: "泡菜", ja: "キムチ", th: "กิมจิ", id: "kimchi", hi: "किमची", ru: "кимчи", ar: "كيمتشي", fil: "kimchi", km: "គីមឈី", mn: "кимчи", uz: "kimchi", my: "ကင်မ်ချီ" }, hints: { isFood: true, isSpicy: true, manMade: true } },
+  { id: "f-pizza", category: "food", emoji: "🍕", names: { ko: "피자", en: "pizza", vi: "pizza", zh: "披萨", ja: "ピザ", th: "พิซซ่า", id: "pizza", hi: "पिज्जा", ru: "пицца", ar: "بيتزا", fil: "pizza", km: "ភីហ្សា", mn: "пицца", uz: "pitsa", my: "ပီဇာ" }, hints: { isFood: true, hasFlour: true, hasMeat: true, isHot: true, manMade: true } },
+  { id: "f-sushi", category: "food", emoji: "🍣", names: { ko: "초밥", en: "sushi", vi: "sushi", zh: "寿司", ja: "寿司", th: "ซูชิ", id: "sushi", hi: "सुशी", ru: "суши", ar: "سوشي", fil: "sushi", km: "ស៊ូស៊ី", mn: "суши", uz: "sushi", my: "ဆူရှီ" }, hints: { isFood: true, hasRice: true, isCold: true, manMade: true } },
+  { id: "f-pho", category: "food", emoji: "🍲", names: { ko: "쌀국수", en: "pho", vi: "phở", zh: "越南河粉", ja: "フォー", th: "เฝอ", id: "pho", hi: "फो", ru: "фо", ar: "فو", fil: "pho", km: "ផូ", mn: "фо", uz: "pho", my: "ဖိုး" }, hints: { isFood: true, hasRice: true, isHot: true, manMade: true } },
+  { id: "f-curry", category: "food", emoji: "🍛", names: { ko: "카레", en: "curry", vi: "cà ri", zh: "咖喱", ja: "カレー", th: "แกง", id: "kari", hi: "करी", ru: "карри", ar: "كاري", fil: "kari", km: "ខារី", mn: "карри", uz: "karri", my: "ကာရီ" }, hints: { isFood: true, isSpicy: true, isHot: true, manMade: true } },
+  { id: "f-tea", category: "food", emoji: "🍵", names: { ko: "차", en: "tea", vi: "trà", zh: "茶", ja: "お茶", th: "ชา", id: "teh", hi: "चाय", ru: "чай", ar: "شاي", fil: "tsaa", km: "តែ", mn: "цай", uz: "choy", my: "လက်ဖက်ရည်" }, hints: { isDrink: true, isHot: true, manMade: true } },
+  { id: "f-ice", category: "food", emoji: "🍦", names: { ko: "아이스크림", en: "ice cream", vi: "kem", zh: "冰淇淋", ja: "アイスクリーム", th: "ไอศกรีม", id: "es krim", hi: "आइसक्रीम", ru: "мороженое", ar: "آيس كريم", fil: "ice cream", km: "ការ៉េម", mn: "зайрмаг", uz: "muzqaymoq", my: "ရေခဲမုန့်" }, hints: { isFood: true, isSweet: true, isCold: true, manMade: true } },
+  { id: "f-banana", category: "food", emoji: "🍌", names: { ko: "바나나", en: "banana", vi: "chuối", zh: "香蕉", ja: "バナナ", th: "กล้วย", id: "pisang", hi: "केला", ru: "банан", ar: "موز", fil: "saging", km: "ចេក", mn: "гадил", uz: "banan", my: "ငှက်ပျောသီး" }, hints: { isFood: true, isSweet: true, livingThing: true } },
+
+  // ----- person (profession) (10) -----
+  { id: "p-teacher", category: "person", emoji: "👩‍🏫", names: { ko: "선생님", en: "teacher", vi: "giáo viên", zh: "老师", ja: "先生", th: "ครู", id: "guru", hi: "शिक्षक", ru: "учитель", ar: "معلم", fil: "guro", km: "គ្រូ", mn: "багш", uz: "oʻqituvchi", my: "ဆရာ" }, hints: { helpsPeople: true, worksIndoors: true, worksWithKids: true, livingThing: true } },
+  { id: "p-doctor", category: "person", emoji: "👨‍⚕️", names: { ko: "의사", en: "doctor", vi: "bác sĩ", zh: "医生", ja: "医者", th: "หมอ", id: "dokter", hi: "डॉक्टर", ru: "врач", ar: "طبيب", fil: "doktor", km: "វេជ្ជបណ្ឌិត", mn: "эмч", uz: "shifokor", my: "ဆရာဝန်" }, hints: { wearsUniform: true, helpsPeople: true, worksIndoors: true, livingThing: true } },
+  { id: "p-chef", category: "person", emoji: "👨‍🍳", names: { ko: "요리사", en: "chef", vi: "đầu bếp", zh: "厨师", ja: "料理人", th: "เชฟ", id: "koki", hi: "रसोइया", ru: "повар", ar: "طاهي", fil: "kusinero", km: "ចុងភៅ", mn: "тогооч", uz: "oshpaz", my: "စားဖိုမှူး" }, hints: { wearsUniform: true, worksIndoors: true, livingThing: true } },
+  { id: "p-police", category: "person", emoji: "👮", names: { ko: "경찰관", en: "police officer", vi: "cảnh sát", zh: "警察", ja: "警察官", th: "ตำรวจ", id: "polisi", hi: "पुलिस", ru: "полицейский", ar: "شرطي", fil: "pulis", km: "ប៉ូលីស", mn: "цагдаа", uz: "politsiyachi", my: "ရဲ" }, hints: { wearsUniform: true, helpsPeople: true, livingThing: true } },
+  { id: "p-firefighter", category: "person", emoji: "🧑‍🚒", names: { ko: "소방관", en: "firefighter", vi: "lính cứu hỏa", zh: "消防员", ja: "消防士", th: "นักดับเพลิง", id: "pemadam", hi: "अग्निशमक", ru: "пожарный", ar: "إطفائي", fil: "bumbero", km: "អ្នកពន្លត់អគ្គីភ័យ", mn: "гал сөнөөгч", uz: "oʻt oʻchiruvchi", my: "မီးသတ်" }, hints: { wearsUniform: true, helpsPeople: true, livingThing: true } },
+  { id: "p-farmer", category: "person", emoji: "🧑‍🌾", names: { ko: "농부", en: "farmer", vi: "nông dân", zh: "农民", ja: "農家", th: "ชาวนา", id: "petani", hi: "किसान", ru: "фермер", ar: "مزارع", fil: "magsasaka", km: "កសិករ", mn: "тариаланч", uz: "dehqon", my: "လယ်သမား" }, hints: { worksIndoors: false, livingThing: true } },
+  { id: "p-driver", category: "person", emoji: "🧑‍✈️", names: { ko: "운전사", en: "driver", vi: "tài xế", zh: "司机", ja: "運転手", th: "คนขับ", id: "supir", hi: "ड्राइवर", ru: "водитель", ar: "سائق", fil: "drayber", km: "អ្នកបើកបរ", mn: "жолооч", uz: "haydovchi", my: "ကားမောင်းသူ" }, hints: { livingThing: true, worksIndoors: false } },
+  { id: "p-nurse", category: "person", emoji: "🧑‍⚕️", names: { ko: "간호사", en: "nurse", vi: "y tá", zh: "护士", ja: "看護師", th: "พยาบาล", id: "perawat", hi: "नर्स", ru: "медсестра", ar: "ممرض", fil: "nars", km: "គិលានុបដ្ឋាយិកា", mn: "сувилагч", uz: "hamshira", my: "သူနာပြု" }, hints: { wearsUniform: true, helpsPeople: true, worksIndoors: true, livingThing: true } },
+  { id: "p-artist", category: "person", emoji: "🧑‍🎨", names: { ko: "화가", en: "artist", vi: "họa sĩ", zh: "画家", ja: "画家", th: "ศิลปิน", id: "pelukis", hi: "कलाकार", ru: "художник", ar: "فنان", fil: "pintor", km: "វិចិត្រករ", mn: "зураач", uz: "rassom", my: "ပန်းချီသူ" }, hints: { livingThing: true, worksIndoors: true } },
+  { id: "p-singer", category: "person", emoji: "🧑‍🎤", names: { ko: "가수", en: "singer", vi: "ca sĩ", zh: "歌手", ja: "歌手", th: "นักร้อง", id: "penyanyi", hi: "गायक", ru: "певец", ar: "مغني", fil: "mang-aawit", km: "អ្នកច្រៀង", mn: "дуучин", uz: "qoʻshiqchi", my: "အဆိုတော်" }, hints: { livingThing: true, famous: true } },
+];
+
+export const HINT_CARDS: HintCard[] = [
+  // region
+  { flag: "isAsian",    emoji: "🌏", group: "region", label: { ko: "아시아에 있나요?", en: "Is it in Asia?", vi: "Có ở châu Á không?", zh: "在亚洲吗?", ja: "アジアにありますか?", th: "อยู่ในเอเชียไหม?", id: "Ada di Asia?", hi: "क्या एशिया में है?", ru: "Это в Азии?", ar: "هل في آسيا؟", fil: "Nasa Asya ba?", km: "នៅអាស៊ី?", mn: "Азид уу?", uz: "Osiyoda?", my: "အာရှမှာလား?" } },
+  { flag: "isEuropean", emoji: "🏰", group: "region", label: { ko: "유럽에 있나요?", en: "Is it in Europe?", vi: "Có ở châu Âu không?", zh: "在欧洲吗?", ja: "ヨーロッパにありますか?", th: "อยู่ในยุโรปไหม?", id: "Ada di Eropa?", hi: "क्या यूरोप में है?", ru: "Это в Европе?", ar: "هل في أوروبا؟", fil: "Nasa Europa ba?", km: "នៅអឺរ៉ុប?", mn: "Европт уу?", uz: "Yevropada?", my: "ဥရောပမှာလား?" } },
+  { flag: "isAmerican", emoji: "🌎", group: "region", label: { ko: "아메리카에 있나요?", en: "Is it in America?", vi: "Có ở châu Mỹ không?", zh: "在美洲吗?", ja: "アメリカ大陸にありますか?", th: "อยู่ในอเมริกาไหม?", id: "Ada di Amerika?", hi: "क्या अमेरिका में है?", ru: "Это в Америке?", ar: "هل في أمريكا؟", fil: "Nasa Amerika ba?", km: "នៅអាមេរិក?", mn: "Америкт уу?", uz: "Amerikada?", my: "အမေရိကမှာလား?" } },
+  // taste
+  { flag: "isHot",      emoji: "🔥", group: "taste",  label: { ko: "뜨거운가요?", en: "Is it hot?", vi: "Nó có nóng không?", zh: "是热的吗?", ja: "熱いですか?", th: "ร้อนไหม?", id: "Panas?", hi: "क्या गर्म है?", ru: "Оно горячее?", ar: "هل ساخن؟", fil: "Mainit ba?", km: "ក្តៅ?", mn: "Халуун уу?", uz: "Issiqmi?", my: "ပူလား?" } },
+  { flag: "isCold",     emoji: "❄️", group: "taste",  label: { ko: "차가운가요?", en: "Is it cold?", vi: "Nó có lạnh không?", zh: "是冷的吗?", ja: "冷たいですか?", th: "เย็นไหม?", id: "Dingin?", hi: "क्या ठंडा है?", ru: "Оно холодное?", ar: "هل بارد؟", fil: "Malamig ba?", km: "ត្រជាក់?", mn: "Хүйтэн үү?", uz: "Sovuqmi?", my: "အေးလား?" } },
+  { flag: "isSweet",    emoji: "🍯", group: "taste",  label: { ko: "달콤한가요?", en: "Is it sweet?", vi: "Nó có ngọt không?", zh: "是甜的吗?", ja: "甘いですか?", th: "หวานไหม?", id: "Manis?", hi: "क्या मीठा है?", ru: "Оно сладкое?", ar: "هل حلو؟", fil: "Matamis ba?", km: "ផ្អែម?", mn: "Чихэрлэг үү?", uz: "Shirinmi?", my: "ချိုလား?" } },
+  { flag: "isSpicy",    emoji: "🌶️", group: "taste",  label: { ko: "매운가요?", en: "Is it spicy?", vi: "Nó có cay không?", zh: "是辣的吗?", ja: "辛いですか?", th: "เผ็ดไหม?", id: "Pedas?", hi: "क्या तीखा है?", ru: "Оно острое?", ar: "هل حار؟", fil: "Maanghang ba?", km: "ហឹរ?", mn: "Халуун ногоотой юу?", uz: "Achchiqmi?", my: "စပ်လား?" } },
+  // use / composition
+  { flag: "isDrink",    emoji: "🥤", group: "use",    label: { ko: "마시는 건가요?", en: "Do you drink it?", vi: "Bạn có uống nó không?", zh: "是喝的吗?", ja: "飲むものですか?", th: "ดื่มได้ไหม?", id: "Diminum?", hi: "क्या पीते हैं?", ru: "Это пьют?", ar: "هل تشرب؟", fil: "Iniinom ba?", km: "ផឹក?", mn: "Уудаг уу?", uz: "Ichiladi?", my: "သောက်တာလား?" } },
+  { flag: "hasRice",    emoji: "🌾", group: "form",   label: { ko: "쌀이 들어있나요?", en: "Does it have rice?", vi: "Có gạo không?", zh: "里面有米吗?", ja: "お米が入っていますか?", th: "มีข้าวไหม?", id: "Ada nasinya?", hi: "क्या चावल है?", ru: "Есть ли рис?", ar: "هل فيه أرز؟", fil: "May bigas ba?", km: "មានអង្ករ?", mn: "Цагаан будаатай юу?", uz: "Guruchmi?", my: "ဆန်ပါလား?" } },
+  { flag: "hasFlour",   emoji: "🍞", group: "form",   label: { ko: "밀가루가 들어있나요?", en: "Does it have flour?", vi: "Có bột mì không?", zh: "里面有面粉吗?", ja: "小麦が入っていますか?", th: "มีแป้งไหม?", id: "Ada tepungnya?", hi: "क्या आटा है?", ru: "Есть ли мука?", ar: "هل فيه دقيق؟", fil: "May harina ba?", km: "មានម្សៅ?", mn: "Гурилтай юу?", uz: "Un?", my: "မုန့်ညက်ပါလား?" } },
+  { flag: "hasMeat",    emoji: "🍖", group: "form",   label: { ko: "고기가 들어있나요?", en: "Does it have meat?", vi: "Có thịt không?", zh: "里面有肉吗?", ja: "肉が入っていますか?", th: "มีเนื้อไหม?", id: "Ada dagingnya?", hi: "क्या मांस है?", ru: "Есть ли мясо?", ar: "هل فيه لحم؟", fil: "May karne ba?", km: "មានសាច់?", mn: "Махтай юу?", uz: "Goʻshti bormi?", my: "အသားပါလား?" } },
+  // form / person
+  { flag: "livingThing", emoji: "🌱", group: "misc",  label: { ko: "살아있는 것인가요?", en: "Is it alive?", vi: "Có phải sinh vật không?", zh: "是活的吗?", ja: "生き物ですか?", th: "มีชีวิตไหม?", id: "Makhluk hidup?", hi: "क्या जीवित है?", ru: "Это живое?", ar: "هل كائن حي؟", fil: "May buhay ba?", km: "មានជីវិត?", mn: "Амьд уу?", uz: "Tirikmi?", my: "အသက်ရှိလား?" } },
+  { flag: "wearsUniform", emoji: "👔", group: "form", label: { ko: "유니폼을 입나요?", en: "Does it wear a uniform?", vi: "Có mặc đồng phục không?", zh: "穿制服吗?", ja: "制服を着ますか?", th: "ใส่เครื่องแบบไหม?", id: "Pakai seragam?", hi: "क्या वर्दी पहनते हैं?", ru: "Носит форму?", ar: "يرتدي زياً؟", fil: "May uniporme?", km: "ពាក់ឯកសណ្ឋាន?", mn: "Дүрэмт хувцастай юу?", uz: "Formakiyamda?", my: "ယူနီဖောင်းဝတ်လား?" } },
+  { flag: "helpsPeople", emoji: "🤝", group: "use",   label: { ko: "사람을 도와주나요?", en: "Do they help people?", vi: "Có giúp đỡ mọi người không?", zh: "帮助别人吗?", ja: "人を助けますか?", th: "ช่วยคนไหม?", id: "Membantu orang?", hi: "लोगों की मदद करता है?", ru: "Помогает людям?", ar: "يساعد الناس؟", fil: "Tumutulong sa tao?", km: "ជួយមនុស្ស?", mn: "Хүмүүст тусладаг уу?", uz: "Odamlarga yordam beradi?", my: "လူတွေကိုကူညီလား?" } },
+  { flag: "worksIndoors", emoji: "🏢", group: "use",  label: { ko: "실내에서 일하나요?", en: "Do they work indoors?", vi: "Làm việc trong nhà không?", zh: "在室内工作吗?", ja: "室内で働きますか?", th: "ทำงานในร่มไหม?", id: "Kerja di dalam ruangan?", hi: "क्या अंदर काम करते हैं?", ru: "Работает в помещении?", ar: "يعمل داخلاً؟", fil: "Nagtatrabaho sa loob?", km: "ធ្វើការខាងក្នុង?", mn: "Дотор ажилладаг уу?", uz: "Ichkarida ishlaydi?", my: "အိမ်တွင်းမှာအလုပ်လုပ်လား?" } },
+  { flag: "famous",      emoji: "🌟", group: "misc",  label: { ko: "유명한가요?", en: "Is it famous?", vi: "Có nổi tiếng không?", zh: "有名吗?", ja: "有名ですか?", th: "มีชื่อเสียงไหม?", id: "Terkenal?", hi: "क्या प्रसिद्ध है?", ru: "Оно знаменитое?", ar: "هل مشهور؟", fil: "Sikat ba?", km: "ល្បី?", mn: "Алдартай юу?", uz: "Mashhurmi?", my: "ထင်ရှားလား?" } },
+];
+
+// ============================================================
+// Honey Taboo (꿀벌 금칙어)
+// ============================================================
+
+export type TabooCategory = "school" | "food" | "animal" | "daily";
+
+export interface TabooCard {
+  id: string;
+  category: TabooCategory;
+  answer: LangMap;
+  taboos: [LangMap, LangMap, LangMap]; // exactly 3 forbidden words
+}
+
+// Helper: shrink translation authoring — fallback to en if a locale omitted.
+function m(partial: LangMap): LangMap { return partial; }
+
+export const TABOO_CARDS: TabooCard[] = [
+  // ----- school (8) -----
+  { id: "s-teacher",  category: "school", answer: m({ ko: "선생님", en: "teacher", vi: "giáo viên", zh: "老师", ja: "先生", th: "ครู", id: "guru", hi: "शिक्षक", ru: "учитель", ar: "معلم", fil: "guro", km: "គ្រូ", mn: "багш", uz: "oʻqituvchi", my: "ဆရာ" }),
+    taboos: [ m({ ko: "학교", en: "school", vi: "trường", zh: "学校", ja: "学校" }), m({ ko: "수업", en: "class", vi: "lớp học", zh: "课", ja: "授業" }), m({ ko: "학생", en: "student", vi: "học sinh", zh: "学生", ja: "生徒" }) ] },
+  { id: "s-pencil",   category: "school", answer: m({ ko: "연필", en: "pencil", vi: "bút chì", zh: "铅笔", ja: "鉛筆", th: "ดินสอ", id: "pensil", hi: "पेंसिल", ru: "карандаш", ar: "قلم رصاص", fil: "lapis", km: "ខ្មៅដៃ", mn: "харандаа", uz: "qalam", my: "ခဲတံ" }),
+    taboos: [ m({ ko: "쓰다", en: "write", vi: "viết", zh: "写", ja: "書く" }), m({ ko: "글자", en: "letter", vi: "chữ", zh: "字", ja: "文字" }), m({ ko: "지우개", en: "eraser", vi: "tẩy", zh: "橡皮", ja: "消しゴム" }) ] },
+  { id: "s-hw",       category: "school", answer: m({ ko: "숙제", en: "homework", vi: "bài tập", zh: "作业", ja: "宿題", th: "การบ้าน", id: "PR", hi: "गृहकार्य", ru: "домашка", ar: "واجب", fil: "takdang-aralin", km: "កិច្ចការ", mn: "гэрийн даалгавар", uz: "uy vazifasi", my: "အိမ်စာ" }),
+    taboos: [ m({ ko: "공부", en: "study", vi: "học", zh: "学习", ja: "勉強" }), m({ ko: "책", en: "book", vi: "sách", zh: "书", ja: "本" }), m({ ko: "집", en: "home", vi: "nhà", zh: "家", ja: "家" }) ] },
+  { id: "s-library",  category: "school", answer: m({ ko: "도서관", en: "library", vi: "thư viện", zh: "图书馆", ja: "図書館", th: "ห้องสมุด", id: "perpustakaan", hi: "पुस्तकालय", ru: "библиотека", ar: "مكتبة", fil: "aklatan", km: "បណ្ណាល័យ", mn: "номын сан", uz: "kutubxona", my: "စာကြည့်တိုက်" }),
+    taboos: [ m({ ko: "책", en: "book", vi: "sách", zh: "书", ja: "本" }), m({ ko: "읽다", en: "read", vi: "đọc", zh: "读", ja: "読む" }), m({ ko: "조용", en: "quiet", vi: "yên", zh: "安静", ja: "静か" }) ] },
+  { id: "s-board",    category: "school", answer: m({ ko: "칠판", en: "blackboard", vi: "bảng", zh: "黑板", ja: "黒板", th: "กระดาน", id: "papan tulis", hi: "ब्लैकबोर्ड", ru: "доска", ar: "سبورة", fil: "pisara", km: "ក្ដារខៀន", mn: "самбар", uz: "doska", my: "ကျောက်သင်ပုန်း" }),
+    taboos: [ m({ ko: "분필", en: "chalk", vi: "phấn", zh: "粉笔", ja: "チョーク" }), m({ ko: "쓰다", en: "write", vi: "viết", zh: "写", ja: "書く" }), m({ ko: "교실", en: "classroom", vi: "lớp", zh: "教室", ja: "教室" }) ] },
+  { id: "s-yard",     category: "school", answer: m({ ko: "운동장", en: "playground", vi: "sân chơi", zh: "操场", ja: "運動場", th: "สนาม", id: "lapangan", hi: "खेल का मैदान", ru: "площадка", ar: "ملعب", fil: "palaruan", km: "ទីលានលេង", mn: "талбай", uz: "maydon", my: "ကစားကွင်း" }),
+    taboos: [ m({ ko: "놀다", en: "play", vi: "chơi", zh: "玩", ja: "遊ぶ" }), m({ ko: "뛰다", en: "run", vi: "chạy", zh: "跑", ja: "走る" }), m({ ko: "밖", en: "outside", vi: "ngoài", zh: "外面", ja: "外" }) ] },
+  { id: "s-class",    category: "school", answer: m({ ko: "교실", en: "classroom", vi: "lớp học", zh: "教室", ja: "教室", th: "ห้องเรียน", id: "kelas", hi: "कक्षा", ru: "класс", ar: "فصل", fil: "silid-aralan", km: "ថ្នាក់", mn: "анги", uz: "sinfxona", my: "စာသင်ခန်း" }),
+    taboos: [ m({ ko: "학교", en: "school", vi: "trường", zh: "学校", ja: "学校" }), m({ ko: "책상", en: "desk", vi: "bàn", zh: "桌子", ja: "机" }), m({ ko: "의자", en: "chair", vi: "ghế", zh: "椅子", ja: "椅子" }) ] },
+  { id: "s-test",     category: "school", answer: m({ ko: "시험", en: "test", vi: "bài kiểm tra", zh: "考试", ja: "テスト", th: "สอบ", id: "ujian", hi: "परीक्षा", ru: "экзамен", ar: "اختبار", fil: "pagsusulit", km: "ប្រលង", mn: "шалгалт", uz: "imtihon", my: "စာမေး" }),
+    taboos: [ m({ ko: "문제", en: "question", vi: "câu hỏi", zh: "题", ja: "問題" }), m({ ko: "점수", en: "score", vi: "điểm", zh: "分数", ja: "点数" }), m({ ko: "공부", en: "study", vi: "học", zh: "学习", ja: "勉強" }) ] },
+
+  // ----- food (8) -----
+  { id: "f-kimchi",   category: "food", answer: m({ ko: "김치", en: "kimchi", vi: "kim chi", zh: "泡菜", ja: "キムチ", th: "กิมจิ", id: "kimchi", hi: "किमची", ru: "кимчи", ar: "كيمتشي", fil: "kimchi", km: "គីមឈី", mn: "кимчи", uz: "kimchi", my: "ကင်မ်ချီ" }),
+    taboos: [ m({ ko: "매운", en: "spicy", vi: "cay", zh: "辣", ja: "辛い" }), m({ ko: "배추", en: "cabbage", vi: "cải thảo", zh: "白菜", ja: "白菜" }), m({ ko: "빨간", en: "red", vi: "đỏ", zh: "红色", ja: "赤い" }) ] },
+  { id: "f-ramen",    category: "food", answer: m({ ko: "라면", en: "ramen", vi: "mì tôm", zh: "拉面", ja: "ラーメン", th: "ราเมง", id: "ramen", hi: "रामेन", ru: "рамэн", ar: "رامين", fil: "ramen", km: "រ៉ាមេន", mn: "рамен", uz: "ramen", my: "ရာမိန်" }),
+    taboos: [ m({ ko: "면", en: "noodles", vi: "mì", zh: "面", ja: "麺" }), m({ ko: "국물", en: "soup", vi: "canh", zh: "汤", ja: "スープ" }), m({ ko: "뜨거운", en: "hot", vi: "nóng", zh: "热", ja: "熱い" }) ] },
+  { id: "f-banana",   category: "food", answer: m({ ko: "바나나", en: "banana", vi: "chuối", zh: "香蕉", ja: "バナナ", th: "กล้วย", id: "pisang", hi: "केला", ru: "банан", ar: "موز", fil: "saging", km: "ចេក", mn: "гадил", uz: "banan", my: "ငှက်ပျောသီး" }),
+    taboos: [ m({ ko: "노란", en: "yellow", vi: "vàng", zh: "黄色", ja: "黄色" }), m({ ko: "원숭이", en: "monkey", vi: "khỉ", zh: "猴子", ja: "サル" }), m({ ko: "과일", en: "fruit", vi: "trái cây", zh: "水果", ja: "果物" }) ] },
+  { id: "f-pizza",    category: "food", answer: m({ ko: "피자", en: "pizza", vi: "pizza", zh: "披萨", ja: "ピザ", th: "พิซซ่า", id: "pizza", hi: "पिज्जा", ru: "пицца", ar: "بيتزا", fil: "pizza", km: "ភីហ្សា", mn: "пицца", uz: "pitsa", my: "ပီဇာ" }),
+    taboos: [ m({ ko: "치즈", en: "cheese", vi: "phô mai", zh: "奶酪", ja: "チーズ" }), m({ ko: "이탈리아", en: "Italy", vi: "Ý", zh: "意大利", ja: "イタリア" }), m({ ko: "둥근", en: "round", vi: "tròn", zh: "圆", ja: "丸い" }) ] },
+  { id: "f-water",    category: "food", answer: m({ ko: "수박", en: "watermelon", vi: "dưa hấu", zh: "西瓜", ja: "スイカ", th: "แตงโม", id: "semangka", hi: "तरबूज", ru: "арбуз", ar: "بطيخ", fil: "pakwan", km: "ឪឡឹក", mn: "тарвас", uz: "tarvuz", my: "ဖရဲသီး" }),
+    taboos: [ m({ ko: "여름", en: "summer", vi: "mùa hè", zh: "夏天", ja: "夏" }), m({ ko: "빨간", en: "red", vi: "đỏ", zh: "红", ja: "赤" }), m({ ko: "씨", en: "seed", vi: "hạt", zh: "籽", ja: "種" }) ] },
+  { id: "f-ice",      category: "food", answer: m({ ko: "아이스크림", en: "ice cream", vi: "kem", zh: "冰淇淋", ja: "アイスクリーム", th: "ไอศกรีม", id: "es krim", hi: "आइसक्रीम", ru: "мороженое", ar: "آيس كريم", fil: "ice cream", km: "ការ៉េម", mn: "зайрмаг", uz: "muzqaymoq", my: "ရေခဲမုန့်" }),
+    taboos: [ m({ ko: "차가운", en: "cold", vi: "lạnh", zh: "冷", ja: "冷たい" }), m({ ko: "달콤", en: "sweet", vi: "ngọt", zh: "甜", ja: "甘い" }), m({ ko: "여름", en: "summer", vi: "mùa hè", zh: "夏天", ja: "夏" }) ] },
+  { id: "f-bread",    category: "food", answer: m({ ko: "빵", en: "bread", vi: "bánh mì", zh: "面包", ja: "パン", th: "ขนมปัง", id: "roti", hi: "रोटी", ru: "хлеб", ar: "خبز", fil: "tinapay", km: "នំបុ័ង", mn: "талх", uz: "non", my: "ပေါင်မုန့်" }),
+    taboos: [ m({ ko: "밀가루", en: "flour", vi: "bột mì", zh: "面粉", ja: "小麦粉" }), m({ ko: "아침", en: "breakfast", vi: "bữa sáng", zh: "早餐", ja: "朝食" }), m({ ko: "버터", en: "butter", vi: "bơ", zh: "黄油", ja: "バター" }) ] },
+  { id: "f-chicken",  category: "food", answer: m({ ko: "치킨", en: "fried chicken", vi: "gà rán", zh: "炸鸡", ja: "からあげ", th: "ไก่ทอด", id: "ayam goreng", hi: "तला चिकन", ru: "курица", ar: "دجاج مقلي", fil: "pritong manok", km: "មាន់បំពង", mn: "шарсан тахиа", uz: "qovurilgan tovuq", my: "ကြက်ကြော်" }),
+    taboos: [ m({ ko: "닭", en: "chicken", vi: "gà", zh: "鸡", ja: "鶏" }), m({ ko: "튀긴", en: "fried", vi: "chiên", zh: "炸", ja: "揚げ" }), m({ ko: "맥주", en: "beer", vi: "bia", zh: "啤酒", ja: "ビール" }) ] },
+
+  // ----- animal (6) -----
+  { id: "a-elephant", category: "animal", answer: m({ ko: "코끼리", en: "elephant", vi: "voi", zh: "大象", ja: "象", th: "ช้าง", id: "gajah", hi: "हाथी", ru: "слон", ar: "فيل", fil: "elepante", km: "ដំរី", mn: "заан", uz: "fil", my: "ဆင်" }),
+    taboos: [ m({ ko: "큰", en: "big", vi: "to", zh: "大", ja: "大きい" }), m({ ko: "코", en: "nose", vi: "mũi", zh: "鼻子", ja: "鼻" }), m({ ko: "회색", en: "grey", vi: "xám", zh: "灰色", ja: "灰色" }) ] },
+  { id: "a-tiger",    category: "animal", answer: m({ ko: "호랑이", en: "tiger", vi: "hổ", zh: "老虎", ja: "トラ", th: "เสือ", id: "harimau", hi: "बाघ", ru: "тигр", ar: "نمر", fil: "tigre", km: "ខ្លា", mn: "бар", uz: "yoʻlbars", my: "ကျား" }),
+    taboos: [ m({ ko: "줄무늬", en: "stripes", vi: "sọc", zh: "条纹", ja: "縞" }), m({ ko: "주황색", en: "orange", vi: "cam", zh: "橙", ja: "オレンジ" }), m({ ko: "사나운", en: "fierce", vi: "hung dữ", zh: "凶猛", ja: "獰猛" }) ] },
+  { id: "a-dog",      category: "animal", answer: m({ ko: "강아지", en: "dog", vi: "chó", zh: "狗", ja: "犬", th: "สุนัข", id: "anjing", hi: "कुत्ता", ru: "собака", ar: "كلب", fil: "aso", km: "ឆ្កែ", mn: "нохой", uz: "it", my: "ခွေး" }),
+    taboos: [ m({ ko: "멍멍", en: "woof", vi: "gâu gâu", zh: "汪汪", ja: "ワンワン" }), m({ ko: "꼬리", en: "tail", vi: "đuôi", zh: "尾巴", ja: "しっぽ" }), m({ ko: "친구", en: "friend", vi: "bạn", zh: "朋友", ja: "友達" }) ] },
+  { id: "a-cat",      category: "animal", answer: m({ ko: "고양이", en: "cat", vi: "mèo", zh: "猫", ja: "猫", th: "แมว", id: "kucing", hi: "बिल्ली", ru: "кошка", ar: "قطة", fil: "pusa", km: "ឆ្មា", mn: "муур", uz: "mushuk", my: "ကြောင်" }),
+    taboos: [ m({ ko: "야옹", en: "meow", vi: "meo", zh: "喵", ja: "にゃー" }), m({ ko: "수염", en: "whiskers", vi: "ria", zh: "胡须", ja: "ヒゲ" }), m({ ko: "쥐", en: "mouse", vi: "chuột", zh: "老鼠", ja: "ネズミ" }) ] },
+  { id: "a-fish",     category: "animal", answer: m({ ko: "물고기", en: "fish", vi: "cá", zh: "鱼", ja: "魚", th: "ปลา", id: "ikan", hi: "मछली", ru: "рыба", ar: "سمك", fil: "isda", km: "ត្រី", mn: "загас", uz: "baliq", my: "ငါး" }),
+    taboos: [ m({ ko: "물", en: "water", vi: "nước", zh: "水", ja: "水" }), m({ ko: "바다", en: "sea", vi: "biển", zh: "海", ja: "海" }), m({ ko: "헤엄치다", en: "swim", vi: "bơi", zh: "游", ja: "泳ぐ" }) ] },
+  { id: "a-bird",     category: "animal", answer: m({ ko: "새", en: "bird", vi: "chim", zh: "鸟", ja: "鳥", th: "นก", id: "burung", hi: "पक्षी", ru: "птица", ar: "طائر", fil: "ibon", km: "សត្វស្លាប", mn: "шувуу", uz: "qush", my: "ငှက်" }),
+    taboos: [ m({ ko: "날다", en: "fly", vi: "bay", zh: "飞", ja: "飛ぶ" }), m({ ko: "날개", en: "wings", vi: "cánh", zh: "翅膀", ja: "翼" }), m({ ko: "하늘", en: "sky", vi: "trời", zh: "天空", ja: "空" }) ] },
+
+  // ----- daily (8) -----
+  { id: "d-umbrella", category: "daily", answer: m({ ko: "우산", en: "umbrella", vi: "ô", zh: "雨伞", ja: "傘", th: "ร่ม", id: "payung", hi: "छाता", ru: "зонт", ar: "مظلة", fil: "payong", km: "ឆត្រ", mn: "шүхэр", uz: "soyabon", my: "ထီး" }),
+    taboos: [ m({ ko: "비", en: "rain", vi: "mưa", zh: "雨", ja: "雨" }), m({ ko: "젖다", en: "wet", vi: "ướt", zh: "湿", ja: "濡れる" }), m({ ko: "들다", en: "hold", vi: "cầm", zh: "拿", ja: "持つ" }) ] },
+  { id: "d-bike",     category: "daily", answer: m({ ko: "자전거", en: "bicycle", vi: "xe đạp", zh: "自行车", ja: "自転車", th: "จักรยาน", id: "sepeda", hi: "साइकिल", ru: "велосипед", ar: "دراجة", fil: "bisikleta", km: "កង់", mn: "дугуй", uz: "velosiped", my: "စက်ဘီး" }),
+    taboos: [ m({ ko: "타다", en: "ride", vi: "đi", zh: "骑", ja: "乗る" }), m({ ko: "바퀴", en: "wheel", vi: "bánh xe", zh: "车轮", ja: "車輪" }), m({ ko: "페달", en: "pedal", vi: "bàn đạp", zh: "踏板", ja: "ペダル" }) ] },
+  { id: "d-shoes",    category: "daily", answer: m({ ko: "신발", en: "shoes", vi: "giày", zh: "鞋", ja: "靴", th: "รองเท้า", id: "sepatu", hi: "जूते", ru: "обувь", ar: "حذاء", fil: "sapatos", km: "ស្បែកជើង", mn: "гутал", uz: "poyabzal", my: "ဖိနပ်" }),
+    taboos: [ m({ ko: "발", en: "foot", vi: "chân", zh: "脚", ja: "足" }), m({ ko: "신다", en: "wear", vi: "đi", zh: "穿", ja: "履く" }), m({ ko: "양말", en: "socks", vi: "tất", zh: "袜子", ja: "靴下" }) ] },
+  { id: "d-family",   category: "daily", answer: m({ ko: "가족", en: "family", vi: "gia đình", zh: "家人", ja: "家族", th: "ครอบครัว", id: "keluarga", hi: "परिवार", ru: "семья", ar: "عائلة", fil: "pamilya", km: "គ្រួសារ", mn: "гэр бүл", uz: "oila", my: "မိသားစု" }),
+    taboos: [ m({ ko: "아빠", en: "dad", vi: "bố", zh: "爸爸", ja: "父" }), m({ ko: "엄마", en: "mom", vi: "mẹ", zh: "妈妈", ja: "母" }), m({ ko: "집", en: "home", vi: "nhà", zh: "家", ja: "家" }) ] },
+  { id: "d-friend",   category: "daily", answer: m({ ko: "친구", en: "friend", vi: "bạn", zh: "朋友", ja: "友達", th: "เพื่อน", id: "teman", hi: "दोस्त", ru: "друг", ar: "صديق", fil: "kaibigan", km: "មិត្ត", mn: "найз", uz: "doʻst", my: "သူငယ်ချင်း" }),
+    taboos: [ m({ ko: "놀다", en: "play", vi: "chơi", zh: "玩", ja: "遊ぶ" }), m({ ko: "같이", en: "together", vi: "cùng", zh: "一起", ja: "一緒" }), m({ ko: "반", en: "class", vi: "lớp", zh: "班", ja: "クラス" }) ] },
+  { id: "d-bday",     category: "daily", answer: m({ ko: "생일", en: "birthday", vi: "sinh nhật", zh: "生日", ja: "誕生日", th: "วันเกิด", id: "ulang tahun", hi: "जन्मदिन", ru: "день рождения", ar: "عيد ميلاد", fil: "kaarawan", km: "ខួបកំណើត", mn: "төрсөн өдөр", uz: "tugʻilgan kun", my: "မွေးနေ့" }),
+    taboos: [ m({ ko: "케이크", en: "cake", vi: "bánh", zh: "蛋糕", ja: "ケーキ" }), m({ ko: "선물", en: "present", vi: "quà", zh: "礼物", ja: "プレゼント" }), m({ ko: "초", en: "candle", vi: "nến", zh: "蜡烛", ja: "ろうそく" }) ] },
+  { id: "d-trip",     category: "daily", answer: m({ ko: "여행", en: "trip", vi: "chuyến đi", zh: "旅行", ja: "旅行", th: "ท่องเที่ยว", id: "perjalanan", hi: "यात्रा", ru: "путешествие", ar: "رحلة", fil: "paglalakbay", km: "ដំណើរ", mn: "аялал", uz: "sayohat", my: "ခရီး" }),
+    taboos: [ m({ ko: "가방", en: "bag", vi: "túi", zh: "包", ja: "かばん" }), m({ ko: "비행기", en: "plane", vi: "máy bay", zh: "飞机", ja: "飛行機" }), m({ ko: "사진", en: "photo", vi: "ảnh", zh: "照片", ja: "写真" }) ] },
+  { id: "d-hosp",     category: "daily", answer: m({ ko: "병원", en: "hospital", vi: "bệnh viện", zh: "医院", ja: "病院", th: "โรงพยาบาล", id: "rumah sakit", hi: "अस्पताल", ru: "больница", ar: "مستشفى", fil: "ospital", km: "មន្ទីរពេទ្យ", mn: "эмнэлэг", uz: "kasalxona", my: "ဆေးရုံ" }),
+    taboos: [ m({ ko: "의사", en: "doctor", vi: "bác sĩ", zh: "医生", ja: "医者" }), m({ ko: "아프다", en: "sick", vi: "ốm", zh: "生病", ja: "病気" }), m({ ko: "주사", en: "injection", vi: "tiêm", zh: "打针", ja: "注射" }) ] },
+];

@@ -13,6 +13,7 @@ import NumberTap from "./games/NumberTap";
 import EmotionQuiz from "./games/EmotionQuiz";
 import MarketRolePlay from "./games/MarketRolePlay";
 import WordTower from "./games/WordTower";
+import TwentyQuestions from "./games/TwentyQuestions";
 
 type GameMeta = {
   id: string;
@@ -35,6 +36,7 @@ const GAMES: GameMeta[] = [
   { id: "puzzle",    icon: "🧩", name: "문화 퍼즐",          sub: "조각 맞추기",       color: "#F472B6", bg: "#FCE7F3", cmp: CulturePuzzle },
   { id: "number",    icon: "🔢", name: "숫자 빨리 누르기",   sub: "듣고 터치",         color: "#FACC15", bg: "#FEF9C3", cmp: NumberTap },
   { id: "tower",     icon: "🏗️", name: "단어 탑 쌓기",       sub: "번역 맞히기",       color: "#14B8A6", bg: "#CCFBF1", cmp: WordTower },
+  { id: "twentyq",   icon: "🔎", name: "스무고개",           sub: "예/아니오로 맞히기", color: "#8B5CF6", bg: "#EDE9FE", cmp: TwentyQuestions },
 ];
 
 const FRIEND_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
