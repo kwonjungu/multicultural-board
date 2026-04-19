@@ -290,3 +290,396 @@ export const TABOO_CARDS: TabooCard[] = [
   { id: "d-hosp",     category: "daily", answer: m({ ko: "병원", en: "hospital", vi: "bệnh viện", zh: "医院", ja: "病院", th: "โรงพยาบาล", id: "rumah sakit", hi: "अस्पताल", ru: "больница", ar: "مستشفى", fil: "ospital", km: "មន្ទីរពេទ្យ", mn: "эмнэлэг", uz: "kasalxona", my: "ဆေးရုံ" }),
     taboos: [ m({ ko: "의사", en: "doctor", vi: "bác sĩ", zh: "医生", ja: "医者" }), m({ ko: "아프다", en: "sick", vi: "ốm", zh: "生病", ja: "病気" }), m({ ko: "주사", en: "injection", vi: "tiêm", zh: "打针", ja: "注射" }) ] },
 ];
+
+// ============================================================
+// Would You Rather (이거 저거 고르기)
+// ============================================================
+
+export type WYRCategory = "food" | "season" | "school" | "home" | "taste";
+
+export interface WYRCard {
+  id: string;
+  category: WYRCategory;
+  optionA: { emoji: string; label: LangMap };
+  optionB: { emoji: string; label: LangMap };
+  followUp: LangMap;
+}
+
+// Follow-up prompts — culture-curious, never judgmental.
+const FU_TASTE: LangMap = {
+  ko: "왜 그걸 골랐어? 언제 먹어봤어?",
+  en: "Why did you pick it? When did you try it?",
+  vi: "Sao bạn chọn nó? Bạn đã thử khi nào?",
+  zh: "你为什么选它？什么时候吃过？",
+  ja: "どうしてそれを選んだ？いつ食べた？",
+};
+const FU_MEMORY: LangMap = {
+  ko: "가족이랑 같이 먹은 적 있어?",
+  en: "Have you eaten it with your family?",
+  vi: "Bạn đã ăn cùng gia đình chưa?",
+  zh: "和家人一起吃过吗？",
+  ja: "家族と一緒に食べたことある？",
+};
+const FU_SEASON: LangMap = {
+  ko: "어느 계절이 더 생각나?",
+  en: "Which season reminds you of it?",
+  vi: "Mùa nào khiến bạn nhớ đến nó?",
+  zh: "哪个季节让你想到它？",
+  ja: "どの季節を思い出す？",
+};
+const FU_HOME: LangMap = {
+  ko: "집에서는 어떻게 지내?",
+  en: "How do you spend time at home?",
+  vi: "Ở nhà bạn thường làm gì?",
+  zh: "你在家里怎么过？",
+  ja: "おうちではどう過ごしてる？",
+};
+const FU_SCHOOL: LangMap = {
+  ko: "학교에서 이 시간이 제일 기대돼?",
+  en: "Is this your favorite time at school?",
+  vi: "Đây có phải giờ bạn thích nhất ở trường?",
+  zh: "这是你在学校最喜欢的时间吗？",
+  ja: "学校で一番楽しみな時間？",
+};
+const FU_STORY: LangMap = {
+  ko: "둘 다 멋져! 어떤 이야기가 떠올라?",
+  en: "Both sound great! What story comes to mind?",
+  vi: "Cả hai đều tuyệt! Bạn nhớ chuyện gì?",
+  zh: "两个都很棒！想到什么故事？",
+  ja: "どっちも素敵！どんな思い出がある？",
+};
+
+export const WYR_CARDS: WYRCard[] = [
+  // ---------------- food (8) ----------------
+  {
+    id: "food-01",
+    category: "food",
+    optionA: { emoji: "🌶️", label: { ko: "매운 떡볶이", en: "spicy tteokbokki", vi: "tteokbokki cay", zh: "辣炒年糕", ja: "辛いトッポッキ" } },
+    optionB: { emoji: "🍜", label: { ko: "따뜻한 쌀국수", en: "warm pho", vi: "phở nóng", zh: "热米粉", ja: "温かいフォー" } },
+    followUp: FU_TASTE,
+  },
+  {
+    id: "food-02",
+    category: "food",
+    optionA: { emoji: "🥬", label: { ko: "김치", en: "kimchi", vi: "kimchi", zh: "泡菜", ja: "キムチ" } },
+    optionB: { emoji: "🥢", label: { ko: "간장 반찬", en: "soy-sauce side", vi: "món kho nước tương", zh: "酱油小菜", ja: "しょうゆのおかず" } },
+    followUp: FU_MEMORY,
+  },
+  {
+    id: "food-03",
+    category: "food",
+    optionA: { emoji: "🍥", label: { ko: "라면", en: "ramyeon", vi: "mì ramyeon", zh: "拉面", ja: "ラーメン" } },
+    optionB: { emoji: "🍲", label: { ko: "우동", en: "udon", vi: "udon", zh: "乌冬面", ja: "うどん" } },
+    followUp: FU_TASTE,
+  },
+  {
+    id: "food-04",
+    category: "food",
+    optionA: { emoji: "🍗", label: { ko: "치킨", en: "fried chicken", vi: "gà rán", zh: "炸鸡", ja: "フライドチキン" } },
+    optionB: { emoji: "🍢", label: { ko: "양꼬치", en: "lamb skewers", vi: "xiên cừu nướng", zh: "羊肉串", ja: "ラム串焼き" } },
+    followUp: FU_STORY,
+  },
+  {
+    id: "food-05",
+    category: "food",
+    optionA: { emoji: "🍕", label: { ko: "피자", en: "pizza", vi: "pizza", zh: "披萨", ja: "ピザ" } },
+    optionB: { emoji: "🍣", label: { ko: "초밥", en: "sushi", vi: "sushi", zh: "寿司", ja: "寿司" } },
+    followUp: FU_TASTE,
+  },
+  {
+    id: "food-06",
+    category: "food",
+    optionA: { emoji: "🥭", label: { ko: "망고", en: "mango", vi: "xoài", zh: "芒果", ja: "マンゴー" } },
+    optionB: { emoji: "🍓", label: { ko: "딸기", en: "strawberry", vi: "dâu tây", zh: "草莓", ja: "いちご" } },
+    followUp: FU_SEASON,
+  },
+  {
+    id: "food-07",
+    category: "food",
+    optionA: { emoji: "🍧", label: { ko: "팥빙수", en: "shaved ice", vi: "đá bào", zh: "刨冰", ja: "かき氷" } },
+    optionB: { emoji: "🍨", label: { ko: "아이스크림", en: "ice cream", vi: "kem", zh: "冰淇淋", ja: "アイスクリーム" } },
+    followUp: FU_SEASON,
+  },
+  {
+    id: "food-08",
+    category: "food",
+    optionA: { emoji: "🍙", label: { ko: "김밥", en: "kimbap", vi: "kimbap", zh: "紫菜包饭", ja: "キンパ" } },
+    optionB: { emoji: "🍣", label: { ko: "초밥", en: "sushi", vi: "sushi", zh: "寿司", ja: "寿司" } },
+    followUp: FU_STORY,
+  },
+
+  // ---------------- season (8) ----------------
+  {
+    id: "season-01",
+    category: "season",
+    optionA: { emoji: "🧧", label: { ko: "설날 세배", en: "Lunar New Year bow", vi: "chúc Tết Hàn Quốc", zh: "春节拜年", ja: "ソルラル挨拶" } },
+    optionB: { emoji: "🎊", label: { ko: "뗏 용돈봉투", en: "Tết lucky money", vi: "lì xì Tết", zh: "越南春节红包", ja: "テトのお年玉" } },
+    followUp: FU_STORY,
+  },
+  {
+    id: "season-02",
+    category: "season",
+    optionA: { emoji: "🥟", label: { ko: "추석 송편", en: "Chuseok songpyeon", vi: "bánh songpyeon Chuseok", zh: "秋夕松饼", ja: "チュソクの松餅" } },
+    optionB: { emoji: "🥮", label: { ko: "중추절 월병", en: "Mid-Autumn mooncake", vi: "bánh trung thu", zh: "中秋月饼", ja: "中秋節の月餅" } },
+    followUp: FU_MEMORY,
+  },
+  {
+    id: "season-03",
+    category: "season",
+    optionA: { emoji: "🏖️", label: { ko: "여름 바다", en: "summer beach", vi: "biển mùa hè", zh: "夏天的海边", ja: "夏の海" } },
+    optionB: { emoji: "🛷", label: { ko: "겨울 눈썰매", en: "winter sledding", vi: "trượt tuyết mùa đông", zh: "冬天滑雪橇", ja: "冬のそり遊び" } },
+    followUp: FU_SEASON,
+  },
+  {
+    id: "season-04",
+    category: "season",
+    optionA: { emoji: "🌸", label: { ko: "벚꽃 구경", en: "cherry blossoms", vi: "ngắm hoa anh đào", zh: "赏樱花", ja: "お花見" } },
+    optionB: { emoji: "🍁", label: { ko: "단풍 구경", en: "autumn leaves", vi: "ngắm lá đỏ", zh: "赏枫叶", ja: "紅葉狩り" } },
+    followUp: FU_SEASON,
+  },
+  {
+    id: "season-05",
+    category: "season",
+    optionA: { emoji: "🎄", label: { ko: "크리스마스", en: "Christmas", vi: "Giáng sinh", zh: "圣诞节", ja: "クリスマス" } },
+    optionB: { emoji: "🌙", label: { ko: "라마단", en: "Ramadan", vi: "Ramadan", zh: "斋月", ja: "ラマダン" } },
+    followUp: FU_STORY,
+  },
+  {
+    id: "season-06",
+    category: "season",
+    optionA: { emoji: "🎡", label: { ko: "어린이날 놀이공원", en: "amusement park on Children's Day", vi: "công viên ngày thiếu nhi", zh: "儿童节游乐园", ja: "こどもの日の遊園地" } },
+    optionB: { emoji: "👨‍👩‍👧", label: { ko: "명절 가족모임", en: "holiday family gathering", vi: "họp mặt gia đình ngày lễ", zh: "节日家庭聚会", ja: "お祝いの家族集まり" } },
+    followUp: FU_MEMORY,
+  },
+  {
+    id: "season-07",
+    category: "season",
+    optionA: { emoji: "🌧️", label: { ko: "비오는 서울", en: "rainy Seoul", vi: "Seoul mưa", zh: "下雨的首尔", ja: "雨のソウル" } },
+    optionB: { emoji: "❄️", label: { ko: "눈오는 하노이", en: "snowy Hanoi (pretend!)", vi: "Hà Nội tuyết (tưởng tượng!)", zh: "下雪的河内（想象）", ja: "雪のハノイ（想像！）" } },
+    followUp: FU_STORY,
+  },
+  {
+    id: "season-08",
+    category: "season",
+    optionA: { emoji: "🌅", label: { ko: "해돋이 보기", en: "watch sunrise", vi: "ngắm bình minh", zh: "看日出", ja: "日の出を見る" } },
+    optionB: { emoji: "🌕", label: { ko: "달구경", en: "moon gazing", vi: "ngắm trăng", zh: "赏月", ja: "月見" } },
+    followUp: FU_SEASON,
+  },
+
+  // ---------------- school (8) ----------------
+  {
+    id: "school-01",
+    category: "school",
+    optionA: { emoji: "⚽", label: { ko: "운동장 축구", en: "soccer on the field", vi: "đá bóng sân trường", zh: "操场踢足球", ja: "グラウンドでサッカー" } },
+    optionB: { emoji: "📚", label: { ko: "도서관 책읽기", en: "reading in library", vi: "đọc sách thư viện", zh: "图书馆看书", ja: "図書室で読書" } },
+    followUp: FU_SCHOOL,
+  },
+  {
+    id: "school-02",
+    category: "school",
+    optionA: { emoji: "🎨", label: { ko: "미술 수업", en: "art class", vi: "giờ mỹ thuật", zh: "美术课", ja: "図工の時間" } },
+    optionB: { emoji: "🎵", label: { ko: "음악 수업", en: "music class", vi: "giờ âm nhạc", zh: "音乐课", ja: "音楽の時間" } },
+    followUp: FU_SCHOOL,
+  },
+  {
+    id: "school-03",
+    category: "school",
+    optionA: { emoji: "🔤", label: { ko: "영어 시간", en: "English class", vi: "giờ tiếng Anh", zh: "英语课", ja: "英語の時間" } },
+    optionB: { emoji: "🇰🇷", label: { ko: "한국어 시간", en: "Korean class", vi: "giờ tiếng Hàn", zh: "韩语课", ja: "韓国語の時間" } },
+    followUp: FU_SCHOOL,
+  },
+  {
+    id: "school-04",
+    category: "school",
+    optionA: { emoji: "🍛", label: { ko: "급식 밥", en: "cafeteria lunch", vi: "cơm căng tin", zh: "学校食堂", ja: "給食" } },
+    optionB: { emoji: "🍱", label: { ko: "도시락", en: "homemade lunchbox", vi: "cơm hộp", zh: "便当", ja: "お弁当" } },
+    followUp: FU_MEMORY,
+  },
+  {
+    id: "school-05",
+    category: "school",
+    optionA: { emoji: "➗", label: { ko: "수학 시험", en: "math test", vi: "bài kiểm tra toán", zh: "数学考试", ja: "算数テスト" } },
+    optionB: { emoji: "📖", label: { ko: "국어 시험", en: "language test", vi: "bài kiểm tra ngữ văn", zh: "语文考试", ja: "国語テスト" } },
+    followUp: FU_SCHOOL,
+  },
+  {
+    id: "school-06",
+    category: "school",
+    optionA: { emoji: "🏕️", label: { ko: "수련회", en: "school camp", vi: "trại huấn luyện", zh: "学校野营", ja: "林間学校" } },
+    optionB: { emoji: "🚌", label: { ko: "수학여행", en: "field trip", vi: "dã ngoại học đường", zh: "修学旅行", ja: "修学旅行" } },
+    followUp: FU_MEMORY,
+  },
+  {
+    id: "school-07",
+    category: "school",
+    optionA: { emoji: "👯", label: { ko: "친구랑 짝", en: "sit with a friend", vi: "ngồi cùng bạn", zh: "和朋友坐", ja: "友達と隣の席" } },
+    optionB: { emoji: "🧘", label: { ko: "혼자 앉기", en: "sit alone", vi: "ngồi một mình", zh: "一个人坐", ja: "ひとりで座る" } },
+    followUp: FU_SCHOOL,
+  },
+  {
+    id: "school-08",
+    category: "school",
+    optionA: { emoji: "🏅", label: { ko: "체육대회", en: "sports day", vi: "hội thao", zh: "运动会", ja: "運動会" } },
+    optionB: { emoji: "🎭", label: { ko: "학예회", en: "school show", vi: "hội diễn văn nghệ", zh: "学艺会", ja: "学芸会" } },
+    followUp: FU_MEMORY,
+  },
+
+  // ---------------- home (8) ----------------
+  {
+    id: "home-01",
+    category: "home",
+    optionA: { emoji: "🍲", label: { ko: "할머니 김치찌개", en: "grandma's kimchi stew", vi: "canh kimchi của bà", zh: "奶奶的泡菜汤", ja: "おばあちゃんのキムチチゲ" } },
+    optionB: { emoji: "🍜", label: { ko: "할머니 퍼", en: "grandma's pho", vi: "phở của bà", zh: "奶奶的河粉", ja: "おばあちゃんのフォー" } },
+    followUp: FU_MEMORY,
+  },
+  {
+    id: "home-02",
+    category: "home",
+    optionA: { emoji: "📖", label: { ko: "침대에서 만화책", en: "comics in bed", vi: "đọc truyện tranh trên giường", zh: "床上看漫画", ja: "ベッドで漫画" } },
+    optionB: { emoji: "🚲", label: { ko: "마당에서 자전거", en: "bike in the yard", vi: "đạp xe ngoài sân", zh: "院子里骑车", ja: "庭で自転車" } },
+    followUp: FU_HOME,
+  },
+  {
+    id: "home-03",
+    category: "home",
+    optionA: { emoji: "🥘", label: { ko: "엄마 반찬", en: "mom's side dishes", vi: "món mẹ nấu", zh: "妈妈的小菜", ja: "お母さんのおかず" } },
+    optionB: { emoji: "🍳", label: { ko: "아빠 요리", en: "dad's cooking", vi: "món bố nấu", zh: "爸爸的菜", ja: "お父さんの料理" } },
+    followUp: FU_MEMORY,
+  },
+  {
+    id: "home-04",
+    category: "home",
+    optionA: { emoji: "🐶", label: { ko: "강아지 키우기", en: "raise a puppy", vi: "nuôi chó con", zh: "养小狗", ja: "子犬を飼う" } },
+    optionB: { emoji: "🐱", label: { ko: "고양이 키우기", en: "raise a kitten", vi: "nuôi mèo con", zh: "养小猫", ja: "子猫を飼う" } },
+    followUp: FU_HOME,
+  },
+  {
+    id: "home-05",
+    category: "home",
+    optionA: { emoji: "🧳", label: { ko: "가족 여행", en: "family trip", vi: "đi du lịch cùng gia đình", zh: "家庭旅行", ja: "家族旅行" } },
+    optionB: { emoji: "🎂", label: { ko: "친구 생일 파티", en: "friend's birthday party", vi: "sinh nhật bạn", zh: "朋友的生日会", ja: "友達の誕生日会" } },
+    followUp: FU_STORY,
+  },
+  {
+    id: "home-06",
+    category: "home",
+    optionA: { emoji: "👯", label: { ko: "형제자매랑", en: "with siblings", vi: "với anh chị em", zh: "和兄弟姐妹", ja: "きょうだいと" } },
+    optionB: { emoji: "👨‍👩‍👧‍👧", label: { ko: "사촌이랑", en: "with cousins", vi: "với anh chị em họ", zh: "和表兄妹", ja: "いとこと" } },
+    followUp: FU_HOME,
+  },
+  {
+    id: "home-07",
+    category: "home",
+    optionA: { emoji: "🛏️", label: { ko: "이층침대 위칸", en: "bunk bed top", vi: "giường tầng trên", zh: "上下铺上铺", ja: "二段ベッド上" } },
+    optionB: { emoji: "🛌", label: { ko: "이층침대 아래칸", en: "bunk bed bottom", vi: "giường tầng dưới", zh: "上下铺下铺", ja: "二段ベッド下" } },
+    followUp: FU_HOME,
+  },
+  {
+    id: "home-08",
+    category: "home",
+    optionA: { emoji: "🖼️", label: { ko: "방에 그림 붙이기", en: "pictures on the wall", vi: "dán tranh trong phòng", zh: "房间贴画", ja: "部屋に絵を貼る" } },
+    optionB: { emoji: "📚", label: { ko: "책장 가득 채우기", en: "fill a bookshelf", vi: "lấp đầy kệ sách", zh: "书架塞满书", ja: "本棚を本でいっぱいに" } },
+    followUp: FU_HOME,
+  },
+
+  // ---------------- taste (8) ----------------
+  {
+    id: "taste-01",
+    category: "taste",
+    optionA: { emoji: "🍭", label: { ko: "단맛", en: "sweet", vi: "vị ngọt", zh: "甜味", ja: "あまい" } },
+    optionB: { emoji: "🌶️", label: { ko: "매운맛", en: "spicy", vi: "vị cay", zh: "辣味", ja: "からい" } },
+    followUp: FU_TASTE,
+  },
+  {
+    id: "taste-02",
+    category: "taste",
+    optionA: { emoji: "🍋", label: { ko: "새콤한 거", en: "sour things", vi: "món chua", zh: "酸的", ja: "すっぱいもの" } },
+    optionB: { emoji: "🧂", label: { ko: "짭짤한 거", en: "salty things", vi: "món mặn", zh: "咸的", ja: "しょっぱいもの" } },
+    followUp: FU_TASTE,
+  },
+  {
+    id: "taste-03",
+    category: "taste",
+    optionA: { emoji: "🍮", label: { ko: "부드러운 거", en: "soft textures", vi: "mềm mại", zh: "软软的", ja: "やわらかい" } },
+    optionB: { emoji: "🥨", label: { ko: "바삭한 거", en: "crunchy textures", vi: "giòn tan", zh: "脆脆的", ja: "サクサク" } },
+    followUp: FU_TASTE,
+  },
+  {
+    id: "taste-04",
+    category: "taste",
+    optionA: { emoji: "🥶", label: { ko: "시원한 거", en: "cold things", vi: "món lạnh", zh: "凉的", ja: "冷たいもの" } },
+    optionB: { emoji: "🔥", label: { ko: "뜨거운 거", en: "hot things", vi: "món nóng", zh: "热的", ja: "熱いもの" } },
+    followUp: FU_SEASON,
+  },
+  {
+    id: "taste-05",
+    category: "taste",
+    optionA: { emoji: "🥣", label: { ko: "큰 그릇 한 번", en: "one big bowl", vi: "một tô lớn", zh: "一大碗", ja: "大きい器でひと口" } },
+    optionB: { emoji: "🍚", label: { ko: "작은 그릇 여러 번", en: "many small bowls", vi: "nhiều bát nhỏ", zh: "好多小碗", ja: "小さい器を何度も" } },
+    followUp: FU_STORY,
+  },
+  {
+    id: "taste-06",
+    category: "taste",
+    optionA: { emoji: "🍎", label: { ko: "과일", en: "fruit", vi: "trái cây", zh: "水果", ja: "くだもの" } },
+    optionB: { emoji: "🥦", label: { ko: "채소", en: "vegetables", vi: "rau củ", zh: "蔬菜", ja: "やさい" } },
+    followUp: FU_TASTE,
+  },
+  {
+    id: "taste-07",
+    category: "taste",
+    optionA: { emoji: "🍚", label: { ko: "밥", en: "rice", vi: "cơm", zh: "米饭", ja: "ごはん" } },
+    optionB: { emoji: "🍞", label: { ko: "빵", en: "bread", vi: "bánh mì", zh: "面包", ja: "パン" } },
+    followUp: FU_TASTE,
+  },
+  {
+    id: "taste-08",
+    category: "taste",
+    optionA: { emoji: "🥣", label: { ko: "국물 있는 음식", en: "soupy food", vi: "món nước", zh: "带汤的", ja: "スープ系" } },
+    optionB: { emoji: "🍛", label: { ko: "국물 없는 음식", en: "dry dishes", vi: "món khô", zh: "不带汤的", ja: "汁なし" } },
+    followUp: FU_TASTE,
+  },
+];
+
+// ============================================================
+// Spot-It (꿀벌 스팟잇)
+// ============================================================
+
+export interface SpotItSymbol {
+  id: number;
+  key: string;
+  image: string;
+  label: LangMap;
+}
+
+// 13개 심볼. 기존 VOCAB 번역을 재활용하되 (id 12: bee) 는 신규.
+export const SPOTIT_SYMBOLS: SpotItSymbol[] = [
+  { id: 0,  key: "apple",  image: "/spotit/apple.png",  label: { ko: "사과",   en: "apple",    vi: "quả táo",    zh: "苹果",   ja: "りんご",  th: "แอปเปิ้ล",  id: "apel",     hi: "सेब",     ru: "яблоко",   ar: "تفاحة",   fil: "mansanas", km: "ផ្លែប៉ោម",  mn: "алим",    uz: "olma",    my: "ပန်းသီး" } },
+  { id: 1,  key: "banana", image: "/spotit/banana.png", label: { ko: "바나나", en: "banana",   vi: "chuối",      zh: "香蕉",   ja: "バナナ",  th: "กล้วย",    id: "pisang",   hi: "केला",    ru: "банан",    ar: "موز",     fil: "saging",   km: "ចេក",        mn: "гадил",   uz: "banan",   my: "ငှက်ပျောသီး" } },
+  { id: 2,  key: "cat",    image: "/spotit/cat.png",    label: { ko: "고양이", en: "cat",      vi: "con mèo",    zh: "猫",     ja: "猫",      th: "แมว",      id: "kucing",   hi: "बिल्ली",  ru: "кошка",    ar: "قطة",     fil: "pusa",     km: "ឆ្មា",         mn: "муур",    uz: "mushuk",  my: "ကြောင်" } },
+  { id: 3,  key: "dog",    image: "/spotit/dog.png",    label: { ko: "강아지", en: "dog",      vi: "con chó",    zh: "狗",     ja: "犬",      th: "สุนัข",     id: "anjing",   hi: "कुत्ता",  ru: "собака",   ar: "كلب",     fil: "aso",      km: "ឆ្កែ",        mn: "нохой",   uz: "it",      my: "ခွေး" } },
+  { id: 4,  key: "book",   image: "/spotit/book.png",   label: { ko: "책",     en: "book",     vi: "sách",       zh: "书",     ja: "本",      th: "หนังสือ",  id: "buku",     hi: "किताब",   ru: "книга",    ar: "كتاب",    fil: "libro",    km: "សៀវភៅ",    mn: "ном",     uz: "kitob",   my: "စာအုပ်" } },
+  { id: 5,  key: "water",  image: "/spotit/water.png",  label: { ko: "물",     en: "water",    vi: "nước",       zh: "水",     ja: "水",      th: "น้ำ",       id: "air",      hi: "पानी",    ru: "вода",     ar: "ماء",     fil: "tubig",    km: "ទឹក",         mn: "ус",      uz: "suv",     my: "ရေ" } },
+  { id: 6,  key: "school", image: "/spotit/school.png", label: { ko: "학교",   en: "school",   vi: "trường",     zh: "学校",   ja: "学校",    th: "โรงเรียน", id: "sekolah",  hi: "स्कूल",   ru: "школа",    ar: "مدرسة",   fil: "paaralan", km: "សាលា",       mn: "сургууль",uz: "maktab",  my: "ကျောင်း" } },
+  { id: 7,  key: "house",  image: "/spotit/house.png",  label: { ko: "집",     en: "house",    vi: "nhà",        zh: "家",     ja: "家",      th: "บ้าน",      id: "rumah",    hi: "घर",      ru: "дом",      ar: "بيت",     fil: "bahay",    km: "ផ្ទះ",         mn: "байшин", uz: "uy",      my: "အိမ်" } },
+  { id: 8,  key: "sun",    image: "/spotit/sun.png",    label: { ko: "해",     en: "sun",      vi: "mặt trời",   zh: "太阳",   ja: "太陽",    th: "ดวงอาทิตย์",id: "matahari", hi: "सूरज",    ru: "солнце",   ar: "شمس",     fil: "araw",     km: "ព្រះអាទិត្យ",mn: "нар",    uz: "quyosh",  my: "နေ" } },
+  { id: 9,  key: "moon",   image: "/spotit/moon.png",   label: { ko: "달",     en: "moon",     vi: "mặt trăng",  zh: "月亮",   ja: "月",      th: "ดวงจันทร์",id: "bulan",    hi: "चाँद",    ru: "луна",     ar: "قمر",     fil: "buwan",    km: "ព្រះចន្ទ",   mn: "сар",     uz: "oy",      my: "လ" } },
+  { id: 10, key: "rice",   image: "/spotit/rice.png",   label: { ko: "쌀밥",   en: "rice",     vi: "cơm",        zh: "米饭",   ja: "ごはん",  th: "ข้าว",      id: "nasi",     hi: "चावल",    ru: "рис",      ar: "أرز",     fil: "kanin",    km: "បាយ",         mn: "будаа",   uz: "guruch",  my: "ထမင်း" } },
+  { id: 11, key: "tea",    image: "/spotit/tea.png",    label: { ko: "차",     en: "tea",      vi: "trà",        zh: "茶",     ja: "お茶",    th: "ชา",        id: "teh",      hi: "चाय",     ru: "чай",      ar: "شاي",     fil: "tsaa",     km: "តែ",          mn: "цай",     uz: "choy",    my: "လက်ဖက်ရည်" } },
+  { id: 12, key: "bee",    image: "/spotit/bee.png",    label: { ko: "꿀벌",   en: "bee",      vi: "con ong",    zh: "蜜蜂",   ja: "ミツバチ",th: "ผึ้ง",      id: "lebah",    hi: "मधुमक्खी",ru: "пчела",   ar: "نحلة",    fil: "bubuyog",  km: "ឃ្មុំ",       mn: "зөгий",   uz: "asalari", my: "ပျားကောင်" } },
+];
+
+// projective plane order 3 — 13 cards of 4 symbols each.
+// 임의 두 카드는 정확히 1개 공통 심볼 공유. 하드코딩.
+export const SPOTIT_CARDS: number[][] = [
+  [0,1,2,3],  [0,4,5,6],   [0,7,8,9],   [0,10,11,12],
+  [1,4,7,10], [1,5,8,11],  [1,6,9,12],
+  [2,4,8,12], [2,5,9,10],  [2,6,7,11],
+  [3,4,9,11], [3,5,7,12],  [3,6,8,10],
+];
+
+// 두 카드의 공통 심볼 1개 반환.
+export function commonSymbol(a: number[], b: number[]): number {
+  for (const s of a) if (b.includes(s)) return s;
+  throw new Error("No common symbol — SPOTIT_CARDS invariant violated");
+}

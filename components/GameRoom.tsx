@@ -14,6 +14,9 @@ import EmotionQuiz from "./games/EmotionQuiz";
 import MarketRolePlay from "./games/MarketRolePlay";
 import WordTower from "./games/WordTower";
 import TwentyQuestions from "./games/TwentyQuestions";
+import HoneyTaboo from "./games/HoneyTaboo";
+import WouldYouRather from "./games/WouldYouRather";
+import SpotIt from "./games/SpotIt";
 
 type GameMeta = {
   id: string;
@@ -37,6 +40,9 @@ const GAMES: GameMeta[] = [
   { id: "number",    icon: "🔢", name: "숫자 빨리 누르기",   sub: "듣고 터치",         color: "#FACC15", bg: "#FEF9C3", cmp: NumberTap },
   { id: "tower",     icon: "🏗️", name: "단어 탑 쌓기",       sub: "번역 맞히기",       color: "#14B8A6", bg: "#CCFBF1", cmp: WordTower },
   { id: "twentyq",   icon: "🔎", name: "스무고개",           sub: "예/아니오로 맞히기", color: "#8B5CF6", bg: "#EDE9FE", cmp: TwentyQuestions },
+  { id: "taboo",     icon: "🚫", name: "꿀벌 금칙어",         sub: "단어 설명 놀이",    color: "#E11D48", bg: "#FFE4E6", cmp: HoneyTaboo },
+  { id: "wyr",       icon: "🎲", name: "이거 저거 고르기",   sub: "둘 중 뭐가 좋아?",  color: "#F97316", bg: "#FFEDD5", cmp: WouldYouRather },
+  { id: "spotit",    icon: "🕵️", name: "꿀벌 스팟잇",         sub: "같은 그림 먼저!",   color: "#F59E0B", bg: "#FEF3C7", cmp: SpotIt },
 ];
 
 const FRIEND_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
