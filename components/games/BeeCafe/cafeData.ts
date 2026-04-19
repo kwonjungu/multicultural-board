@@ -86,7 +86,9 @@ export const MENUS: MenuDef[] = [
     origin: "VN",
     name: { ko: "반미", en: "Banh Mi", vi: "Bánh mì", zh: "越南三明治", ja: "バインミー" },
     ingredients: ["pork", "carrot", "cilantro", "chili", "soy-sauce"],
-    steps: ["marinate", "grill", "chop", "mix", "serve"],
+    // 실제 반미 조리 순서: 고기·채소를 먼저 썰고, 고기를 양념·구운 뒤, 빵에 채워 낸다.
+    // 기존 `marinate→grill→chop→mix`는 고기 구운 뒤에 써는 꼴이라 어색 → 조정.
+    steps: ["chop", "marinate", "grill", "mix", "serve"],
   },
   {
     id: "pad-thai",
@@ -102,7 +104,9 @@ export const MENUS: MenuDef[] = [
     origin: "TH",
     name: { ko: "망고 찹쌀밥", en: "Mango Sticky Rice", vi: "Xôi xoài", zh: "芒果糯米饭", ja: "マンゴーもち米" },
     ingredients: ["rice", "mango"],
-    steps: ["wash", "steam", "rest", "plate", "garnish"],
+    // 태국식 카오니아오 마무앙: 찹쌀은 씻고 '불린(rest)' 뒤 찐다.
+    // 기존은 steam→rest 순이라 증기로 익힌 밥을 다시 쉬게 하는 꼴. 실제는 wash→rest(불리기)→steam→plate→garnish.
+    steps: ["wash", "rest", "steam", "plate", "garnish"],
   },
   {
     id: "curry-rice",
@@ -126,7 +130,9 @@ export const MENUS: MenuDef[] = [
     origin: "JP",
     name: { ko: "초밥", en: "Sushi", vi: "Sushi", zh: "寿司", ja: "寿司" },
     ingredients: ["rice", "fish", "soy-sauce"],
-    steps: ["wash", "boil", "rest", "plate", "serve"],
+    // 실제 초밥: 쌀을 씻어 밥짓고(steam에 가까움), 식힌 뒤 생선을 '썰어' 올려 낸다.
+    // 기존 `boil`은 초밥 샤리 조리법과 어긋나고, 생선 손질(chop) 단계가 빠져 있었음.
+    steps: ["wash", "steam", "rest", "chop", "plate"],
   },
   {
     id: "adobo",
