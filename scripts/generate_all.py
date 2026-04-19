@@ -116,6 +116,42 @@ add("interpreter/success.png",       "a bee celebrating with a check mark",     
 add("patterns/bubble.png",           "soft bubble tile pattern",                "seamless tileable pattern of soft beige bubbles on white, very gentle, flat, no outlines, made for repeating wallpaper.")
 add("icons/empty.png",               "empty-state placeholder",                 "a sleepy honeybee sitting on a tiny cloud with Zs, smiling closed eyes, pastel colors, kawaii sticker.")
 
+# === DrawGuess 15장 (그림 맞히기) ===
+DRAW_STYLE = "Children's storybook illustration, flat cartoon vector, single subject on pure white background, thick black outline, kawaii, no text, no letters, centered."
+add("game-assets/draw/apple.png",   "a red apple",        f"{DRAW_STYLE} One bright red apple with tiny green leaf and short brown stem.")
+add("game-assets/draw/banana.png",  "a banana",           f"{DRAW_STYLE} One ripe yellow banana with a small brown tip.")
+add("game-assets/draw/dog.png",     "a puppy",            f"{DRAW_STYLE} One smiling brown puppy with floppy ears, sitting.")
+add("game-assets/draw/cat.png",     "a cat",              f"{DRAW_STYLE} One orange tabby cat sitting with round eyes and pink nose.")
+add("game-assets/draw/book.png",    "an open book",       f"{DRAW_STYLE} One open storybook with yellow cover and two blank cream pages.")
+add("game-assets/draw/water.png",   "a water drop",       f"{DRAW_STYLE} One big blue teardrop water droplet with a white highlight.")
+add("game-assets/draw/school.png",  "a school house",     f"{DRAW_STYLE} One small red schoolhouse with a white bell on top and a yellow door.")
+add("game-assets/draw/friend.png",  "two kids hugging",   f"{DRAW_STYLE} Two cute round kids holding hands and smiling together.")
+add("game-assets/draw/family.png",  "family portrait",    f"{DRAW_STYLE} A small family of three cute characters standing in a row smiling.")
+add("game-assets/draw/house.png",   "a house",            f"{DRAW_STYLE} One cozy cottage house with a red roof, yellow square window, beige walls, small chimney.")
+add("game-assets/draw/sun.png",     "a smiling sun",      f"{DRAW_STYLE} One yellow sun with eight triangular rays and a happy face in the center.")
+add("game-assets/draw/moon.png",    "a crescent moon",    f"{DRAW_STYLE} One pale yellow crescent moon facing right with a sleepy closed eye.")
+add("game-assets/draw/rice.png",    "a bowl of rice",     f"{DRAW_STYLE} One white bowl with blue rim filled with fluffy white rice, gentle steam curls.")
+add("game-assets/draw/tea.png",     "a cup of tea",       f"{DRAW_STYLE} One teal round teacup with a handle, amber tea inside, three curly steam lines.")
+add("game-assets/draw/thanks.png",  "thank you gesture",  f"{DRAW_STYLE} Two tiny cartoon hands clasped together in a thank-you bow pose, sparkles around.")
+
+# === EmotionQuiz 15장 (감정 상황 카드) ===
+EMO_STYLE = "Children's storybook illustration, flat cartoon, kawaii multicultural children, warm pastel palette, single scene on white background, no text, no letters, centered composition."
+add("emotions/happy_birthday.png",  "birthday celebration", f"{EMO_STYLE} A kid smiling with a birthday cake and balloons, a friend congratulating with a gift.")
+add("emotions/lost_item.png",       "lost a precious item", f"{EMO_STYLE} A sad kid kneeling on the ground looking for something, tears in eyes.")
+add("emotions/drawing_ruined.png",  "drawing ruined",       f"{EMO_STYLE} A child looking angry and pointing to a torn piece of paper on the desk.")
+add("emotions/dark_room.png",       "alone in dark room",   f"{EMO_STYLE} A scared child sitting alone in a dim bedroom hugging knees, moon through window.")
+add("emotions/presentation.png",    "class presentation",   f"{EMO_STYLE} A nervous kid standing in front of a blackboard, classmates watching, red cheeks.")
+add("emotions/meet_friend.png",     "reunion hug",          f"{EMO_STYLE} Two kids running toward each other with open arms, happy tears.")
+add("emotions/studied_late.png",    "tired from study",     f"{EMO_STYLE} A sleepy kid at a desk yawning, books piled up, small clock showing late night.")
+add("emotions/loud_noise.png",      "sudden loud noise",    f"{EMO_STYLE} A startled kid with wide eyes covering ears, shock lines behind head.")
+add("emotions/get_gift.png",        "unexpected gift",      f"{EMO_STYLE} A delighted kid opening a wrapped present with a big smile, sparkles around.")
+add("emotions/fall_down.png",       "fell down",            f"{EMO_STYLE} A kid crying softly on the playground ground with a scraped knee, friends approaching.")
+add("emotions/win_game.png",        "won a game",           f"{EMO_STYLE} A kid holding up a trophy triumphantly, fist pumping, gold stars around.")
+add("emotions/share_snack.png",     "sharing snack",        f"{EMO_STYLE} Two kids sitting together sharing cookies from one plate, smiling.")
+add("emotions/new_school.png",      "first day new school", f"{EMO_STYLE} A nervous kid with a backpack standing in front of a school gate, hand waving goodbye to parent.")
+add("emotions/pet_passed.png",      "sick pet",             f"{EMO_STYLE} A sad kid gently petting a small dog lying down, soft colors, warm mood.")
+add("emotions/help_other.png",      "helping a classmate",  f"{EMO_STYLE} A kid picking up fallen books to help another kid, both smiling warmly.")
+
 # === 틀린 그림 찾기 10쌍 (20장) ===
 # Each pair shares a scene; version B explicitly lists 3 concrete differences.
 # Note: Imagen/Gemini cannot guarantee pixel-identical base + tweaks, so this is

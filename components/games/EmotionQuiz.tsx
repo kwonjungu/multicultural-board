@@ -1,11 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { EMOTIONS, pickN, tr } from "@/lib/gameData";
+import { EMOTIONS, EmotionItem, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
 import { ProgressBar } from "./CountryGuess";
 
-const EMOJI_POOL = ["😊","😢","😠","😨","😳","🤗","😴","😮","🤔","🥳"];
+const EMOJI_POOL = ["😊","😢","😠","😨","😳","🤗","😴","😮","🤔","🥳","🥰","😭","🏆","🤝","😟","💔"];
+
+function EmotionImage({ item }: { item: EmotionItem }) {
+  const [imgOk, setImgOk] = useState(true);
+  return imgOk ? (
+    <img
+      src={`/emotions/${item.imageKey}.png`}
+      alt=""
+      aria-hidden="true"
+      onError={() => setImgOk(false)}
+      style={{ width: 180, height: 180, objectFit: "contain", borderRadius: 16 }}
+    />
+  ) : (
+    <div style={{ fontSize: 96 }}>{item.emoji}</div>
+  );
+}
 
 export default function EmotionQuiz({ langA, langB }: { langA: string; langB: string }) {
   const [round, setRound] = useState(0);
@@ -54,6 +69,9 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
       }}>
         <div style={{ fontSize: 10, fontWeight: 800, color: "#F59E0B", letterSpacing: 1.2, marginBottom: 8 }}>
           💭 상황
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+          <EmotionImage item={cur.answer} />
         </div>
         <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.5 }}>
           {tr(cur.answer.situation, langA)}

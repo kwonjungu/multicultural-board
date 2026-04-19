@@ -6,33 +6,22 @@ import { LangMap, tr } from "@/lib/gameData";
 
 // 할리갈리 — Halli Galli (Amigo Games, 1990) 정식 룰 기반.
 // ─────────────────────────────────────────────────────────────
-// 룰 요약 (2인 split-screen 변형):
+// 룰 요약 (2~5인 변형):
 //  1) 카드 총 56장. 과일 4종(딸기/라임/바나나/자두) × 각 14장.
 //     각 카드의 과일 수는 1·2·3·4·5개 중 하나.
-//  2) 카드를 플레이어 수대로 균등 분배. 모두 뒤집어 자기 앞에 쌓아둠
-//     (시작 시 공개된 카드는 없음 — 정식 룰).
+//  2) 카드를 플레이어 수대로 균등 분배. 56/n, 나머지는 앞 사람부터 1장씩.
+//     모두 뒤집어 자기 앞에 쌓아둠 (시작 시 공개된 카드는 없음 — 정식 룰).
 //  3) 시계방향으로 한 명씩 맨 위 카드를 자기 앞에 공개(뒤집어).
 //     공개된 카드는 각자의 파일(pile)에 누적되며 맨 위 카드만 보임.
 //  4) 모든 플레이어의 "공개 파일 맨 위 카드"를 합쳐, **한 과일의 합이
 //     정확히 5개** 가 되는 순간 먼저 종을 친 사람이 모든 공개 카드를 가져감.
-//  5) 잘못 친 경우 페널티: **각 상대에게 카드 1장씩** 지급
-//     (2인전이면 상대에게 1장).
+//  5) 잘못 친 경우 페널티: **각 상대에게 카드 1장씩** 지급.
 //  6) 자기 덱이 비면 그 사람은 차례를 패스. 전원 카드가 다 떨어지면 종료.
 //  7) 최종적으로 카드(여기선 점수로 환산)가 가장 많은 사람이 승.
 //
-// 사용자 피드백 "처음에 넘겨진 상태여야지 4개가" 해석:
-//  - 정식 룰에서는 "초기 공개 카드"가 없다. 앞서 시도한
-//    "각자 2장씩 선공개(총 4장)" 방식은 룰 위반이며, 첫 턴 전에
-//    이미 5합이 성립할 수도 있어 게임이 기형적으로 시작된다.
-//  - 가설 A(수량): 각자 덱에 쥐는 카드 수를 강조한 말로 해석.
-//    2인전 균등 분배 시 56/2 = 28장씩이므로 "4장"은 맞지 않음 →
-//    정식 56장 구성을 복원하는 것이 핵심 교정.
-//  - 가설 B(슬롯/과일 수): 게임 내 과일 종류는 정확히 4종이므로
-//    그 4종이 항상 화면에 보이도록 TotalsBar로 가시화(기존 유지).
-//  - 결론: 초기 공개 제거(정식 룰 준수) + 덱 56장 정식 구성으로 복원.
-//    4종 과일 가시성은 TotalsBar에서 항상 0부터 보여 "4개 슬롯" 해석도 만족.
-//
-// 제약: 2인 split-screen 구조, 이미지 폴백 이모지 유지.
+// 레이아웃:
+//  - 2인: 기존 split-screen(+180도 회전) 유지.
+//  - 3~5인: flex-wrap 격자로 각 플레이어 영역 나열.
 
 type Fruit = "strawberry" | "lime" | "banana" | "plum";
 
@@ -78,118 +67,173 @@ function fruitImg(f: Fruit): string { return `/halligalli/${f}.png`; }
 
 type Phase = "intro" | "play" | "result";
 
+type PlayerCount = 2 | 3 | 4 | 5;
+
+// 플레이어 팔레트 (최대 5명).
+const PLAYER_PALETTE: ReadonlyArray<{ color: string; bg: string }> = [
+  { color: "#F59E0B", bg: "#FEF3C7" }, // A - amber
+  { color: "#3B82F6", bg: "#DBEAFE" }, // B - blue
+  { color: "#10B981", bg: "#D1FAE5" }, // C - emerald
+  { color: "#EC4899", bg: "#FCE7F3" }, // D - pink
+  { color: "#8B5CF6", bg: "#EDE9FE" }, // E - violet
+];
+
+const PLAYER_LABEL = ["A", "B", "C", "D", "E"];
+
+// ─────────────────────────────────────────────────────────────
+// WebAudio SFX — 파일 없이 Oscillator 로 합성.
+// ─────────────────────────────────────────────────────────────
+function playTone(freq: number, durationMs: number, type: OscillatorType = "sine") {
+  if (typeof window === "undefined") return;
+  const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  if (!AC) return;
+  const ctx = new AC();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = type; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.18, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
+  osc.start();
+  osc.stop(ctx.currentTime + durationMs / 1000);
+}
+const sfx = {
+  flip: () => playTone(420, 120, "triangle"),
+  bell: () => { playTone(880, 160); setTimeout(() => playTone(1320, 200), 80); },
+  miss: () => playTone(180, 240, "sawtooth"),
+};
+
+// 56장 덱을 n명에게 균등 분배. 나머지는 앞 사람부터 1장씩.
+function dealDecks(full: Card[], n: PlayerCount): Card[][] {
+  const base = Math.floor(full.length / n);
+  const remainder = full.length % n;
+  const out: Card[][] = [];
+  let idx = 0;
+  for (let i = 0; i < n; i++) {
+    const size = base + (i < remainder ? 1 : 0);
+    out.push(full.slice(idx, idx + size));
+    idx += size;
+  }
+  return out;
+}
+
 export default function HalliGalli({ langA, langB }: { langA: string; langB: string }) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [sessionKey, setSessionKey] = useState(0);
+  const [playerCount, setPlayerCount] = useState<PlayerCount>(2);
 
-  // Decks (private) & revealed piles (public). Pile top = latest reveal.
   // 정식 룰: 시작 시 공개된 카드는 없다. 모든 카드는 뒤집어진 채 각자 덱에
   // 쌓여 있고, 턴마다 맨 위 1장을 공개한다.
-  // 2인전이므로 56장을 28/28로 균등 분배.
   const initial = useMemo(() => {
     const full = buildDeck();
-    const half = Math.floor(full.length / 2); // 28
-    return {
-      deckA: full.slice(0, half),
-      deckB: full.slice(half, half * 2),
-      pileA: [] as Card[],
-      pileB: [] as Card[],
-    };
-  }, [sessionKey]);
-  const [deckA, setDeckA] = useState<Card[]>(initial.deckA);
-  const [deckB, setDeckB] = useState<Card[]>(initial.deckB);
-  const [pileA, setPileA] = useState<Card[]>(initial.pileA);
-  const [pileB, setPileB] = useState<Card[]>(initial.pileB);
-  const [turn, setTurn] = useState<"A" | "B">("A");
-  const [scoreA, setScoreA] = useState(0);
-  const [scoreB, setScoreB] = useState(0);
-  const [flash, setFlash] = useState<{ who: "A" | "B"; kind: "hit" | "miss"; reason: string } | null>(null);
+    const decks = dealDecks(full, playerCount);
+    const piles: Card[][] = Array.from({ length: playerCount }, () => []);
+    return { decks, piles };
+    // sessionKey + playerCount 변경 시 새 덱.
+  }, [sessionKey, playerCount]);
+
+  const [decks, setDecks] = useState<Card[][]>(initial.decks);
+  const [piles, setPiles] = useState<Card[][]>(initial.piles);
+  const [turn, setTurn] = useState<number>(0);
+  const [scores, setScores] = useState<number[]>(() => Array.from({ length: playerCount }, () => 0));
+  const [flash, setFlash] = useState<{ who: number; kind: "hit" | "miss"; reason: string } | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Reset local state whenever sessionKey changes (i.e. "다시하기")
-    setDeckA(initial.deckA);
-    setDeckB(initial.deckB);
-    setPileA([]);
-    setPileB([]);
-    setTurn("A");
-    setScoreA(0);
-    setScoreB(0);
+    // Reset local state whenever sessionKey/playerCount changes.
+    setDecks(initial.decks);
+    setPiles(initial.piles);
+    setTurn(0);
+    setScores(Array.from({ length: playerCount }, () => 0));
     setFlash(null);
-  }, [sessionKey, initial]);
+  }, [sessionKey, initial, playerCount]);
 
-  // 양쪽 덱이 모두 비면 게임 종료 (정식 룰: 모든 플레이어 카드 소진).
+  // 모든 덱이 비면 게임 종료 (정식 룰: 모든 플레이어 카드 소진).
   useEffect(() => {
     if (phase !== "play") return;
-    if (deckA.length === 0 && deckB.length === 0) {
+    if (decks.every((d) => d.length === 0)) {
       setPhase("result");
     }
-  }, [deckA.length, deckB.length, phase]);
+  }, [decks, phase]);
 
   // 정식 룰: 자기 덱이 비면 차례를 패스한다.
-  // 현재 턴인 플레이어의 덱이 비었고 상대는 남아있으면 자동 패스.
   useEffect(() => {
     if (phase !== "play") return;
-    if (turn === "A" && deckA.length === 0 && deckB.length > 0) {
-      setTurn("B");
-    } else if (turn === "B" && deckB.length === 0 && deckA.length > 0) {
-      setTurn("A");
+    if (decks.length === 0) return;
+    if (decks[turn] && decks[turn].length === 0 && decks.some((d) => d.length > 0)) {
+      // 다음 살아 있는 플레이어로 건너뛴다.
+      let next = (turn + 1) % decks.length;
+      // 안전한 루프.
+      for (let i = 0; i < decks.length; i++) {
+        if (decks[next].length > 0) break;
+        next = (next + 1) % decks.length;
+      }
+      if (next !== turn) setTurn(next);
     }
-  }, [turn, deckA.length, deckB.length, phase]);
+  }, [turn, decks, phase]);
 
   function flipNext() {
     if (phase !== "play") return;
-    const mine = turn === "A" ? deckA : deckB;
-    if (mine.length === 0) {
-      // Empty deck — switch turn automatically
-      setTurn(turn === "A" ? "B" : "A");
+    const mine = decks[turn];
+    if (!mine || mine.length === 0) {
+      // Empty deck — find next non-empty turn.
+      if (decks.some((d) => d.length > 0)) {
+        let next = (turn + 1) % decks.length;
+        for (let i = 0; i < decks.length; i++) {
+          if (decks[next].length > 0) break;
+          next = (next + 1) % decks.length;
+        }
+        setTurn(next);
+      }
       return;
     }
     const [top, ...rest] = mine;
-    if (turn === "A") {
-      setDeckA(rest);
-      setPileA((p) => [top, ...p]);
-    } else {
-      setDeckB(rest);
-      setPileB((p) => [top, ...p]);
+    sfx.flip();
+    setDecks((ds) => ds.map((d, i) => (i === turn ? rest : d)));
+    setPiles((ps) => ps.map((p, i) => (i === turn ? [top, ...p] : p)));
+    // 다음 살아있는 플레이어로 턴 이동.
+    // decks 는 아직 업데이트 전이지만 turn 본인만 1장 줄어드므로 판단에 영향 없음.
+    let next = (turn + 1) % decks.length;
+    for (let i = 0; i < decks.length; i++) {
+      const candLen = next === turn ? rest.length : decks[next].length;
+      if (candLen > 0) break;
+      next = (next + 1) % decks.length;
     }
-    setTurn(turn === "A" ? "B" : "A");
+    setTurn(next);
   }
 
-  function totalByFruit(): Record<Fruit, number> {
+  function totalByFruit(pilesArr: Card[][]): Record<Fruit, number> {
     const sum: Record<Fruit, number> = { strawberry: 0, lime: 0, banana: 0, plum: 0 };
-    const top = (p: Card[]) => (p.length > 0 ? p[0] : null);
-    const topA = top(pileA);
-    const topB = top(pileB);
-    if (topA) sum[topA.fruit] += topA.count;
-    if (topB) sum[topB.fruit] += topB.count;
+    pilesArr.forEach((p) => {
+      if (p.length > 0) {
+        const top = p[0];
+        sum[top.fruit] += top.count;
+      }
+    });
     return sum;
   }
 
-  function ringBell(who: "A" | "B") {
+  function ringBell(who: number) {
     if (phase !== "play") return;
-    const totals = totalByFruit();
+    const totals = totalByFruit(piles);
     const winningFruit = (Object.keys(totals) as Fruit[]).find((f) => totals[f] === 5);
     if (flashTimer.current) { clearTimeout(flashTimer.current); flashTimer.current = null; }
     if (winningFruit) {
-      // Correct — collect both piles
-      const gained = pileA.length + pileB.length;
-      if (who === "A") setScoreA((s) => s + gained);
-      else setScoreB((s) => s + gained);
-      setPileA([]);
-      setPileB([]);
+      // Correct — collect all piles
+      const gained = piles.reduce((acc, p) => acc + p.length, 0);
+      setScores((arr) => arr.map((s, i) => (i === who ? s + gained : s)));
+      setPiles(piles.map(() => [] as Card[]));
+      sfx.bell();
       setFlash({ who, kind: "hit", reason: `${FRUIT_META[winningFruit].emoji} 정확히 5개!` });
     } else {
       // 오답 페널티 — 정식 룰: 각 상대 플레이어에게 카드 1장씩 지급.
-      // 2인전이므로 "상대에게 1장" = 내 점수 -1, 상대 점수 +1.
-      const penalty = 1;
-      if (who === "A") {
-        setScoreA((s) => Math.max(0, s - penalty));
-        setScoreB((s) => s + penalty);
-      } else {
-        setScoreB((s) => Math.max(0, s - penalty));
-        setScoreA((s) => s + penalty);
-      }
+      // 점수 기반으로는 "상대 수"만큼 잃고, 상대 각각 1씩 얻는 식으로 반영.
+      const opponents = scores.length - 1;
+      setScores((arr) => arr.map((s, i) => {
+        if (i === who) return Math.max(0, s - opponents);
+        return s + 1;
+      }));
+      sfx.miss();
       setFlash({ who, kind: "miss", reason: "5개가 아니에요" });
     }
     flashTimer.current = setTimeout(() => setFlash(null), 1400);
@@ -199,7 +243,8 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
 
   function reset() { setSessionKey((k) => k + 1); setPhase("intro"); }
 
-  const totals = phase === "play" ? totalByFruit() : null;
+  const totals = phase === "play" ? totalByFruit(piles) : null;
+  const winningFruit = totals ? (Object.keys(totals) as Fruit[]).find((f) => totals[f] === 5) : undefined;
 
   if (phase === "intro") {
     return (
@@ -211,6 +256,39 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
             같은 과일이 <b>정확히 5개</b>가 되면 종을 누르세요!
           </p>
         </div>
+
+        <div style={{
+          display: "flex", flexDirection: "column", gap: 8,
+          background: "#FFFBEB", border: "2px solid #FDE68A", borderRadius: 14,
+          padding: "12px 14px", marginBottom: 12,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: "#B45309" }}>👥 플레이어 수</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+            {([2, 3, 4, 5] as PlayerCount[]).map((n) => {
+              const active = playerCount === n;
+              return (
+                <button
+                  key={n}
+                  onClick={() => setPlayerCount(n)}
+                  aria-label={`${n}명`}
+                  aria-pressed={active}
+                  style={{
+                    minHeight: 44, padding: "8px 4px", borderRadius: 12,
+                    background: active ? "#F59E0B" : "#fff",
+                    color: active ? "#fff" : "#92400E",
+                    border: `2px solid ${active ? "#D97706" : "#FDE68A"}`,
+                    fontSize: 15, fontWeight: 900, cursor: "pointer",
+                  }}
+                >{n}명</button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: "#6B7280", fontWeight: 700 }}>
+            56장을 {playerCount}명에게 균등 분배 ({Math.floor(56 / playerCount)}장씩
+            {56 % playerCount > 0 ? `, 앞 ${56 % playerCount}명은 +1장` : ""})
+          </div>
+        </div>
+
         <button
           onClick={() => setPhase("play")}
           style={primaryBtn}
@@ -221,66 +299,109 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
   }
 
   if (phase === "result") {
-    const winner = scoreA === scoreB ? null : scoreA > scoreB ? "A" : "B";
+    const max = Math.max(...scores);
+    const winners: number[] = [];
+    scores.forEach((s, i) => { if (s === max) winners.push(i); });
+    const isDraw = winners.length > 1;
     return (
       <div style={{ ...wrap, textAlign: "center" }}>
-        <BeeMascot size={120} mood={winner ? "cheer" : "think"} />
+        <BeeMascot size={120} mood={isDraw ? "think" : "cheer"} />
         <h2 style={{ fontSize: 26, fontWeight: 900, margin: "14px 0 4px", color: "#111827" }}>
-          {winner ? `🏆 플레이어 ${winner} 승!` : "🤝 무승부!"}
+          {isDraw ? "🤝 무승부!" : `🏆 플레이어 ${PLAYER_LABEL[winners[0]]} 승!`}
         </h2>
-        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 18, fontSize: 18, fontWeight: 900 }}>
-          <div style={{ color: "#F59E0B" }}>A: {scoreA}</div>
-          <div style={{ color: "#3B82F6" }}>B: {scoreB}</div>
+        <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginTop: 18, fontSize: 16, fontWeight: 900 }}>
+          {scores.map((s, i) => (
+            <div key={i} style={{ color: PLAYER_PALETTE[i].color }}>
+              {PLAYER_LABEL[i]}: {s}
+            </div>
+          ))}
         </div>
         <button onClick={reset} style={{ ...primaryBtn, marginTop: 20 }}>🔄 다시하기</button>
       </div>
     );
   }
 
-  // play — 실제 할리갈리 테이블처럼 두 카드가 가운데 놓이고, 과일 수를
-  // 이미지로 직접 세어 판단한다. 숫자 합계 표시(TotalsBar)는 제거.
-  const topA = pileA[0];
-  const topB = pileB[0];
-  const winningFruit = totals ? (Object.keys(totals) as Fruit[]).find((f) => totals[f] === 5) : undefined;
+  // play
+  if (playerCount === 2) {
+    // 기존 split-screen + 180도 회전 유지.
+    const topA = piles[0]?.[0];
+    const topB = piles[1]?.[0];
+    return (
+      <div style={{
+        maxWidth: 680, margin: "0 auto",
+        display: "flex", flexDirection: "column", gap: 10,
+        padding: "12px 12px 28px",
+      }}>
+        {/* Player B controls (top, rotated 180° toward opposite player) */}
+        <PlayerControls
+          label="B"
+          color={PLAYER_PALETTE[1].color} bg={PLAYER_PALETTE[1].bg}
+          deckCount={decks[1]?.length ?? 0} score={scores[1] ?? 0} isTurn={turn === 1}
+          onFlip={flipNext} onBell={() => ringBell(1)}
+          flipped
+        />
 
+        {/* Center table — two face-up cards */}
+        <div style={{
+          display: "flex", flexDirection: "column", gap: 8,
+          alignItems: "center", padding: "4px 0",
+        }}>
+          <CenterCard
+            card={topB}
+            flipped
+            highlight={!!(topB && winningFruit && topB.fruit === winningFruit)}
+          />
+          <CenterCard
+            card={topA}
+            highlight={!!(topA && winningFruit && topA.fruit === winningFruit)}
+          />
+        </div>
+
+        {/* Player A controls (bottom) */}
+        <PlayerControls
+          label="A"
+          color={PLAYER_PALETTE[0].color} bg={PLAYER_PALETTE[0].bg}
+          deckCount={decks[0]?.length ?? 0} score={scores[0] ?? 0} isTurn={turn === 0}
+          onFlip={flipNext} onBell={() => ringBell(0)}
+        />
+
+        {flash && <FlashOverlay flash={{ who: PLAYER_LABEL[flash.who], kind: flash.kind, reason: flash.reason }} />}
+      </div>
+    );
+  }
+
+  // 3~5인: flex-wrap 격자 — 각 플레이어 영역을 카드+컨트롤로 묶어 나열.
   return (
     <div style={{
-      maxWidth: 680, margin: "0 auto",
+      maxWidth: 880, margin: "0 auto",
       display: "flex", flexDirection: "column", gap: 10,
       padding: "12px 12px 28px",
     }}>
-      {/* Player B controls (top, rotated 180° toward opposite player) */}
-      <PlayerControls
-        side="B" color="#3B82F6" bg="#DBEAFE"
-        deckCount={deckB.length} score={scoreB} isTurn={turn === "B"}
-        onFlip={flipNext} onBell={() => ringBell("B")}
-        flipped
-      />
-
-      {/* Center table — two face-up cards */}
       <div style={{
-        display: "flex", flexDirection: "column", gap: 8,
-        alignItems: "center", padding: "4px 0",
+        display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10,
       }}>
-        <CenterCard
-          card={topB}
-          flipped
-          highlight={!!(topB && winningFruit && topB.fruit === winningFruit)}
-        />
-        <CenterCard
-          card={topA}
-          highlight={!!(topA && winningFruit && topA.fruit === winningFruit)}
-        />
+        {Array.from({ length: playerCount }).map((_, i) => {
+          const top = piles[i]?.[0];
+          const palette = PLAYER_PALETTE[i];
+          return (
+            <PlayerPanel
+              key={i}
+              label={PLAYER_LABEL[i]}
+              color={palette.color}
+              bg={palette.bg}
+              card={top}
+              highlight={!!(top && winningFruit && top.fruit === winningFruit)}
+              deckCount={decks[i]?.length ?? 0}
+              score={scores[i] ?? 0}
+              isTurn={turn === i}
+              onFlip={flipNext}
+              onBell={() => ringBell(i)}
+            />
+          );
+        })}
       </div>
 
-      {/* Player A controls (bottom) */}
-      <PlayerControls
-        side="A" color="#F59E0B" bg="#FEF3C7"
-        deckCount={deckA.length} score={scoreA} isTurn={turn === "A"}
-        onFlip={flipNext} onBell={() => ringBell("A")}
-      />
-
-      {flash && <FlashOverlay flash={flash} />}
+      {flash && <FlashOverlay flash={{ who: PLAYER_LABEL[flash.who], kind: flash.kind, reason: flash.reason }} />}
     </div>
   );
 }
@@ -290,9 +411,9 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
 // ────────────────────────────────────────────────
 
 function PlayerControls({
-  side, color, bg, deckCount, score, isTurn, onFlip, onBell, flipped,
+  label, color, bg, deckCount, score, isTurn, onFlip, onBell, flipped,
 }: {
-  side: "A" | "B";
+  label: string;
   color: string;
   bg: string;
   deckCount: number;
@@ -313,7 +434,7 @@ function PlayerControls({
       <div style={{
         fontSize: 12, fontWeight: 900, color, padding: "4px 10px",
         background: "#fff", borderRadius: 999, border: `2px solid ${color}`,
-      }}>P {side}</div>
+      }}>P {label}</div>
       <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280" }}>
         🃏 {deckCount} · 🏆 {score}
       </div>
@@ -327,7 +448,7 @@ function PlayerControls({
       <button
         onClick={onFlip}
         disabled={!isTurn || deckCount === 0}
-        aria-label={`플레이어 ${side} 카드 넘기기`}
+        aria-label={`플레이어 ${label} 카드 넘기기`}
         style={{
           minHeight: 44, padding: "0 16px", borderRadius: 12,
           background: isTurn && deckCount > 0 ? "#fff" : "#F3F4F6",
@@ -339,7 +460,7 @@ function PlayerControls({
       >▶ 넘기기</button>
       <button
         onClick={onBell}
-        aria-label={`플레이어 ${side} 종 누르기`}
+        aria-label={`플레이어 ${label} 종 누르기`}
         style={{
           minHeight: 44, minWidth: 56, padding: 0, borderRadius: 14,
           background: `linear-gradient(135deg, ${color}, ${color}cc)`,
@@ -351,16 +472,87 @@ function PlayerControls({
   );
 }
 
-function CenterCard({ card, flipped, highlight }: { card: Card | undefined; flipped?: boolean; highlight?: boolean }) {
+// 3~5인 격자용 단일 플레이어 패널 (카드 + 컨트롤 한 덩어리).
+function PlayerPanel({
+  label, color, bg, card, highlight, deckCount, score, isTurn, onFlip, onBell,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+  card: Card | undefined;
+  highlight: boolean;
+  deckCount: number;
+  score: number;
+  isTurn: boolean;
+  onFlip: () => void;
+  onBell: () => void;
+}) {
+  return (
+    <div
+      style={{
+        background: bg, border: `2px solid ${color}`, borderRadius: 16,
+        padding: 10, display: "flex", flexDirection: "column", gap: 8,
+        width: "min(100%, 260px)", flex: "1 1 240px",
+        boxShadow: isTurn ? `0 0 0 3px ${color}55, 0 6px 14px rgba(0,0,0,0.12)` : "0 2px 6px rgba(0,0,0,0.08)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{
+          fontSize: 12, fontWeight: 900, color, padding: "3px 10px",
+          background: "#fff", borderRadius: 999, border: `2px solid ${color}`,
+        }}>P {label}</div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: "#6B7280" }}>
+          🃏 {deckCount} · 🏆 {score}
+        </div>
+        {isTurn && (
+          <span style={{
+            fontSize: 10, fontWeight: 900, background: color, color: "#fff",
+            padding: "2px 8px", borderRadius: 999, marginLeft: "auto",
+          }}>내 차례</span>
+        )}
+      </div>
+      <CenterCard card={card} highlight={highlight} compact />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={onFlip}
+          disabled={!isTurn || deckCount === 0}
+          aria-label={`플레이어 ${label} 카드 넘기기`}
+          style={{
+            flex: 1,
+            minHeight: 44, padding: "0 10px", borderRadius: 12,
+            background: isTurn && deckCount > 0 ? "#fff" : "#F3F4F6",
+            color: isTurn && deckCount > 0 ? color : "#9CA3AF",
+            border: `2px solid ${isTurn && deckCount > 0 ? color : "#E5E7EB"}`,
+            fontWeight: 900, fontSize: 13,
+            cursor: isTurn && deckCount > 0 ? "pointer" : "not-allowed",
+          }}
+        >▶ 넘기기</button>
+        <button
+          onClick={onBell}
+          aria-label={`플레이어 ${label} 종 누르기`}
+          style={{
+            minHeight: 44, minWidth: 52, padding: 0, borderRadius: 14,
+            background: `linear-gradient(135deg, ${color}, ${color}cc)`,
+            color: "#fff", border: "none", fontWeight: 900, fontSize: 22,
+            cursor: "pointer", boxShadow: `0 4px 10px ${color}55`,
+          }}
+        >🔔</button>
+      </div>
+    </div>
+  );
+}
+
+function CenterCard({ card, flipped, highlight, compact }: { card: Card | undefined; flipped?: boolean; highlight?: boolean; compact?: boolean }) {
   const transform = flipped ? "rotate(180deg)" : undefined;
+  const widthStyle = compact ? "100%" : "min(92%, 420px)";
   if (!card) {
     return (
       <div
         style={{
-          width: "min(92%, 420px)", aspectRatio: "5 / 3",
+          width: widthStyle, aspectRatio: "5 / 3",
           background: "#fff", border: "3px dashed #E5E7EB", borderRadius: 20,
           display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#9CA3AF", fontWeight: 800, fontSize: 14,
+          color: "#9CA3AF", fontWeight: 800, fontSize: 13,
           transform,
         }}
       >카드 대기 중</div>
@@ -371,7 +563,7 @@ function CenterCard({ card, flipped, highlight }: { card: Card | undefined; flip
   return (
     <div
       style={{
-        width: "min(92%, 420px)", aspectRatio: "5 / 3",
+        width: widthStyle, aspectRatio: "5 / 3",
         background: "#fff",
         border: `4px solid ${highlight ? "#DC2626" : meta.color}`,
         borderRadius: 20,
@@ -429,12 +621,12 @@ function FruitGlyph({ fruit }: { fruit: Fruit }) {
       alt=""
       aria-hidden="true"
       onError={() => setFailed(true)}
-      style={{ width: "clamp(36px, 10vw, 64px)", height: "clamp(36px, 10vw, 64px)", objectFit: "contain", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.12))" }}
+      style={{ width: "clamp(28px, 9vw, 56px)", height: "clamp(28px, 9vw, 56px)", objectFit: "contain", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.12))" }}
     />
   );
 }
 
-function FlashOverlay({ flash }: { flash: { who: "A" | "B"; kind: "hit" | "miss"; reason: string } }) {
+function FlashOverlay({ flash }: { flash: { who: string; kind: "hit" | "miss"; reason: string } }) {
   return (
     <div
       aria-live="polite"
@@ -470,7 +662,7 @@ function Rules({ langA, langB }: { langA: string; langB: string }) {
         <li>서로 번갈아 카드를 넘겨요.</li>
         <li>지금 공개된 카드 중 <b>한 과일이 정확히 5개</b>면 종을 눌러요.</li>
         <li>정답이면 지금까지 쌓인 카드를 모두 가져가요.</li>
-        <li>오답이면 상대에게 1장을 줘야 해요.</li>
+        <li>오답이면 상대에게 1장씩 줘야 해요.</li>
         <li>덱이 다 떨어지면 점수 많은 쪽이 이겨요.</li>
       </ol>
       <div style={{ marginTop: 8, fontSize: 11, color: "#9CA3AF" }}>

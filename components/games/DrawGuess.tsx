@@ -16,7 +16,7 @@ function normalize(s: string): string {
 export default function DrawGuess({ langA, langB }: { langA: string; langB: string }) {
   const rounds = useMemo(() => {
     const drawable = VOCAB.filter((v) => DRAW_KEYS.has(v.key));
-    return pickN(drawable, 5);
+    return pickN(drawable, 15);
   }, []);
 
   const [round, setRound] = useState(0);
@@ -131,7 +131,7 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
             onChange={(e) => { setInput(e.target.value); if (feedback === "wrong") setFeedback("idle"); }}
             onKeyDown={handleKey}
             aria-label="답을 입력하세요"
-            placeholder={`예: ${answerA}`}
+            placeholder="여기에 답을 써주세요"
             autoComplete="off"
             style={{
               width: "100%", padding: "12px 14px", borderRadius: 12,
