@@ -1,0 +1,14 @@
+{
+  "_doc": "Head anchor per character asset. Coords are percentages of the PNG's width/height. headTopYPct = top of head (where a hat's bottom should land). hatScalePct = hat width as % of image width.",
+  "stage-1-egg":    { "headXPct": 50, "headTopYPct": 18, "hatScalePct": 42 },
+  "stage-2-larva":  { "headXPct": 50, "headTopYPct": 20, "hatScalePct": 42 },
+  "stage-3-pupa":   { "headXPct": 50, "headTopYPct": 14, "hatScalePct": 40 },
+  "stage-4-bee":    { "headXPct": 50, "headTopYPct": 12, "hatScalePct": 42 },
+  "stage-5-queen":  { "headXPct": 50, "headTopYPct": 10, "hatScalePct": 34 },
+  "skin-classic":   { "headXPct": 35, "headTopYPct": 22, "hatScalePct": 34 },
+  "skin-green":     { "headXPct": 35, "headTopYPct": 22, "hatScalePct": 34 },
+  "skin-orange":    { "headXPct": 35, "headTopYPct": 22, "hatScalePct": 34 },
+  "skin-pink":      { "headXPct": 35, "headTopYPct": 22, "hatScalePct": 34 },
+  "skin-purple":    { "headXPct": 35, "headTopYPct": 22, "hatScalePct": 34 },
+  "skin-sky":       { "headXPct": 35, "headTopYPct": 22, "hatScalePct": 34 }
+}

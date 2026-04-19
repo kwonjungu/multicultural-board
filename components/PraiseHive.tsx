@@ -28,6 +28,7 @@ import {
 } from "@/lib/stickers";
 import { HONEY } from "@/lib/constants";
 import { t, tFmt } from "@/lib/i18n";
+import anchorsData from "@/public/stickers/anchors.json";
 
 // ============================================================
 // Praise Hive (칭찬 꿀벌집) — 4-tab student/teacher dashboard.
@@ -95,32 +96,23 @@ const STAGE_LABEL_KEY: Record<Stage, string> = {
   queen: "phStageQueen",
 };
 
-// Character anchor map (measured per asset).
-//   headXPct / headTopYPct: head center x & head TOP y, as % of the image box.
-//   hatScalePct: hat width as % of image box width.
-//   trophy/pet offsets are px relative to the 240×240 character box.
-type CharKey = Stage | `skin-${string}`;
+// Head anchors loaded from /public/stickers/anchors.json.
+// Key: "stage-{id}" (egg/larva/pupa/bee/queen) or "skin-{id}".
 interface CharAnchor {
   headXPct: number;
   headTopYPct: number;
   hatScalePct: number;
 }
-const CHAR_ANCHOR: Record<CharKey, CharAnchor> = {
-  // Upright stages (head centered horizontally, upper portion of image)
-  egg:    { headXPct: 50, headTopYPct: 20, hatScalePct: 34 },
-  larva:  { headXPct: 50, headTopYPct: 22, hatScalePct: 38 },
-  pupa:   { headXPct: 50, headTopYPct: 14, hatScalePct: 34 }, // bee occupies upper half
-  bee:    { headXPct: 50, headTopYPct: 16, hatScalePct: 36 },
-  queen:  { headXPct: 50, headTopYPct: 12, hatScalePct: 32 }, // already has tiny crown
-  // Sideways skin variants — head on the left
-  "skin-classic": { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
-  "skin-green":   { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
-  "skin-orange":  { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
-  "skin-pink":    { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
-  "skin-purple":  { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
-  "skin-sky":     { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
+const ANCHORS = anchorsData as unknown as Record<string, CharAnchor>;
+const FALLBACK_ANCHOR: CharAnchor = { headXPct: 50, headTopYPct: 18, hatScalePct: 38 };
+
+const STAGE_ANCHOR_KEY: Record<Stage, string> = {
+  egg: "stage-1-egg",
+  larva: "stage-2-larva",
+  pupa: "stage-3-pupa",
+  bee: "stage-4-bee",
+  queen: "stage-5-queen",
 };
-const FALLBACK_ANCHOR: CharAnchor = { headXPct: 50, headTopYPct: 18, hatScalePct: 34 };
 
 // ---- helpers ----
 
@@ -384,23 +376,25 @@ function MyHiveTab({
       ? stageImage(stage)
       : `/stickers/skin-${cosmetics.skin}.png`;
 
-  const charKey: CharKey =
-    cosmetics.skin === "classic" ? stage : (`skin-${cosmetics.skin}` as CharKey);
-  const anchor = CHAR_ANCHOR[charKey] ?? FALLBACK_ANCHOR;
+  const anchorKey =
+    cosmetics.skin === "classic"
+      ? STAGE_ANCHOR_KEY[stage]
+      : `skin-${cosmetics.skin}`;
+  const anchor = ANCHORS[anchorKey] ?? FALLBACK_ANCHOR;
 
   // Character box size (px). Keep square.
   const CHAR_BOX = 240;
 
-  // Hat placement (px, relative to CHAR_BOX). Hat bottom sits at head TOP,
-  // with a small 8% overlap so it visually rests on the head.
+  // Hat placement (px, relative to CHAR_BOX).
+  // Hat bottom sinks 15% into the head so it visually rests on top.
   const hatW = (anchor.hatScalePct / 100) * CHAR_BOX;
   const hatH = hatW;
   const hatCenterX = (anchor.headXPct / 100) * CHAR_BOX;
-  const hatBottomY = (anchor.headTopYPct / 100) * CHAR_BOX + hatH * 0.15; // sink 15% into head
+  const hatBottomY = (anchor.headTopYPct / 100) * CHAR_BOX + hatH * 0.15;
   const hatLeft = hatCenterX - hatW / 2;
   const hatTop = hatBottomY - hatH;
 
-  // My sticker type counts
+  // My sticker type counts (for per-type stats)
   const myTypeCounts: Record<StickerType, number> = {
     helpful: 0, brave: 0, creative: 0,
     cooperative: 0, persistent: 0, curious: 0,
@@ -408,13 +402,18 @@ function MyHiveTab({
   for (const s of list) myTypeCounts[s.type] = (myTypeCounts[s.type] ?? 0) + 1;
   const myMaxType = Math.max(1, ...Object.values(myTypeCounts));
 
-  // Honeycomb grid — real tiled hexagons (pointy-top, W:H = √3/2).
+  // Stickers in chronological order — each fills one hex cell.
+  const received = [...list].sort((a, b) => a.timestamp - b.timestamp);
+
+  // Honeycomb — pointy-top hex tiling with exact √3/2 ratio (no rounding).
+  // Adjacent rows overlap vertically by exactly H/4 and odd rows shift by W/2.
   const HEX_ROWS = 7;
   const HEX_COLS = 7;
   const HEX_COUNT = HEX_ROWS * HEX_COLS; // 49
-  const HEX_W = 40;
-  const HEX_H = Math.round(HEX_W * 2 / Math.sqrt(3)); // ~46
-  const HEX_ROW_OVERLAP = Math.round(HEX_H / 4); // ~12
+  const HEX_W = 44;
+  const HEX_H = HEX_W * 2 / Math.sqrt(3); // ≈ 50.81 — fractional for pixel-perfect tiling
+  const HEX_ROW_STEP = HEX_H * 0.75;       // row-to-row vertical distance
+  const HEX_ROW_OVERLAP = HEX_H - HEX_ROW_STEP; // ≈ 12.70
   const filled = Math.min(count, HEX_COUNT);
   const extra = count > HEX_COUNT ? count - HEX_COUNT : 0;
 
@@ -576,7 +575,7 @@ function MyHiveTab({
         </button>
       </div>
 
-      {/* Real honeycomb — tiled hexagons */}
+      {/* Real honeycomb — pointy-top hex tiling, flush edges, received sticker in each filled cell */}
       <div
         style={{
           background: "#fff",
@@ -596,11 +595,14 @@ function MyHiveTab({
                   display: "flex",
                   marginTop: r === 0 ? 0 : -HEX_ROW_OVERLAP,
                   marginLeft: isOdd ? HEX_W / 2 : 0,
+                  // width precise to avoid sub-pixel wrap
+                  width: HEX_W * HEX_COLS,
                 }}
               >
                 {Array.from({ length: HEX_COLS }).map((_, c) => {
                   const i = r * HEX_COLS + c;
                   const isFilled = i < filled;
+                  const sticker = isFilled ? received[i] : null;
                   return (
                     <div
                       key={c}
@@ -610,31 +612,28 @@ function MyHiveTab({
                         clipPath:
                           "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
                         background: isFilled
-                          ? `linear-gradient(160deg, ${HONEY.h300}, ${HONEY.h500})`
+                          ? `radial-gradient(circle at 50% 40%, ${HONEY.h300} 0%, ${HONEY.h400} 60%, ${HONEY.h500} 100%)`
                           : HONEY.h50,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         transition: "background 0.3s",
                       }}
+                      title={sticker ? t(TYPE_LABEL_KEY[sticker.type], lang) : undefined}
                     >
-                      <div
-                        style={{
-                          width: "88%",
-                          height: "88%",
-                          clipPath:
-                            "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
-                          background: isFilled ? HONEY.h400 : HONEY.h100,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 18,
-                          color: isFilled ? "#fff" : HONEY.h200,
-                          fontWeight: 900,
-                        }}
-                      >
-                        {isFilled ? "🍯" : ""}
-                      </div>
+                      {sticker ? (
+                        <img
+                          src={`/stickers/sticker-${sticker.type}.png`}
+                          alt=""
+                          aria-hidden="true"
+                          style={{
+                            width: "78%",
+                            height: "78%",
+                            objectFit: "contain",
+                            filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.25))",
+                          }}
+                        />
+                      ) : null}
                     </div>
                   );
                 })}
