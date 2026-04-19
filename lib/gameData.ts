@@ -873,3 +873,36 @@ export const STORY_SYMBOLS: StorySymbol[] = [
   { id: 27, key: "question", emoji: "❓", image: "/story/question.png", group: "abstract",
     label: { ko: "질문",   en: "question", vi: "câu hỏi",    zh: "问题",   ja: "しつもん",th: "คำถาม",     id: "pertanyaan", hi: "सवाल",  ru: "вопрос",   ar: "سؤال",    fil: "tanong",   km: "សំណួរ",       mn: "асуулт",  uz: "savol",   my: "မေးခွန်း" } },
 ];
+
+// ============================================================
+// Bee Treasure Hunt (보물 찾기) — scenes & spatial hint phrases
+// ============================================================
+
+export interface TreasureScene {
+  key: "park" | "market" | "school";
+  name: LangMap;
+  image: string;
+  fallbackBg: string;
+  emoji: string;
+}
+
+export const TREASURE_SCENES: TreasureScene[] = [
+  { key: "park",   name: { ko: "공원", en: "park",   vi: "công viên", zh: "公园",   ja: "公園",   th: "สวน",        id: "taman",     hi: "पार्क",    ru: "парк",    ar: "حديقة",    fil: "parke",    km: "សួនច្បារ",  mn: "цэцэрлэг", uz: "park",    my: "ပန်းခြံ" }, image: "/treasure/scene-park.png",   fallbackBg: "#BBF7D0", emoji: "🌳" },
+  { key: "market", name: { ko: "시장", en: "market", vi: "chợ",        zh: "市场",   ja: "市場",   th: "ตลาด",       id: "pasar",     hi: "बाज़ार",   ru: "рынок",   ar: "سوق",      fil: "palengke", km: "ផ្សារ",       mn: "зах",       uz: "bozor",   my: "စျေး" },    image: "/treasure/scene-market.png", fallbackBg: "#FED7AA", emoji: "🛒" },
+  { key: "school", name: { ko: "학교", en: "school", vi: "trường",     zh: "学校",   ja: "学校",   th: "โรงเรียน",  id: "sekolah",   hi: "स्कूल",    ru: "школа",   ar: "مدرسة",    fil: "paaralan", km: "សាលា",       mn: "сургууль", uz: "maktab",  my: "ကျောင်း" }, image: "/treasure/scene-school.png", fallbackBg: "#DBEAFE", emoji: "🏫" },
+];
+
+// Spatial hint phrases for communication between hider and seeker.
+export const POSITION_HINTS: LangMap[] = [
+  { ko: "위쪽",     en: "top",          vi: "phía trên",     zh: "上方",   ja: "上",         th: "ด้านบน",     id: "atas",      hi: "ऊपर",       ru: "сверху",      ar: "أعلى",       fil: "sa itaas",   km: "ខាងលើ",      mn: "дээр",      uz: "yuqorida",  my: "အပေါ်" },
+  { ko: "아래쪽",   en: "bottom",       vi: "phía dưới",     zh: "下方",   ja: "下",         th: "ด้านล่าง",   id: "bawah",     hi: "नीचे",      ru: "снизу",       ar: "أسفل",       fil: "sa ibaba",   km: "ខាងក្រោម",   mn: "доор",      uz: "pastda",    my: "အောက်" },
+  { ko: "왼쪽",     en: "left",         vi: "bên trái",      zh: "左边",   ja: "左",         th: "ด้านซ้าย",   id: "kiri",      hi: "बाएँ",      ru: "слева",       ar: "يسار",       fil: "sa kaliwa",  km: "ខាងឆ្វេង",    mn: "зүүн",      uz: "chapda",    my: "ဘယ်ဘက်" },
+  { ko: "오른쪽",   en: "right",        vi: "bên phải",      zh: "右边",   ja: "右",         th: "ด้านขวา",    id: "kanan",     hi: "दाएँ",      ru: "справа",      ar: "يمين",       fil: "sa kanan",   km: "ខាងស្ដាំ",    mn: "баруун",    uz: "oʻngda",    my: "ညာဘက်" },
+  { ko: "가운데",   en: "center",       vi: "ở giữa",        zh: "中间",   ja: "真ん中",     th: "ตรงกลาง",    id: "tengah",    hi: "बीच में",   ru: "в центре",    ar: "في الوسط",   fil: "sa gitna",   km: "កណ្ដាល",      mn: "дунд",      uz: "oʻrtada",   my: "အလယ်" },
+  { ko: "~옆",       en: "next to ~",    vi: "bên cạnh ~",    zh: "在~旁边",ja: "〜の隣",     th: "ข้าง ๆ ~",   id: "di samping ~", hi: "~ के पास", ru: "рядом с ~",   ar: "بجانب ~",    fil: "sa tabi ng ~", km: "ក្បែរ ~",  mn: "~ хажууд",  uz: "~ yonida",  my: "~ ဘေးမှာ" },
+  { ko: "~근처",     en: "near ~",       vi: "gần ~",         zh: "~附近",  ja: "〜の近く",   th: "ใกล้ ~",     id: "dekat ~",   hi: "~ के नज़दीक", ru: "около ~",  ar: "قرب ~",      fil: "malapit sa ~", km: "ជិត ~",     mn: "~ ойролцоо", uz: "~ yaqinida", my: "~ အနီးမှာ" },
+  { ko: "구석",     en: "corner",       vi: "góc",           zh: "角落",   ja: "すみ",       th: "มุม",        id: "sudut",     hi: "कोने",      ru: "в углу",      ar: "الزاوية",    fil: "sa sulok",   km: "ជ្រុង",       mn: "булан",     uz: "burchak",   my: "ထောင့်" },
+  { ko: "위에서 둘째줄", en: "2nd row from top", vi: "hàng 2 từ trên", zh: "从上往下第2行", ja: "上から2行目", th: "แถวที่ 2 จากบน", id: "baris ke-2 dari atas", hi: "ऊपर से 2री पंक्ति", ru: "2-й ряд сверху", ar: "الصف 2 من الأعلى", fil: "ika-2 hilera mula sa itaas", km: "ជួរទី 2 ពីលើ", mn: "дээрээс 2-р эгнээ", uz: "yuqoridan 2-qator", my: "အပေါ်မှ ၂ တန်း" },
+  { ko: "왼쪽에서 셋째칸", en: "3rd cell from left", vi: "ô thứ 3 từ trái", zh: "从左数第3格", ja: "左から3マス目", th: "ช่องที่ 3 จากซ้าย", id: "kotak ke-3 dari kiri", hi: "बाएँ से 3री खाना", ru: "3-я клетка слева", ar: "الخانة 3 من اليسار", fil: "ika-3 kahon mula sa kaliwa", km: "ប្រអប់ទី 3 ពីឆ្វេង", mn: "зүүнээс 3-р нүд", uz: "chapdan 3-katak", my: "ဘယ်မှ ၃ ကွက်" },
+];
+

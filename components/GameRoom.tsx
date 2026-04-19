@@ -20,6 +20,9 @@ import SpotIt from "./games/SpotIt";
 import HalliGalli from "./games/HalliGalli";
 import BeeWorldMarble from "./games/BeeWorldMarble";
 import StoryCubes from "./games/StoryCubes";
+import BeeTreasureHunt from "./games/BeeTreasureHunt";
+import HoneyYut from "./games/HoneyYut";
+import BeeCafe from "./games/BeeCafe";
 
 type GameMeta = {
   id: string;
@@ -51,6 +54,9 @@ const GAMES: GameMeta[] = [
   { id: "halligalli", icon: "🔔", iconImg: "/game-icons/halligalli.png", name: "할리갈리",           sub: "과일 5개 종 울려!", color: "#DC2626", bg: "#FEE2E2", cmp: HalliGalli },
   { id: "marble",    icon: "🎲", iconImg: "/marble/tiles/start.png", name: "꿀벌 월드 마블",     sub: "세계 여행 보드게임", color: "#D97706", bg: "#FEF3C7", cmp: BeeWorldMarble },
   { id: "story", icon: "📖", iconImg: "/game-icons/story.png", name: "이야기 주사위", sub: "한 문장씩 이어가기", color: "#A78BFA", bg: "#EDE9FE", cmp: StoryCubes },
+  { id: "treasure", icon: "🗺", iconImg: "/game-icons/treasure.png", name: "꿀벌 보물사냥", sub: "힌트로 찾아내기", color: "#14B8A6", bg: "#CCFBF1", cmp: BeeTreasureHunt },
+  { id: "yut",      icon: "🪵", iconImg: "/game-icons/yut.png",      name: "꿀벌 윷놀이",   sub: "우리 전통 놀이",    color: "#B45309", bg: "#FEF3C7", cmp: HoneyYut },
+  { id: "cafe",     icon: "🍳", iconImg: "/game-icons/cafe.png",     name: "꿀벌 카페",     sub: "함께 요리해요",     color: "#F97316", bg: "#FFEDD5", cmp: BeeCafe },
 ];
 
 /** Graceful <img> that falls back to an emoji span when the PNG is missing. */

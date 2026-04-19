@@ -120,18 +120,29 @@ export function CharacterSetup({ langA, langB, onDone }: CharacterSetupProps) {
       <button
         type="button"
         aria-label="게임 시작"
-        onClick={() => onDone(active)}
+        onClick={() => {
+          // Fill blank names with "플레이어 N" so we never submit empty strings.
+          // Any other missing field has a hard-coded default already.
+          const sanitized = active.map((sp, i) => ({
+            ...sp,
+            name: sp.name.trim() || `플레이어 ${i + 1}`,
+          }));
+          onDone(sanitized);
+        }}
         style={{
           background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
           color: "#fff",
           border: "none",
-          padding: "14px 32px",
+          padding: "16px 40px",
           borderRadius: 999,
-          fontSize: 16,
+          fontSize: 18,
           fontWeight: 900,
           cursor: "pointer",
           boxShadow: "0 8px 20px rgba(245,158,11,0.4)",
           alignSelf: "center",
+          minWidth: 180,
+          position: "relative",
+          zIndex: 2,
         }}
       >
         ▶ 시작!
