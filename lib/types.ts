@@ -132,7 +132,7 @@ export interface PresenceEntry {
 export type StickerType = "helpful" | "brave" | "creative" | "cooperative" | "persistent" | "curious";
 export type Stage = "egg" | "larva" | "pupa" | "bee" | "queen";
 export type SkinId = "classic" | "orange" | "green" | "sky" | "pink" | "purple";
-export type HatId = "top" | "cap" | "ribbon" | "crown" | null;
+export type HatId = "top" | "cap" | "party" | "crown" | null;
 export type PetId = "dog" | "cat" | "rabbit" | "butterfly" | null;
 export type TrophyId = "gold" | "star" | null;
 

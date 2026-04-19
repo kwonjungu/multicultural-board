@@ -15,6 +15,7 @@ import {
   stageOf,
   stageImage,
   stageImageWithSkin,
+  stageImageWithHat,
   nextThreshold,
   progressInStage,
 } from "@/lib/stage";
@@ -371,8 +372,15 @@ function MyHiveTab({
       ? "bee"
       : "queen";
 
-  // Skin 은 동일 단계 캐릭터의 색 변형. stage anchor 그대로 사용.
-  const charImg = stageImageWithSkin(stage, cosmetics.skin);
+  // 이미지 합성 우선순위:
+  //  1) classic 스킨 + 모자(hat): 미리 합성된 PNG 사용 (가장 자연스러움)
+  //  2) 그 외: stage + skin 재채색본 + 런타임 hat 오버레이 (이전 방식, 폴백)
+  // useCompositeHat: 합성본이 있는 classic+hat 조합 여부
+  const useCompositeHat =
+    cosmetics.skin === "classic" && cosmetics.hat !== null;
+  const charImg = useCompositeHat && cosmetics.hat
+    ? stageImageWithHat(stage, cosmetics.hat)
+    : stageImageWithSkin(stage, cosmetics.skin);
   const anchorKey = STAGE_ANCHOR_KEY[stage];
   const anchor = ANCHORS[anchorKey] ?? FALLBACK_ANCHOR;
 
@@ -465,8 +473,8 @@ function MyHiveTab({
               zIndex: 1,
             }}
           />
-          {/* Hat — anchored to measured head coordinates */}
-          {cosmetics.hat && (
+          {/* Hat — 합성본이 없을 때만 런타임 오버레이 (classic 스킨이 아니거나, 합성본 파일 누락 대비) */}
+          {cosmetics.hat && !useCompositeHat && (
             <img
               src={`/stickers/hat-${cosmetics.hat}.png`}
               alt=""

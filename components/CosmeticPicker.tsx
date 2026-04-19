@@ -26,7 +26,7 @@ interface Props {
 }
 
 const ALL_SKINS: SkinId[] = ["classic", "orange", "green", "sky", "pink", "purple"];
-const ALL_HATS: NonNullable<HatId>[] = ["top", "cap", "ribbon", "crown"];
+const ALL_HATS: NonNullable<HatId>[] = ["top", "cap", "party", "crown"];
 const ALL_PETS: NonNullable<PetId>[] = ["dog", "cat", "rabbit", "butterfly"];
 const ALL_TROPHIES: NonNullable<TrophyId>[] = ["gold", "star"];
 
