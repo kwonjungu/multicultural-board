@@ -16,7 +16,6 @@ export interface TileProps {
   viewerLang: string;
   friendLang: string;
   highlight?: boolean;
-  size: number;                // pixels
 }
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -65,7 +64,6 @@ export function Tile({
   viewerLang,
   friendLang,
   highlight,
-  size,
 }: TileProps) {
   const [imgFail, setImgFail] = useState(false);
 
@@ -91,19 +89,18 @@ export function Tile({
     position: "relative",
     width: "100%",
     height: "100%",
-    aspectRatio: "1 / 1",
     background: bg,
-    border: highlight ? "3px solid #F59E0B" : "1px solid #D1D5DB",
-    borderRadius: 6,
+    border: highlight ? "2.5px solid #F59E0B" : "1px solid #D1D5DB",
+    borderRadius: 5,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 2,
+    padding: "4%",
     overflow: "hidden",
     boxShadow: highlight ? "0 0 10px rgba(245,158,11,0.6)" : undefined,
     boxSizing: "border-box",
-    fontSize: Math.max(8, size * 0.14),
+    fontSize: "clamp(9px, 1.4vw, 12px)",
   };
 
   return (
@@ -117,7 +114,8 @@ export function Tile({
             left: 0,
             right: 0,
             top: 0,
-            height: 4,
+            height: "10%",
+            minHeight: 3,
             background: ownerColor,
           }}
         />
@@ -131,9 +129,10 @@ export function Tile({
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          fontSize: Math.max(10, size * 0.28),
+          fontSize: "clamp(12px, 2.8vw, 22px)",
           lineHeight: 1,
-          marginTop: 2,
+          flex: "1 1 auto",
+          minHeight: 0,
         }}
       >
         {isCity ? (
@@ -144,8 +143,8 @@ export function Tile({
               aria-hidden="true"
               onError={() => setImgFail(true)}
               style={{
-                width: size * 0.5,
-                height: size * 0.5,
+                maxWidth: "70%",
+                maxHeight: "70%",
                 objectFit: "contain",
               }}
             />
@@ -160,8 +159,8 @@ export function Tile({
               aria-hidden="true"
               onError={() => setImgFail(true)}
               style={{
-                width: size * 0.55,
-                height: size * 0.55,
+                maxWidth: "80%",
+                maxHeight: "80%",
                 objectFit: "contain",
               }}
             />
@@ -175,7 +174,7 @@ export function Tile({
       <div
         style={{
           width: "100%",
-          fontSize: Math.max(7, size * 0.11),
+          fontSize: "clamp(8px, 1.2vw, 11px)",
           fontWeight: 800,
           textAlign: "center",
           color: "#1F2937",
@@ -183,7 +182,7 @@ export function Tile({
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
-          padding: "0 2px",
+          padding: "0 1px",
         }}
       >
         {isCity ? primaryLabel : labelForType(tile.type)}
@@ -192,7 +191,7 @@ export function Tile({
         <div
           style={{
             width: "100%",
-            fontSize: Math.max(6, size * 0.09),
+            fontSize: "clamp(7px, 1vw, 10px)",
             textAlign: "center",
             color: "#6B7280",
             fontWeight: 700,
@@ -200,7 +199,7 @@ export function Tile({
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            padding: "0 2px",
+            padding: "0 1px",
           }}
         >
           {secondaryLabel}
@@ -213,8 +212,8 @@ export function Tile({
           aria-hidden="true"
           style={{
             position: "absolute",
-            right: 2,
-            bottom: 2,
+            right: "6%",
+            bottom: "6%",
             display: "flex",
             gap: 2,
             flexWrap: "wrap",
@@ -226,8 +225,8 @@ export function Tile({
             <span
               key={p}
               style={{
-                width: Math.max(8, size * 0.18),
-                height: Math.max(8, size * 0.18),
+                width: "clamp(8px, 1.8vw, 14px)",
+                height: "clamp(8px, 1.8vw, 14px)",
                 borderRadius: "50%",
                 background: PLAYER_COLOR[p],
                 border: "2px solid #fff",

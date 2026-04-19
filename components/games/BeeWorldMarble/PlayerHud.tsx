@@ -10,79 +10,110 @@ export interface PlayerHudProps {
   playerIds: PlayerId[];
   turn: PlayerId;
   viewerLang: string;
+  /** When true, stacks vertically for sidebar / desktop layout. */
+  stacked?: boolean;
 }
 
-export function PlayerHud({ players, playerIds, turn }: PlayerHudProps) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${Math.min(4, playerIds.length)}, minmax(0, 1fr))`,
+export function PlayerHud({
+  players,
+  playerIds,
+  turn,
+  stacked = false,
+}: PlayerHudProps) {
+  const wrap: CSSProperties = stacked
+    ? {
+        display: "flex",
+        flexDirection: "column",
         gap: 6,
         width: "100%",
-      }}
-    >
+      }
+    : {
+        display: "flex",
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 6,
+        width: "100%",
+      };
+
+  return (
+    <div style={wrap}>
       {playerIds.map((pid) => (
-        <PlayerCard
+        <PlayerRow
           key={pid}
           player={players[pid]}
           active={pid === turn}
+          stacked={stacked}
+          count={playerIds.length}
         />
       ))}
     </div>
   );
 }
 
-function PlayerCard({
+function PlayerRow({
   player,
   active,
+  stacked,
+  count,
 }: {
   player: PlayerState;
   active: boolean;
+  stacked: boolean;
+  count: number;
 }) {
   const [imgFail, setImgFail] = useState(false);
   const color = PLAYER_COLOR[player.id];
   const lang = LANGUAGES[player.lang];
 
+  // On horizontal mode: each player is an equal-flex row pill.
   const wrap: CSSProperties = {
     background: "#fff",
-    border: `3px solid ${active ? color : "#E5E7EB"}`,
-    borderRadius: 12,
-    padding: "6px 8px",
+    border: `2px solid ${active ? color : "#E5E7EB"}`,
+    borderRadius: 10,
+    padding: "4px 8px",
     display: "flex",
-    flexDirection: "column",
+    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    boxShadow: active ? `0 6px 14px ${color}55` : "none",
+    gap: 6,
+    boxShadow: active ? `0 4px 10px ${color}44` : "none",
     opacity: player.bankrupt ? 0.45 : 1,
     position: "relative",
     minWidth: 0,
+    flex: stacked ? "0 0 auto" : `1 1 calc(${100 / count}% - 6px)`,
+    width: stacked ? "100%" : undefined,
+    boxSizing: "border-box",
   };
 
   return (
-    <div style={wrap} aria-label={`플레이어 ${player.id}`}>
+    <div
+      style={wrap}
+      aria-label={`플레이어 ${player.name || player.id}${active ? " (내 차례)" : ""}`}
+    >
       {active && (
         <div
           aria-hidden="true"
           style={{
             position: "absolute",
-            top: -8,
-            right: -6,
+            top: -7,
+            right: -4,
             background: color,
             color: "#fff",
             borderRadius: 999,
             padding: "1px 6px",
-            fontSize: 10,
+            fontSize: 9,
             fontWeight: 900,
+            letterSpacing: 0.5,
           }}
         >
           TURN
         </div>
       )}
+
       <div
+        aria-hidden="true"
         style={{
-          width: 36,
-          height: 36,
+          width: 28,
+          height: 28,
           borderRadius: "50%",
           background: `${color}22`,
           display: "flex",
@@ -90,10 +121,11 @@ function PlayerCard({
           justifyContent: "center",
           border: `2px solid ${color}`,
           overflow: "hidden",
+          flexShrink: 0,
         }}
       >
         {imgFail ? (
-          <span aria-hidden="true" style={{ fontSize: 22 }}>🐝</span>
+          <span style={{ fontSize: 16 }}>🐝</span>
         ) : (
           <img
             src={`/stickers/skin-${player.skin || "classic"}.png`}
@@ -104,41 +136,49 @@ function PlayerCard({
           />
         )}
       </div>
+
       <div
         style={{
-          fontSize: 12,
-          fontWeight: 900,
-          color: "#1F2937",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          maxWidth: "100%",
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+          flex: 1,
+          lineHeight: 1.15,
         }}
       >
-        {player.name || player.id}
-      </div>
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: "#6B7280",
-        }}
-      >
-        {lang?.flag ?? "🏳️"} {lang?.label ?? player.lang}
-      </div>
-      <div
-        style={{
-          fontSize: 14,
-          fontWeight: 900,
-          color: color,
-        }}
-      >
-        💰 {player.cash}
-      </div>
-      <div style={{ fontSize: 10, color: "#6B7280" }}>
-        🏘️ {player.owned.length}
-        {player.inJail > 0 ? ` · 🏝️${player.inJail}` : ""}
-        {player.skipNext ? " · 🛌" : ""}
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 900,
+            color: "#1F2937",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {lang?.flag ?? "🏳️"} {player.name || player.id}
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 800,
+            color,
+            display: "flex",
+            gap: 6,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          <span>💰{player.cash}</span>
+          <span style={{ color: "#6B7280" }}>🏘️{player.owned.length}</span>
+          {player.inJail > 0 && (
+            <span style={{ color: "#6B7280" }}>🏝️{player.inJail}</span>
+          )}
+          {player.skipNext && (
+            <span style={{ color: "#6B7280" }}>🛌</span>
+          )}
+        </div>
       </div>
     </div>
   );

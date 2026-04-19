@@ -1,12 +1,12 @@
 "use client";
 
-import { CSSProperties, useEffect, useReducer } from "react";
+import { CSSProperties, useEffect, useReducer, useState } from "react";
 import {
   initialState,
   reducer,
   type SetupPlayer,
 } from "@/lib/marbleReducer";
-import { ActionPanel } from "./ActionPanel";
+import { renderActionPanels } from "./ActionPanel";
 import { Board } from "./Board";
 import { CharacterSetup } from "./CharacterSetup";
 import { LogTicker } from "./LogTicker";
@@ -30,8 +30,17 @@ export default function BeeWorldMarble({
     return () => clearInterval(id);
   }, [state.phase.kind]);
 
-  // Quiz→wrong fallbacks: if the reducer lands us on "landed" after a quiz,
-  // the ActionPanel already shows a continue button — no auto-step required.
+  // Track viewport width to switch between stacked (mobile/tablet) and
+  // sidebar (desktop/landscape) layouts. 900px was chosen so the board
+  // at `min(96vw, 720px)` always has room plus a 240-260px HUD column.
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 900px)");
+    const apply = () => setWide(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   const handleStart = (players: SetupPlayer[]) => {
     dispatch({ type: "start", players });
@@ -41,8 +50,6 @@ export default function BeeWorldMarble({
     if (state.phase.kind !== "rolling") return;
     const a = 1 + Math.floor(Math.random() * 6);
     const b = 1 + Math.floor(Math.random() * 6);
-    // Briefly set a "rolling visually" pause by dispatching rollDice first
-    // would require extra phase; we just dispatch the result directly.
     dispatch({ type: "rollResult", a, b });
   };
 
@@ -55,60 +62,91 @@ export default function BeeWorldMarble({
     );
   }
 
+  const { center: centerNode, overlay: overlayNode } = renderActionPanels({
+    state,
+    langA,
+    langB,
+    dispatch,
+    onRoll: handleRoll,
+  });
+
+  const boardNode = (
+    <Board
+      state={state}
+      viewerLang={langA}
+      friendLang={langB}
+      center={centerNode}
+      overlay={overlayNode}
+    />
+  );
+
+  const hudNode = (
+    <PlayerHud
+      players={state.players}
+      playerIds={state.playerIds}
+      turn={state.turn}
+      viewerLang={langA}
+      stacked={wide}
+    />
+  );
+
+  const footerNode = (
+    <div style={footerBar}>
+      <LogTicker log={state.log} variant="footer" />
+      <button
+        type="button"
+        aria-label="게임 다시 시작"
+        onClick={() => dispatch({ type: "restart" })}
+        style={restartBtn}
+      >
+        🔁
+      </button>
+    </div>
+  );
+
+  if (wide) {
+    // Landscape / desktop: board on the left, HUD + log stacked on the right.
+    return (
+      <div style={rootWide}>
+        <div style={boardCol}>{boardNode}</div>
+        <aside style={sideCol} aria-label="플레이어 정보">
+          {hudNode}
+          {footerNode}
+        </aside>
+      </div>
+    );
+  }
+
+  // Mobile / tablet portrait: HUD top, board mid, log bottom.
   return (
     <div style={root}>
-      {/* Top HUD */}
-      <div style={topBar}>
-        <PlayerHud
-          players={state.players}
-          playerIds={state.playerIds}
-          turn={state.turn}
-          viewerLang={langA}
-        />
-      </div>
-
-      {/* Board + overlay panel */}
-      <div style={boardWrap}>
-        <Board
-          state={state}
-          viewerLang={langA}
-          friendLang={langB}
-        />
-        <ActionPanel
-          state={state}
-          langA={langA}
-          langB={langB}
-          dispatch={dispatch}
-          onRoll={handleRoll}
-        />
-      </div>
-
-      {/* Log + restart */}
-      <div style={footerBar}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <LogTicker log={state.log} />
-        </div>
-        <button
-          type="button"
-          aria-label="게임 다시 시작"
-          onClick={() => dispatch({ type: "restart" })}
-          style={restartBtn}
-        >
-          🔁
-        </button>
-      </div>
+      <div style={topBar}>{hudNode}</div>
+      <div style={boardWrap}>{boardNode}</div>
+      <div style={{ width: "100%" }}>{footerNode}</div>
     </div>
   );
 }
 
 const root: CSSProperties = {
   width: "100%",
-  maxWidth: 520,
+  maxWidth: 720,
   margin: "0 auto",
-  padding: "10px 10px 14px",
+  padding: "10px 8px 14px",
   display: "flex",
   flexDirection: "column",
   gap: 8,
+  boxSizing: "border-box",
+};
+
+const rootWide: CSSProperties = {
+  width: "100%",
+  maxWidth: 1120,
+  margin: "0 auto",
+  padding: "14px 16px 18px",
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) 260px",
+  gap: 16,
+  alignItems: "start",
   boxSizing: "border-box",
 };
 
@@ -128,10 +166,22 @@ const boardWrap: CSSProperties = {
   width: "100%",
 };
 
+const boardCol: CSSProperties = {
+  minWidth: 0,
+};
+
+const sideCol: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  minWidth: 0,
+};
+
 const footerBar: CSSProperties = {
   display: "flex",
   gap: 6,
   alignItems: "stretch",
+  width: "100%",
 };
 
 const restartBtn: CSSProperties = {

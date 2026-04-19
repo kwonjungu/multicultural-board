@@ -8,6 +8,8 @@ export interface DicePanelProps {
   rolling: boolean;
   canRoll: boolean;
   onRoll: () => void;
+  /** Compact sizing for the in-board center card. */
+  compact?: boolean;
 }
 
 const DICE_FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
@@ -16,7 +18,14 @@ function face(n: number): string {
   return DICE_FACES[Math.max(1, Math.min(6, n)) - 1];
 }
 
-export function DicePanel({ a, b, rolling, canRoll, onRoll }: DicePanelProps) {
+export function DicePanel({
+  a,
+  b,
+  rolling,
+  canRoll,
+  onRoll,
+  compact = false,
+}: DicePanelProps) {
   const [flicker, setFlicker] = useState<{ a: number; b: number }>({ a, b });
 
   // While rolling, show a quick face animation so the dice feel alive.
@@ -38,29 +47,35 @@ export function DicePanel({ a, b, rolling, canRoll, onRoll }: DicePanelProps) {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: 8,
+    gap: compact ? 6 : 8,
   };
 
   const diceRow: CSSProperties = {
     display: "flex",
-    gap: 10,
+    gap: compact ? 6 : 10,
   };
 
+  const dieSize = compact ? "clamp(28px, 7vw, 44px)" : 52;
+  const dieFontSize = compact ? "clamp(22px, 5.5vw, 36px)" : 38;
+
   const die: CSSProperties = {
-    width: 52,
-    height: 52,
+    width: dieSize,
+    height: dieSize,
     background: "#fff",
     color: "#111827",
-    border: "3px solid #F59E0B",
-    borderRadius: 12,
+    border: "2.5px solid #F59E0B",
+    borderRadius: 10,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: 38,
+    fontSize: dieFontSize,
     lineHeight: 1,
     fontFamily: "serif",
     boxShadow: "0 4px 10px rgba(245,158,11,0.3)",
   };
+
+  const buttonPad = compact ? "8px 16px" : "12px 24px";
+  const buttonFontSize = compact ? "clamp(12px, 2vw, 14px)" : 16;
 
   return (
     <div style={wrap}>
@@ -79,10 +94,10 @@ export function DicePanel({ a, b, rolling, canRoll, onRoll }: DicePanelProps) {
             : "#E5E7EB",
           color: canRoll && !rolling ? "#fff" : "#9CA3AF",
           border: "none",
-          padding: "12px 24px",
+          padding: buttonPad,
           borderRadius: 999,
           fontWeight: 900,
-          fontSize: 16,
+          fontSize: buttonFontSize,
           cursor: canRoll && !rolling ? "pointer" : "not-allowed",
           boxShadow: canRoll && !rolling
             ? "0 6px 16px rgba(245,158,11,0.4)"

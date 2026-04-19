@@ -790,3 +790,86 @@ export function commonSymbol(a: number[], b: number[]): number {
   for (const s of a) if (b.includes(s)) return s;
   throw new Error("No common symbol — SPOTIT_CARDS invariant violated");
 }
+
+// ============================================================
+// Story Cubes (이야기 주사위)
+// ============================================================
+// 두 명이 번갈아 9개의 그림 타일을 골라 한 문장씩 이야기를 이어가는 협동 창작 게임.
+// id 0~12: SpotIt 심볼 재활용 (apple ~ bee)
+// id 13~15: VOCAB 재활용 (friend, family, thanks)
+// id 16~27: 신규 추상/자연 12개
+
+export type StoryGroup = "object" | "nature" | "people" | "action" | "abstract";
+
+export interface StorySymbol {
+  id: number;
+  key: string;
+  emoji: string;
+  image: string;
+  label: LangMap;
+  group: StoryGroup;
+}
+
+export const STORY_SYMBOLS: StorySymbol[] = [
+  // ---- SpotIt 재활용 (0~12) ----
+  { id: 0,  key: "apple",  emoji: "🍎", image: "/spotit/apple.png",  group: "object",
+    label: { ko: "사과",   en: "apple",    vi: "quả táo",    zh: "苹果",   ja: "りんご",  th: "แอปเปิ้ล",  id: "apel",     hi: "सेब",     ru: "яблоко",   ar: "تفاحة",   fil: "mansanas", km: "ផ្លែប៉ោម",  mn: "алим",    uz: "olma",    my: "ပန်းသီး" } },
+  { id: 1,  key: "banana", emoji: "🍌", image: "/spotit/banana.png", group: "object",
+    label: { ko: "바나나", en: "banana",   vi: "chuối",      zh: "香蕉",   ja: "バナナ",  th: "กล้วย",    id: "pisang",   hi: "केला",    ru: "банан",    ar: "موز",     fil: "saging",   km: "ចេក",        mn: "гадил",   uz: "banan",   my: "ငှက်ပျောသီး" } },
+  { id: 2,  key: "cat",    emoji: "🐱", image: "/spotit/cat.png",    group: "nature",
+    label: { ko: "고양이", en: "cat",      vi: "con mèo",    zh: "猫",     ja: "猫",      th: "แมว",      id: "kucing",   hi: "बिल्ली",  ru: "кошка",    ar: "قطة",     fil: "pusa",     km: "ឆ្មា",         mn: "муур",    uz: "mushuk",  my: "ကြောင်" } },
+  { id: 3,  key: "dog",    emoji: "🐶", image: "/spotit/dog.png",    group: "nature",
+    label: { ko: "강아지", en: "dog",      vi: "con chó",    zh: "狗",     ja: "犬",      th: "สุนัข",     id: "anjing",   hi: "कुत्ता",  ru: "собака",   ar: "كلب",     fil: "aso",      km: "ឆ្កែ",        mn: "нохой",   uz: "it",      my: "ခွေး" } },
+  { id: 4,  key: "book",   emoji: "📖", image: "/spotit/book.png",   group: "object",
+    label: { ko: "책",     en: "book",     vi: "sách",       zh: "书",     ja: "本",      th: "หนังสือ",  id: "buku",     hi: "किताब",   ru: "книга",    ar: "كتاب",    fil: "libro",    km: "សៀវភៅ",    mn: "ном",     uz: "kitob",   my: "စာအုပ်" } },
+  { id: 5,  key: "water",  emoji: "💧", image: "/spotit/water.png",  group: "nature",
+    label: { ko: "물",     en: "water",    vi: "nước",       zh: "水",     ja: "水",      th: "น้ำ",       id: "air",      hi: "पानी",    ru: "вода",     ar: "ماء",     fil: "tubig",    km: "ទឹក",         mn: "ус",      uz: "suv",     my: "ရေ" } },
+  { id: 6,  key: "school", emoji: "🏫", image: "/spotit/school.png", group: "object",
+    label: { ko: "학교",   en: "school",   vi: "trường",     zh: "学校",   ja: "学校",    th: "โรงเรียน", id: "sekolah",  hi: "स्कूल",   ru: "школа",    ar: "مدرسة",   fil: "paaralan", km: "សាលា",       mn: "сургууль",uz: "maktab",  my: "ကျောင်း" } },
+  { id: 7,  key: "house",  emoji: "🏠", image: "/spotit/house.png",  group: "object",
+    label: { ko: "집",     en: "house",    vi: "nhà",        zh: "家",     ja: "家",      th: "บ้าน",      id: "rumah",    hi: "घर",      ru: "дом",      ar: "بيت",     fil: "bahay",    km: "ផ្ទះ",         mn: "байшин", uz: "uy",      my: "အိမ်" } },
+  { id: 8,  key: "sun",    emoji: "☀️", image: "/spotit/sun.png",    group: "nature",
+    label: { ko: "해",     en: "sun",      vi: "mặt trời",   zh: "太阳",   ja: "太陽",    th: "ดวงอาทิตย์",id: "matahari", hi: "सूरज",    ru: "солнце",   ar: "شمس",     fil: "araw",     km: "ព្រះអាទិត្យ",mn: "нар",    uz: "quyosh",  my: "နေ" } },
+  { id: 9,  key: "moon",   emoji: "🌙", image: "/spotit/moon.png",   group: "nature",
+    label: { ko: "달",     en: "moon",     vi: "mặt trăng",  zh: "月亮",   ja: "月",      th: "ดวงจันทร์",id: "bulan",    hi: "चाँद",    ru: "луна",     ar: "قمر",     fil: "buwan",    km: "ព្រះចន្ទ",   mn: "сар",     uz: "oy",      my: "လ" } },
+  { id: 10, key: "rice",   emoji: "🍚", image: "/spotit/rice.png",   group: "object",
+    label: { ko: "쌀밥",   en: "rice",     vi: "cơm",        zh: "米饭",   ja: "ごはん",  th: "ข้าว",      id: "nasi",     hi: "चावल",    ru: "рис",      ar: "أرز",     fil: "kanin",    km: "បាយ",         mn: "будаа",   uz: "guruch",  my: "ထမင်း" } },
+  { id: 11, key: "tea",    emoji: "🍵", image: "/spotit/tea.png",    group: "object",
+    label: { ko: "차",     en: "tea",      vi: "trà",        zh: "茶",     ja: "お茶",    th: "ชา",        id: "teh",      hi: "चाय",     ru: "чай",      ar: "شاي",     fil: "tsaa",     km: "តែ",          mn: "цай",     uz: "choy",    my: "လက်ဖက်ရည်" } },
+  { id: 12, key: "bee",    emoji: "🐝", image: "/spotit/bee.png",    group: "nature",
+    label: { ko: "꿀벌",   en: "bee",      vi: "con ong",    zh: "蜜蜂",   ja: "ミツバチ",th: "ผึ้ง",      id: "lebah",    hi: "मधुमक्खी",ru: "пчела",   ar: "نحلة",    fil: "bubuyog",  km: "ឃ្មុំ",       mn: "зөгий",   uz: "asalari", my: "ပျားကောင်" } },
+
+  // ---- VOCAB 재활용 (13~15) ----
+  { id: 13, key: "friend", emoji: "🤝", image: "/story/friend.png", group: "people",
+    label: { ko: "친구",   en: "friend",   vi: "bạn",        zh: "朋友",   ja: "友達",    th: "เพื่อน",    id: "teman",    hi: "दोस्त",   ru: "друг",     ar: "صديق",    fil: "kaibigan", km: "មិត្ត",        mn: "найз",    uz: "doʻst",   my: "သူငယ်ချင်း" } },
+  { id: 14, key: "family", emoji: "👨‍👩‍👧", image: "/story/family.png", group: "people",
+    label: { ko: "가족",   en: "family",   vi: "gia đình",   zh: "家人",   ja: "家族",    th: "ครอบครัว",  id: "keluarga", hi: "परिवार",  ru: "семья",    ar: "عائلة",   fil: "pamilya",  km: "គ្រួសារ",     mn: "гэр бүл", uz: "oila",    my: "မိသားစု" } },
+  { id: 15, key: "thanks", emoji: "🙏", image: "/story/thanks.png", group: "action",
+    label: { ko: "고마워", en: "thanks",   vi: "cảm ơn",     zh: "谢谢",   ja: "ありがとう", th: "ขอบคุณ",  id: "terima kasih", hi: "धन्यवाद", ru: "спасибо", ar: "شكرا", fil: "salamat", km: "អរគុណ",     mn: "баярлалаа",uz: "rahmat",my: "ကျေးဇူးတင်ပါတယ်" } },
+
+  // ---- 신규 추상/자연 (16~27) ----
+  { id: 16, key: "journey", emoji: "🗺️", image: "/story/journey.png", group: "action",
+    label: { ko: "여행",   en: "journey",  vi: "chuyến đi",  zh: "旅行",   ja: "旅",      th: "การเดินทาง", id: "perjalanan", hi: "यात्रा", ru: "путешествие", ar: "رحلة", fil: "paglalakbay", km: "ដំណើរ", mn: "аялал", uz: "sayohat", my: "ခရီး" } },
+  { id: 17, key: "star", emoji: "⭐", image: "/story/star.png", group: "nature",
+    label: { ko: "별",     en: "star",     vi: "ngôi sao",   zh: "星星",   ja: "星",      th: "ดาว",       id: "bintang",  hi: "तारा",    ru: "звезда",   ar: "نجمة",    fil: "bituin",   km: "ផ្កាយ",        mn: "од",      uz: "yulduz",  my: "ကြယ်" } },
+  { id: 18, key: "door", emoji: "🚪", image: "/story/door.png", group: "object",
+    label: { ko: "문",     en: "door",     vi: "cánh cửa",   zh: "门",     ja: "ドア",    th: "ประตู",     id: "pintu",    hi: "दरवाज़ा", ru: "дверь",    ar: "باب",     fil: "pinto",    km: "ទ្វារ",        mn: "хаалга",  uz: "eshik",   my: "တံခါး" } },
+  { id: 19, key: "letter", emoji: "✉️", image: "/story/letter.png", group: "object",
+    label: { ko: "편지",   en: "letter",   vi: "lá thư",     zh: "信",     ja: "手紙",    th: "จดหมาย",    id: "surat",    hi: "पत्र",    ru: "письмо",   ar: "رسالة",   fil: "sulat",    km: "សំបុត្រ",     mn: "захидал", uz: "xat",     my: "စာ" } },
+  { id: 20, key: "secret", emoji: "🤫", image: "/story/secret.png", group: "abstract",
+    label: { ko: "비밀",   en: "secret",   vi: "bí mật",     zh: "秘密",   ja: "ひみつ",  th: "ความลับ",   id: "rahasia",  hi: "रहस्य",   ru: "секрет",   ar: "سر",      fil: "sikreto",  km: "អាថ៌កំបាំង",  mn: "нууц",    uz: "sir",     my: "လျှို့ဝှက်ချက်" } },
+  { id: 21, key: "gift", emoji: "🎁", image: "/story/gift.png", group: "object",
+    label: { ko: "선물",   en: "gift",     vi: "món quà",    zh: "礼物",   ja: "プレゼント",th: "ของขวัญ",  id: "hadiah",   hi: "उपहार",   ru: "подарок",  ar: "هدية",    fil: "regalo",   km: "អំណោយ",      mn: "бэлэг",   uz: "sovgʻa",  my: "လက်ဆောင်" } },
+  { id: 22, key: "music", emoji: "🎵", image: "/story/music.png", group: "abstract",
+    label: { ko: "음악",   en: "music",    vi: "âm nhạc",    zh: "音乐",   ja: "音楽",    th: "ดนตรี",    id: "musik",    hi: "संगीत",   ru: "музыка",   ar: "موسيقى",  fil: "musika",   km: "តន្ត្រី",       mn: "хөгжим",  uz: "musiqa",  my: "ဂီတ" } },
+  { id: 23, key: "dream", emoji: "💭", image: "/story/dream.png", group: "abstract",
+    label: { ko: "꿈",     en: "dream",    vi: "giấc mơ",    zh: "梦",     ja: "夢",      th: "ความฝัน",   id: "mimpi",    hi: "सपना",    ru: "мечта",    ar: "حلم",     fil: "panaginip",km: "សុបិន",       mn: "мөрөөдөл",uz: "orzu",    my: "အိပ်မက်" } },
+  { id: 24, key: "rain", emoji: "🌧️", image: "/story/rain.png", group: "nature",
+    label: { ko: "비",     en: "rain",     vi: "mưa",        zh: "雨",     ja: "雨",      th: "ฝน",        id: "hujan",    hi: "बारिश",   ru: "дождь",    ar: "مطر",     fil: "ulan",     km: "ភ្លៀង",        mn: "бороо",   uz: "yomgʻir", my: "မိုး" } },
+  { id: 25, key: "bridge", emoji: "🌉", image: "/story/bridge.png", group: "object",
+    label: { ko: "다리",   en: "bridge",   vi: "cây cầu",    zh: "桥",     ja: "橋",      th: "สะพาน",     id: "jembatan", hi: "पुल",     ru: "мост",     ar: "جسر",     fil: "tulay",    km: "ស្ពាន",        mn: "гүүр",    uz: "koʻprik", my: "တံတား" } },
+  { id: 26, key: "heart", emoji: "❤️", image: "/story/heart.png", group: "abstract",
+    label: { ko: "마음",   en: "heart",    vi: "trái tim",   zh: "心",     ja: "心",      th: "หัวใจ",     id: "hati",     hi: "दिल",     ru: "сердце",   ar: "قلب",     fil: "puso",     km: "បេះដូង",     mn: "зүрх",    uz: "yurak",   my: "နှလုံး" } },
+  { id: 27, key: "question", emoji: "❓", image: "/story/question.png", group: "abstract",
+    label: { ko: "질문",   en: "question", vi: "câu hỏi",    zh: "问题",   ja: "しつもん",th: "คำถาม",     id: "pertanyaan", hi: "सवाल",  ru: "вопрос",   ar: "سؤال",    fil: "tanong",   km: "សំណួរ",       mn: "асуулт",  uz: "savol",   my: "မေးခွန်း" } },
+];
