@@ -14,6 +14,7 @@ import type {
 import {
   stageOf,
   stageImage,
+  stageImageWithSkin,
   nextThreshold,
   progressInStage,
 } from "@/lib/stage";
@@ -370,16 +371,9 @@ function MyHiveTab({
       ? "bee"
       : "queen";
 
-  // Character image: use skin override if not classic
-  const charImg =
-    cosmetics.skin === "classic"
-      ? stageImage(stage)
-      : `/stickers/skin-${cosmetics.skin}.png`;
-
-  const anchorKey =
-    cosmetics.skin === "classic"
-      ? STAGE_ANCHOR_KEY[stage]
-      : `skin-${cosmetics.skin}`;
+  // Skin 은 동일 단계 캐릭터의 색 변형. stage anchor 그대로 사용.
+  const charImg = stageImageWithSkin(stage, cosmetics.skin);
+  const anchorKey = STAGE_ANCHOR_KEY[stage];
   const anchor = ANCHORS[anchorKey] ?? FALLBACK_ANCHOR;
 
   // Character box size (px). Keep square.

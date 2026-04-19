@@ -6,6 +6,7 @@ import { subscribeCosmetics, setCosmetics } from "@/lib/stickers";
 import {
   stageOf,
   stageImage,
+  stageImageWithSkin,
   unlockedSkins,
   unlockedHats,
   unlockedPets,
@@ -126,7 +127,10 @@ export default function CosmeticPicker({
   }
 
   // === Preview composition ===
-  const stageSrc = stageImage(stage);
+  // Skin 은 같은 stage 캐릭터의 색 변형이므로 stage base 이미지 자체를 교체.
+  // classic 이면 기존 stageImage, 아니면 stage-{n}-{stage}-{skin}.png.
+  const stageSrc = stageImageWithSkin(stage, draft.skin);
+  const stageSrcBase = stageImage(stage);
 
   return (
     <>
@@ -226,29 +230,17 @@ export default function CosmeticPicker({
                 boxShadow: "0 4px 12px rgba(245,158,11,0.18)",
               }}
             >
-              {/* Stage base */}
+              {/* Stage base (skin 이 적용된 재채색 버전). 파일 없으면 classic 으로 폴백. */}
               <img
                 src={stageSrc}
                 alt=""
                 aria-hidden="true"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = stageSrcBase; }}
                 style={{
                   position: "absolute", inset: 0, width: "100%", height: "100%",
                   objectFit: "contain",
                 }}
               />
-              {/* Skin overlay */}
-              {draft.skin && draft.skin !== "classic" && (
-                <img
-                  src={assetPath("skin", draft.skin)}
-                  alt=""
-                  aria-hidden="true"
-                  style={{
-                    position: "absolute", inset: 0, width: "100%", height: "100%",
-                    objectFit: "contain",
-                    mixBlendMode: "multiply",
-                  }}
-                />
-              )}
               {/* Pet (bottom-left) */}
               {draft.pet && (
                 <img
@@ -291,7 +283,7 @@ export default function CosmeticPicker({
             </div>
           </div>
 
-          {/* Skins section (no "none" — always has default "classic") */}
+          {/* Skins section — 현재 단계 캐릭터에 색만 입힌 프리뷰로 표시 */}
           <Section title={t("cosmeticSkins", lang)}>
             <Row>
               {ALL_SKINS.map((id) => {
@@ -304,7 +296,7 @@ export default function CosmeticPicker({
                     unlocked={unlocked}
                     onClick={() => unlocked && setDraft((d) => ({ ...d, skin: id }))}
                     lockedHint={t("cosmeticLocked", lang)}
-                    imageSrc={assetPath("skin", id)}
+                    imageSrc={stageImageWithSkin(stage, id)}
                   />
                 );
               })}
