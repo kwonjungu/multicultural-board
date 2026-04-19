@@ -30,6 +30,18 @@ const GROUP_LABEL: Record<HintGroup, { ko: string; en: string; emoji: string }> 
   misc:   { ko: "기타",  en: "Other",   emoji: "✨" },
 };
 
+function landmarkFor(item: TwentyQItem): string | null {
+  if (item.category !== "country") return null;
+  const map: Record<string, string> = {
+    "c-kr": "/landmarks/korea.png", "c-vn": "/landmarks/vietnam.png",
+    "c-cn": "/landmarks/china.png", "c-jp": "/landmarks/japan.png",
+    "c-th": "/landmarks/thailand.png", "c-ph": "/landmarks/philippines.png",
+    "c-us": "/landmarks/usa.png", "c-ru": "/landmarks/russia.png",
+    "c-id": "/landmarks/indonesia.png", "c-in": "/landmarks/india.png",
+  };
+  return map[item.id] ?? null;
+}
+
 export default function TwentyQuestions({ langA, langB }: { langA: string; langB: string }) {
   const [phase, setPhase] = useState<Phase>("category");
   const [category, setCategory] = useState<TwentyQCategory | null>(null);
@@ -230,7 +242,13 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
               onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
               onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
             >
-              <span style={{ fontSize: 32 }}>{it.emoji}</span>
+              {(() => {
+                const lm = landmarkFor(it);
+                return lm
+                  ? <img src={lm} alt="" aria-hidden="true" style={{ width: 52, height: 52, objectFit: "contain" }}
+                      onError={(e)=>{(e.currentTarget as HTMLImageElement).replaceWith(document.createElement("span"));}} />
+                  : <span style={{ fontSize: 32 }}>{it.emoji}</span>;
+              })()}
               <span>{tr(it.names, langA)}</span>
             </button>
           ))}
@@ -250,9 +268,17 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
         {correct ? "🎉 정답!" : "😅 아쉬워요"}
       </div>
       {secret && (
-        <div style={{ fontSize: 18, color: "#374151", fontWeight: 700 }}>
-          정답은 {secret.emoji} <b>{tr(secret.names, langA)}</b> /
-          {" "}{tr(secret.names, langB)}
+        <div style={{ fontSize: 18, color: "#374151", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+          <span>정답은</span>
+          {(() => {
+            const lm = landmarkFor(secret);
+            return lm
+              ? <img src={lm} alt="" aria-hidden="true" style={{ width: 52, height: 52, objectFit: "contain" }}
+                  onError={(e)=>{(e.currentTarget as HTMLImageElement).replaceWith(document.createElement("span"));}} />
+              : <span>{secret.emoji}</span>;
+          })()}
+          <b>{tr(secret.names, langA)}</b>
+          <span>/ {tr(secret.names, langB)}</span>
         </div>
       )}
       <ProgressBar value={20 - remaining} max={20} score={correct ? 1 : 0} />
@@ -373,7 +399,13 @@ function SetupPanel({
             onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
           >
-            <span style={{ fontSize: 32 }}>{it.emoji}</span>
+            {(() => {
+              const lm = landmarkFor(it);
+              return lm
+                ? <img src={lm} alt="" aria-hidden="true" style={{ width: 52, height: 52, objectFit: "contain" }}
+                    onError={(e)=>{(e.currentTarget as HTMLImageElement).replaceWith(document.createElement("span"));}} />
+                : <span style={{ fontSize: 32 }}>{it.emoji}</span>;
+            })()}
             <span>{tr(it.names, langB)}</span>
           </button>
         ))}

@@ -21,56 +21,99 @@ const NUMBERS_WORDS: Record<string, string[]> = {
   my: ["သုည","တစ်","နှစ်","သုံး","လေး","ငါး","ခြောက်","ခုနစ်","ရှစ်","ကိုး"],
 };
 
-const TIME_LIMIT = 30;
+const ROUND_COUNT = 10;
+const WRONG_LOCK_MS = 500;
+
+type Phase = "ready" | "play" | "done";
 
 export default function NumberTap({ langA, langB }: { langA: string; langB: string }) {
-  const [phase, setPhase] = useState<"ready" | "play" | "done">("ready");
-  const [score, setScore] = useState(0);
-  const [miss, setMiss] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(TIME_LIMIT);
+  const [phase, setPhase] = useState<Phase>("ready");
+  const [scoreA, setScoreA] = useState(0);
+  const [scoreB, setScoreB] = useState(0);
+  const [round, setRound] = useState(0);
   const [target, setTarget] = useState<{ n: number; lang: string } | null>(null);
-  const [flash, setFlash] = useState<"ok" | "bad" | null>(null);
+  const [flashA, setFlashA] = useState<"ok" | "bad" | null>(null);
+  const [flashB, setFlashB] = useState<"ok" | "bad" | null>(null);
+  const [lockA, setLockA] = useState(0);
+  const [lockB, setLockB] = useState(0);
+  const [nowTs, setNowTs] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const solvedRef = useRef(false);
 
   useEffect(() => {
     if (phase !== "play") return;
-    const id = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) { clearInterval(id); setPhase("done"); return 0; }
-        return t - 1;
-      });
-    }, 1000);
+    const id = setInterval(() => setNowTs(Date.now()), 100);
     return () => clearInterval(id);
   }, [phase]);
 
-  function pickTarget() {
+  function pickTarget(nextRound: number) {
     const n = Math.floor(Math.random() * 10);
     const lang = Math.random() < 0.5 ? langA : langB;
     setTarget({ n, lang });
+    solvedRef.current = false;
     const word = NUMBERS_WORDS[lang]?.[n] || String(n);
     try { audioRef.current?.pause(); } catch {}
     const a = new Audio(`/api/tts?text=${encodeURIComponent(word)}&lang=${lang}`);
     audioRef.current = a;
     a.play().catch(() => {});
+    setRound(nextRound);
+  }
+
+  function replayTts() {
+    if (!target) return;
+    const word = NUMBERS_WORDS[target.lang]?.[target.n] || String(target.n);
+    try { audioRef.current?.pause(); } catch {}
+    const a = new Audio(`/api/tts?text=${encodeURIComponent(word)}&lang=${target.lang}`);
+    audioRef.current = a;
+    a.play().catch(() => {});
   }
 
   function start() {
-    setScore(0); setMiss(0); setTimeLeft(TIME_LIMIT);
+    setScoreA(0); setScoreB(0);
+    setLockA(0); setLockB(0);
+    setFlashA(null); setFlashB(null);
     setPhase("play");
-    setTimeout(pickTarget, 200);
+    setTimeout(() => pickTarget(1), 200);
   }
 
-  function handleTap(n: number) {
-    if (!target || phase !== "play") return;
-    if (n === target.n) {
-      setScore((s) => s + 1);
-      setFlash("ok");
-    } else {
-      setMiss((m) => m + 1);
-      setFlash("bad");
+  function advance() {
+    if (round >= ROUND_COUNT) {
+      setPhase("done");
+      return;
     }
-    setTimeout(() => setFlash(null), 250);
-    setTimeout(pickTarget, 400);
+    setTimeout(() => pickTarget(round + 1), 600);
+  }
+
+  function handleTap(player: "A" | "B", n: number) {
+    if (!target || phase !== "play" || solvedRef.current) return;
+    const now = Date.now();
+    const locked = player === "A" ? lockA : lockB;
+    if (now < locked) return;
+
+    if (n === target.n) {
+      solvedRef.current = true;
+      if (player === "A") {
+        setScoreA((s) => s + 1);
+        setFlashA("ok");
+        setTimeout(() => setFlashA(null), 250);
+      } else {
+        setScoreB((s) => s + 1);
+        setFlashB("ok");
+        setTimeout(() => setFlashB(null), 250);
+      }
+      advance();
+    } else {
+      const until = now + WRONG_LOCK_MS;
+      if (player === "A") {
+        setLockA(until);
+        setFlashA("bad");
+        setTimeout(() => setFlashA(null), 250);
+      } else {
+        setLockB(until);
+        setFlashB("bad");
+        setTimeout(() => setFlashB(null), 250);
+      }
+    }
   }
 
   if (phase === "ready") {
@@ -79,7 +122,10 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
         <BeeMascot size={120} mood="happy" />
         <div style={{ fontSize: 22, fontWeight: 900, margin: "18px 0 10px" }}>🔢 숫자 빨리 누르기</div>
         <div style={{ color: "#6B7280", marginBottom: 20, fontSize: 14 }}>
-          들려주는 숫자를 {TIME_LIMIT}초 안에 빨리 눌러요!
+          둘이서 마주 앉아, 들려주는 숫자를 먼저 눌러요! ({ROUND_COUNT}라운드)
+        </div>
+        <div style={{ color: "#6B7280", marginBottom: 20, fontSize: 13 }}>
+          A: {langA.toUpperCase()} · B: {langB.toUpperCase()}
         </div>
         <button onClick={start} style={primaryBtn}>▶ 시작</button>
       </div>
@@ -87,61 +133,129 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
   }
 
   if (phase === "done") {
+    const winner = scoreA === scoreB ? "무승부" : scoreA > scoreB ? "Player A 승!" : "Player B 승!";
     return (
       <div style={{ textAlign: "center", padding: 40 }}>
         <BeeMascot size={120} mood="cheer" />
-        <div style={{ fontSize: 28, fontWeight: 900, color: "#111827", margin: "18px 0 6px" }}>
-          🎯 맞춘 수 {score}
+        <div style={{ fontSize: 26, fontWeight: 900, color: "#111827", margin: "18px 0 6px" }}>
+          🏆 {winner}
         </div>
-        <div style={{ color: "#6B7280", fontSize: 14, marginBottom: 20 }}>
-          놓친 수 {miss}
+        <div style={{ color: "#6B7280", fontSize: 15, marginBottom: 20 }}>
+          A: {scoreA} · B: {scoreB}
         </div>
         <button onClick={start} style={primaryBtn}>🔁 다시 하기</button>
       </div>
     );
   }
 
+  const targetWord = target ? (NUMBERS_WORDS[target.lang]?.[target.n] || String(target.n)) : "";
+
   return (
-    <div style={{ padding: "20px 16px 40px", maxWidth: 480, margin: "0 auto" }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", marginBottom: 14,
-        fontSize: 14, fontWeight: 800,
-      }}>
-        <span style={{ color: "#16A34A" }}>⭐ {score}</span>
-        <span style={{ color: timeLeft <= 5 ? "#DC2626" : "#6B7280" }}>⏱ {timeLeft}s</span>
-      </div>
+    <div style={{
+      display: "flex", flexDirection: "column",
+      minHeight: "100vh", maxWidth: 480, margin: "0 auto",
+      background: "#F9FAFB",
+    }}>
+      <PlayerArea
+        player="B"
+        lang={langB}
+        score={scoreB}
+        rotated
+        flash={flashB}
+        locked={nowTs < lockB}
+        onTap={(n) => handleTap("B", n)}
+      />
 
       <div style={{
-        background: flash === "ok" ? "#DCFCE7" : flash === "bad" ? "#FEE2E2" : "linear-gradient(135deg,#FBBF24,#F59E0B)",
-        borderRadius: 20, padding: "40px 20px", marginBottom: 16,
-        textAlign: "center", color: flash ? "#111827" : "#fff",
-        fontSize: 14, fontWeight: 800, transition: "background 0.15s",
+        background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
+        color: "#fff", padding: "14px 16px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 10, borderTop: "3px solid #fff", borderBottom: "3px solid #fff",
       }}>
-        <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 6 }}>
-          {target?.lang.toUpperCase()} ({NUMBERS_WORDS[target?.lang || ""]?.[target?.n ?? 0]})
+        <div style={{ fontSize: 12, fontWeight: 800 }}>
+          <div style={{ opacity: 0.85 }}>라운드 {round}/{ROUND_COUNT}</div>
+          <div style={{ fontSize: 15, marginTop: 2 }}>
+            🎧 {target?.lang.toUpperCase()} · {targetWord}
+          </div>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 900, textAlign: "center", flex: 1 }}>
+          A: {scoreA} · B: {scoreB}
         </div>
         <button
-          onClick={() => target && pickTarget()}
+          onClick={replayTts}
+          aria-label="문제 다시 듣기"
           style={{
-            background: "rgba(255,255,255,0.25)", border: "none", color: "inherit",
-            padding: "8px 16px", borderRadius: 99, cursor: "pointer",
-            fontSize: 13, fontWeight: 800,
+            background: "rgba(255,255,255,0.25)", border: "none", color: "#fff",
+            padding: "8px 14px", borderRadius: 99, cursor: "pointer",
+            fontSize: 13, fontWeight: 800, whiteSpace: "nowrap",
           }}
-        >🔊 다시 듣기</button>
+        >🔊 재생</button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
+      <PlayerArea
+        player="A"
+        lang={langA}
+        score={scoreA}
+        rotated={false}
+        flash={flashA}
+        locked={nowTs < lockA}
+        onTap={(n) => handleTap("A", n)}
+      />
+    </div>
+  );
+}
+
+function PlayerArea({
+  player, lang, score, rotated, flash, locked, onTap,
+}: {
+  player: "A" | "B";
+  lang: string;
+  score: number;
+  rotated: boolean;
+  flash: "ok" | "bad" | null;
+  locked: boolean;
+  onTap: (n: number) => void;
+}) {
+  const bg =
+    flash === "ok" ? "#DCFCE7" :
+    flash === "bad" ? "#FEE2E2" :
+    "#fff";
+
+  return (
+    <div style={{
+      flex: 1, padding: "16px 16px 20px",
+      background: bg, transition: "background 0.15s",
+      transform: rotated ? "rotate(180deg)" : "none",
+      display: "flex", flexDirection: "column",
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        marginBottom: 10, fontSize: 13, fontWeight: 800, color: "#374151",
+      }}>
+        <span>Player {player} · {lang.toUpperCase()}</span>
+        <span style={{ color: "#16A34A" }}>⭐ {score}</span>
+      </div>
+
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8,
+        flex: 1, alignContent: "center",
+      }}>
         {Array.from({ length: 10 }, (_, i) => (
           <button
             key={i}
-            onClick={() => handleTap(i)}
+            onClick={() => onTap(i)}
+            disabled={locked}
+            aria-label={`Player ${player} 숫자 ${i}`}
             style={{
               aspectRatio: "1 / 1", borderRadius: 14,
               border: "2px solid #E5E7EB", background: "#fff",
-              fontSize: 24, fontWeight: 900, cursor: "pointer",
+              fontSize: 24, fontWeight: 900,
+              cursor: locked ? "not-allowed" : "pointer",
               color: "#111827",
+              opacity: locked ? 0.5 : 1,
+              transition: "opacity 0.15s",
             }}
-          >{i}</button>
+          >{locked ? "⏳" : i}</button>
         ))}
       </div>
     </div>
