@@ -1,0 +1,28 @@
+{
+  "name": "batches/bezf6ixwzq5iqn6uiaxi95srt528e3bt999k",
+  "paths": [
+    "cities/usa-liberty.png",
+    "cities/usa-grand-canyon.png",
+    "cities/usa-golden-gate.png",
+    "cities/ru-red-square.png",
+    "cities/ru-petersburg.png",
+    "cities/ph-manila.png",
+    "cities/ph-cebu.png",
+    "cities/id-bali.png",
+    "cities/id-jakarta.png",
+    "cities/mn-ulaanbaatar.png",
+    "cities/mn-steppe.png",
+    "story/journey.png",
+    "story/star.png",
+    "story/door.png",
+    "story/letter.png",
+    "story/secret.png",
+    "story/gift.png",
+    "story/music.png",
+    "story/dream.png",
+    "story/rain.png",
+    "story/bridge.png",
+    "story/heart.png",
+    "story/question.png"
+  ]
+}

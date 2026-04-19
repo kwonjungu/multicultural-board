@@ -31,6 +31,13 @@ export interface Tile {
   price?: number;
   tollBase?: number;
   landmark?: LangMap;
+  /**
+   * Optional city-specific artwork (e.g. "/cities/usa-liberty.png").
+   * When present, Tile prefers it over the generic country landmark;
+   * if the file is missing at runtime the <img onError> path falls
+   * back to the country landmark and then to an emoji.
+   */
+  image?: string;
 }
 
 // Landmark image per country code — only 15 files exist in /public/landmarks.
@@ -76,7 +83,8 @@ export const TILES: Tile[] = [
   { idx: 4, type: "city", country: "CN", color: "eastAsia", price: 250, tollBase: 50,
     landmark: { ko: "만리장성", en: "Great Wall", vi: "Vạn Lý Trường Thành", zh: "长城", ja: "万里の長城" } },
   { idx: 5, type: "city", country: "MN", color: "eastAsia", price: 220, tollBase: 44,
-    landmark: { ko: "울란바토르 초원", en: "Steppe of Ulaanbaatar", vi: "Thảo nguyên Mông Cổ", zh: "乌兰巴托草原", ja: "ウランバートル草原" } },
+    landmark: { ko: "울란바토르 초원", en: "Steppe of Ulaanbaatar", vi: "Thảo nguyên Mông Cổ", zh: "乌兰巴托草原", ja: "ウランバートル草原" },
+    image: "/cities/mn-ulaanbaatar.png" },
   { idx: 6, type: "jail" },
   { idx: 7, type: "city", country: "VN", color: "southeastA", price: 230, tollBase: 46,
     landmark: { ko: "하롱베이", en: "Ha Long Bay", vi: "Vịnh Hạ Long", zh: "下龙湾", ja: "ハロン湾" } },
@@ -84,9 +92,11 @@ export const TILES: Tile[] = [
     landmark: { ko: "방콕 왕궁", en: "Grand Palace", vi: "Cung điện Bangkok", zh: "曼谷大皇宫", ja: "バンコク王宮" } },
   { idx: 9, type: "key" },
   { idx: 10, type: "city", country: "PH", color: "southeastA", price: 220, tollBase: 44,
-    landmark: { ko: "마닐라 해변", en: "Manila Beach", vi: "Bãi biển Manila", zh: "马尼拉海滩", ja: "マニラビーチ" } },
+    landmark: { ko: "마닐라 해변", en: "Manila Beach", vi: "Bãi biển Manila", zh: "马尼拉海滩", ja: "マニラビーチ" },
+    image: "/cities/ph-manila.png" },
   { idx: 11, type: "city", country: "ID", color: "southeastB", price: 240, tollBase: 48,
-    landmark: { ko: "발리 해변", en: "Bali Beach", vi: "Biển Bali", zh: "巴厘岛海滩", ja: "バリ島ビーチ" } },
+    landmark: { ko: "발리 해변", en: "Bali Beach", vi: "Biển Bali", zh: "巴厘岛海滩", ja: "バリ島ビーチ" },
+    image: "/cities/id-bali.png" },
   { idx: 12, type: "city", country: "KH", color: "southeastB", price: 220, tollBase: 44,
     landmark: { ko: "앙코르와트", en: "Angkor Wat", vi: "Angkor Wat", zh: "吴哥窟", ja: "アンコール・ワット" } },
   { idx: 13, type: "tax" },
@@ -99,26 +109,34 @@ export const TILES: Tile[] = [
     landmark: { ko: "사마르칸트 광장", en: "Samarkand Square", vi: "Quảng trường Samarkand", zh: "撒马尔罕", ja: "サマルカンド広場" } },
   { idx: 18, type: "chance" },
   { idx: 19, type: "city", country: "MN", color: "centralAsia", price: 240, tollBase: 48,
-    landmark: { ko: "몽골 초원 하이킹", en: "Mongolian Steppe Hike", vi: "Trekking thảo nguyên", zh: "蒙古草原徒步", ja: "モンゴル草原ハイキング" } },
+    landmark: { ko: "몽골 초원 하이킹", en: "Mongolian Steppe Hike", vi: "Trekking thảo nguyên", zh: "蒙古草原徒步", ja: "モンゴル草原ハイキング" },
+    image: "/cities/mn-steppe.png" },
   { idx: 20, type: "space" },
   { idx: 21, type: "city", country: "SA", color: "westAsia", price: 250, tollBase: 50,
     landmark: { ko: "사막 오아시스", en: "Desert Oasis", vi: "Ốc đảo sa mạc", zh: "沙漠绿洲", ja: "砂漠のオアシス" } },
   { idx: 22, type: "city", country: "RU", color: "westAsia", price: 240, tollBase: 48,
-    landmark: { ko: "붉은 광장", en: "Red Square", vi: "Quảng trường Đỏ", zh: "红场", ja: "赤の広場" } },
+    landmark: { ko: "붉은 광장", en: "Red Square", vi: "Quảng trường Đỏ", zh: "红场", ja: "赤の広場" },
+    image: "/cities/ru-red-square.png" },
   { idx: 23, type: "key" },
   { idx: 24, type: "city", country: "RU", color: "europe", price: 270, tollBase: 54,
-    landmark: { ko: "상트페테르부르크", en: "Saint Petersburg", vi: "Saint Petersburg", zh: "圣彼得堡", ja: "サンクトペテルブルク" } },
+    landmark: { ko: "상트페테르부르크", en: "Saint Petersburg", vi: "Saint Petersburg", zh: "圣彼得堡", ja: "サンクトペテルブルク" },
+    image: "/cities/ru-petersburg.png" },
   { idx: 25, type: "city", country: "US", color: "americas", price: 290, tollBase: 58,
-    landmark: { ko: "자유의 여신상", en: "Statue of Liberty", vi: "Tượng Nữ thần Tự do", zh: "自由女神像", ja: "自由の女神" } },
+    landmark: { ko: "자유의 여신상", en: "Statue of Liberty", vi: "Tượng Nữ thần Tự do", zh: "自由女神像", ja: "自由の女神" },
+    image: "/cities/usa-liberty.png" },
   { idx: 26, type: "city", country: "US", color: "americas", price: 280, tollBase: 56,
-    landmark: { ko: "그랜드 캐니언", en: "Grand Canyon", vi: "Grand Canyon", zh: "大峡谷", ja: "グランドキャニオン" } },
+    landmark: { ko: "그랜드 캐니언", en: "Grand Canyon", vi: "Grand Canyon", zh: "大峡谷", ja: "グランドキャニオン" },
+    image: "/cities/usa-grand-canyon.png" },
   // Originally chance — swapped to city per planner §2 note (keep chance count = 2).
   { idx: 27, type: "city", country: "US", color: "americas", price: 260, tollBase: 52,
-    landmark: { ko: "샌프란시스코 금문교", en: "Golden Gate Bridge", vi: "Cầu Golden Gate", zh: "金门大桥", ja: "ゴールデンゲート橋" } },
+    landmark: { ko: "샌프란시스코 금문교", en: "Golden Gate Bridge", vi: "Cầu Golden Gate", zh: "金门大桥", ja: "ゴールデンゲート橋" },
+    image: "/cities/usa-golden-gate.png" },
   { idx: 28, type: "city", country: "PH", color: "southeastB", price: 240, tollBase: 48,
-    landmark: { ko: "세부 해변", en: "Cebu Beach", vi: "Biển Cebu", zh: "宿务海滩", ja: "セブビーチ" } },
+    landmark: { ko: "세부 해변", en: "Cebu Beach", vi: "Biển Cebu", zh: "宿务海滩", ja: "セブビーチ" },
+    image: "/cities/ph-cebu.png" },
   { idx: 29, type: "city", country: "ID", color: "southeastB", price: 250, tollBase: 50,
-    landmark: { ko: "자카르타", en: "Jakarta", vi: "Jakarta", zh: "雅加达", ja: "ジャカルタ" } },
+    landmark: { ko: "자카르타", en: "Jakarta", vi: "Jakarta", zh: "雅加达", ja: "ジャカルタ" },
+    image: "/cities/id-jakarta.png" },
 ];
 
 export const BOARD_SIZE = TILES.length; // 30

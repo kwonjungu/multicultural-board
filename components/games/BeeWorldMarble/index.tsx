@@ -1,16 +1,18 @@
 "use client";
 
-import { CSSProperties, useEffect, useReducer, useState } from "react";
+import { CSSProperties, useEffect, useReducer, useRef, useState } from "react";
 import {
   initialState,
   reducer,
   type SetupPlayer,
 } from "@/lib/marbleReducer";
+import { JAIL_INDEX } from "@/lib/marbleData";
 import { renderActionPanels } from "./ActionPanel";
 import { Board } from "./Board";
 import { CharacterSetup } from "./CharacterSetup";
 import { LogTicker } from "./LogTicker";
 import { PlayerHud } from "./PlayerHud";
+import { sfx } from "./marbleSfx";
 
 export default function BeeWorldMarble({
   langA,
@@ -21,14 +23,46 @@ export default function BeeWorldMarble({
 }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Movement animation: tick every 200ms while moving.
+  // Movement animation: tick every 200ms while moving. Each tick plays a
+  // short "move" tone so a multi-tile move is audible.
   useEffect(() => {
     if (state.phase.kind !== "moving") return;
     const id = setInterval(() => {
+      sfx.move();
       dispatch({ type: "advance" });
     }, 200);
     return () => clearInterval(id);
   }, [state.phase.kind]);
+
+  // Fire phase-entry sfx (buy / toll / quiz / festival / jail / win). These
+  // run reactively after a dispatch settles, which is always downstream of a
+  // user gesture so mobile audio unlock has already happened.
+  const prevPhaseKind = useRef<typeof state.phase.kind | null>(null);
+  useEffect(() => {
+    const prev = prevPhaseKind.current;
+    const curr = state.phase.kind;
+    if (prev !== curr) {
+      if (curr === "tollPaid") sfx.toll();
+      else if (curr === "festival") sfx.festival();
+      else if (curr === "gameover") sfx.win();
+      // Jail: entering a "landed" on the jail tile (either via 3-double jail
+      // or chance card toJail) or entering rolling while inJail > 0.
+      else if (
+        curr === "landed" &&
+        state.phase.kind === "landed" &&
+        state.phase.tile === JAIL_INDEX
+      ) {
+        // Only play when actually imprisoned, not when just visiting.
+        const who = state.phase.who;
+        if (state.players[who]?.inJail > 0) sfx.jail();
+      }
+    }
+    // "buyPrompt" entering → we don't sound on prompt; buy() plays on buyYes.
+    // "quiz" entering → the card itself drives the ding on answer.
+    prevPhaseKind.current = curr;
+    // We intentionally depend on phase object so cash-only changes don't
+    // retrigger; phase.kind covers transitions we care about here.
+  }, [state.phase, state.players]);
 
   // Track viewport width to switch between stacked (mobile/tablet) and
   // sidebar (desktop/landscape) layouts. 900px was chosen so the board
@@ -48,9 +82,24 @@ export default function BeeWorldMarble({
 
   const handleRoll = () => {
     if (state.phase.kind !== "rolling") return;
+    sfx.diceRoll();
     const a = 1 + Math.floor(Math.random() * 6);
     const b = 1 + Math.floor(Math.random() * 6);
     dispatch({ type: "rollResult", a, b });
+  };
+
+  // Intercept specific Actions to play sfx in direct response to the user
+  // gesture (mobile audio unlock requires this). The reducer is otherwise
+  // pure and phase-entry sfx (toll / festival / jail / win) are handled by
+  // the effect above.
+  type Dispatch = typeof dispatch;
+  const dispatchWithSfx: Dispatch = (action) => {
+    if (action.type === "buyYes") sfx.buy();
+    else if (action.type === "answerQuiz") {
+      if (action.correct) sfx.quizCorrect();
+      else sfx.quizWrong();
+    }
+    dispatch(action);
   };
 
   // Intro screen
@@ -66,7 +115,7 @@ export default function BeeWorldMarble({
     state,
     langA,
     langB,
-    dispatch,
+    dispatch: dispatchWithSfx,
     onRoll: handleRoll,
   });
 

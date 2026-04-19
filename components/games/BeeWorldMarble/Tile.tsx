@@ -65,6 +65,9 @@ export function Tile({
   friendLang,
   highlight,
 }: TileProps) {
+  // Two-step fallback for city art: first try tile.image (city-specific),
+  // then the generic country landmark, finally the emoji glyph.
+  const [cityImgFail, setCityImgFail] = useState(false);
   const [imgFail, setImgFail] = useState(false);
 
   const bg =
@@ -76,8 +79,11 @@ export function Tile({
   const ownerColor = ownerId ? PLAYER_COLOR[ownerId] : undefined;
 
   const isCity = tile.type === "city";
-  const landmarkImg =
+  const countryImg =
     isCity && tile.country ? COUNTRY_LANDMARK_IMG[tile.country] : undefined;
+  // Prefer per-city art; fall back to per-country landmark on load failure.
+  const cityImg = isCity && tile.image && !cityImgFail ? tile.image : undefined;
+  const landmarkImg = cityImg ?? countryImg;
 
   const primaryLabel = tile.landmark ? tr(tile.landmark, viewerLang) : "";
   const secondaryLabel =
@@ -138,10 +144,17 @@ export function Tile({
         {isCity ? (
           landmarkImg && !imgFail ? (
             <img
+              // Re-mount the <img> when swapping from city art to country
+              // art so onError fires cleanly for the new source.
+              key={landmarkImg}
               src={landmarkImg}
               alt=""
               aria-hidden="true"
-              onError={() => setImgFail(true)}
+              onError={() => {
+                // Cascade: city-specific → country-landmark → emoji.
+                if (cityImg && !cityImgFail) setCityImgFail(true);
+                else setImgFail(true);
+              }}
               style={{
                 maxWidth: "70%",
                 maxHeight: "70%",
