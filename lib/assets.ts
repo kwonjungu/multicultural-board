@@ -26,6 +26,12 @@ const LANDMARK: Record<string, string> = {
   ru:  "/landmarks/russia.png",
   th:  "/landmarks/thailand.png",
   id:  "/landmarks/indonesia.png",
+  km:  "/landmarks/cambodia.png",
+  mn:  "/landmarks/mongolia.png",
+  uz:  "/landmarks/uzbekistan.png",
+  hi:  "/landmarks/india.png",
+  ar:  "/landmarks/saudi.png",
+  my:  "/landmarks/myanmar.png",
 };
 
 export function landmarkFor(langCode: string): string | null {

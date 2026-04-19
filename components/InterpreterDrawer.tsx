@@ -164,7 +164,17 @@ function InterpreterSide({ side, lang, value, state, onStart, onStop, onReplay, 
             </div>
           </div>
         ) : (
-          <div style={{ textAlign: "center", opacity: 0.85, padding: "0 10px" }}>
+          <div style={{ textAlign: "center", opacity: 0.9, padding: "0 10px" }}>
+            {isMe && (
+              <img
+                src="/interpreter/empty.png"
+                alt=""
+                aria-hidden="true"
+                onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+                style={{ width: 110, height: 110, objectFit: "contain", margin: "0 auto 6px", display: "block",
+                  filter: "drop-shadow(0 4px 10px rgba(245,158,11,0.28))" }}
+              />
+            )}
             <div style={{ fontSize: 14, fontWeight: 800, color: tint.ink, lineHeight: 1.65, whiteSpace: "pre-line" }}>
               {isMe
                 ? `마이크를 누르고\n${info.label}로 말해봐!`
