@@ -1,0 +1,21 @@
+{
+  "name": "batches/cdegr30i8fnnkawhu3eazk0cgrk2qmeb92kl",
+  "paths": [
+    "landmarks/india.png",
+    "landmarks/saudi.png",
+    "landmarks/myanmar.png",
+    "landmarks/cambodia.png",
+    "landmarks/mongolia.png",
+    "landmarks/uzbekistan.png",
+    "marble/tiles/start.png",
+    "marble/tiles/island.png",
+    "marble/tiles/space.png",
+    "marble/tiles/tax.png",
+    "marble/tiles/festival.png",
+    "marble/tiles/chance.png",
+    "marble/tiles/goldkey.png",
+    "marble/buildings/villa.png",
+    "marble/buildings/building.png",
+    "marble/buildings/hotel.png"
+  ]
+}

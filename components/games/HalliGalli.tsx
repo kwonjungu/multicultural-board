@@ -492,7 +492,8 @@ function PlayerPanel({
       style={{
         background: bg, border: `2px solid ${color}`, borderRadius: 16,
         padding: 10, display: "flex", flexDirection: "column", gap: 8,
-        width: "min(100%, 260px)", flex: "1 1 240px",
+        // 3~5인 공통: 셀 크기 고정 (flex-grow 금지) → 마지막 플레이어만 커지지 않음
+        flex: "0 0 260px", maxWidth: 260,
         boxShadow: isTurn ? `0 0 0 3px ${color}55, 0 6px 14px rgba(0,0,0,0.12)` : "0 2px 6px rgba(0,0,0,0.08)",
       }}
     >
@@ -565,10 +566,11 @@ function CenterCard({ card, flipped, highlight, compact }: { card: Card | undefi
       style={{
         width: widthStyle, aspectRatio: "5 / 3",
         background: "#fff",
-        border: `4px solid ${highlight ? "#DC2626" : meta.color}`,
+        // 합이 5인 승리 기회 상태 = 긍정적 녹색(#10B981). 빨강은 오답/경고용이라 부적절.
+        border: `4px solid ${highlight ? "#10B981" : meta.color}`,
         borderRadius: 20,
         boxShadow: highlight
-          ? "0 0 0 6px rgba(220,38,38,0.35), 0 12px 28px rgba(0,0,0,0.18)"
+          ? "0 0 0 6px rgba(16,185,129,0.35), 0 12px 28px rgba(0,0,0,0.18)"
           : "0 10px 22px rgba(0,0,0,0.12)",
         padding: 12, position: "relative",
         display: "flex", alignItems: "center", justifyContent: "center",
