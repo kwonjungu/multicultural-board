@@ -575,7 +575,7 @@ function MyHiveTab({
         </button>
       </div>
 
-      {/* Real honeycomb — pointy-top hex tiling, flush edges, received sticker in each filled cell */}
+      {/* Real honeycomb — absolute-positioned pointy-top hex tiling (pixel-perfect, no flex overlap) */}
       <div
         style={{
           background: "#fff",
@@ -585,69 +585,66 @@ function MyHiveTab({
           boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          {Array.from({ length: HEX_ROWS }).map((_, r) => {
-            const isOdd = r % 2 === 1;
+        <div
+          style={{
+            position: "relative",
+            width: HEX_W * HEX_COLS + HEX_W / 2, // + odd-row shift
+            height: (HEX_ROWS - 1) * HEX_ROW_STEP + HEX_H,
+            margin: "0 auto",
+          }}
+        >
+          {Array.from({ length: HEX_COUNT }).map((_, i) => {
+            const r = Math.floor(i / HEX_COLS);
+            const c = i % HEX_COLS;
+            const x = c * HEX_W + (r % 2 === 1 ? HEX_W / 2 : 0);
+            const y = r * HEX_ROW_STEP;
+            const isFilled = i < filled;
+            const sticker = isFilled ? received[i] : null;
             return (
               <div
-                key={r}
+                key={i}
                 style={{
+                  position: "absolute",
+                  left: x,
+                  top: y,
+                  width: HEX_W,
+                  height: HEX_H,
+                  clipPath:
+                    "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                  background: isFilled
+                    ? `radial-gradient(circle at 50% 40%, ${HONEY.h300} 0%, ${HONEY.h400} 60%, ${HONEY.h500} 100%)`
+                    : HONEY.h50,
                   display: "flex",
-                  marginTop: r === 0 ? 0 : -HEX_ROW_OVERLAP,
-                  marginLeft: isOdd ? HEX_W / 2 : 0,
-                  // width precise to avoid sub-pixel wrap
-                  width: HEX_W * HEX_COLS,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "background 0.3s",
                 }}
+                title={sticker ? t(TYPE_LABEL_KEY[sticker.type], lang) : undefined}
               >
-                {Array.from({ length: HEX_COLS }).map((_, c) => {
-                  const i = r * HEX_COLS + c;
-                  const isFilled = i < filled;
-                  const sticker = isFilled ? received[i] : null;
-                  return (
-                    <div
-                      key={c}
-                      style={{
-                        width: HEX_W,
-                        height: HEX_H,
-                        clipPath:
-                          "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
-                        background: isFilled
-                          ? `radial-gradient(circle at 50% 40%, ${HONEY.h300} 0%, ${HONEY.h400} 60%, ${HONEY.h500} 100%)`
-                          : HONEY.h50,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "background 0.3s",
-                      }}
-                      title={sticker ? t(TYPE_LABEL_KEY[sticker.type], lang) : undefined}
-                    >
-                      {sticker ? (
-                        <img
-                          src={`/stickers/sticker-${sticker.type}.png`}
-                          alt=""
-                          aria-hidden="true"
-                          style={{
-                            width: "78%",
-                            height: "78%",
-                            objectFit: "contain",
-                            filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.25))",
-                          }}
-                        />
-                      ) : null}
-                    </div>
-                  );
-                })}
+                {sticker ? (
+                  <img
+                    src={`/stickers/sticker-${sticker.type}.png`}
+                    alt=""
+                    aria-hidden="true"
+                    style={{
+                      width: "82%",
+                      height: "82%",
+                      objectFit: "contain",
+                      // Radial fade masks any leftover PNG-baked edges.
+                      WebkitMaskImage:
+                        "radial-gradient(circle at center, #000 58%, transparent 88%)",
+                      maskImage:
+                        "radial-gradient(circle at center, #000 58%, transparent 88%)",
+                      filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.25))",
+                    }}
+                  />
+                ) : null}
               </div>
             );
           })}
         </div>
         {extra > 0 && (
-          <div
-            style={{
-              marginTop: 12,
-              textAlign: "center",
-            }}
-          >
+          <div style={{ marginTop: 12, textAlign: "center" }}>
             <span
               style={{
                 display: "inline-block",
