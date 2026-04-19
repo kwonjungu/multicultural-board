@@ -36,6 +36,7 @@ export function landmarkFor(langCode: string): string | null {
 export function beePng(mood:
   | "welcome" | "cheer" | "think" | "oops"
   | "sleep" | "celebrate" | "loading" | "shh"
+  | "student" | "teacher"
 ): string {
   return `/mascot/bee-${mood}.png`;
 }

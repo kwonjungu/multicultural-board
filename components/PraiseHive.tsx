@@ -95,6 +95,33 @@ const STAGE_LABEL_KEY: Record<Stage, string> = {
   queen: "phStageQueen",
 };
 
+// Character anchor map (measured per asset).
+//   headXPct / headTopYPct: head center x & head TOP y, as % of the image box.
+//   hatScalePct: hat width as % of image box width.
+//   trophy/pet offsets are px relative to the 240×240 character box.
+type CharKey = Stage | `skin-${string}`;
+interface CharAnchor {
+  headXPct: number;
+  headTopYPct: number;
+  hatScalePct: number;
+}
+const CHAR_ANCHOR: Record<CharKey, CharAnchor> = {
+  // Upright stages (head centered horizontally, upper portion of image)
+  egg:    { headXPct: 50, headTopYPct: 20, hatScalePct: 34 },
+  larva:  { headXPct: 50, headTopYPct: 22, hatScalePct: 38 },
+  pupa:   { headXPct: 50, headTopYPct: 14, hatScalePct: 34 }, // bee occupies upper half
+  bee:    { headXPct: 50, headTopYPct: 16, hatScalePct: 36 },
+  queen:  { headXPct: 50, headTopYPct: 12, hatScalePct: 32 }, // already has tiny crown
+  // Sideways skin variants — head on the left
+  "skin-classic": { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
+  "skin-green":   { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
+  "skin-orange":  { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
+  "skin-pink":    { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
+  "skin-purple":  { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
+  "skin-sky":     { headXPct: 38, headTopYPct: 25, hatScalePct: 30 },
+};
+const FALLBACK_ANCHOR: CharAnchor = { headXPct: 50, headTopYPct: 18, hatScalePct: 34 };
+
 // ---- helpers ----
 
 function shortId(id: string): string {
@@ -357,11 +384,37 @@ function MyHiveTab({
       ? stageImage(stage)
       : `/stickers/skin-${cosmetics.skin}.png`;
 
-  // Last 5 stickers (most recent first)
-  const recent = [...list].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+  const charKey: CharKey =
+    cosmetics.skin === "classic" ? stage : (`skin-${cosmetics.skin}` as CharKey);
+  const anchor = CHAR_ANCHOR[charKey] ?? FALLBACK_ANCHOR;
 
-  // 50 honeycomb cells, 7 per row
-  const HEX_COUNT = 50;
+  // Character box size (px). Keep square.
+  const CHAR_BOX = 240;
+
+  // Hat placement (px, relative to CHAR_BOX). Hat bottom sits at head TOP,
+  // with a small 8% overlap so it visually rests on the head.
+  const hatW = (anchor.hatScalePct / 100) * CHAR_BOX;
+  const hatH = hatW;
+  const hatCenterX = (anchor.headXPct / 100) * CHAR_BOX;
+  const hatBottomY = (anchor.headTopYPct / 100) * CHAR_BOX + hatH * 0.15; // sink 15% into head
+  const hatLeft = hatCenterX - hatW / 2;
+  const hatTop = hatBottomY - hatH;
+
+  // My sticker type counts
+  const myTypeCounts: Record<StickerType, number> = {
+    helpful: 0, brave: 0, creative: 0,
+    cooperative: 0, persistent: 0, curious: 0,
+  };
+  for (const s of list) myTypeCounts[s.type] = (myTypeCounts[s.type] ?? 0) + 1;
+  const myMaxType = Math.max(1, ...Object.values(myTypeCounts));
+
+  // Honeycomb grid — real tiled hexagons (pointy-top, W:H = √3/2).
+  const HEX_ROWS = 7;
+  const HEX_COLS = 7;
+  const HEX_COUNT = HEX_ROWS * HEX_COLS; // 49
+  const HEX_W = 40;
+  const HEX_H = Math.round(HEX_W * 2 / Math.sqrt(3)); // ~46
+  const HEX_ROW_OVERLAP = Math.round(HEX_H / 4); // ~12
   const filled = Math.min(count, HEX_COUNT);
   const extra = count > HEX_COUNT ? count - HEX_COUNT : 0;
 
@@ -378,16 +431,16 @@ function MyHiveTab({
           textAlign: "center",
         }}
       >
-        {/* Character */}
+        {/* Character wrapper — character exactly centered; hat positioned via measured anchor */}
         <div
           style={{
             position: "relative",
-            width: 260,
-            height: 260,
+            width: CHAR_BOX,
+            height: CHAR_BOX,
             margin: "0 auto",
           }}
         >
-          {/* Trophy (left) */}
+          {/* Trophy (bottom-left, slightly outside box) */}
           {cosmetics.trophy && (
             <img
               src={`/stickers/trophy-${cosmetics.trophy}.png`}
@@ -395,33 +448,31 @@ function MyHiveTab({
               aria-hidden="true"
               style={{
                 position: "absolute",
-                left: -10,
-                bottom: 10,
-                width: 80,
-                height: 80,
+                left: -26,
+                bottom: -8,
+                width: 78,
+                height: 78,
                 zIndex: 2,
                 filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.15))",
               }}
             />
           )}
-          {/* Main character */}
+          {/* Main character fills the wrapper */}
           <img
             src={charImg}
             alt=""
             aria-hidden="true"
             style={{
               position: "absolute",
-              top: 10,
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: 240,
-              height: 240,
+              inset: 0,
+              width: "100%",
+              height: "100%",
               animation: "heroBeeFloat 3s ease-in-out infinite",
               filter: "drop-shadow(0 8px 18px rgba(245,158,11,0.4))",
               zIndex: 1,
             }}
           />
-          {/* Hat (on top of character) */}
+          {/* Hat — anchored to measured head coordinates */}
           {cosmetics.hat && (
             <img
               src={`/stickers/hat-${cosmetics.hat}.png`}
@@ -429,18 +480,17 @@ function MyHiveTab({
               aria-hidden="true"
               style={{
                 position: "absolute",
-                top: -4,
-                left: "50%",
-                transform: "translateX(-50%)",
-                width: 90,
-                height: 90,
+                left: hatLeft,
+                top: hatTop,
+                width: hatW,
+                height: hatH,
                 zIndex: 3,
                 animation: "heroBeeFloat 3s ease-in-out infinite",
                 filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.2))",
               }}
             />
           )}
-          {/* Pet (right) */}
+          {/* Pet (bottom-right, slightly outside box) */}
           {cosmetics.pet && (
             <img
               src={`/stickers/pet-${cosmetics.pet}.png`}
@@ -448,10 +498,10 @@ function MyHiveTab({
               aria-hidden="true"
               style={{
                 position: "absolute",
-                right: -10,
-                bottom: 20,
-                width: 100,
-                height: 100,
+                right: -30,
+                bottom: -12,
+                width: 96,
+                height: 96,
                 zIndex: 2,
                 filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.15))",
               }}
@@ -526,56 +576,68 @@ function MyHiveTab({
         </button>
       </div>
 
-      {/* Honeycomb grid */}
+      {/* Real honeycomb — tiled hexagons */}
       <div
         style={{
           background: "#fff",
           borderRadius: 22,
-          padding: "16px 14px",
+          padding: "18px 14px",
           border: `2px solid ${HONEY.h200}`,
           boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
         }}
       >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, 1fr)",
-            gap: 4,
-            justifyItems: "center",
-          }}
-        >
-          {Array.from({ length: HEX_COUNT }).map((_, i) => {
-            const row = Math.floor(i / 7);
-            const isFilled = i < filled;
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          {Array.from({ length: HEX_ROWS }).map((_, r) => {
+            const isOdd = r % 2 === 1;
             return (
               <div
-                key={i}
+                key={r}
                 style={{
-                  width: "100%",
-                  aspectRatio: "1 / 1",
-                  maxWidth: 48,
-                  marginLeft: row % 2 === 1 ? "14%" : 0,
-                  marginRight: row % 2 === 1 ? "-14%" : 0,
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  marginTop: r === 0 ? 0 : -HEX_ROW_OVERLAP,
+                  marginLeft: isOdd ? HEX_W / 2 : 0,
                 }}
               >
-                <img
-                  src={
-                    isFilled
-                      ? "/stickers/hive-cell-filled.png"
-                      : "/stickers/hive-cell-empty.png"
-                  }
-                  alt=""
-                  aria-hidden="true"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                    opacity: isFilled ? 1 : 0.55,
-                  }}
-                />
+                {Array.from({ length: HEX_COLS }).map((_, c) => {
+                  const i = r * HEX_COLS + c;
+                  const isFilled = i < filled;
+                  return (
+                    <div
+                      key={c}
+                      style={{
+                        width: HEX_W,
+                        height: HEX_H,
+                        clipPath:
+                          "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                        background: isFilled
+                          ? `linear-gradient(160deg, ${HONEY.h300}, ${HONEY.h500})`
+                          : HONEY.h50,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "background 0.3s",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "88%",
+                          height: "88%",
+                          clipPath:
+                            "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                          background: isFilled ? HONEY.h400 : HONEY.h100,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 18,
+                          color: isFilled ? "#fff" : HONEY.h200,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {isFilled ? "🍯" : ""}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -583,25 +645,28 @@ function MyHiveTab({
         {extra > 0 && (
           <div
             style={{
-              marginTop: 10,
+              marginTop: 12,
               textAlign: "center",
-              background: HONEY.h100,
-              color: HONEY.h800,
-              padding: "6px 12px",
-              borderRadius: 999,
-              fontSize: 13,
-              fontWeight: 800,
-              display: "inline-block",
-              marginLeft: "50%",
-              transform: "translateX(-50%)",
             }}
           >
-            {tFmt("phMoreCells", lang, { n: extra })}
+            <span
+              style={{
+                display: "inline-block",
+                background: HONEY.h100,
+                color: HONEY.h800,
+                padding: "6px 14px",
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 800,
+              }}
+            >
+              {tFmt("phMoreCells", lang, { n: extra })}
+            </span>
           </div>
         )}
       </div>
 
-      {/* Recent 5 */}
+      {/* My sticker type stats */}
       <div
         style={{
           background: "#fff",
@@ -619,41 +684,82 @@ function MyHiveTab({
             marginBottom: 10,
           }}
         >
-          {t("phRecentStickers", lang)}
+          {t("phMyTypeStats", lang)}
         </div>
-        {recent.length === 0 ? (
+        {count === 0 ? (
           <div style={{ fontSize: 13, color: HONEY.h700, fontWeight: 600 }}>
             {t("phNoStickersYet", lang)}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {recent.map((s) => (
-              <div
-                key={s.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "8px 10px",
-                  background: HONEY.h50,
-                  borderRadius: 12,
-                  border: `1px solid ${HONEY.h100}`,
-                }}
-              >
-                <img
-                  src={`/stickers/sticker-${s.type}.png`}
-                  alt=""
-                  aria-hidden="true"
-                  style={{ width: 32, height: 32, flexShrink: 0 }}
-                />
-                <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "#1F2937" }}>
-                  {t(TYPE_LABEL_KEY[s.type], lang)}
+            {STICKER_TYPES.map((tp) => {
+              const c = myTypeCounts[tp];
+              const pct = Math.round((c / myMaxType) * 100);
+              return (
+                <div
+                  key={tp}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "36px 1fr auto",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <img
+                    src={`/stickers/sticker-${tp}.png`}
+                    alt=""
+                    aria-hidden="true"
+                    style={{ width: 32, height: 32 }}
+                  />
+                  <div
+                    style={{
+                      position: "relative",
+                      background: HONEY.h50,
+                      borderRadius: 10,
+                      height: 26,
+                      overflow: "hidden",
+                      border: `1px solid ${HONEY.h100}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: `${pct}%`,
+                        background: TYPE_COLOR[tp],
+                        opacity: 0.6,
+                        transition: "width 0.5s",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "relative",
+                        padding: "3px 10px",
+                        fontSize: 13,
+                        fontWeight: 800,
+                        color: "#1F2937",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {t(TYPE_LABEL_KEY[tp], lang)}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 900,
+                      color: HONEY.h800,
+                      minWidth: 28,
+                      textAlign: "right",
+                    }}
+                  >
+                    {c}
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: HONEY.h700, fontWeight: 700 }}>
-                  {timeAgo(s.timestamp, lang)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

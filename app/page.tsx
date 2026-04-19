@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LANGUAGES } from "@/lib/constants";
 import BeeMascot from "@/components/BeeMascot";
+import { PATTERN } from "@/lib/assets";
 
 const DEFAULT_LANGS = ["ko", "en", "vi", "zh", "fil"];
 
@@ -255,25 +256,36 @@ export default function Home() {
       fontFamily: "'Noto Sans KR', sans-serif", padding: 20,
       position: "relative", overflow: "hidden",
     }}>
-      <svg style={{ position: "fixed", top: 0, right: 0, opacity: 0.18, pointerEvents: "none" }} width="360" height="360" viewBox="0 0 300 300">
-        {[0,1,2,3].flatMap(i => [0,1,2,3].map(j => {
-          const x = i*80 + (j%2)*40;
-          const y = j*70;
-          return <polygon key={`${i}-${j}`} points={`${x+30},${y} ${x+60},${y+17} ${x+60},${y+52} ${x+30},${y+70} ${x},${y+52} ${x},${y+17}`} fill="none" stroke="#F59E0B" strokeWidth="2"/>;
-        }))}
-      </svg>
-      <div style={{ position: "fixed", bottom: "-20%", left: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.35) 0%, transparent 65%)", pointerEvents: "none" }} />
+      <div style={{
+        position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
+        backgroundImage: `url(${PATTERN.honeycomb})`,
+        backgroundSize: "280px auto",
+        backgroundRepeat: "repeat",
+        opacity: 0.12,
+      }} />
+      <div style={{ position: "fixed", bottom: "-20%", left: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.35) 0%, transparent 65%)", pointerEvents: "none", zIndex: 0 }} />
 
       <div style={{
         background: "#fff", borderRadius: 28, padding: view === "hero" ? "40px 28px 28px" : "22px 28px 28px",
         maxWidth: "min(480px, 92vw)", width: "100%",
         boxShadow: "0 30px 80px rgba(180,83,9,0.18), 0 0 0 1px rgba(253,230,138,0.6)",
         animation: "fadeSlideIn 0.4s ease", position: "relative", zIndex: 1,
+        overflow: "hidden",
       }}>
+        {view === "hero" && (
+          <div aria-hidden="true" style={{
+            position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
+            opacity: 0.18,
+            backgroundImage: `url(${PATTERN.flowers})`,
+            backgroundPosition: "center bottom",
+            backgroundSize: "85% auto",
+            backgroundRepeat: "no-repeat",
+          }} />
+        )}
         {view === "hero" ? (
           <>
             {/* Hero: big mascot + 2 CTAs */}
-            <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div style={{ textAlign: "center", marginBottom: 28, position: "relative", zIndex: 1 }}>
               <div style={{ display: "inline-block", position: "relative", marginBottom: 10 }}>
                 <img
                   src="/mascot/bee-welcome.png"
@@ -313,6 +325,7 @@ export default function Home() {
                 boxShadow: "0 10px 28px rgba(245,158,11,0.4), inset 0 -4px 0 rgba(0,0,0,0.15)",
                 cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
                 marginBottom: 12, transition: "transform 0.12s",
+                position: "relative", zIndex: 1,
               }}
               onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
               onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
@@ -330,6 +343,7 @@ export default function Home() {
                 boxShadow: "0 6px 16px rgba(180,83,9,0.1)",
                 cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                 transition: "transform 0.12s, background 0.15s, border-color 0.15s",
+                position: "relative", zIndex: 1,
               }}
               onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
               onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
@@ -346,6 +360,7 @@ export default function Home() {
                 width: "100%", marginTop: 14, background: "none", border: "none",
                 color: "#92400E", fontSize: 14, fontWeight: 800, cursor: "pointer",
                 textDecoration: "underline", textUnderlineOffset: 4, padding: "6px 0",
+                position: "relative", zIndex: 1,
               }}
             >📄 문서 번역하기</button>
           </>

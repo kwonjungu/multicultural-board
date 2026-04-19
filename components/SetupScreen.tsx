@@ -4,7 +4,7 @@ import { useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
-import { landmarkFor } from "@/lib/assets";
+import { landmarkFor, PATTERN } from "@/lib/assets";
 
 interface Props {
   onDone: (config: UserConfig) => void;
@@ -62,15 +62,15 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
       fontFamily: "'Noto Sans KR', sans-serif", padding: "20px",
       position: "relative", overflow: "hidden",
     }}>
-      {/* Honeycomb decoration */}
-      <svg style={{ position: "fixed", top: 0, right: 0, opacity: 0.14, pointerEvents: "none" }} width="320" height="320" viewBox="0 0 300 300" aria-hidden="true">
-        {[0,1,2,3].flatMap(i => [0,1,2,3].map(j => {
-          const x = i*80 + (j%2)*40;
-          const y = j*70;
-          return <polygon key={`${i}-${j}`} points={`${x+30},${y} ${x+60},${y+17} ${x+60},${y+52} ${x+30},${y+70} ${x},${y+52} ${x},${y+17}`} fill="none" stroke="#F59E0B" strokeWidth="2"/>;
-        }))}
-      </svg>
-      <div style={{ position: "fixed", bottom: "-15%", left: "-10%", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.45) 0%, transparent 65%)", pointerEvents: "none" }} />
+      {/* Honeycomb pattern background */}
+      <div style={{
+        position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
+        backgroundImage: `url(${PATTERN.honeycomb})`,
+        backgroundSize: "280px auto",
+        backgroundRepeat: "repeat",
+        opacity: 0.12,
+      }} aria-hidden="true" />
+      <div style={{ position: "fixed", bottom: "-15%", left: "-10%", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.45) 0%, transparent 65%)", pointerEvents: "none", zIndex: 0 }} />
 
       <div style={{
         background: "#fff", borderRadius: 32, padding: "clamp(22px, 4vw, 32px) clamp(20px, 4vw, 30px)",

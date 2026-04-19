@@ -932,6 +932,13 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "Недавние наклейки", uz: "So'nggi stikerlar", hi: "हाल के स्टिकर",
     id: "Stiker terbaru", ar: "ملصقات حديثة", my: "မကြာသေးမီက",
   },
+  phMyTypeStats: {
+    ko: "내가 받은 스티커 종류", en: "My stickers by type", vi: "Sticker của tôi theo loại",
+    zh: "我收到的贴纸种类", fil: "Mga sticker ko ayon sa uri", ja: "もらったシールの種類",
+    th: "ประเภทสติ๊กเกอร์ของฉัน", km: "ប្រភេទស្ទីគ័ររបស់ខ្ញុំ", mn: "Миний шошгын төрөл",
+    ru: "Мои наклейки по типам", uz: "Mening stikerlarim turi bo'yicha", hi: "प्रकार के अनुसार मेरे स्टिकर",
+    id: "Stikerku per jenis", ar: "ملصقاتي حسب النوع", my: "ကျွန်ုပ်ရဲ့စတစ်ကာအမျိုးအစား",
+  },
   phMoreCells: {
     ko: "+{n}개 더", en: "+{n} more", vi: "+{n} nữa",
     zh: "+{n} 更多", fil: "+{n} pa", ja: "+{n} もっと",
