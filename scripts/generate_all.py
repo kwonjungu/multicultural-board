@@ -96,6 +96,46 @@ add("game-icons/spotit.png",   "a detective magnifying glass with star sparkle",
 # === 통역 드로어 대기 일러스트 ===
 add("interpreter/empty.png", "a cute yellow bee holding a microphone and smiling, a small speech bubble says 안녕 and hello", "kawaii cartoon, thick outline, pure white background.")
 
+# =====================================================================
+# 2차 파이프라인 추가 에셋
+# =====================================================================
+
+# === 할리갈리 과일 4종 ===
+add("halligalli/strawberry.png", "a single strawberry", "one red strawberry with tiny yellow seed dots and a green leafy stem on top, thick outline, kawaii sticker.")
+add("halligalli/lime.png",       "a single lime",       "one bright green lime fruit, round, with a tiny leaf on top, thick outline, kawaii sticker.")
+add("halligalli/banana.png",     "a single banana",     "one bright yellow banana with a small brown tip, gentle curve, thick outline, kawaii sticker.")
+add("halligalli/plum.png",       "a single plum",       "one round purple plum fruit with a tiny green leaf, thick outline, kawaii sticker.")
+
+# === 할리갈리 게임 카드 아이콘 ===
+add("game-icons/halligalli.png", "a golden hand bell", "one golden hand bell with a wooden handle, small shake marks around, flat cartoon game card icon, honey-yellow and cream palette.")
+
+# === 2차 파이프라인 Top 5 ===
+add("mascot/bee-approve.png",        "a cheerful bee giving a thumbs up",       "yellow-black stripe chubby bee, one paw showing thumbs-up, sparkles around, kawaii sticker.")
+add("interpreter/drag-drop.png",     "a friendly bee hugging a document file",  "a bee carrying a paper file with a dashed outline box behind suggesting drag-and-drop, upward arrow, kawaii.")
+add("interpreter/success.png",       "a bee celebrating with a check mark",     "happy bee flying holding a large green check mark badge, mini stars, kawaii.")
+add("patterns/bubble.png",           "soft bubble tile pattern",                "seamless tileable pattern of soft beige bubbles on white, very gentle, flat, no outlines, made for repeating wallpaper.")
+add("icons/empty.png",               "empty-state placeholder",                 "a sleepy honeybee sitting on a tiny cloud with Zs, smiling closed eyes, pastel colors, kawaii sticker.")
+
+# === 틀린 그림 찾기 10쌍 (20장) ===
+# Each pair shares a scene; version B explicitly lists 3 concrete differences.
+# Note: Imagen/Gemini cannot guarantee pixel-identical base + tweaks, so this is
+# best-effort. The game code will treat diffs as "side-A-only" / "side-B-only" flags.
+def wyr_pair(idx: str, scene: str, a_extras: str, b_extras: str):
+    common = f"{scene}. Flat cartoon storybook illustration, thick black outline, warm honey-yellow and pastel palette, children's book style, centered composition."
+    add(f"spot-diff/{idx}_a.png", f"{scene} version A", f"{common} Scene A contains: {a_extras}")
+    add(f"spot-diff/{idx}_b.png", f"{scene} version B", f"{common} Scene B is the SAME scene but with 3 small differences: {b_extras}")
+
+wyr_pair("01_park",    "a sunny park with a tree, a bench, and clouds",           "one red balloon on the bench, one bird in the sky, two small flowers on the grass", "the balloon is BLUE, there is NO bird, and there are FOUR flowers on the grass.")
+wyr_pair("02_kitchen", "a cozy kitchen scene with a stove and a table",           "five red apples on the table, a blue cup, the window is closed",                    "FOUR apples (one missing), a RED cup, the window is OPEN.")
+wyr_pair("03_bedroom", "a tidy bedroom with a bed and window",                    "two pillows on the bed, yellow curtains, one book on the night stand",              "ONE pillow, PINK curtains, NO book on the night stand.")
+wyr_pair("04_garden",  "a flower garden with a fence",                            "three red flowers, a butterfly, a wooden fence",                                    "three BLUE flowers, NO butterfly, a WHITE fence.")
+wyr_pair("05_school",  "a classroom scene with blackboard and desks",             "letter A on blackboard, red schoolbag, two students at desks",                      "letter B on blackboard, BLUE schoolbag, ONE student.")
+wyr_pair("06_sea",     "an ocean scene with waves and sky",                       "three fish under water, two clouds, a small sailboat",                              "TWO fish, THREE clouds, NO sailboat.")
+wyr_pair("07_living",  "a living room with sofa and TV",                          "TV is on showing color bars, a cat on the sofa, green cushions",                    "TV is OFF (black), NO cat, RED cushions.")
+wyr_pair("08_market",  "a fruit market stall",                                    "apples oranges and bananas on the stall, vendor with red cap, a scale",             "apples oranges and GRAPES (no bananas), vendor with YELLOW cap, NO scale.")
+wyr_pair("09_playground", "a playground with swings and slide",                   "two swings, a yellow slide, a small dog near the slide",                            "ONE swing, a BLUE slide, NO dog.")
+wyr_pair("10_night",   "a quiet night street with a lamppost",                    "lamppost light is ON, a full round moon, three stars in the sky",                   "lamppost light is OFF, a CRESCENT moon, FIVE stars.")
+
 
 def load_api_key() -> str:
     env = os.environ.get("GEMINI_API_KEY")
