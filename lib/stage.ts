@@ -97,6 +97,17 @@ export function stageImageWithHat(stage: Stage, hat: NonNullable<HatId>): string
   return `/stickers/stage-hats/${stageKey(stage)}-${hat}.png`;
 }
 
+// Skin + Hat 합성본. skin_hats 배치로 5색 × 5스테이지 × 4모자 = 100장 생성.
+// classic 스킨은 기존 stage-hats 폴더 사용.
+export function stageImageWithSkinAndHat(
+  stage: Stage,
+  skin: SkinId,
+  hat: NonNullable<HatId>,
+): string {
+  if (skin === "classic") return stageImageWithHat(stage, hat);
+  return `/stickers/skin-hats/${stageKey(stage)}-${skin}-${hat}.png`;
+}
+
 // Helper: numeric rank of a stage (egg=0 ... queen=4)
 function rank(stage: Stage): number {
   return STAGE_ORDER.indexOf(stage);
