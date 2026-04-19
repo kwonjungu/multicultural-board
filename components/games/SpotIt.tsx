@@ -11,51 +11,110 @@ import {
 } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
 
-type Player = "A" | "B";
+// ────────────────────────────────────────────────────────────
+// 타입 / 상수
+// ────────────────────────────────────────────────────────────
+type PlayerId = 0 | 1 | 2 | 3 | 4 | 5;
 type Phase = "intro" | "play" | "result";
+type Difficulty = "easy" | "normal" | "hard";
 
 interface Pop {
-  who: Player;
+  who: PlayerId;
   label: string;
   labelOther: string;
 }
 
-const WIN_SCORE = 7;
+interface DifficultyInfo {
+  order: number;         // projective plane order
+  perCard: number;       // n+1
+  ready: boolean;        // order 3만 정식 지원 (order 4/5 는 타협 모드)
+  label: string;
+}
 
-// 카드별 심볼 위치(2x2 그리드 내 살짝 랜덤 회전). 카드 id 별로 고정되게 seeded.
+const WIN_SCORE = 7;
+const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 6;
+
+const DIFF_INFO: Record<Difficulty, DifficultyInfo> = {
+  easy:   { order: 3, perCard: 4, ready: true,  label: "쉬움 (4 심볼/카드)" },
+  normal: { order: 4, perCard: 5, ready: false, label: "보통 (5 심볼/카드)" },
+  hard:   { order: 5, perCard: 6, ready: false, label: "어려움 (6 심볼/카드)" },
+};
+
+// ⚠️ 타협(compromise) 모드
+// gameData.ts 는 order 3 (13 심볼, 4/카드, 13장) 데이터만 보유.
+// order 4/5 정식 데이터가 없으므로 "준비 중" 으로 막는 대신,
+// 같은 13 심볼 풀을 재사용해서 perCard 만 5/6 으로 늘린 카드를 합성.
+// 이 경우 "두 카드 간 공통 심볼이 정확히 1개" 라는 projective plane 불변이 깨질 수 있음.
+// → 아이들 플레이용으로는 "공통 심볼이 있으면 그중 하나" 를 정답으로 수용.
+//   수학적 완전성은 포기하되 게임 진행에는 문제 없음.
+const COMPROMISE_MODE = true;
+
+// ────────────────────────────────────────────────────────────
+// 카드 표시용 결정론적 회전
+// ────────────────────────────────────────────────────────────
 function seededRotation(cardId: number, slot: number): number {
-  // 간단한 결정론적 해시: 카드 index + slot → -15°..15°
   const h = Math.sin(cardId * 9.31 + slot * 2.17) * 10000;
   const frac = h - Math.floor(h);
   return Math.round(frac * 30 - 15);
 }
 
 function cardIndex(card: number[]): number {
-  // 카드의 심볼들을 정렬한 문자열을 SPOTIT_CARDS 에서 찾는 대신
-  // 간단히 첫번째/두번째 심볼 합으로 유사 해시. (표시용 회전에만 쓰임)
-  return card[0] * 17 + card[1] * 3 + card[2] + card[3] * 5;
+  let acc = 0;
+  for (let i = 0; i < card.length; i++) acc += card[i] * (i + 1) * 7;
+  return acc;
 }
 
+// 두 카드가 공유하는 아무 심볼 하나. 없으면 -1.
+function anyCommon(a: number[], b: number[]): number {
+  for (const x of a) if (b.includes(x)) return x;
+  return -1;
+}
+
+// ────────────────────────────────────────────────────────────
+// 타협 모드 카드 합성
+//   base (4 심볼) 카드에 여분 심볼을 채워 perCard 개로 확장.
+//   결정론적이지 않아도 무방 (셔플 시마다 다름).
+// ────────────────────────────────────────────────────────────
+function buildCompromiseDeck(perCard: number): number[][] {
+  const totalSymbols = SPOTIT_SYMBOLS.length;
+  const out: number[][] = [];
+  for (const base of SPOTIT_CARDS) {
+    const card = [...base];
+    // 무작위로 기존에 없는 심볼 추가
+    let guard = 0;
+    while (card.length < perCard && guard < 200) {
+      const id = Math.floor(Math.random() * totalSymbols);
+      if (!card.includes(id)) card.push(id);
+      guard++;
+    }
+    // 심볼이 부족하면 (13 심볼뿐이므로 perCard≤13 이면 항상 충분) 잘라내기
+    out.push(card.slice(0, perCard));
+  }
+  return out;
+}
+
+// ────────────────────────────────────────────────────────────
+// 메인 컴포넌트
+// ────────────────────────────────────────────────────────────
 export default function SpotIt({ langA, langB }: { langA: string; langB: string }) {
   const [phase, setPhase] = useState<Phase>("intro");
+  const [playerCount, setPlayerCount] = useState<number>(2);
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
 
-  // 덱 + 세 자리
+  // 덱 + 자리
   const [deck, setDeck] = useState<number[][]>([]);
   const [cursor, setCursor] = useState<number>(0);
   const [centerCard, setCenterCard] = useState<number[]>([]);
-  const [cardA, setCardA] = useState<number[]>([]);
-  const [cardB, setCardB] = useState<number[]>([]);
-
-  const [scoreA, setScoreA] = useState(0);
-  const [scoreB, setScoreB] = useState(0);
-  const [lockA, setLockA] = useState(0);
-  const [lockB, setLockB] = useState(0);
+  const [playerCards, setPlayerCards] = useState<number[][]>([]);
+  const [scores, setScores] = useState<number[]>([]);
+  const [locks, setLocks] = useState<number[]>([]);
   const [pop, setPop] = useState<Pop | null>(null);
 
-  // 이미지 폴백 추적 (id 별)
+  // 이미지 폴백 추적
   const [imgFail, setImgFail] = useState<Record<number, boolean>>({});
 
-  // 1Hz tick — 락/팝 해제 감지 + 재렌더 트리거
+  // 10Hz tick — 락 해제 감지
   const [, setTick] = useState(0);
   useEffect(() => {
     if (phase !== "play") return;
@@ -70,7 +129,7 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
     };
   }, []);
 
-  // dev invariant check
+  // dev invariant check (easy/order 3 만)
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
       for (let i = 0; i < SPOTIT_CARDS.length; i++) {
@@ -87,17 +146,29 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
   }, []);
 
   function start() {
-    const shuffled = pickN(SPOTIT_CARDS, SPOTIT_CARDS.length);
-    // 3장 초기 배분 + cursor = 3
+    const info = DIFF_INFO[difficulty];
+    if (!info.ready && !COMPROMISE_MODE) return;
+
+    const baseDeck = difficulty === "easy"
+      ? SPOTIT_CARDS
+      : buildCompromiseDeck(info.perCard);
+
+    const shuffled = pickN(baseDeck, baseDeck.length);
+    // 중앙 1 + 플레이어 N 만큼 필요
+    const need = 1 + playerCount;
+    if (shuffled.length < need) return;
+
+    const initPlayerCards: number[][] = [];
+    for (let i = 0; i < playerCount; i++) {
+      initPlayerCards.push(shuffled[1 + i]);
+    }
+
     setDeck(shuffled);
     setCenterCard(shuffled[0]);
-    setCardA(shuffled[1]);
-    setCardB(shuffled[2]);
-    setCursor(3);
-    setScoreA(0);
-    setScoreB(0);
-    setLockA(0);
-    setLockB(0);
+    setPlayerCards(initPlayerCards);
+    setCursor(need);
+    setScores(new Array(playerCount).fill(0));
+    setLocks(new Array(playerCount).fill(0));
     setPop(null);
     setPhase("play");
   }
@@ -106,10 +177,8 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
     return SPOTIT_SYMBOLS[id];
   }
 
-  function showPop(who: Player, symbolId: number) {
+  function showPop(who: PlayerId, symbolId: number, myLang: string, otherLang: string) {
     const sym = symbolById(symbolId);
-    const myLang = who === "A" ? langA : langB;
-    const otherLang = who === "A" ? langB : langA;
     setPop({
       who,
       label: tr(sym.label, myLang),
@@ -119,69 +188,135 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
     popTimerRef.current = setTimeout(() => setPop(null), 2000);
   }
 
-  function onTap(player: Player, symbolId: number) {
+  function langForPlayer(p: number): string {
+    // 짝수 index → langA, 홀수 → langB
+    return p % 2 === 0 ? langA : langB;
+  }
+  function otherLangForPlayer(p: number): string {
+    return p % 2 === 0 ? langB : langA;
+  }
+
+  function onTap(player: PlayerId, symbolId: number) {
     if (phase !== "play") return;
     const now = Date.now();
-    const myLock = player === "A" ? lockA : lockB;
-    if (now < myLock) return;
+    if (now < (locks[player] ?? 0)) return;
 
-    const myCard = player === "A" ? cardA : cardB;
-    const common = commonSymbol(myCard, centerCard);
+    const myCard = playerCards[player];
+    if (!myCard || myCard.length === 0) return;
 
-    if (symbolId !== common) {
+    // easy(order 3) 는 commonSymbol (정확히 1개 보장),
+    // 타협 모드는 anyCommon (0 또는 여러 개 가능)
+    const common = difficulty === "easy"
+      ? commonSymbol(myCard, centerCard)
+      : anyCommon(myCard, centerCard);
+
+    const isCorrect = common !== -1 && symbolId === common;
+
+    if (!isCorrect) {
       // 오답 → 0.8초 락
       const until = now + 800;
-      if (player === "A") setLockA(until);
-      else setLockB(until);
+      setLocks((ls) => ls.map((v, i) => (i === player ? until : v)));
       return;
     }
 
     // 정답 → 점수 +1, 중앙:=내 카드, 내 카드:=deck[cursor]
-    showPop(player, symbolId);
+    showPop(player, symbolId, langForPlayer(player), otherLangForPlayer(player));
 
     const nextCenter = myCard;
     const nextCard = cursor < deck.length ? deck[cursor] : null;
 
-    if (player === "A") setScoreA((s) => s + 1);
-    else setScoreB((s) => s + 1);
-
+    const newScores = scores.map((s, i) => (i === player ? s + 1 : s));
+    setScores(newScores);
     setCenterCard(nextCenter);
 
     if (nextCard === null) {
-      // 덱 소진 → result
-      if (player === "A") setCardA([]);
-      else setCardB([]);
+      // 덱 소진 → 해당 플레이어 카드 비우고 종료
+      setPlayerCards((cards) => cards.map((c, i) => (i === player ? [] : c)));
       setPhase("result");
       return;
     }
 
-    if (player === "A") setCardA(nextCard);
-    else setCardB(nextCard);
+    setPlayerCards((cards) => cards.map((c, i) => (i === player ? nextCard : c)));
     setCursor((c) => c + 1);
 
-    // 승리 점수 도달
-    const newScore = (player === "A" ? scoreA : scoreB) + 1;
-    if (newScore >= WIN_SCORE) {
+    if (newScores[player] >= WIN_SCORE) {
       setPhase("result");
     }
   }
 
   const remaining = Math.max(0, deck.length - cursor);
 
+  // ────────────────────────────────────────────────────────────
+  // intro 화면
+  // ────────────────────────────────────────────────────────────
   if (phase === "intro") {
+    const info = DIFF_INFO[difficulty];
+    const blocked = !info.ready && !COMPROMISE_MODE;
+
     return (
-      <div style={{ textAlign: "center", padding: 40, maxWidth: 480, margin: "0 auto" }}>
-        <BeeMascot size={120} mood="happy" />
-        <div style={{ fontSize: 24, fontWeight: 900, margin: "18px 0 8px", color: "#1F2937" }}>
+      <div style={{ textAlign: "center", padding: 32, maxWidth: 520, margin: "0 auto" }}>
+        <BeeMascot size={110} mood="happy" />
+        <div style={{ fontSize: 24, fontWeight: 900, margin: "16px 0 6px", color: "#1F2937" }}>
           🕵️ 꿀벌 스팟잇
         </div>
-        <div style={{ color: "#6B7280", marginBottom: 16, fontSize: 14, lineHeight: 1.6 }}>
+        <div style={{ color: "#6B7280", marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
           내 카드와 가운데 카드에서<br />
           <b>똑같은 그림 1개</b>를 먼저 찾아 탭하세요!
         </div>
+
+        {/* 인원 선택 */}
+        <div style={sectionBox}>
+          <div style={sectionTitle}>인원</div>
+          <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+            {[2, 3, 4, 5, 6].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setPlayerCount(n)}
+                style={pillBtn(playerCount === n, "#F59E0B")}
+                aria-pressed={playerCount === n}
+              >
+                {n}인
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 난이도 선택 */}
+        <div style={sectionBox}>
+          <div style={sectionTitle}>난이도</div>
+          <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+            {(Object.keys(DIFF_INFO) as Difficulty[]).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDifficulty(d)}
+                style={pillBtn(difficulty === d, "#3B82F6")}
+                aria-pressed={difficulty === d}
+              >
+                {DIFF_INFO[d].label}
+              </button>
+            ))}
+          </div>
+          {!info.ready && (
+            <div style={{
+              marginTop: 10, fontSize: 12, color: "#B45309",
+              background: "#FEF3C7", border: "1px solid #FCD34D",
+              padding: "8px 10px", borderRadius: 10, lineHeight: 1.5,
+            }}>
+              {COMPROMISE_MODE ? (
+                <>※ 정식 카드 세트가 아직 준비 중입니다.<br />
+                13개 심볼을 재사용해 간이 모드로 플레이해요.</>
+              ) : (
+                <>※ 이 난이도는 준비 중입니다.</>
+              )}
+            </div>
+          )}
+        </div>
+
         <div style={{
-          background: "#fff", borderRadius: 16, padding: "14px 16px",
-          fontSize: 13, color: "#374151", lineHeight: 1.7, marginBottom: 20,
+          background: "#fff", borderRadius: 16, padding: "12px 14px",
+          fontSize: 12, color: "#374151", lineHeight: 1.7, margin: "14px 0 18px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
           border: "2px solid #FDE68A", textAlign: "left",
         }}>
@@ -189,46 +324,65 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
           <div>• 오답 → 0.8초 동안 탭 못함</div>
           <div>• 먼저 <b>{WIN_SCORE}점</b> 내거나 카드 소진 시 종료</div>
         </div>
-        <button onClick={start} style={primaryBtn}>▶ 시작</button>
+
+        <button onClick={start} style={primaryBtn} disabled={blocked}>
+          ▶ 시작
+        </button>
       </div>
     );
   }
 
+  // ────────────────────────────────────────────────────────────
+  // result 화면
+  // ────────────────────────────────────────────────────────────
   if (phase === "result") {
-    const winner = scoreA === scoreB ? null : scoreA > scoreB ? "A" : "B";
+    const maxScore = scores.reduce((a, b) => Math.max(a, b), 0);
+    const winners = scores
+      .map((s, i) => (s === maxScore ? i : -1))
+      .filter((i) => i >= 0);
+    const isTie = winners.length > 1;
+
     return (
-      <div style={{ textAlign: "center", padding: 40, maxWidth: 480, margin: "0 auto" }}>
-        <BeeMascot size={120} mood={winner ? "celebrate" : "think"} />
-        <div style={{ fontSize: 24, fontWeight: 900, margin: "18px 0 10px", color: "#1F2937" }}>
-          {winner ? (winner === "A" ? "🎉 아래쪽 승리!" : "🎉 위쪽 승리!") : "🤝 무승부!"}
+      <div style={{ textAlign: "center", padding: 32, maxWidth: 520, margin: "0 auto" }}>
+        <BeeMascot size={120} mood={isTie ? "think" : "celebrate"} />
+        <div style={{ fontSize: 22, fontWeight: 900, margin: "18px 0 10px", color: "#1F2937" }}>
+          {isTie
+            ? "🤝 동점이에요!"
+            : `🎉 플레이어 ${winners[0] + 1} 승리!`}
         </div>
         <div style={{
-          display: "flex", gap: 16, justifyContent: "center", marginBottom: 24,
-          fontSize: 18, fontWeight: 800,
+          display: "flex", gap: 10, justifyContent: "center", marginBottom: 20,
+          fontSize: 16, fontWeight: 800, flexWrap: "wrap",
         }}>
-          <div style={{
-            background: "#FEF3C7", padding: "12px 20px", borderRadius: 14,
-            border: "2px solid #FBBF24",
-          }}>
-            <div style={{ fontSize: 11, color: "#92400E" }}>아래 (A)</div>
-            <div style={{ fontSize: 24, color: "#B45309" }}>{scoreA}</div>
-          </div>
-          <div style={{
-            background: "#DBEAFE", padding: "12px 20px", borderRadius: 14,
-            border: "2px solid #60A5FA",
-          }}>
-            <div style={{ fontSize: 11, color: "#1E40AF" }}>위 (B)</div>
-            <div style={{ fontSize: 24, color: "#1D4ED8" }}>{scoreB}</div>
-          </div>
+          {scores.map((s, i) => {
+            const color = playerAccent(i);
+            const isWin = winners.includes(i) && !isTie;
+            return (
+              <div key={i} style={{
+                background: `${color}22`, padding: "10px 14px", borderRadius: 14,
+                border: `2px solid ${color}`,
+                opacity: isWin ? 1 : 0.85,
+                minWidth: 70,
+              }}>
+                <div style={{ fontSize: 11, color: "#374151" }}>P{i + 1}</div>
+                <div style={{ fontSize: 22, color, fontWeight: 900 }}>{s}</div>
+              </div>
+            );
+          })}
         </div>
-        <button onClick={start} style={primaryBtn}>🔁 다시 하기</button>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          <button onClick={start} style={primaryBtn}>🔁 다시 하기</button>
+          <button onClick={() => setPhase("intro")} style={secondaryBtn}>⚙️ 설정</button>
+        </div>
       </div>
     );
   }
 
+  // ────────────────────────────────────────────────────────────
+  // play 화면
+  // ────────────────────────────────────────────────────────────
   const now = Date.now();
-  const aLocked = now < lockA;
-  const bLocked = now < lockB;
+  const layout = computeLayout(playerCount);
 
   return (
     <div style={{
@@ -253,89 +407,214 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
           background: "#fff", padding: "4px 10px", borderRadius: 999,
           border: "2px solid #E5E7EB",
         }}>
-          목표 {WIN_SCORE}점
+          목표 {WIN_SCORE}점 · {playerCount}인 · {DIFF_INFO[difficulty].label}
         </span>
       </div>
 
-      {/* 플레이어 B 영역 (상단, 180도 회전) */}
-      <PlayerZone
-        player="B"
-        card={cardB}
-        score={scoreB}
-        locked={bLocked}
-        imgFail={imgFail}
-        onImgFail={(id) => setImgFail((m) => ({ ...m, [id]: true }))}
-        onTap={(s) => onTap("B", s)}
-        lang={langB}
-        pop={pop?.who === "B" ? pop : null}
-        rotated
-      />
-
-      {/* 중앙 카드 */}
+      {/* 플레이 영역 */}
       <div style={{
-        display: "flex", justifyContent: "center", alignItems: "center",
-        padding: "2px 0",
+        position: "relative",
+        flex: 1,
+        display: "grid",
+        gridTemplateColumns: layout.columns,
+        gridTemplateRows: layout.rows,
+        gap: 8,
+        alignItems: "center",
+        justifyItems: "center",
       }}>
-        <SpotItCardView
-          card={centerCard}
-          accentColor="#F59E0B"
-          bgColor="#FFFFFF"
-          imgFail={imgFail}
-          onImgFail={(id) => setImgFail((m) => ({ ...m, [id]: true }))}
-          interactive={false}
-          locked={false}
-          ariaRole="img"
-          ariaLabel="중앙 카드"
-        />
-      </div>
+        {/* 중앙 카드 */}
+        <div style={{
+          gridColumn: layout.center.col,
+          gridRow: layout.center.row,
+          display: "flex", justifyContent: "center", alignItems: "center",
+          zIndex: 1,
+        }}>
+          <SpotItCardView
+            card={centerCard}
+            accentColor="#F59E0B"
+            bgColor="#FFFFFF"
+            imgFail={imgFail}
+            onImgFail={(id) => setImgFail((m) => ({ ...m, [id]: true }))}
+            interactive={false}
+            locked={false}
+            ariaRole="img"
+            ariaLabel="중앙 카드"
+            size={layout.cardSize}
+          />
+        </div>
 
-      {/* 플레이어 A 영역 (하단) */}
-      <PlayerZone
-        player="A"
-        card={cardA}
-        score={scoreA}
-        locked={aLocked}
-        imgFail={imgFail}
-        onImgFail={(id) => setImgFail((m) => ({ ...m, [id]: true }))}
-        onTap={(s) => onTap("A", s)}
-        lang={langA}
-        pop={pop?.who === "A" ? pop : null}
-        rotated={false}
-      />
+        {/* 플레이어 영역 */}
+        {playerCards.map((card, i) => {
+          const slot = layout.players[i];
+          const locked = now < (locks[i] ?? 0);
+          return (
+            <div
+              key={i}
+              style={{
+                gridColumn: slot.col,
+                gridRow: slot.row,
+                width: "100%",
+                display: "flex",
+                justifyContent: "center",
+                zIndex: 2,
+              }}
+            >
+              <PlayerZone
+                playerIndex={i}
+                card={card}
+                score={scores[i] ?? 0}
+                locked={locked}
+                imgFail={imgFail}
+                onImgFail={(id) => setImgFail((m) => ({ ...m, [id]: true }))}
+                onTap={(s) => onTap(i as PlayerId, s)}
+                pop={pop?.who === i ? pop : null}
+                rotated={slot.rotated}
+                cardSize={layout.cardSize}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
+}
+
+// ────────────────────────────────────────────────────────────
+// 레이아웃 계산
+// ────────────────────────────────────────────────────────────
+interface SlotPos {
+  col: string;   // e.g. "1 / 2"
+  row: string;
+  rotated: boolean;
+}
+interface LayoutInfo {
+  columns: string;
+  rows: string;
+  center: { col: string; row: string };
+  players: SlotPos[];
+  cardSize: number;
+}
+
+function computeLayout(n: number): LayoutInfo {
+  // cardSize: 인원 많을수록 작게
+  const cardSize = n <= 2 ? 210 : n <= 4 ? 170 : 140;
+
+  if (n === 2) {
+    // 상(B, 회전) / 중앙 / 하(A)
+    return {
+      columns: "1fr",
+      rows: "auto auto auto",
+      center: { col: "1 / 2", row: "2 / 3" },
+      players: [
+        { col: "1 / 2", row: "3 / 4", rotated: false }, // P1 하단
+        { col: "1 / 2", row: "1 / 2", rotated: true },  // P2 상단(회전)
+      ],
+      cardSize,
+    };
+  }
+
+  if (n === 3) {
+    // 상 한 명(회전), 하 두 명
+    return {
+      columns: "1fr 1fr",
+      rows: "auto auto auto",
+      center: { col: "1 / 3", row: "2 / 3" },
+      players: [
+        { col: "1 / 2", row: "3 / 4", rotated: false }, // P1 하-좌
+        { col: "2 / 3", row: "3 / 4", rotated: false }, // P2 하-우
+        { col: "1 / 3", row: "1 / 2", rotated: true },  // P3 상(회전)
+      ],
+      cardSize,
+    };
+  }
+
+  if (n === 4) {
+    // 상 2(회전), 하 2
+    return {
+      columns: "1fr 1fr",
+      rows: "auto auto auto",
+      center: { col: "1 / 3", row: "2 / 3" },
+      players: [
+        { col: "1 / 2", row: "3 / 4", rotated: false }, // P1 하-좌
+        { col: "2 / 3", row: "3 / 4", rotated: false }, // P2 하-우
+        { col: "1 / 2", row: "1 / 2", rotated: true },  // P3 상-좌
+        { col: "2 / 3", row: "1 / 2", rotated: true },  // P4 상-우
+      ],
+      cardSize,
+    };
+  }
+
+  if (n === 5) {
+    // 상 2(회전), 하 3 (중앙 row = 2열 span)
+    return {
+      columns: "1fr 1fr 1fr",
+      rows: "auto auto auto",
+      center: { col: "1 / 4", row: "2 / 3" },
+      players: [
+        { col: "1 / 2", row: "3 / 4", rotated: false }, // P1
+        { col: "2 / 3", row: "3 / 4", rotated: false }, // P2
+        { col: "3 / 4", row: "3 / 4", rotated: false }, // P3
+        { col: "1 / 2", row: "1 / 2", rotated: true },  // P4
+        { col: "3 / 4", row: "1 / 2", rotated: true },  // P5
+      ],
+      cardSize,
+    };
+  }
+
+  // n === 6 (최대)
+  return {
+    columns: "1fr 1fr 1fr",
+    rows: "auto auto auto",
+    center: { col: "1 / 4", row: "2 / 3" },
+    players: [
+      { col: "1 / 2", row: "3 / 4", rotated: false }, // P1
+      { col: "2 / 3", row: "3 / 4", rotated: false }, // P2
+      { col: "3 / 4", row: "3 / 4", rotated: false }, // P3
+      { col: "1 / 2", row: "1 / 2", rotated: true },  // P4
+      { col: "2 / 3", row: "1 / 2", rotated: true },  // P5
+      { col: "3 / 4", row: "1 / 2", rotated: true },  // P6
+    ],
+    cardSize,
+  };
+}
+
+// ────────────────────────────────────────────────────────────
+// 플레이어 색상
+// ────────────────────────────────────────────────────────────
+const PLAYER_ACCENTS = ["#F59E0B", "#3B82F6", "#10B981", "#EC4899", "#8B5CF6", "#EF4444"];
+function playerAccent(i: number): string {
+  return PLAYER_ACCENTS[i % PLAYER_ACCENTS.length];
 }
 
 // ────────────────────────────────────────────────────────────
 // PlayerZone
 // ────────────────────────────────────────────────────────────
 function PlayerZone(props: {
-  player: Player;
+  playerIndex: number;
   card: number[];
   score: number;
   locked: boolean;
   imgFail: Record<number, boolean>;
   onImgFail: (id: number) => void;
   onTap: (symbolId: number) => void;
-  lang: string;
   pop: Pop | null;
   rotated: boolean;
+  cardSize: number;
 }) {
   const {
-    player, card, score, locked, imgFail, onImgFail, onTap, lang, pop, rotated,
+    playerIndex, card, score, locked, imgFail, onImgFail, onTap, pop, rotated, cardSize,
   } = props;
 
-  const isA = player === "A";
-  const bg = isA ? "#FEF3C7" : "#DBEAFE";
-  const accent = isA ? "#F59E0B" : "#3B82F6";
-  const label = isA ? "아래 (A)" : "위 (B)";
+  const accent = playerAccent(playerIndex);
+  const bg = `${accent}1A`;
+  const label = `P${playerIndex + 1}`;
 
   return (
     <div
       style={{
         background: bg,
         borderRadius: 22,
-        padding: "10px 10px 12px",
+        padding: "8px 10px 10px",
         border: `2px solid ${accent}55`,
         boxShadow: `0 4px 10px ${accent}22`,
         position: "relative",
@@ -379,6 +658,7 @@ function PlayerZone(props: {
           onTap={onTap}
           ariaRole="group"
           ariaLabel={`${label} 카드`}
+          size={cardSize}
         />
       </div>
 
@@ -388,10 +668,10 @@ function PlayerZone(props: {
           aria-live="polite"
           style={{
             position: "absolute",
-            top: isA ? -8 : undefined,
-            bottom: isA ? undefined : -8,
+            top: rotated ? undefined : -8,
+            bottom: rotated ? -8 : undefined,
             left: "50%",
-            transform: `translate(-50%, ${isA ? "-100%" : "100%"})${rotated ? " rotate(180deg)" : ""}`,
+            transform: `translate(-50%, ${rotated ? "100%" : "-100%"})${rotated ? " rotate(180deg)" : ""}`,
             background: "#fff",
             border: `3px solid ${accent}`,
             borderRadius: 18,
@@ -404,7 +684,7 @@ function PlayerZone(props: {
           }}
         >
           <div style={{
-            fontSize: 22, fontWeight: 900, color: "#111827", lineHeight: 1.1,
+            fontSize: 20, fontWeight: 900, color: "#111827", lineHeight: 1.1,
           }}>
             {pop.label}
           </div>
@@ -433,18 +713,20 @@ function SpotItCardView(props: {
   onTap?: (symbolId: number) => void;
   ariaRole?: string;
   ariaLabel?: string;
+  size: number;
 }) {
   const {
     card, accentColor, bgColor, imgFail, onImgFail,
-    interactive, locked, onTap, ariaRole, ariaLabel,
+    interactive, locked, onTap, ariaRole, ariaLabel, size,
   } = props;
 
   const cid = useMemo(() => (card.length ? cardIndex(card) : 0), [card]);
+  const grid = useMemo(() => gridSpec(card.length), [card.length]);
 
   if (!card.length) {
     return (
       <div style={{
-        width: 220, height: 220,
+        width: size, height: size,
         borderRadius: 24,
         background: "#F3F4F6",
         border: "2px dashed #D1D5DB",
@@ -462,16 +744,16 @@ function SpotItCardView(props: {
       aria-label={ariaLabel}
       style={{
         position: "relative",
-        width: 220, height: 220,
+        width: size, height: size,
         borderRadius: 24,
         background: bgColor,
         border: `3px solid ${accentColor}`,
         boxShadow: `0 8px 18px ${accentColor}44, inset 0 2px 0 rgba(255,255,255,0.6)`,
         display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gridTemplateRows: "1fr 1fr",
+        gridTemplateColumns: grid.cols,
+        gridTemplateRows: grid.rows,
         gap: 4,
-        padding: 10,
+        padding: 8,
         opacity: locked ? 0.5 : 1,
         transition: "opacity 0.15s",
       }}
@@ -485,6 +767,7 @@ function SpotItCardView(props: {
           imgFailed={!!imgFail[symbolId]}
           onImgFail={() => onImgFail(symbolId)}
           onTap={onTap}
+          fontSize={Math.max(22, Math.floor(size / 6))}
         />
       ))}
 
@@ -497,7 +780,7 @@ function SpotItCardView(props: {
             background: "rgba(255,255,255,0.55)",
             backdropFilter: "blur(1.5px)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 54, pointerEvents: "none",
+            fontSize: Math.floor(size / 4), pointerEvents: "none",
           }}
         >
           <span role="img" aria-label="대기">⏳</span>
@@ -505,6 +788,16 @@ function SpotItCardView(props: {
       )}
     </div>
   );
+}
+
+// 심볼 개수별 격자 배치
+function gridSpec(count: number): { cols: string; rows: string } {
+  switch (count) {
+    case 4:  return { cols: "1fr 1fr", rows: "1fr 1fr" };
+    case 5:  return { cols: "1fr 1fr 1fr", rows: "1fr 1fr" }; // 6칸 중 5개 사용
+    case 6:  return { cols: "1fr 1fr 1fr", rows: "1fr 1fr" };
+    default: return { cols: "1fr 1fr", rows: "1fr 1fr" };
+  }
 }
 
 // ────────────────────────────────────────────────────────────
@@ -517,8 +810,9 @@ function SpotItSymbolButton(props: {
   imgFailed: boolean;
   onImgFail: () => void;
   onTap?: (symbolId: number) => void;
+  fontSize: number;
 }) {
-  const { symbolId, rotation, interactive, imgFailed, onImgFail, onTap } = props;
+  const { symbolId, rotation, interactive, imgFailed, onImgFail, onTap, fontSize } = props;
   const sym = SPOTIT_SYMBOLS[symbolId];
   const fallbackEmoji = emojiForKey(sym.key);
 
@@ -526,7 +820,7 @@ function SpotItSymbolButton(props: {
     width: "100%", height: "100%",
     display: "flex", alignItems: "center", justifyContent: "center",
     transform: `rotate(${rotation}deg)`,
-    fontSize: 44, lineHeight: 1,
+    fontSize, lineHeight: 1,
   };
 
   const imgStyle: CSSProperties = {
@@ -601,9 +895,45 @@ function emojiForKey(key: string): string {
   }
 }
 
+// ────────────────────────────────────────────────────────────
+// 공통 스타일
+// ────────────────────────────────────────────────────────────
 const primaryBtn: CSSProperties = {
   background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
   color: "#fff", border: "none", padding: "14px 32px",
   borderRadius: 99, fontSize: 15, fontWeight: 800, cursor: "pointer",
   boxShadow: "0 8px 20px rgba(245,158,11,0.4)",
 };
+
+const secondaryBtn: CSSProperties = {
+  background: "#fff", color: "#374151",
+  border: "2px solid #D1D5DB", padding: "12px 22px",
+  borderRadius: 99, fontSize: 14, fontWeight: 800, cursor: "pointer",
+};
+
+const sectionBox: CSSProperties = {
+  background: "#fff", borderRadius: 14, padding: "10px 12px",
+  marginBottom: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
+  border: "1px solid #F3F4F6",
+};
+
+const sectionTitle: CSSProperties = {
+  fontSize: 12, fontWeight: 800, color: "#6B7280",
+  marginBottom: 8, textAlign: "left",
+};
+
+function pillBtn(active: boolean, accent: string): CSSProperties {
+  return {
+    background: active ? accent : "#fff",
+    color: active ? "#fff" : "#374151",
+    border: `2px solid ${active ? accent : "#E5E7EB"}`,
+    padding: "8px 14px",
+    borderRadius: 99,
+    fontSize: 13, fontWeight: 800,
+    cursor: "pointer",
+    minWidth: 60,
+  };
+}
+
+// MIN_PLAYERS / MAX_PLAYERS / PlayerId 레퍼런스 유지용 (린트)
+export const _SPOT_IT_META = { MIN_PLAYERS, MAX_PLAYERS };

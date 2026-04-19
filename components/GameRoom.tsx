@@ -18,6 +18,7 @@ import HoneyTaboo from "./games/HoneyTaboo";
 import WouldYouRather from "./games/WouldYouRather";
 import SpotIt from "./games/SpotIt";
 import HalliGalli from "./games/HalliGalli";
+import BeeWorldMarble from "./games/BeeWorldMarble";
 
 type GameMeta = {
   id: string;
@@ -47,6 +48,7 @@ const GAMES: GameMeta[] = [
   { id: "wyr",       icon: "🎲", iconImg: "/game-icons/wyr.png",      name: "이거 저거 고르기",   sub: "둘 중 뭐가 좋아?",  color: "#F97316", bg: "#FFEDD5", cmp: WouldYouRather },
   { id: "spotit",    icon: "🕵️", iconImg: "/game-icons/spotit.png",   name: "꿀벌 스팟잇",         sub: "같은 그림 먼저!",   color: "#F59E0B", bg: "#FEF3C7", cmp: SpotIt },
   { id: "halligalli", icon: "🔔", iconImg: "/game-icons/halligalli.png", name: "할리갈리",           sub: "과일 5개 종 울려!", color: "#DC2626", bg: "#FEE2E2", cmp: HalliGalli },
+  { id: "marble",    icon: "🎲", iconImg: "/marble/tiles/start.png", name: "꿀벌 월드 마블",     sub: "세계 여행 보드게임", color: "#D97706", bg: "#FEF3C7", cmp: BeeWorldMarble },
 ];
 
 /** Graceful <img> that falls back to an emoji span when the PNG is missing. */
