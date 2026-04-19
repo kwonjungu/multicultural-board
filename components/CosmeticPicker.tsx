@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import { subscribeCosmetics, setCosmetics } from "@/lib/stickers";
 import {
@@ -63,12 +63,22 @@ export default function CosmeticPicker({
   const uPets = useMemo(() => new Set<NonNullable<PetId>>(unlockedPets(stage)), [stage]);
   const uTrophies = useMemo(() => new Set<NonNullable<TrophyId>>(unlockedTrophies(stage)), [stage]);
 
-  // Subscribe to cosmetics while open
+  // Subscribe to cosmetics while open.
+  // BUG FIX: Firebase onValue can fire multiple times (cache → server roundtrip
+  // OR our own optimistic write echoing back). If we setDraft() on every fire
+  // we clobber the user's in-flight selections, so subsequent picks revert.
+  // → only seed `draft` from the FIRST fire per modal opening; after that,
+  // only mirror into `current` so the local "last saved" baseline stays fresh.
+  const seededRef = useRef(false);
   useEffect(() => {
     if (!open || !myClientId) return;
+    seededRef.current = false;
     const unsub = subscribeCosmetics(roomCode, myClientId, (c) => {
       setCurrent(c);
-      setDraft(c);
+      if (!seededRef.current) {
+        setDraft(c);
+        seededRef.current = true;
+      }
     });
     return () => { unsub(); };
   }, [open, roomCode, myClientId]);

@@ -75,3 +75,42 @@
 - `npm run build` 는 타입 체크 + 13개 페이지 prerender 까지 포함. PraiseHive /
   BeeMascot / SetupScreen 수정 후엔 반드시 통과시키고 푸시.
 - 에셋(PNG) 만 변경했어도 type import 가 깨졌을 수 있으니 빌드 생략하지 말 것.
+
+## Firebase 실시간 구독 (subscribe 패턴)
+
+- **Firebase `onValue` 는 한 번에 두 번 이상 발화할 수 있다.** 캐시값 → 서버값
+  왕복, 또는 자기 자신의 낙관적 쓰기가 에코로 되돌아오는 경우가 대표적. 콜백
+  안에서 `setDraft(remote)` 같은 코드를 그대로 쓰면 사용자가 고른 값이 subs
+  재발화 때 원래값으로 덮어써진다.
+- **구독은 "첫 fire 에만 draft 시딩" 패턴을 고수.** 모달/화면이 열릴 때마다
+  `useRef(false)` 플래그를 리셋해 1회 시딩, 이후엔 `current`(읽기 전용 상태)만
+  갱신하고 사용자 편집 상태는 건드리지 말 것. CosmeticPicker 가 이 패턴.
+- **쓰기는 낙관적으로.** 저장 버튼 → `onClose()` 즉시 + `onSaved()` 토스트
+  먼저 → `setCosmetics(...).catch(err => onSaveError(err))` 백그라운드. `await`
+  로 모달을 붙잡아두면 체감 지연이 커지고, Firebase 가 에코 재발화하며 UI 상태
+  가 튈 수 있다.
+- 토스트 컴포넌트는 `components/Toast.tsx` 재사용. tone `success` / `error`.
+
+## 배경 제거 파이프라인 (scripts/clean-bg.mjs)
+
+- **이전 실수:** `isNearBlack(r<40 && g<40 && b<40)` 같은 **predicate-only** 스트립
+  은 이미지 안쪽의 까만 외곽선까지 통째로 날린다 (예: 번데기 몸통 검은 줄무늬).
+- **현재 올바른 방식:** 가장자리에서 **flood-fill seed** 를 잡고, "같은 종류
+  (light / dark) 의 인접 픽셀만 지우기"로 경계를 존중한다. 뿌리부터 닿을 수
+  있는 배경만 지우기 때문에 **내부 본체 검은 선은 보존**된다.
+- **다중 패스.** 체커 패턴처럼 한 겹을 지우면 안쪽 링이 새 가장자리가 되는
+  경우가 있어서 `MAX_PASSES=6` 번까지 수렴할 때까지 반복.
+- **에지 샘플링은 많이.** 한 변에 16 샘플 위치 × 4 방향으로 가장 바깥 불투명
+  픽셀을 seed 로 등록. 본체가 특정 위치에서 edge 에 닿아도 다른 샘플로 우회.
+- **dark seed 는 현재 비활성.** 까만 배경을 flood 로 지우면 본체 외곽선까지
+  따라가는 사고가 잦아서, 특정 파일에 대해서만 별도 스크립트(`strip-bg.mjs`)
+  로 수동 처리.
+- `public/patterns/` 는 스크립트 대상에서 제외 — 타일링 배경이므로 내용 자체
+  가 "배경".
+
+## Next.js 외부 이미지
+
+- 표준 `<img src="...">` 는 도메인 제한 없이 사용 가능. `next/image` 는 도메인
+  허용 목록(`next.config.js → images.remotePatterns`) 필요.
+- `flagcdn.com`, `flagpedia.net` 등은 오픈 라이선스 국기 CDN. srcset `w320`/`w640`
+  세트로 HiDPI 대응.
