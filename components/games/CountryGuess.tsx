@@ -4,6 +4,11 @@ import { useMemo, useState } from "react";
 import { COUNTRIES, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
 
+// Real flag image via flagcdn (open, CC-licensed). Provide 2x for sharp displays.
+function flagUrl(code: string, size: "w320" | "w640" = "w640"): string {
+  return `https://flagcdn.com/${size}/${code.toLowerCase()}.png`;
+}
+
 export default function CountryGuess({ langA, langB }: { langA: string; langB: string }) {
   const [round, setRound] = useState(0);
   const [score, setScore] = useState(0);
@@ -57,8 +62,18 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
         padding: "34px 20px 26px", borderRadius: 22,
         boxShadow: "0 8px 24px rgba(0,0,0,0.08)", marginBottom: 18,
       }}>
-        <div style={{ fontSize: 110, lineHeight: 1 }}>{cur.answer.flag}</div>
-        <div style={{ fontSize: 13, color: "#6B7280", marginTop: 10, fontWeight: 700 }}>
+        <img
+          src={flagUrl(cur.answer.code, "w640")}
+          srcSet={`${flagUrl(cur.answer.code, "w320")} 1x, ${flagUrl(cur.answer.code, "w640")} 2x`}
+          alt=""
+          aria-hidden="true"
+          style={{
+            width: 220, maxWidth: "70vw", height: "auto",
+            borderRadius: 10, display: "block", margin: "0 auto",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+          }}
+        />
+        <div style={{ fontSize: 13, color: "#6B7280", marginTop: 12, fontWeight: 700 }}>
           이 국기의 나라는?
         </div>
       </div>
@@ -98,7 +113,16 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
           marginTop: 18, padding: "14px 16px",
           background: "#F0F9FF", borderRadius: 14, textAlign: "center",
         }}>
-          <div style={{ fontSize: 36 }}>{cur.answer.flag}</div>
+          <img
+            src={flagUrl(cur.answer.code, "w320")}
+            alt=""
+            aria-hidden="true"
+            style={{
+              width: 90, height: "auto",
+              borderRadius: 6, display: "block", margin: "0 auto 8px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            }}
+          />
           <div style={{ display: "flex", justifyContent: "center", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
             <button
               onClick={() => playTts(tr(cur.answer.names, langA), langA)}

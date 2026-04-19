@@ -939,6 +939,27 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "Мои наклейки по типам", uz: "Mening stikerlarim turi bo'yicha", hi: "प्रकार के अनुसार मेरे स्टिकर",
     id: "Stikerku per jenis", ar: "ملصقاتي حسب النوع", my: "ကျွန်ုပ်ရဲ့စတစ်ကာအမျိုးအစား",
   },
+  cosmeticSaved: {
+    ko: "변경되었습니다!", en: "Saved!", vi: "Đã lưu!",
+    zh: "已保存！", fil: "Nai-save!", ja: "保存しました！",
+    th: "บันทึกแล้ว!", km: "រក្សាទុកហើយ!", mn: "Хадгалагдлаа!",
+    ru: "Сохранено!", uz: "Saqlandi!", hi: "सहेजा गया!",
+    id: "Tersimpan!", ar: "تم الحفظ!", my: "သိမ်းဆည်းပြီး!",
+  },
+  cosmeticSaveError: {
+    ko: "저장 실패 — 다시 시도", en: "Save failed — try again", vi: "Lưu thất bại — thử lại",
+    zh: "保存失败", fil: "Pag-save nabigo", ja: "保存失敗",
+    th: "บันทึกไม่สำเร็จ", km: "រក្សាទុកបរាជ័យ", mn: "Хадгалж чадсангүй",
+    ru: "Ошибка сохранения", uz: "Saqlab boʻlmadi", hi: "सहेजना विफल",
+    id: "Gagal menyimpan", ar: "فشل الحفظ", my: "သိမ်းဆည်းမရ",
+  },
+  praiseAction: {
+    ko: "칭찬", en: "Praise", vi: "Khen",
+    zh: "表扬", fil: "Purihin", ja: "ほめる",
+    th: "ชม", km: "សរសើរ", mn: "Магтах",
+    ru: "Похвалить", uz: "Maqtash", hi: "प्रशंसा",
+    id: "Puji", ar: "امتدح", my: "ချီးမွမ်း",
+  },
   phMoreCells: {
     ko: "+{n}개 더", en: "+{n} more", vi: "+{n} nữa",
     zh: "+{n} 更多", fil: "+{n} pa", ja: "+{n} もっと",

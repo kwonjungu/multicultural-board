@@ -20,6 +20,8 @@ interface Props {
   stickerCount: number;
   lang: string;
   onClose: () => void;
+  onSaved?: () => void;
+  onSaveError?: (msg: string) => void;
 }
 
 const ALL_SKINS: SkinId[] = ["classic", "orange", "green", "sky", "pink", "purple"];
@@ -47,6 +49,8 @@ export default function CosmeticPicker({
   stickerCount,
   lang,
   onClose,
+  onSaved,
+  onSaveError,
 }: Props) {
   const [current, setCurrent] = useState<StudentCosmetics>(DEFAULT_COSMETICS);
   const [draft, setDraft] = useState<StudentCosmetics>(DEFAULT_COSMETICS);
@@ -94,18 +98,21 @@ export default function CosmeticPicker({
     onClose();
   }
 
-  async function handleSave() {
+  function handleSave() {
     if (saving) return;
-    setSaving(true);
+    // Optimistic UX: close the drawer immediately, fire toast, write in background.
+    // Firebase subscription in the parent will reflect the change when it lands
+    // (usually <200ms). On failure we surface an error toast.
+    const snapshot = draft;
+    setCurrent(snapshot); // local mirror so re-opens don't flash the old state
     setError(null);
-    try {
-      await setCosmetics(roomCode, myClientId, draft);
-      onClose();
-    } catch (e) {
-      console.error("cosmetic save error:", e);
-      setError((e as Error).message || "저장 실패");
-    }
     setSaving(false);
+    onSaved?.();
+    onClose();
+    setCosmetics(roomCode, myClientId, snapshot).catch((e) => {
+      console.error("cosmetic save error:", e);
+      onSaveError?.((e as Error).message || "저장 실패");
+    });
   }
 
   // === Preview composition ===

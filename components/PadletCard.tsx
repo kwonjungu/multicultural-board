@@ -99,6 +99,7 @@ interface Props {
   authorName?: string;
   onEdit?: () => void;
   onDelete?: () => void;
+  onPraise?: () => void;
   isPending?: boolean;
   roomCode: string;
   roomLangs: string[];
@@ -114,6 +115,7 @@ export default function PadletCard({
   authorName,
   onEdit,
   onDelete,
+  onPraise,
   isPending,
   roomCode,
   roomLangs,
@@ -395,6 +397,23 @@ export default function PadletCard({
               }}
             >
               ✏️
+            </button>
+          )}
+          {/* Praise (teacher-only, can't praise teacher-authored cards) */}
+          {isTeacher && onPraise && !card.isTeacher && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPraise(); }}
+              title={`${t("praiseAction", viewerLang)} — ${card.authorName}`}
+              style={{
+                background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8,
+                padding: "4px 8px", cursor: "pointer", fontSize: 12, color: "#B45309",
+                fontWeight: 800, flexShrink: 0, transition: "all 0.15s",
+                display: "inline-flex", alignItems: "center", gap: 4,
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF3C7"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FFFBEB"; }}
+            >
+              🌟 {t("praiseAction", viewerLang)}
             </button>
           )}
           {/* Delete button */}

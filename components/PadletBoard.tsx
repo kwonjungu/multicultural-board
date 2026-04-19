@@ -34,6 +34,7 @@ interface Props {
   onLogout: () => void;
   roomConfig: RoomConfig;
   myClientId: string;
+  onPraiseStudent?: (clientId: string, name: string) => void;
 }
 
 const COL_COLORS = [
@@ -41,7 +42,7 @@ const COL_COLORS = [
   "#D97706", "#EC4899", "#14B8A6", "#F97316", "#10B981",
 ];
 
-export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomConfig, myClientId }: Props) {
+export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomConfig, myClientId, onPraiseStudent }: Props) {
   const [cards, setCards] = useState<CardData[]>([]);
   const [columns, setColumns] = useState<FirebaseColumn[]>(
     COLUMNS_DEFAULT.map((col, i) => ({ ...col, order: i }))
@@ -961,6 +962,11 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                       isPending={isTeacher && card.status === "pending"}
                       onEdit={() => setEditModal({ card, colTitle: col.title, colColor: col.color })}
                       onDelete={isTeacher ? () => deleteCard(card.id) : undefined}
+                      onPraise={
+                        isTeacher && onPraiseStudent && !card.isTeacher
+                          ? () => onPraiseStudent(card.authorClientId || card.authorName, card.authorName)
+                          : undefined
+                      }
                       roomCode={roomCode}
                       roomLangs={teacherLangs}
                       approvalMode={roomConfigState.approvalMode}

@@ -13,8 +13,10 @@ import InterpreterDrawer from "@/components/InterpreterDrawer";
 import PraiseHive from "@/components/PraiseHive";
 import StickerGiveModal from "@/components/StickerGiveModal";
 import CosmeticPicker from "@/components/CosmeticPicker";
+import Toast from "@/components/Toast";
 import { subscribeStudentStickers } from "@/lib/stickers";
 import { UserConfig, RoomConfig } from "@/lib/types";
+import { t } from "@/lib/i18n";
 
 const ALL_LANGS = Object.keys(LANGUAGES);
 
@@ -31,6 +33,7 @@ export default function RoomPage() {
   const [giveModalFor, setGiveModalFor] = useState<{ clientId: string; name: string } | null>(null);
   const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
   const [myStickerCount, setMyStickerCount] = useState(0);
+  const [toast, setToast] = useState<{ msg: string; tone: "success" | "error" } | null>(null);
 
   // 내 스티커 개수 구독 (CosmeticPicker에 전달용)
   useEffect(() => {
@@ -140,6 +143,37 @@ export default function RoomPage() {
     );
   }
 
+  // Shared overlays — available on every hub view so 칭찬/꾸미기/토스트 가 한 곳에서 제어됨
+  const overlays = (
+    <>
+      <StickerGiveModal
+        roomCode={roomCode}
+        teacherName={user.myName}
+        teacherClientId={myClientId}
+        targetStudent={giveModalFor}
+        lang={user.myLang}
+        onClose={() => setGiveModalFor(null)}
+      />
+      <CosmeticPicker
+        open={cosmeticsOpen}
+        roomCode={roomCode}
+        myClientId={user.myName}
+        stickerCount={myStickerCount}
+        lang={user.myLang}
+        onClose={() => setCosmeticsOpen(false)}
+        onSaved={() => setToast({ msg: t("cosmeticSaved", user.myLang), tone: "success" })}
+        onSaveError={(m) =>
+          setToast({ msg: m || t("cosmeticSaveError", user.myLang), tone: "error" })
+        }
+      />
+      <Toast
+        message={toast?.msg ?? null}
+        tone={toast?.tone}
+        onDismiss={() => setToast(null)}
+      />
+    </>
+  );
+
   // 허브 메인 화면
   if (hubView === "hub") {
     return (
@@ -160,12 +194,18 @@ export default function RoomPage() {
           viewerLang={user.myLang}
           availableLangs={roomLangs}
         />
+        {overlays}
       </>
     );
   }
 
   if (hubView === "games") {
-    return <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} />;
+    return (
+      <>
+        <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} />
+        {overlays}
+      </>
+    );
   }
 
   if (hubView === "dashboard") {
@@ -180,35 +220,24 @@ export default function RoomPage() {
           onOpenGive={(clientId, name) => setGiveModalFor({ clientId, name })}
           onOpenCosmetics={() => setCosmeticsOpen(true)}
         />
-        <StickerGiveModal
-          roomCode={roomCode}
-          teacherName={user.myName}
-          teacherClientId={myClientId}
-          targetStudent={giveModalFor}
-          lang={user.myLang}
-          onClose={() => setGiveModalFor(null)}
-        />
-        <CosmeticPicker
-          open={cosmeticsOpen}
-          roomCode={roomCode}
-          myClientId={user.myName}
-          stickerCount={myStickerCount}
-          lang={user.myLang}
-          onClose={() => setCosmeticsOpen(false)}
-        />
+        {overlays}
       </>
     );
   }
 
-  // 기본: 소통창
+  // 기본: 소통창 — 교사가 카드별 칭찬 버튼으로 스티커 지급
   return (
-    <PadletBoard
-      user={user}
-      roomCode={roomCode}
-      roomLangs={roomLangs}
-      onLogout={() => setHubView("hub")}
-      roomConfig={roomConfig}
-      myClientId={myClientId}
-    />
+    <>
+      <PadletBoard
+        user={user}
+        roomCode={roomCode}
+        roomLangs={roomLangs}
+        onLogout={() => setHubView("hub")}
+        roomConfig={roomConfig}
+        myClientId={myClientId}
+        onPraiseStudent={(clientId, name) => setGiveModalFor({ clientId, name })}
+      />
+      {overlays}
+    </>
   );
 }
