@@ -32,6 +32,8 @@ const TARGETS = [
   "public/spotit",
   "public/game-icons",
   "public/interpreter",
+  "public/halligalli",
+  "public/spot-diff",
 ];
 const SKIP = new Set([]);
 

@@ -4,10 +4,35 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import BeeMascot from "../BeeMascot";
 import { LangMap, tr } from "@/lib/gameData";
 
-// 할리갈리 — Halli Galli style bell game.
-// Split-screen 2-player. Each player turns one card at a time. When any single
-// fruit's total visible count equals exactly 5, the first player to ring the
-// bell wins the pile.
+// 할리갈리 — Halli Galli (Amigo Games, 1990) 정식 룰 기반.
+// ─────────────────────────────────────────────────────────────
+// 룰 요약 (2인 split-screen 변형):
+//  1) 카드 총 56장. 과일 4종(딸기/라임/바나나/자두) × 각 14장.
+//     각 카드의 과일 수는 1·2·3·4·5개 중 하나.
+//  2) 카드를 플레이어 수대로 균등 분배. 모두 뒤집어 자기 앞에 쌓아둠
+//     (시작 시 공개된 카드는 없음 — 정식 룰).
+//  3) 시계방향으로 한 명씩 맨 위 카드를 자기 앞에 공개(뒤집어).
+//     공개된 카드는 각자의 파일(pile)에 누적되며 맨 위 카드만 보임.
+//  4) 모든 플레이어의 "공개 파일 맨 위 카드"를 합쳐, **한 과일의 합이
+//     정확히 5개** 가 되는 순간 먼저 종을 친 사람이 모든 공개 카드를 가져감.
+//  5) 잘못 친 경우 페널티: **각 상대에게 카드 1장씩** 지급
+//     (2인전이면 상대에게 1장).
+//  6) 자기 덱이 비면 그 사람은 차례를 패스. 전원 카드가 다 떨어지면 종료.
+//  7) 최종적으로 카드(여기선 점수로 환산)가 가장 많은 사람이 승.
+//
+// 사용자 피드백 "처음에 넘겨진 상태여야지 4개가" 해석:
+//  - 정식 룰에서는 "초기 공개 카드"가 없다. 앞서 시도한
+//    "각자 2장씩 선공개(총 4장)" 방식은 룰 위반이며, 첫 턴 전에
+//    이미 5합이 성립할 수도 있어 게임이 기형적으로 시작된다.
+//  - 가설 A(수량): 각자 덱에 쥐는 카드 수를 강조한 말로 해석.
+//    2인전 균등 분배 시 56/2 = 28장씩이므로 "4장"은 맞지 않음 →
+//    정식 56장 구성을 복원하는 것이 핵심 교정.
+//  - 가설 B(슬롯/과일 수): 게임 내 과일 종류는 정확히 4종이므로
+//    그 4종이 항상 화면에 보이도록 TotalsBar로 가시화(기존 유지).
+//  - 결론: 초기 공개 제거(정식 룰 준수) + 덱 56장 정식 구성으로 복원.
+//    4종 과일 가시성은 TotalsBar에서 항상 0부터 보여 "4개 슬롯" 해석도 만족.
+//
+// 제약: 2인 split-screen 구조, 이미지 폴백 이모지 유지.
 
 type Fruit = "strawberry" | "lime" | "banana" | "plum";
 
@@ -20,16 +45,28 @@ const FRUIT_META: Record<Fruit, { emoji: string; color: string; label: LangMap }
 
 interface Card { fruit: Fruit; count: 1 | 2 | 3 | 4 | 5 }
 
+// 정식 할리갈리 카드 분포 (총 56장, 과일당 14장).
+// 개당 카드 수가 1·2·3·4·5 중 하나이며 과일별 합이 14장이 되도록 구성.
+// 일반적으로 알려진 분포: 1개×5장, 2개×3장, 3개×3장, 4개×2장, 5개×1장
+// = 5+3+3+2+1 = 14장/과일 × 4과일 = 56장.
+const FRUIT_COUNT_DIST: ReadonlyArray<readonly [1 | 2 | 3 | 4 | 5, number]> = [
+  [1, 5],
+  [2, 3],
+  [3, 3],
+  [4, 2],
+  [5, 1],
+];
+
 function buildDeck(): Card[] {
   const deck: Card[] = [];
-  // Balanced: each fruit × each count × 2 copies = 40 cards → split 20/20
   (Object.keys(FRUIT_META) as Fruit[]).forEach((f) => {
-    ([1, 2, 3, 4, 5] as const).forEach((c) => {
-      deck.push({ fruit: f, count: c });
-      deck.push({ fruit: f, count: c });
+    FRUIT_COUNT_DIST.forEach(([count, copies]) => {
+      for (let i = 0; i < copies; i++) {
+        deck.push({ fruit: f, count });
+      }
     });
   });
-  // Fisher-Yates
+  // Fisher-Yates shuffle
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -46,14 +83,23 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
   const [sessionKey, setSessionKey] = useState(0);
 
   // Decks (private) & revealed piles (public). Pile top = latest reveal.
+  // 정식 룰: 시작 시 공개된 카드는 없다. 모든 카드는 뒤집어진 채 각자 덱에
+  // 쌓여 있고, 턴마다 맨 위 1장을 공개한다.
+  // 2인전이므로 56장을 28/28로 균등 분배.
   const initial = useMemo(() => {
     const full = buildDeck();
-    return { deckA: full.slice(0, 20), deckB: full.slice(20, 40) };
+    const half = Math.floor(full.length / 2); // 28
+    return {
+      deckA: full.slice(0, half),
+      deckB: full.slice(half, half * 2),
+      pileA: [] as Card[],
+      pileB: [] as Card[],
+    };
   }, [sessionKey]);
   const [deckA, setDeckA] = useState<Card[]>(initial.deckA);
   const [deckB, setDeckB] = useState<Card[]>(initial.deckB);
-  const [pileA, setPileA] = useState<Card[]>([]);
-  const [pileB, setPileB] = useState<Card[]>([]);
+  const [pileA, setPileA] = useState<Card[]>(initial.pileA);
+  const [pileB, setPileB] = useState<Card[]>(initial.pileB);
   const [turn, setTurn] = useState<"A" | "B">("A");
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
@@ -72,13 +118,24 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
     setFlash(null);
   }, [sessionKey, initial]);
 
-  // Auto-end when both decks empty
+  // 양쪽 덱이 모두 비면 게임 종료 (정식 룰: 모든 플레이어 카드 소진).
   useEffect(() => {
     if (phase !== "play") return;
     if (deckA.length === 0 && deckB.length === 0) {
       setPhase("result");
     }
   }, [deckA.length, deckB.length, phase]);
+
+  // 정식 룰: 자기 덱이 비면 차례를 패스한다.
+  // 현재 턴인 플레이어의 덱이 비었고 상대는 남아있으면 자동 패스.
+  useEffect(() => {
+    if (phase !== "play") return;
+    if (turn === "A" && deckA.length === 0 && deckB.length > 0) {
+      setTurn("B");
+    } else if (turn === "B" && deckB.length === 0 && deckA.length > 0) {
+      setTurn("A");
+    }
+  }, [turn, deckA.length, deckB.length, phase]);
 
   function flipNext() {
     if (phase !== "play") return;
@@ -123,8 +180,9 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
       setPileB([]);
       setFlash({ who, kind: "hit", reason: `${FRUIT_META[winningFruit].emoji} 정확히 5개!` });
     } else {
-      // Wrong — penalty: pay 3 cards to opponent
-      const penalty = 3;
+      // 오답 페널티 — 정식 룰: 각 상대 플레이어에게 카드 1장씩 지급.
+      // 2인전이므로 "상대에게 1장" = 내 점수 -1, 상대 점수 +1.
+      const penalty = 1;
       if (who === "A") {
         setScoreA((s) => Math.max(0, s - penalty));
         setScoreB((s) => s + penalty);
@@ -422,7 +480,7 @@ function Rules({ langA, langB }: { langA: string; langB: string }) {
         <li>서로 번갈아 카드를 넘겨요.</li>
         <li>지금 공개된 카드 중 <b>한 과일이 정확히 5개</b>면 종을 눌러요.</li>
         <li>정답이면 지금까지 쌓인 카드를 모두 가져가요.</li>
-        <li>오답이면 상대에게 3장을 줘야 해요.</li>
+        <li>오답이면 상대에게 1장을 줘야 해요.</li>
         <li>덱이 다 떨어지면 점수 많은 쪽이 이겨요.</li>
       </ol>
       <div style={{ marginTop: 8, fontSize: 11, color: "#9CA3AF" }}>
