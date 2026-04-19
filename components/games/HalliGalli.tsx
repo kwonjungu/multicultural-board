@@ -237,44 +237,47 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
     );
   }
 
-  // play
+  // play — 실제 할리갈리 테이블처럼 두 카드가 가운데 놓이고, 과일 수를
+  // 이미지로 직접 세어 판단한다. 숫자 합계 표시(TotalsBar)는 제거.
   const topA = pileA[0];
   const topB = pileB[0];
+  const winningFruit = totals ? (Object.keys(totals) as Fruit[]).find((f) => totals[f] === 5) : undefined;
 
   return (
     <div style={{
       maxWidth: 680, margin: "0 auto",
-      display: "flex", flexDirection: "column", gap: 12,
+      display: "flex", flexDirection: "column", gap: 10,
       padding: "12px 12px 28px",
     }}>
-      {/* Player B (top, rotated so partner sits facing opposite) */}
-      <PlayerSide
-        side="B"
-        color="#3B82F6"
-        bg="#DBEAFE"
-        top={topB}
-        deckCount={deckB.length}
-        score={scoreB}
-        isTurn={turn === "B"}
-        onFlip={flipNext}
-        onBell={() => ringBell("B")}
+      {/* Player B controls (top, rotated 180° toward opposite player) */}
+      <PlayerControls
+        side="B" color="#3B82F6" bg="#DBEAFE"
+        deckCount={deckB.length} score={scoreB} isTurn={turn === "B"}
+        onFlip={flipNext} onBell={() => ringBell("B")}
         flipped
       />
 
-      {/* Center — totals indicator */}
-      <TotalsBar totals={totals} />
+      {/* Center table — two face-up cards */}
+      <div style={{
+        display: "flex", flexDirection: "column", gap: 8,
+        alignItems: "center", padding: "4px 0",
+      }}>
+        <CenterCard
+          card={topB}
+          flipped
+          highlight={!!(topB && winningFruit && topB.fruit === winningFruit)}
+        />
+        <CenterCard
+          card={topA}
+          highlight={!!(topA && winningFruit && topA.fruit === winningFruit)}
+        />
+      </div>
 
-      {/* Player A (bottom) */}
-      <PlayerSide
-        side="A"
-        color="#F59E0B"
-        bg="#FEF3C7"
-        top={topA}
-        deckCount={deckA.length}
-        score={scoreA}
-        isTurn={turn === "A"}
-        onFlip={flipNext}
-        onBell={() => ringBell("A")}
+      {/* Player A controls (bottom) */}
+      <PlayerControls
+        side="A" color="#F59E0B" bg="#FEF3C7"
+        deckCount={deckA.length} score={scoreA} isTurn={turn === "A"}
+        onFlip={flipNext} onBell={() => ringBell("A")}
       />
 
       {flash && <FlashOverlay flash={flash} />}
@@ -283,14 +286,15 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
 }
 
 // ────────────────────────────────────────────────
+// Sub-components
+// ────────────────────────────────────────────────
 
-function PlayerSide({
-  side, color, bg, top, deckCount, score, isTurn, onFlip, onBell, flipped,
+function PlayerControls({
+  side, color, bg, deckCount, score, isTurn, onFlip, onBell, flipped,
 }: {
   side: "A" | "B";
   color: string;
   bg: string;
-  top: Card | undefined;
   deckCount: number;
   score: number;
   isTurn: boolean;
@@ -301,146 +305,132 @@ function PlayerSide({
   return (
     <div
       style={{
-        background: bg, border: `3px solid ${color}`, borderRadius: 20,
-        padding: "12px 14px", transform: flipped ? "rotate(180deg)" : undefined,
+        background: bg, border: `2px solid ${color}`, borderRadius: 16,
+        padding: "10px 12px", display: "flex", alignItems: "center", gap: 10,
+        transform: flipped ? "rotate(180deg)" : undefined,
       }}
     >
       <div style={{
-        display: "flex", alignItems: "center", gap: 10, marginBottom: 10,
-      }}>
-        <div style={{
-          fontSize: 13, fontWeight: 900, color, padding: "4px 10px",
-          background: "#fff", borderRadius: 999, border: `2px solid ${color}`,
-        }}>플레이어 {side}</div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280" }}>
-          🃏 {deckCount} · 🏆 {score}
-        </div>
-        <span style={{ flex: 1 }} />
-        {isTurn && (
-          <span style={{
-            fontSize: 11, fontWeight: 900, background: color, color: "#fff",
-            padding: "3px 10px", borderRadius: 999,
-          }}>내 차례</span>
-        )}
+        fontSize: 12, fontWeight: 900, color, padding: "4px 10px",
+        background: "#fff", borderRadius: 999, border: `2px solid ${color}`,
+      }}>P {side}</div>
+      <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280" }}>
+        🃏 {deckCount} · 🏆 {score}
       </div>
-
-      <div style={{
-        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
-        alignItems: "stretch",
-      }}>
-        {/* Card slot */}
-        <div style={{
-          minHeight: 128, background: "#fff", borderRadius: 16,
-          border: `2px dashed ${color}`, padding: 8,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          {top ? <CardFace card={top} /> : <div style={{ fontSize: 38, opacity: 0.25 }}>🂠</div>}
-        </div>
-
-        {/* Buttons */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button
-            onClick={onFlip}
-            disabled={!isTurn || deckCount === 0}
-            aria-label={`플레이어 ${side} 카드 넘기기`}
-            style={{
-              flex: 1, minHeight: 56, borderRadius: 14,
-              background: isTurn ? "#fff" : "#F3F4F6",
-              color: isTurn ? color : "#9CA3AF",
-              border: `2px solid ${isTurn ? color : "#E5E7EB"}`,
-              fontWeight: 900, fontSize: 15, cursor: isTurn && deckCount > 0 ? "pointer" : "not-allowed",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            }}
-          >▶ 넘기기</button>
-          <button
-            onClick={onBell}
-            aria-label={`플레이어 ${side} 종 누르기`}
-            style={{
-              flex: 1, minHeight: 56, borderRadius: 14,
-              background: `linear-gradient(135deg, ${color}, ${color}cc)`,
-              color: "#fff", border: "none", fontWeight: 900, fontSize: 20,
-              cursor: "pointer", boxShadow: `0 6px 14px ${color}55`,
-            }}
-          >🔔</button>
-        </div>
-      </div>
+      {isTurn && (
+        <span style={{
+          fontSize: 11, fontWeight: 900, background: color, color: "#fff",
+          padding: "3px 10px", borderRadius: 999,
+        }}>내 차례</span>
+      )}
+      <span style={{ flex: 1 }} />
+      <button
+        onClick={onFlip}
+        disabled={!isTurn || deckCount === 0}
+        aria-label={`플레이어 ${side} 카드 넘기기`}
+        style={{
+          minHeight: 44, padding: "0 16px", borderRadius: 12,
+          background: isTurn && deckCount > 0 ? "#fff" : "#F3F4F6",
+          color: isTurn && deckCount > 0 ? color : "#9CA3AF",
+          border: `2px solid ${isTurn && deckCount > 0 ? color : "#E5E7EB"}`,
+          fontWeight: 900, fontSize: 14,
+          cursor: isTurn && deckCount > 0 ? "pointer" : "not-allowed",
+        }}
+      >▶ 넘기기</button>
+      <button
+        onClick={onBell}
+        aria-label={`플레이어 ${side} 종 누르기`}
+        style={{
+          minHeight: 44, minWidth: 56, padding: 0, borderRadius: 14,
+          background: `linear-gradient(135deg, ${color}, ${color}cc)`,
+          color: "#fff", border: "none", fontWeight: 900, fontSize: 24,
+          cursor: "pointer", boxShadow: `0 4px 10px ${color}55`,
+        }}
+      >🔔</button>
     </div>
   );
 }
 
-function CardFace({ card }: { card: Card }) {
+function CenterCard({ card, flipped, highlight }: { card: Card | undefined; flipped?: boolean; highlight?: boolean }) {
+  const transform = flipped ? "rotate(180deg)" : undefined;
+  if (!card) {
+    return (
+      <div
+        style={{
+          width: "min(92%, 420px)", aspectRatio: "5 / 3",
+          background: "#fff", border: "3px dashed #E5E7EB", borderRadius: 20,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#9CA3AF", fontWeight: 800, fontSize: 14,
+          transform,
+        }}
+      >카드 대기 중</div>
+    );
+  }
   const meta = FRUIT_META[card.fruit];
-  const dots = Array.from({ length: card.count });
-  const [imgOk, setImgOk] = useState(true);
+  const columns = card.count <= 3 ? card.count : 3;
   return (
-    <div style={{
-      width: "100%", height: "100%",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
-    }}>
-      <div style={{ fontSize: 10, fontWeight: 900, color: meta.color, letterSpacing: 1 }}>
-        ×{card.count}
-      </div>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: card.count >= 4 ? "repeat(3, 22px)" : "repeat(auto-fill, 22px)",
-        gap: 4, justifyContent: "center",
-      }}>
-        {dots.map((_, i) => (
-          imgOk ? (
-            <img
-              key={i}
-              src={fruitImg(card.fruit)}
-              alt=""
-              aria-hidden="true"
-              onError={() => setImgOk(false)}
-              style={{ width: 22, height: 22, objectFit: "contain" }}
-            />
-          ) : (
-            <div key={i} style={{ fontSize: 18, lineHeight: 1, textAlign: "center" }}>{meta.emoji}</div>
-          )
+    <div
+      style={{
+        width: "min(92%, 420px)", aspectRatio: "5 / 3",
+        background: "#fff",
+        border: `4px solid ${highlight ? "#DC2626" : meta.color}`,
+        borderRadius: 20,
+        boxShadow: highlight
+          ? "0 0 0 6px rgba(220,38,38,0.35), 0 12px 28px rgba(0,0,0,0.18)"
+          : "0 10px 22px rgba(0,0,0,0.12)",
+        padding: 12, position: "relative",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transform,
+        animation: highlight ? "halliGlow 0.6s ease-in-out infinite alternate" : undefined,
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+          gap: 8,
+          width: "100%",
+          height: "100%",
+          alignContent: "center",
+          justifyItems: "center",
+          placeItems: "center",
+        }}
+      >
+        {Array.from({ length: card.count }).map((_, i) => (
+          <FruitGlyph key={i} fruit={card.fruit} />
         ))}
       </div>
-    </div>
-  );
-}
-
-function TotalsBar({ totals }: { totals: Record<Fruit, number> | null }) {
-  if (!totals) return null;
-  return (
-    <div style={{
-      display: "flex", justifyContent: "center", gap: 10,
-      background: "#fff", padding: "10px 14px", borderRadius: 14,
-      border: "2px solid #FDE68A", flexWrap: "wrap",
-    }}>
-      {(Object.keys(totals) as Fruit[]).map((f) => {
-        const n = totals[f];
-        const isFive = n === 5;
-        return (
-          <div
-            key={f}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "4px 10px", borderRadius: 99,
-              background: isFive ? FRUIT_META[f].color : "#F9FAFB",
-              color: isFive ? "#fff" : "#1F2937",
-              fontWeight: 900, fontSize: 13,
-              border: isFive ? `2px solid ${FRUIT_META[f].color}` : "1px solid #E5E7EB",
-              animation: isFive ? "halliPulse 0.4s ease-in-out infinite alternate" : undefined,
-            }}
-          >
-            <span>{FRUIT_META[f].emoji}</span>
-            <span>{n}</span>
-            {isFive && <span>🔔</span>}
-          </div>
-        );
-      })}
+      {/* Corner count for tactile confirmation, very subtle */}
+      <div style={{
+        position: "absolute", top: 8, left: 12,
+        fontSize: 13, fontWeight: 900, color: meta.color,
+        background: "#fff", padding: "2px 8px", borderRadius: 999,
+        border: `2px solid ${meta.color}`,
+      }}>{meta.emoji} ×{card.count}</div>
       <style jsx>{`
-        @keyframes halliPulse {
-          from { transform: scale(1); }
-          to   { transform: scale(1.08); }
+        @keyframes halliGlow {
+          from { box-shadow: 0 0 0 4px rgba(220,38,38,0.25), 0 12px 28px rgba(0,0,0,0.18); }
+          to   { box-shadow: 0 0 0 10px rgba(220,38,38,0.55), 0 12px 32px rgba(0,0,0,0.25); }
         }
       `}</style>
     </div>
+  );
+}
+
+function FruitGlyph({ fruit }: { fruit: Fruit }) {
+  const meta = FRUIT_META[fruit];
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return <span style={{ fontSize: "clamp(32px, 9vw, 56px)", lineHeight: 1 }}>{meta.emoji}</span>;
+  }
+  return (
+    <img
+      src={fruitImg(fruit)}
+      alt=""
+      aria-hidden="true"
+      onError={() => setFailed(true)}
+      style={{ width: "clamp(36px, 10vw, 64px)", height: "clamp(36px, 10vw, 64px)", objectFit: "contain", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.12))" }}
+    />
   );
 }
 
