@@ -1542,9 +1542,26 @@ function CharacterChat({
         display: "flex", alignItems: "center", gap: 12,
         borderBottom: "2px solid #F59E0B33",
       }}>
-        <div style={{ fontSize: 40, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.1))" }}>
-          {character.avatarEmoji}
-        </div>
+        {character.avatarUrl ? (
+          <div style={{
+            width: 52, height: 52, borderRadius: "50%",
+            overflow: "hidden", background: "#fff",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+            border: "2px solid #fff",
+            flexShrink: 0,
+          }}>
+            <img
+              src={character.avatarUrl}
+              alt=""
+              aria-hidden="true"
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          </div>
+        ) : (
+          <div style={{ fontSize: 40, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.1))" }}>
+            {character.avatarEmoji}
+          </div>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2 }}>
             {pick(character.name, lang)}
@@ -1675,7 +1692,22 @@ function ChatBubble({
       flexDirection: isStudent ? "row-reverse" : "row",
     }}>
       {!isStudent && (
-        <div style={{ fontSize: 22, flexShrink: 0 }}>{character.avatarEmoji}</div>
+        character.avatarUrl ? (
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%",
+            overflow: "hidden", flexShrink: 0, background: "#fff",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+          }}>
+            <img
+              src={character.avatarUrl}
+              alt=""
+              aria-hidden="true"
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          </div>
+        ) : (
+          <div style={{ fontSize: 22, flexShrink: 0 }}>{character.avatarEmoji}</div>
+        )
       )}
       <div style={{
         padding: "10px 14px",
@@ -1822,10 +1854,25 @@ function TeacherAfterView({
                 : "#F9FAFB",
               border: `2px solid ${session.activeCharacterId === c.id ? "#F59E0B" : "#E5E7EB"}`,
               borderRadius: 14,
+              textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 40 }}>{c.avatarEmoji}</div>
-            <div style={{ fontSize: 13, fontWeight: 900, color: "#1F2937", marginTop: 4 }}>
+            {c.avatarUrl ? (
+              <div style={{
+                width: 64, height: 64, margin: "0 auto",
+                borderRadius: "50%", overflow: "hidden", background: "#fff",
+              }}>
+                <img
+                  src={c.avatarUrl}
+                  alt=""
+                  aria-hidden="true"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+              </div>
+            ) : (
+              <div style={{ fontSize: 40 }}>{c.avatarEmoji}</div>
+            )}
+            <div style={{ fontSize: 13, fontWeight: 900, color: "#1F2937", marginTop: 6 }}>
               {pick(c.name, lang)}
             </div>
           </div>
