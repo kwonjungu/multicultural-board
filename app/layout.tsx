@@ -73,8 +73,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             50%      { box-shadow: 0 0 0 18px rgba(251, 191, 36, 0), 0 0 0 4px rgba(251, 191, 36, 0.95); }
           }
           @keyframes tutorialDialogueIn {
-            from { transform: translateY(100%); opacity: 0; }
-            to   { transform: translateY(0);    opacity: 1; }
+            from { transform: translate(-50%, 100%); opacity: 0; }
+            to   { transform: translate(-50%, 0);    opacity: 1; }
+          }
+          @keyframes tutorialBackdropIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
           }
           @keyframes tutorialCaret {
             0%, 50%   { opacity: 1; }

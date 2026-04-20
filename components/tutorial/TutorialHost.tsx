@@ -82,11 +82,17 @@ export default function TutorialHost({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, dialogueDone]);
 
-  // Auto-advance speak steps once the last line is read
+  // Auto-advance speak/highlight/celebrate once the last line is read
   useEffect(() => {
     if (!step) return;
-    if (step.kind === "speak" && dialogueDone) advance();
-    if (step.kind === "highlight" && dialogueDone && !step.waitFor) advance();
+    if (!dialogueDone) return;
+    if (step.kind === "speak") { advance(); return; }
+    if (step.kind === "highlight" && !step.waitFor) { advance(); return; }
+    if (step.kind === "celebrate") {
+      // Hold on the reward popup for a beat, then complete.
+      const t = window.setTimeout(() => advance(), 1400);
+      return () => window.clearTimeout(t);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dialogueDone]);
 
@@ -154,6 +160,20 @@ export default function TutorialHost({
         </button>
       )}
 
+      {/* Gentle backdrop dim for speak/celebrate (no spotlight) */}
+      {!showSpotlight && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed", inset: 0,
+            background: "rgba(17, 24, 39, 0.35)",
+            zIndex: 9989,
+            pointerEvents: "none",
+            animation: "tutorialBackdropIn 320ms ease-out both",
+          }}
+        />
+      )}
+
       {/* Spotlight overlay for highlight/await steps */}
       {showSpotlight && <Spotlight selector={(step as any).target} />}
 
@@ -161,7 +181,7 @@ export default function TutorialHost({
       <BeeGuide
         expression={activeExpression}
         position={position}
-        size={130}
+        size={190}
         particles={particles}
       />
 

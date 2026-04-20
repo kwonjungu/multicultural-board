@@ -122,7 +122,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
             src="/mascot/bee-welcome.png"
             alt=""
             aria-hidden="true"
-            style={{ width: 56, height: 56, flexShrink: 0, filter: "drop-shadow(0 4px 10px rgba(245,158,11,0.35))" }}
+            style={{ width: 72, height: 72, flexShrink: 0, filter: "drop-shadow(0 4px 10px rgba(245,158,11,0.35))" }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
@@ -203,7 +203,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
                     alt=""
                     aria-hidden="true"
                     style={{
-                      width: 88, height: 88, display: "block",
+                      width: 112, height: 112, display: "block",
                       filter: `drop-shadow(0 6px 14px ${s.color}55)`,
                       animation: locked ? undefined : "heroBeeFloat 3s ease-in-out infinite",
                     }}

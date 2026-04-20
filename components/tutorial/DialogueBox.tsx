@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DialogueLine } from "@/lib/tutorial/types";
 
 interface Props {
@@ -11,16 +11,76 @@ interface Props {
   muted?: boolean;
 }
 
+type Segment = { bold: boolean; text: string };
+
+/**
+ * Parse "**emphasis**" into { bold: true, text: "emphasis" } segments so we
+ * can render bold without the literal asterisks showing in the typewriter.
+ */
+function parseBoldSegments(text: string): Segment[] {
+  const out: Segment[] = [];
+  const re = /\*\*([^*]+?)\*\*/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push({ bold: false, text: text.slice(last, m.index) });
+    out.push({ bold: true, text: m[1] });
+    last = re.lastIndex;
+  }
+  if (last < text.length) {
+    // Strip any stray unpaired "**" so they never flash mid-typewriter
+    out.push({ bold: false, text: text.slice(last).replace(/\*\*/g, "") });
+  }
+  return out;
+}
+
+function segmentsLength(segs: Segment[]): number {
+  return segs.reduce((n, s) => n + s.text.length, 0);
+}
+
+function renderSegments(segs: Segment[], visibleChars: number): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let remaining = visibleChars;
+  for (let i = 0; i < segs.length; i++) {
+    if (remaining <= 0) break;
+    const s = segs[i];
+    const take = Math.min(s.text.length, remaining);
+    const slice = s.text.slice(0, take);
+    parts.push(
+      s.bold
+        ? <strong key={i} style={{ color: "#B45309", fontWeight: 900 }}>{slice}</strong>
+        : <span key={i}>{slice}</span>
+    );
+    remaining -= take;
+  }
+  return parts;
+}
+
+function charAt(segs: Segment[], idx: number): string {
+  let remaining = idx;
+  for (const s of segs) {
+    if (remaining < s.text.length) return s.text[remaining];
+    remaining -= s.text.length;
+  }
+  return "";
+}
+
 /**
  * Animal-crossing style bottom-third dialogue box with typewriter effect
  * and multi-line advance-on-click. Plays short beep sounds per character.
  */
 export default function DialogueBox({ lines, speakerName, onLineChange, onDone, muted = false }: Props) {
   const [idx, setIdx] = useState(0);
-  const [rendered, setRendered] = useState("");
+  const [visibleChars, setVisibleChars] = useState(0);
   const [typing, setTyping] = useState(true);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const currentLine = lines[idx];
+
+  const segments = useMemo(
+    () => (currentLine ? parseBoldSegments(currentLine.text) : []),
+    [currentLine],
+  );
+  const totalChars = useMemo(() => segmentsLength(segments), [segments]);
 
   // Fire onLineChange when the active line changes
   useEffect(() => {
@@ -30,12 +90,11 @@ export default function DialogueBox({ lines, speakerName, onLineChange, onDone, 
   // Typewriter effect per line
   useEffect(() => {
     if (!currentLine) return;
-    setRendered("");
+    setVisibleChars(0);
     setTyping(true);
-    const text = currentLine.text;
     const speed = currentLine.speed ?? 32;
     if (speed === 0) {
-      setRendered(text);
+      setVisibleChars(totalChars);
       setTyping(false);
       return;
     }
@@ -44,26 +103,23 @@ export default function DialogueBox({ lines, speakerName, onLineChange, onDone, 
     const tick = () => {
       if (cancelled) return;
       i++;
-      const slice = text.slice(0, i);
-      setRendered(slice);
-      if (!muted) playBeep(audioCtxRef, text[i - 1]);
-      if (i >= text.length) {
+      setVisibleChars(i);
+      const ch = charAt(segments, i - 1);
+      if (!muted) playBeep(audioCtxRef, ch);
+      if (i >= totalChars) {
         setTyping(false);
         return;
       }
-      // pause longer after sentence-ending punctuation
-      const ch = text[i - 1];
       const delay = /[.,!?~…]/.test(ch) ? speed * 5 : speed;
       window.setTimeout(tick, delay);
     };
     window.setTimeout(tick, 80);
     return () => { cancelled = true; };
-  }, [currentLine, muted]);
+  }, [currentLine, muted, segments, totalChars]);
 
   function advance() {
     if (typing) {
-      // skip: reveal full line instantly
-      setRendered(currentLine.text);
+      setVisibleChars(totalChars);
       setTyping(false);
       return;
     }
@@ -128,7 +184,7 @@ export default function DialogueBox({ lines, speakerName, onLineChange, onDone, 
         fontSize: 18, lineHeight: 1.6, fontWeight: 600,
         minHeight: 58, whiteSpace: "pre-wrap",
       }}>
-        {rendered}
+        {renderSegments(segments, visibleChars)}
         {typing && (
           <span style={{
             display: "inline-block", width: 2, marginLeft: 3,
