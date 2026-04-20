@@ -53,6 +53,8 @@ interface Props {
   onSentenceDone: (idx: number) => void;
   onListenBump: () => void;
   onClose: () => void;
+  roomCode: string;
+  clientId: string;
 }
 
 const PURPLE = "#8B5CF6";
@@ -61,6 +63,7 @@ const PURPLE_LIGHT = "#F5F3FF";
 
 export default function VocabCard({
   word, lang, doneSentences, onSentenceDone, onListenBump, onClose,
+  roomCode, clientId,
 }: Props) {
   const [idx, setIdx] = useState(0);
   const [rate, setRate] = useState(1);
@@ -327,6 +330,10 @@ export default function VocabCard({
             sentenceText={sentence.ko}
             onOriginalPlay={() => { speakKorean(sentence.ko, rate); onListenBump(); }}
             onComplete={handleDone}
+            roomCode={roomCode}
+            clientId={clientId}
+            wordId={word.id}
+            sentenceIdx={idx}
           />
         )}
 

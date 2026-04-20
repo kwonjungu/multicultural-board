@@ -7,9 +7,11 @@ import { VOCAB_WORDS, VocabWord } from "@/lib/vocabWords";
 import {
   loadProgress, saveProgress, markSentenceDone, bumpListen,
   wordDoneCount, masteredCount, ProgressMap,
+  subscribeProgress, writeWordProgress, mergeProgress,
 } from "@/lib/vocabProgress";
 import { extractVocabLocal, MatchedWord, wordById } from "@/lib/vocabUtils";
 import { checkAndAward, RewardRule, getAwardedIds } from "@/lib/vocabRewards";
+import { cleanupExpiredRecordings } from "@/lib/vocabRecordings";
 import { UserConfig, CardData } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import VocabCard from "./VocabCard";
@@ -62,6 +64,21 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
     setProgress(loadProgress(roomCode, user.myName));
   }, [roomCode, user.myName]);
 
+  // Firebase 진행도 구독 — 원격 변경을 로컬과 머지 (doneSentences 합집합, 최대 lastStudied)
+  useEffect(() => {
+    const unsub = subscribeProgress(roomCode, user.myName, (remote) => {
+      setProgress((local) => {
+        const merged = mergeProgress(local, remote);
+        // 머지 결과가 로컬과 다르면 localStorage 도 갱신
+        if (JSON.stringify(merged) !== JSON.stringify(local)) {
+          saveProgress(roomCode, user.myName, merged);
+        }
+        return merged;
+      });
+    });
+    return () => unsub();
+  }, [roomCode, user.myName]);
+
   // 받은 vocab 스티커 수 (지급 기록 개수)
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +87,11 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
     });
     return () => { cancelled = true; };
   }, [roomCode, user.myName, awardQueue.length]); // 큐 변경 시 새로고침
+
+  // Hub 마운트 시 30일 넘은 녹음 정리 (백그라운드, 1회)
+  useEffect(() => {
+    cleanupExpiredRecordings(roomCode, user.myName).catch(() => { /* silent */ });
+  }, [roomCode, user.myName]);
 
   // 카드 구독 — originalText + translations.ko 수집
   useEffect(() => {
@@ -121,17 +143,19 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
     }
   }
 
-  function persist(next: ProgressMap, checkRewards = false) {
+  function persist(next: ProgressMap, opts?: { checkRewards?: boolean; touchedWordId?: string }) {
     setProgress(next);
     saveProgress(roomCode, user.myName, next);
-    if (checkRewards) {
-      // 낙관적 UI — 백그라운드에서 지급 검사
+
+    // 변경된 단어만 Firebase 에 싱크 — 낙관적 fire-and-forget
+    if (opts?.touchedWordId && next[opts.touchedWordId]) {
+      writeWordProgress(roomCode, user.myName, opts.touchedWordId, next[opts.touchedWordId])
+        .catch(() => { /* silent */ });
+    }
+
+    if (opts?.checkRewards) {
       checkAndAward(roomCode, user.myName, user.myName, next)
-        .then((newly) => {
-          if (newly.length > 0) {
-            setAwardQueue((q) => [...q, ...newly]);
-          }
-        })
+        .then((newly) => { if (newly.length > 0) setAwardQueue((q) => [...q, ...newly]); })
         .catch(() => { /* silent */ });
     }
   }
@@ -447,9 +471,17 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           word={openWord}
           lang={lang}
           doneSentences={progress[openWord.id]?.doneSentences ?? []}
-          onSentenceDone={(idx) => persist(markSentenceDone(progress, openWord.id, idx), true)}
-          onListenBump={() => persist(bumpListen(progress, openWord.id))}
+          onSentenceDone={(idx) => persist(
+            markSentenceDone(progress, openWord.id, idx),
+            { checkRewards: true, touchedWordId: openWord.id },
+          )}
+          onListenBump={() => persist(
+            bumpListen(progress, openWord.id),
+            { touchedWordId: openWord.id },
+          )}
           onClose={() => setOpenWord(null)}
+          roomCode={roomCode}
+          clientId={user.myName}
         />
       )}
 
