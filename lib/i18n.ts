@@ -760,6 +760,30 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
   vocabScanning: {
     ko: "단어 찾는 중…", en: "Scanning…", vi: "Đang quét…", zh: "扫描中…",
   },
+  vocabViewGrid: {
+    ko: "📚 카드", en: "📚 Cards", vi: "📚 Thẻ", zh: "📚 卡片",
+    ja: "📚 カード", fil: "📚 Cards", th: "📚 การ์ด", km: "📚 កាត",
+    mn: "📚 Карт", ru: "📚 Карточки", uz: "📚 Kartalar",
+    hi: "📚 कार्ड", id: "📚 Kartu", ar: "📚 بطاقات", my: "📚 ကတ်",
+  },
+  vocabViewNotebook: {
+    ko: "📗 단어장", en: "📗 Notebook", vi: "📗 Sổ tay", zh: "📗 单词本",
+    ja: "📗 単語帳", fil: "📗 Notebook", th: "📗 สมุดคำศัพท์", km: "📗 សៀវភៅ",
+    mn: "📗 Тэмдэглэл", ru: "📗 Словарь", uz: "📗 Lug'at",
+    hi: "📗 शब्दकोश", id: "📗 Buku", ar: "📗 دفتر", my: "📗 အဘိဓာန်",
+  },
+  vocabSectionMastered: {
+    ko: "🏆 완주한 단어", en: "🏆 Mastered",
+  },
+  vocabSectionInProgress: {
+    ko: "🔄 학습 중", en: "🔄 In progress",
+  },
+  vocabSectionUnstudied: {
+    ko: "○ 아직 안 배운 단어", en: "○ Not started",
+  },
+  vocabStickersEarned: {
+    ko: "🐝 스티커 {n}개", en: "🐝 {n} stickers",
+  },
   vocabSub_감정: { ko: "감정", en: "Emotions" },
   vocabSub_지칭어: { ko: "지칭어", en: "Pointing" },
   vocabSub_의사표현: { ko: "의사표현", en: "Expression" },

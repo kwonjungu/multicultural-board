@@ -9,9 +9,11 @@ import {
   wordDoneCount, masteredCount, ProgressMap,
 } from "@/lib/vocabProgress";
 import { extractVocabLocal, MatchedWord, wordById } from "@/lib/vocabUtils";
+import { checkAndAward, RewardRule, getAwardedIds } from "@/lib/vocabRewards";
 import { UserConfig, CardData } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import VocabCard from "./VocabCard";
+import VocabNotebook from "./VocabNotebook";
 
 const PURPLE = "#8B5CF6";
 const PURPLE_DARK = "#6D28D9";
@@ -49,9 +51,25 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   const [scanState, setScanState] = useState<"idle" | "scanning" | "error">("idle");
   const scanOnce = useRef(false);
 
+  // 자동 보상 축하 큐
+  const [awardQueue, setAwardQueue] = useState<RewardRule[]>([]);
+  const [stickersEarned, setStickersEarned] = useState(0);
+
+  // 뷰 모드 (그리드 / 단어장)
+  const [viewMode, setViewMode] = useState<"grid" | "notebook">("grid");
+
   useEffect(() => {
     setProgress(loadProgress(roomCode, user.myName));
   }, [roomCode, user.myName]);
+
+  // 받은 vocab 스티커 수 (지급 기록 개수)
+  useEffect(() => {
+    let cancelled = false;
+    getAwardedIds(roomCode, user.myName).then((s) => {
+      if (!cancelled) setStickersEarned(s.size);
+    });
+    return () => { cancelled = true; };
+  }, [roomCode, user.myName, awardQueue.length]); // 큐 변경 시 새로고침
 
   // 카드 구독 — originalText + translations.ko 수집
   useEffect(() => {
@@ -103,10 +121,31 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
     }
   }
 
-  function persist(next: ProgressMap) {
+  function persist(next: ProgressMap, checkRewards = false) {
     setProgress(next);
     saveProgress(roomCode, user.myName, next);
+    if (checkRewards) {
+      // 낙관적 UI — 백그라운드에서 지급 검사
+      checkAndAward(roomCode, user.myName, user.myName, next)
+        .then((newly) => {
+          if (newly.length > 0) {
+            setAwardQueue((q) => [...q, ...newly]);
+          }
+        })
+        .catch(() => { /* silent */ });
+    }
   }
+
+  // 축하 큐 — 각 2.8초씩 순차 표시
+  useEffect(() => {
+    if (awardQueue.length === 0) return;
+    const id = window.setTimeout(() => {
+      setAwardQueue((q) => q.slice(1));
+    }, 2800);
+    return () => window.clearTimeout(id);
+  }, [awardQueue]);
+
+  const currentAward = awardQueue[0];
 
   const filteredWords = useMemo(() => {
     if (activeSub === "all") return VOCAB_WORDS;
@@ -160,6 +199,45 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           🏆 {masteredTotal}
         </div>
       </div>
+
+      {/* View mode toggle */}
+      <div style={{
+        maxWidth: 760, margin: "0 auto 14px",
+        display: "flex", gap: 4,
+        background: "#fff", padding: 4, borderRadius: 14,
+        border: "2px solid " + PURPLE + "22",
+      }}>
+        {([
+          { k: "grid" as const, label: t("vocabViewGrid", lang) },
+          { k: "notebook" as const, label: t("vocabViewNotebook", lang) },
+        ]).map((v) => (
+          <button
+            key={v.k}
+            onClick={() => setViewMode(v.k)}
+            style={{
+              flex: 1,
+              background: viewMode === v.k
+                ? "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")"
+                : "transparent",
+              color: viewMode === v.k ? "#fff" : "#374151",
+              border: "none", borderRadius: 10,
+              padding: "10px", fontSize: 14, fontWeight: 900,
+              cursor: "pointer", fontFamily: "inherit",
+              boxShadow: viewMode === v.k ? "0 6px 14px rgba(139, 92, 246, 0.3)" : "none",
+            }}
+          >{v.label}</button>
+        ))}
+      </div>
+
+      {viewMode === "notebook" ? (
+        <VocabNotebook
+          progress={progress}
+          stickersEarned={stickersEarned}
+          onOpenWord={setOpenWord}
+          lang={lang}
+        />
+      ) : (
+      <>
 
       {/* Board-matched words */}
       <div style={{ maxWidth: 760, margin: "0 auto 14px" }}>
@@ -360,6 +438,8 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           );
         })}
       </div>
+      </>
+      )}
 
       {/* Study modal */}
       {openWord && (
@@ -367,11 +447,45 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           word={openWord}
           lang={lang}
           doneSentences={progress[openWord.id]?.doneSentences ?? []}
-          onSentenceDone={(idx) => persist(markSentenceDone(progress, openWord.id, idx))}
+          onSentenceDone={(idx) => persist(markSentenceDone(progress, openWord.id, idx), true)}
           onListenBump={() => persist(bumpListen(progress, openWord.id))}
           onClose={() => setOpenWord(null)}
         />
       )}
+
+      {/* Reward celebration banner */}
+      {currentAward && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
+            zIndex: 1200,
+            background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
+            color: "#78350F",
+            borderRadius: 20, padding: "14px 22px",
+            fontSize: 15, fontWeight: 900, letterSpacing: -0.2,
+            boxShadow: "0 14px 40px rgba(245, 158, 11, 0.5)",
+            display: "flex", alignItems: "center", gap: 10,
+            animation: "rewardPop 0.4s ease",
+            maxWidth: "90vw",
+          }}
+        >
+          <span style={{ fontSize: 24 }}>🏆</span>
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.8 }}>스티커 획득</div>
+            <div>{currentAward.label}</div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes rewardPop {
+          0% { transform: translate(-50%, -80px) scale(0.6); opacity: 0; }
+          60% { transform: translate(-50%, 0) scale(1.05); opacity: 1; }
+          100% { transform: translate(-50%, 0) scale(1); }
+        }
+      `}</style>
     </div>
   );
 }
