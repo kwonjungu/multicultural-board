@@ -11,7 +11,8 @@
   "cover": {
     "emoji": "🐝🌍✨",
     "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A 40%, #A5B4FC)",
-    "imagePrompt": "A cute cartoon bee wearing a little explorer cap with goggles, holding a glowing globe, surrounded by a tiny rocket, a seashell, a tree root, and a VR headset icon. Soft watercolor children's book cover, warm honey palette with pastel blues and purples, dreamy soft lighting, centered composition, no text."
+    "imagePrompt": "A cute cartoon bee wearing a little explorer cap with goggles, holding a glowing globe, surrounded by a tiny rocket, a seashell, a tree root, and a VR headset icon. Soft watercolor children's book cover, warm honey palette with pastel blues and purples, dreamy soft lighting, centered composition, no text.",
+    "imageUrl": "/storybooks/curious-worlds/cover.png"
   },
   "authorName": "샘플 그림책 (2슬02-04)",
   "createdAt": 0,
@@ -28,7 +29,8 @@
       },
       "illustration": {
         "emoji": "🐝📖🗺️",
-        "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A)"
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A)",
+        "imageUrl": "/storybooks/curious-worlds/page-1.png"
       },
       "imagePrompt": "A cute cartoon bee standing on a stack of picture books, looking up at a giant colorful world map on the wall. Cozy warm room, sunlight streaming in, soft watercolor children's book style."
     },
@@ -44,7 +46,8 @@
       },
       "illustration": {
         "emoji": "🚀⭐🪐",
-        "bgGradient": "linear-gradient(180deg, #1E3A8A, #3730A3 60%, #6366F1)"
+        "bgGradient": "linear-gradient(180deg, #1E3A8A, #3730A3 60%, #6366F1)",
+        "imageUrl": "/storybooks/curious-worlds/page-2.png"
       },
       "imagePrompt": "A cute cartoon bee piloting a small colorful rocket through a purple-blue starry sky with pastel planets and swirling stardust. Soft watercolor children's book illustration, whimsical and dreamy."
     },
@@ -60,7 +63,8 @@
       },
       "illustration": {
         "emoji": "🌟👴✨",
-        "bgGradient": "linear-gradient(180deg, #312E81, #4338CA, #818CF8)"
+        "bgGradient": "linear-gradient(180deg, #312E81, #4338CA, #818CF8)",
+        "imageUrl": "/storybooks/curious-worlds/page-3.png"
       },
       "imagePrompt": "A friendly wise old star character with a long beard and kind smile, floating next to a cute bee in space. Pastel starry background with sparkles, soft watercolor children's book illustration, warm magical glow."
     },
@@ -76,7 +80,8 @@
       },
       "illustration": {
         "emoji": "🐟🐚🌊",
-        "bgGradient": "linear-gradient(180deg, #06B6D4, #22D3EE, #A5F3FC)"
+        "bgGradient": "linear-gradient(180deg, #06B6D4, #22D3EE, #A5F3FC)",
+        "imageUrl": "/storybooks/curious-worlds/page-4.png"
       },
       "imagePrompt": "A cute cartoon bee wearing a small diving suit and round helmet swimming among colorful coral reefs with smiling fish. Soft underwater light, pastel aqua palette, gentle bubbles, watercolor children's book style."
     },
@@ -92,7 +97,8 @@
       },
       "illustration": {
         "emoji": "🐙💬",
-        "bgGradient": "linear-gradient(180deg, #0E7490, #06B6D4, #67E8F9)"
+        "bgGradient": "linear-gradient(180deg, #0E7490, #06B6D4, #67E8F9)",
+        "imageUrl": "/storybooks/curious-worlds/page-5.png"
       },
       "imagePrompt": "A friendly cartoon purple octopus with a big smile waving its tentacles, greeting the bee in a diving suit. Soft watercolor underwater scene, pastel teal colors, cheerful mood."
     },
@@ -108,7 +114,8 @@
       },
       "illustration": {
         "emoji": "🌱🐛💎",
-        "bgGradient": "linear-gradient(180deg, #78350F, #B45309, #FBBF24)"
+        "bgGradient": "linear-gradient(180deg, #78350F, #B45309, #FBBF24)",
+        "imageUrl": "/storybooks/curious-worlds/page-6.png"
       },
       "imagePrompt": "A cute cartoon bee and a smiling earthworm exploring tree roots underground, with sparkling gem stones glowing between the roots. Warm brown and amber palette, watercolor children's book illustration."
     },
@@ -124,7 +131,8 @@
       },
       "illustration": {
         "emoji": "🥽💻🌲",
-        "bgGradient": "linear-gradient(135deg, #C7D2FE, #A5B4FC, #EC4899)"
+        "bgGradient": "linear-gradient(135deg, #C7D2FE, #A5B4FC, #EC4899)",
+        "imageUrl": "/storybooks/curious-worlds/page-7.png"
       },
       "imagePrompt": "A cute cartoon bee wearing a small VR headset standing in front of a glowing portal showing a magical pixel forest. Soft pastel purple-pink palette, shimmering geometric leaves, watercolor children's book style."
     },
@@ -140,7 +148,8 @@
       },
       "illustration": {
         "emoji": "🐋💫",
-        "bgGradient": "linear-gradient(135deg, #FBCFE8, #C7D2FE, #93C5FD)"
+        "bgGradient": "linear-gradient(135deg, #FBCFE8, #C7D2FE, #93C5FD)",
+        "imageUrl": "/storybooks/curious-worlds/page-8.png"
       },
       "imagePrompt": "A cute cartoon bee drawing a flying whale in a dreamy digital space with sparkles and floating geometric shapes. Soft pastel pink and blue palette, magical atmosphere, watercolor children's book style."
     },
@@ -156,7 +165,8 @@
       },
       "illustration": {
         "emoji": "📚📱🎮",
-        "bgGradient": "linear-gradient(135deg, #FEF3C7, #A7F3D0, #BFDBFE)"
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #A7F3D0, #BFDBFE)",
+        "imageUrl": "/storybooks/curious-worlds/page-9.png"
       },
       "imagePrompt": "A cute cartoon bee at a cozy desk with an open picture book, a tablet playing video, and a small game controller. Warm pastel palette, cozy evening light, watercolor children's book style."
     },
@@ -172,7 +182,8 @@
       },
       "illustration": {
         "emoji": "🗺️💫🐝",
-        "bgGradient": "linear-gradient(180deg, #FBBF24, #FCD34D, #FEF3C7)"
+        "bgGradient": "linear-gradient(180deg, #FBBF24, #FCD34D, #FEF3C7)",
+        "imageUrl": "/storybooks/curious-worlds/page-10.png"
       },
       "imagePrompt": "A cute cartoon bee standing in front of a giant colorful wall map with stickers marking space, ocean, earth, and digital worlds, with stars and sparkles around. Warm sunset glow, hopeful mood, watercolor children's book style."
     }
@@ -192,7 +203,8 @@
       "avatarImagePrompt": "A cute cartoon bee character portrait — friendly smile, big curious eyes, wearing a small explorer cap with tiny goggles on top, little yellow-and-black striped body, soft watercolor children's book style, clean pastel-cream solid background, character centered, no text, no scene, just the character.",
       "personality": "호기심이 아주 많고 씩씩한 탐험가 꿀벌. 새로운 걸 보면 눈이 반짝반짝 빛난다.",
       "speechStyle": "말끝에 '~붕!' 붙이기. 신날 땐 '우와~붕!' 궁금할 땐 '그래서? ~붕?'",
-      "bookContext": "우주·바닷속·땅속·가상공간을 차례로 탐험하며, 책·영상·VR 등 여러 매체로 궁금한 것을 알아볼 수 있다는 걸 배웠다."
+      "bookContext": "우주·바닷속·땅속·가상공간을 차례로 탐험하며, 책·영상·VR 등 여러 매체로 궁금한 것을 알아볼 수 있다는 걸 배웠다.",
+      "avatarUrl": "/storybooks/curious-worlds/char-buzzy.png"
     },
     {
       "id": "star-grandpa",
@@ -208,7 +220,8 @@
       "avatarImagePrompt": "A friendly wise old star character portrait — long white beard, kind warm smile, cosmic pointed hat, tiny twinkle sparkles around. Soft watercolor children's book style, clean pastel deep-blue solid background, character centered, no text, no scene.",
       "personality": "따뜻하고 느긋한 어른. 우주의 별들을 오래 지켜본 현명한 가이드.",
       "speechStyle": "느긋하게 '~란다' 체. 예: '별은 참 신기하단다.' 가끔 '허허~' 하고 웃음.",
-      "bookContext": "우주로 여행 온 붕붕이를 만나 별이 왜 반짝이는지 이야기해준 가이드."
+      "bookContext": "우주로 여행 온 붕붕이를 만나 별이 왜 반짝이는지 이야기해준 가이드.",
+      "avatarUrl": "/storybooks/curious-worlds/char-star-grandpa.png"
     }
   ],
   "questions": [

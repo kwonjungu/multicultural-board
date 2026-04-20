@@ -11,7 +11,8 @@
   "cover": {
     "emoji": "🐝🌸🍁❄️",
     "bgGradient": "linear-gradient(135deg, #FBCFE8, #A7F3D0 40%, #FDE68A 70%, #BFDBFE)",
-    "imagePrompt": "A cute cartoon bee wearing a tiny scarf standing in the center of a circular wreath divided into four seasons — spring cherry blossoms, summer green leaves, autumn red maple, winter snowflakes. Soft watercolor children's book cover, gentle pastel palette, centered composition, no text."
+    "imagePrompt": "A cute cartoon bee wearing a tiny scarf standing in the center of a circular wreath divided into four seasons — spring cherry blossoms, summer green leaves, autumn red maple, winter snowflakes. Soft watercolor children's book cover, gentle pastel palette, centered composition, no text.",
+    "imageUrl": "/storybooks/seasons-beauty/cover.png"
   },
   "authorName": "샘플 그림책 (2즐01-04)",
   "createdAt": 0,
@@ -28,7 +29,8 @@
       },
       "illustration": {
         "emoji": "🐝🌤️",
-        "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A, #FBCFE8)"
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A, #FBCFE8)",
+        "imageUrl": "/storybooks/seasons-beauty/page-1.png"
       },
       "imagePrompt": "A cute cartoon bee standing at a window looking outside, with a small calendar on the wall. Warm morning light, soft watercolor children's book style."
     },
@@ -44,7 +46,8 @@
       },
       "illustration": {
         "emoji": "🌸🌷🦋",
-        "bgGradient": "linear-gradient(180deg, #FBCFE8, #FCE7F3, #FEF3C7)"
+        "bgGradient": "linear-gradient(180deg, #FBCFE8, #FCE7F3, #FEF3C7)",
+        "imageUrl": "/storybooks/seasons-beauty/page-2.png"
       },
       "imagePrompt": "A cute cartoon bee flying through a spring scene with pink cherry blossoms, pastel tulips, and a small butterfly. Soft watercolor children's book style, warm spring light, cheerful mood."
     },
@@ -60,7 +63,8 @@
       },
       "illustration": {
         "emoji": "🌸📓🖍️",
-        "bgGradient": "linear-gradient(135deg, #FCE7F3, #FEF3C7)"
+        "bgGradient": "linear-gradient(135deg, #FCE7F3, #FEF3C7)",
+        "imageUrl": "/storybooks/seasons-beauty/page-3.png"
       },
       "imagePrompt": "A cute cartoon bee sitting on a flower drawing in a small sketchbook, with colored petals and a crayon nearby. Soft pastel pink and yellow watercolor palette, children's book style."
     },
@@ -76,7 +80,8 @@
       },
       "illustration": {
         "emoji": "🌳💧☀️",
-        "bgGradient": "linear-gradient(180deg, #22D3EE, #86EFAC, #FDE68A)"
+        "bgGradient": "linear-gradient(180deg, #22D3EE, #86EFAC, #FDE68A)",
+        "imageUrl": "/storybooks/seasons-beauty/page-4.png"
       },
       "imagePrompt": "A cute cartoon bee resting by a small stream surrounded by lush green trees and sunlight dappling through leaves. Soft watercolor summer scene, children's book style."
     },
@@ -92,7 +97,8 @@
       },
       "illustration": {
         "emoji": "🦋🎵🌻",
-        "bgGradient": "linear-gradient(135deg, #FEF3C7, #A7F3D0)"
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #A7F3D0)",
+        "imageUrl": "/storybooks/seasons-beauty/page-5.png"
       },
       "imagePrompt": "A cute cartoon bee and a pastel butterfly resting on a sunflower in a lush summer meadow, with little music notes floating. Soft watercolor children's book style."
     },
@@ -108,7 +114,8 @@
       },
       "illustration": {
         "emoji": "🍁🍂📖",
-        "bgGradient": "linear-gradient(180deg, #F97316, #FBBF24, #FDE68A)"
+        "bgGradient": "linear-gradient(180deg, #F97316, #FBBF24, #FDE68A)",
+        "imageUrl": "/storybooks/seasons-beauty/page-6.png"
       },
       "imagePrompt": "A cute cartoon bee holding a bright red maple leaf near a pile of autumn leaves, with a small picture book nearby. Warm orange and amber watercolor palette, cozy children's book style."
     },
@@ -124,7 +131,8 @@
       },
       "illustration": {
         "emoji": "🍃🎶",
-        "bgGradient": "linear-gradient(135deg, #FBBF24, #EA580C)"
+        "bgGradient": "linear-gradient(135deg, #FBBF24, #EA580C)",
+        "imageUrl": "/storybooks/seasons-beauty/page-7.png"
       },
       "imagePrompt": "A cute cartoon bee happily dancing on a pile of crunchy autumn leaves, with little music notes in the air. Warm sunset palette, soft watercolor children's book style."
     },
@@ -140,7 +148,8 @@
       },
       "illustration": {
         "emoji": "❄️☃️",
-        "bgGradient": "linear-gradient(180deg, #DBEAFE, #E0E7FF, #F3F4F6)"
+        "bgGradient": "linear-gradient(180deg, #DBEAFE, #E0E7FF, #F3F4F6)",
+        "imageUrl": "/storybooks/seasons-beauty/page-8.png"
       },
       "imagePrompt": "A cute cartoon bee wearing a tiny scarf gazing at softly falling snowflakes over a white hill, with a small snowman in the distance. Gentle pastel blue and cream watercolor palette, children's book style."
     },
@@ -156,7 +165,8 @@
       },
       "illustration": {
         "emoji": "🎨📓",
-        "bgGradient": "linear-gradient(135deg, #FBCFE8, #A7F3D0, #FCA5A5, #E0E7FF)"
+        "bgGradient": "linear-gradient(135deg, #FBCFE8, #A7F3D0, #FCA5A5, #E0E7FF)",
+        "imageUrl": "/storybooks/seasons-beauty/page-9.png"
       },
       "imagePrompt": "A cute cartoon bee painting four small landscapes of spring, summer, autumn, and winter on a sketchbook, with color swatches beside it. Warm cozy desk scene, soft watercolor children's book style."
     },
@@ -172,7 +182,8 @@
       },
       "illustration": {
         "emoji": "🌈🐝💛",
-        "bgGradient": "linear-gradient(135deg, #FBCFE8, #FDE68A, #A7F3D0, #BFDBFE)"
+        "bgGradient": "linear-gradient(135deg, #FBCFE8, #FDE68A, #A7F3D0, #BFDBFE)",
+        "imageUrl": "/storybooks/seasons-beauty/page-10.png"
       },
       "imagePrompt": "A cute cartoon bee standing under a soft rainbow arch with petals, leaves, and snowflakes gently swirling around her. Dreamy pastel palette, warm hopeful glow, watercolor children's book style."
     }
@@ -192,7 +203,8 @@
       "avatarImagePrompt": "A cute cartoon bee character portrait — friendly smile, big gentle eyes, wearing a tiny pastel-pink scarf, little yellow-and-black striped body, holding a small sketchbook. Soft watercolor children's book style, clean cream solid background, character centered, no text, no scene.",
       "personality": "감수성이 풍부하고 자연의 작은 변화를 금방 알아차리는 꿀벌. 자기 느낌을 색과 소리로 표현하는 걸 좋아한다.",
       "speechStyle": "말끝에 '~붕!' 붙이기. 감탄할 땐 '와~붕!' 생각에 잠길 땐 '음… 이건 뭐지~붕?'",
-      "bookContext": "봄·여름·가을·겨울을 차례로 느끼며, 자연의 아름다움을 자신만의 방식(그림·소리·색)으로 표현할 수 있다는 걸 배웠다."
+      "bookContext": "봄·여름·가을·겨울을 차례로 느끼며, 자연의 아름다움을 자신만의 방식(그림·소리·색)으로 표현할 수 있다는 걸 배웠다.",
+      "avatarUrl": "/storybooks/seasons-beauty/char-buzzy.png"
     },
     {
       "id": "butterfly-friend",
@@ -208,7 +220,8 @@
       "avatarImagePrompt": "A cute cartoon butterfly character portrait — pastel pink and purple wings with gentle patterns, kind eyes, small smile, soft antennae. Watercolor children's book style, clean pastel-cream solid background, character centered, no text, no scene.",
       "personality": "부드럽고 상냥하다. 붕붕이 곁에서 함께 계절을 느끼는 친구.",
       "speechStyle": "살랑살랑 부드러운 말투, '~해요~' 체. 예: '이 꽃 좀 봐요~' '같이 날아요~'",
-      "bookContext": "여름에 붕붕이 곁에 날아와 함께 매미 소리를 듣고, 계절마다 다시 찾아오는 친구."
+      "bookContext": "여름에 붕붕이 곁에 날아와 함께 매미 소리를 듣고, 계절마다 다시 찾아오는 친구.",
+      "avatarUrl": "/storybooks/seasons-beauty/char-butterfly-friend.png"
     }
   ],
   "questions": [
