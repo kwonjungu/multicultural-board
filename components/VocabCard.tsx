@@ -43,6 +43,9 @@ async function speakKorean(text: string, rate = 1) {
 
 type Mode = "listen" | "speak" | "write";
 
+// 모듈 스코프 번역 캐시: key = `${wordId}:${lang}` → {word, s0, s1, s2, sit0, sit1, sit2}
+const translationCache = new Map<string, Record<string, string>>();
+
 interface Props {
   word: VocabWord;
   lang: string;
@@ -62,11 +65,45 @@ export default function VocabCard({
   const [idx, setIdx] = useState(0);
   const [rate, setRate] = useState(1);
   const [mode, setMode] = useState<Mode>("listen");
+  const [showNative, setShowNative] = useState(false);
+  const [nativeMap, setNativeMap] = useState<Record<string, string> | null>(null);
+  const [nativeLoading, setNativeLoading] = useState(false);
 
   const sentence = word.sentences[idx];
   const doneSet = useMemo(() => new Set(doneSentences), [doneSentences]);
   const isDone = doneSet.has(idx);
   const mastered = doneSet.size >= 3;
+
+  // 번역 fetch (lang ≠ ko 이고 showNative 켰을 때 첫 1회)
+  useEffect(() => {
+    if (lang === "ko") { setNativeMap(null); return; }
+    if (!showNative) return;
+    const cacheKey = `${word.id}:${lang}`;
+    const cached = translationCache.get(cacheKey);
+    if (cached) { setNativeMap(cached); return; }
+    setNativeLoading(true);
+    const items = [
+      { key: "word", text: word.ko },
+      { key: "s0", text: word.sentences[0].ko },
+      { key: "s1", text: word.sentences[1].ko },
+      { key: "s2", text: word.sentences[2].ko },
+      { key: "sit0", text: word.sentences[0].situation },
+      { key: "sit1", text: word.sentences[1].situation },
+      { key: "sit2", text: word.sentences[2].situation },
+    ];
+    fetch("/api/vocab-translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items, targetLang: lang }),
+    })
+      .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+      .then((j: { translations: Record<string, string> }) => {
+        translationCache.set(cacheKey, j.translations);
+        setNativeMap(j.translations);
+      })
+      .catch(() => { /* silent — 실패 시 모국어 표시 불가 */ })
+      .finally(() => setNativeLoading(false));
+  }, [word.id, lang, showNative, word]);
 
   // 모드 변경 / 예문 변경 시 상태 리셋
   function switchMode(m: Mode) { setMode(m); }
@@ -76,6 +113,10 @@ export default function VocabCard({
     onSentenceDone(idx);
     if (idx < 2) setTimeout(() => { setIdx((p) => Math.min(2, p + 1)); setMode("listen"); }, 300);
   }
+
+  const nativeSentence = nativeMap?.[`s${idx}`];
+  const nativeSituation = nativeMap?.[`sit${idx}`];
+  const nativeWord = nativeMap?.word;
 
   return (
     <div
@@ -132,8 +173,24 @@ export default function VocabCard({
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, color: PURPLE_DARK, marginTop: 2 }}>
               {word.subcategory} · {word.category}
+              {showNative && nativeWord && (
+                <span style={{ color: "#059669", marginLeft: 8 }}>· {nativeWord}</span>
+              )}
             </div>
           </div>
+          {lang !== "ko" && (
+            <button
+              onClick={() => setShowNative((v) => !v)}
+              aria-label="모국어 번역"
+              style={{
+                background: showNative ? "linear-gradient(135deg, #10B981, #059669)" : PURPLE_LIGHT,
+                color: showNative ? "#fff" : PURPLE_DARK,
+                border: "none", borderRadius: 10,
+                padding: "6px 10px", fontSize: 11, fontWeight: 900,
+                cursor: "pointer", fontFamily: "inherit", flexShrink: 0,
+              }}
+            >🌐 {showNative ? "ON" : "OFF"}</button>
+          )}
           {mastered && (
             <div style={{
               background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
@@ -184,11 +241,27 @@ export default function VocabCard({
           border: "3px solid " + PURPLE_DARK,
           borderRadius: 18, padding: "18px 16px",
           textAlign: "center",
-          fontSize: 24, fontWeight: 900, color: "#1F2937",
-          letterSpacing: -0.3, lineHeight: 1.5,
           boxShadow: "0 6px 16px rgba(109, 40, 217, 0.15)",
         }}>
-          {sentence.ko}
+          <div style={{
+            fontSize: 24, fontWeight: 900, color: "#1F2937",
+            letterSpacing: -0.3, lineHeight: 1.5,
+          }}>
+            {sentence.ko}
+          </div>
+          {showNative && nativeSentence && (
+            <div style={{
+              fontSize: 15, color: "#059669", fontWeight: 700,
+              marginTop: 10, paddingTop: 10,
+              borderTop: "1.5px dashed " + PURPLE + "55",
+              lineHeight: 1.5,
+            }}>
+              🌐 {nativeSentence}
+            </div>
+          )}
+          {showNative && !nativeSentence && nativeLoading && (
+            <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 10 }}>번역 중…</div>
+          )}
         </div>
 
         {/* Situation */}
@@ -198,6 +271,11 @@ export default function VocabCard({
           lineHeight: 1.5,
         }}>
           {t("vocabSituation", lang)}: {sentence.situation}
+          {showNative && nativeSituation && (
+            <div style={{ color: "#059669", marginTop: 4, fontWeight: 600 }}>
+              {nativeSituation}
+            </div>
+          )}
         </div>
 
         {/* Mode tabs */}
