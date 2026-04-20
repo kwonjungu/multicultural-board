@@ -79,6 +79,7 @@ export interface BookListEntry {
   id: string;
   titleKo: string;
   coverEmoji: string;
+  coverImageUrl?: string;      // Present when the book has a generated/static cover image
   source: "static" | "generated";
   createdAt?: number;
   authorName?: string;
@@ -95,6 +96,7 @@ export async function listGeneratedBooks(): Promise<BookListEntry[]> {
       id: b.id,
       titleKo: b.title?.ko || b.id,
       coverEmoji: b.cover?.emoji || "📖",
+      coverImageUrl: b.cover?.imageUrl,
       source: "generated" as const,
       createdAt: b.createdAt,
       authorName: b.authorName,

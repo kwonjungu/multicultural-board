@@ -47,8 +47,18 @@ interface Props {
 
 // MVP: single hard-coded book. Phase 3 will add a library.
 const AVAILABLE_BOOKS = [
-  { id: "curious-worlds",  titleKo: "붕붕이의 궁금 여행",    cover: "🐝🌍✨" },
-  { id: "seasons-beauty",  titleKo: "붕붕이의 사계절 산책",  cover: "🐝🌸🍁❄️" },
+  {
+    id: "curious-worlds",
+    titleKo: "붕붕이의 궁금 여행",
+    cover: "🐝🌍✨",
+    coverImageUrl: "/storybooks/curious-worlds/cover.png",
+  },
+  {
+    id: "seasons-beauty",
+    titleKo: "붕붕이의 사계절 산책",
+    cover: "🐝🌸🍁❄️",
+    coverImageUrl: "/storybooks/seasons-beauty/cover.png",
+  },
 ];
 
 const TIER_KEY: Record<QuestionTier, string> = {
@@ -311,7 +321,11 @@ function TeacherSetup({
   }
 
   const staticList: BookListEntry[] = AVAILABLE_BOOKS.map((b) => ({
-    id: b.id, titleKo: b.titleKo, coverEmoji: b.cover, source: "static" as const,
+    id: b.id,
+    titleKo: b.titleKo,
+    coverEmoji: b.cover,
+    coverImageUrl: b.coverImageUrl,
+    source: "static" as const,
   }));
   const allBooks = [...generated, ...staticList];
 
@@ -375,10 +389,10 @@ function TeacherSetup({
                 key={b.id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "68px 1fr auto",
+                  gridTemplateColumns: "88px 1fr auto",
                   alignItems: "center",
-                  gap: 12,
-                  padding: "14px 16px",
+                  gap: 14,
+                  padding: "12px 14px",
                   background: b.source === "generated"
                     ? "linear-gradient(135deg, #FAF5FF, #EDE9FE)"
                     : "linear-gradient(135deg, #FEF3C7, #FDE68A)",
@@ -387,10 +401,33 @@ function TeacherSetup({
                   boxShadow: "0 6px 20px rgba(180,83,9,0.15)",
                 }}
               >
-                <div style={{
-                  fontSize: 44, textAlign: "center",
-                  filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.1))",
-                }}>{b.coverEmoji}</div>
+                {b.coverImageUrl ? (
+                  <div style={{
+                    width: 88, height: 88,
+                    borderRadius: 12, overflow: "hidden",
+                    boxShadow: "0 4px 10px rgba(180,83,9,0.25)",
+                    background: "#fff",
+                    border: "2px solid #fff",
+                  }}>
+                    <img
+                      src={b.coverImageUrl}
+                      alt=""
+                      aria-hidden="true"
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{
+                    width: 88, height: 88,
+                    borderRadius: 12,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(255,255,255,0.6)",
+                    fontSize: 44,
+                    filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.1))",
+                  }}>
+                    {b.coverEmoji}
+                  </div>
+                )}
                 <div style={{ minWidth: 0 }}>
                   <div style={{
                     fontSize: 16, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2,
