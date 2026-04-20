@@ -30,8 +30,12 @@ import {
   raiseAlert,
   subscribeAlerts,
   clearAlert,
+  listGeneratedBooks,
+  deleteGeneratedBook,
+  type BookListEntry,
 } from "@/lib/storybook";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
+import StorybookCreator from "./StorybookCreator";
 import { t, tFmt } from "@/lib/i18n";
 
 interface Props {
@@ -110,6 +114,7 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
       return (
         <TeacherSetup
           lang={lang}
+          teacherName={user.myName}
           onBack={onBack}
           onStart={handleStart}
         />
@@ -217,19 +222,64 @@ function TeacherAlertBanner({ lang, roomCode }: { lang: string; roomCode: string
 }
 
 // ============================================================
-// Teacher Setup
+// Teacher Setup — book library + "create new" entry point
 // ============================================================
 
 function TeacherSetup({
   lang,
+  teacherName,
   onBack,
   onStart,
 }: {
   lang: string;
+  teacherName: string;
   onBack: () => void;
   onStart: (bookId: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [generated, setGenerated] = useState<BookListEntry[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    setLoadingList(true);
+    listGeneratedBooks()
+      .then((list) => { if (!cancel) setGenerated(list); })
+      .catch((err) => console.error("listGeneratedBooks failed", err))
+      .finally(() => { if (!cancel) setLoadingList(false); });
+    return () => { cancel = true; };
+  }, [creating]);
+
+  async function handleDelete(id: string) {
+    if (!window.confirm("정말 삭제할까요?")) return;
+    try {
+      await deleteGeneratedBook(id);
+      setGenerated((prev) => prev.filter((b) => b.id !== id));
+    } catch (err) {
+      console.error("deleteGeneratedBook failed", err);
+    }
+  }
+
+  if (creating) {
+    return (
+      <StorybookCreator
+        teacherName={teacherName}
+        onCreated={async (id) => {
+          setCreating(false);
+          if (busy) return;
+          setBusy(true);
+          try { await onStart(id); } finally { setBusy(false); }
+        }}
+        onCancel={() => setCreating(false)}
+      />
+    );
+  }
+
+  const staticList: BookListEntry[] = AVAILABLE_BOOKS.map((b) => ({
+    id: b.id, titleKo: b.titleKo, coverEmoji: b.cover, source: "static" as const,
+  }));
+  const allBooks = [...generated, ...staticList];
 
   return (
     <div
@@ -240,7 +290,7 @@ function TeacherSetup({
         padding: "20px 16px 40px",
       }}
     >
-      <div style={{ maxWidth: 560, margin: "0 auto" }}>
+      <div style={{ maxWidth: 620, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           <button
             onClick={onBack}
@@ -256,52 +306,101 @@ function TeacherSetup({
           </h1>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {AVAILABLE_BOOKS.map((b) => (
-            <button
-              key={b.id}
-              onClick={async () => {
-                if (busy) return;
-                setBusy(true);
-                try { await onStart(b.id); } finally { setBusy(false); }
-              }}
-              disabled={busy}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "80px 1fr",
-                alignItems: "center",
-                gap: 14,
-                padding: "18px 20px",
-                background: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
-                border: "3px solid #F59E0B55",
-                borderRadius: 22,
-                cursor: busy ? "wait" : "pointer",
-                boxShadow: "0 8px 24px rgba(180,83,9,0.2)",
-                transition: "transform 0.15s",
-                textAlign: "left",
-                fontFamily: "inherit",
-                opacity: busy ? 0.6 : 1,
-              }}
-            >
-              <div style={{
-                fontSize: 56, textAlign: "center",
-                filter: "drop-shadow(0 4px 10px rgba(245,158,11,0.3))",
-              }}>{b.cover}</div>
-              <div>
-                <div style={{ fontSize: 19, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-                  {b.titleKo}
+        {/* Create new — hero button */}
+        <button
+          onClick={() => setCreating(true)}
+          disabled={busy}
+          style={{
+            width: "100%", marginBottom: 14,
+            padding: "18px 20px",
+            background: "linear-gradient(135deg, #8B5CF6, #6D28D9)",
+            color: "#fff", border: "none", borderRadius: 22,
+            fontSize: 17, fontWeight: 900, cursor: busy ? "not-allowed" : "pointer",
+            boxShadow: "0 8px 24px rgba(139,92,246,0.4)",
+            letterSpacing: -0.2,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            fontFamily: "inherit",
+          }}
+        >
+          <span style={{ fontSize: 26 }}>🎨</span>
+          AI로 새 그림책 만들기
+        </button>
+
+        {loadingList ? (
+          <div style={{ textAlign: "center", padding: 30, color: "#92400E", fontWeight: 700 }}>
+            📚 그림책 목록 불러오는 중…
+          </div>
+        ) : allBooks.length === 0 ? (
+          <div style={{ marginTop: 16, textAlign: "center", fontSize: 13, color: "#92400E", fontWeight: 700 }}>
+            {t("sbNoBookYet", lang)}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {allBooks.map((b) => (
+              <div
+                key={b.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "68px 1fr auto",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "14px 16px",
+                  background: b.source === "generated"
+                    ? "linear-gradient(135deg, #FAF5FF, #EDE9FE)"
+                    : "linear-gradient(135deg, #FEF3C7, #FDE68A)",
+                  border: `3px solid ${b.source === "generated" ? "#8B5CF655" : "#F59E0B55"}`,
+                  borderRadius: 18,
+                  boxShadow: "0 6px 20px rgba(180,83,9,0.15)",
+                }}
+              >
+                <div style={{
+                  fontSize: 44, textAlign: "center",
+                  filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.1))",
+                }}>{b.coverEmoji}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 16, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    {b.titleKo}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: b.source === "generated" ? "#6D28D9" : "#B45309", marginTop: 2 }}>
+                    {b.source === "generated" ? `🤖 AI · ${b.authorName || ""}` : "📖 샘플"}
+                  </div>
                 </div>
-                <div style={{ fontSize: 13, color: "#B45309", fontWeight: 800, marginTop: 4 }}>
-                  {t("sbStart", lang)}
+                <div style={{ display: "flex", gap: 6 }}>
+                  {b.source === "generated" && (
+                    <button
+                      onClick={() => handleDelete(b.id)}
+                      aria-label="delete"
+                      style={{
+                        minHeight: 40, padding: "6px 10px",
+                        background: "#fff", border: "1.5px solid #FCA5A5",
+                        color: "#B91C1C", fontSize: 12, fontWeight: 900,
+                        borderRadius: 10, cursor: "pointer",
+                      }}
+                    >🗑</button>
+                  )}
+                  <button
+                    onClick={async () => {
+                      if (busy) return;
+                      setBusy(true);
+                      try { await onStart(b.id); } finally { setBusy(false); }
+                    }}
+                    disabled={busy}
+                    style={{
+                      minHeight: 40, padding: "6px 14px",
+                      background: busy ? "#E5E7EB" : "linear-gradient(135deg, #F59E0B, #D97706)",
+                      color: busy ? "#9CA3AF" : "#fff",
+                      fontSize: 13, fontWeight: 900, border: "none",
+                      borderRadius: 10, cursor: busy ? "wait" : "pointer",
+                    }}
+                  >▶ 시작</button>
                 </div>
               </div>
-            </button>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 16, textAlign: "center", fontSize: 12, color: "#92400E", fontWeight: 700 }}>
-          {t("sbNoBookYet", lang)}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -693,17 +792,6 @@ function PageCard({
         }}>
           {pick(page.text, lang)}
         </div>
-        <button
-          onClick={() => speakText(pick(page.text, lang), lang)}
-          aria-label={t("sbReadText", lang)}
-          style={{
-            marginTop: 10,
-            minHeight: 40, padding: "8px 14px",
-            background: "#FEF3C7", border: "2px solid #FDE68A",
-            color: "#92400E", fontSize: 13, fontWeight: 900,
-            borderRadius: 12, cursor: "pointer",
-          }}
-        >{t("sbReadText", lang)}</button>
       </div>
     </div>
   );

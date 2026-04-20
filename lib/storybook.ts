@@ -29,12 +29,76 @@ function alertsPath(roomCode: string): string {
   return `rooms/${roomCode}/storybook/alerts`;
 }
 
-// === Book loading (static JSON under /public/storybooks/{id}/book.json) ===
+// === Book loading ===
+// Static books live under /public/storybooks/{id}/book.json.
+// Generated books live under Firebase at generated_books/{id}.
+
+const STATIC_BOOK_IDS = ["buzz-sharing"];
 
 export async function loadBook(bookId: string): Promise<Storybook> {
-  const res = await fetch(`/storybooks/${bookId}/book.json`);
-  if (!res.ok) throw new Error(`Failed to load book ${bookId}`);
-  return (await res.json()) as Storybook;
+  if (STATIC_BOOK_IDS.includes(bookId)) {
+    const res = await fetch(`/storybooks/${bookId}/book.json`);
+    if (!res.ok) throw new Error(`Failed to load static book ${bookId}`);
+    return (await res.json()) as Storybook;
+  }
+  // Firebase generated book
+  const db = getClientDb();
+  const snap = await get(ref(db, `generated_books/${bookId}`));
+  const val = snap.val() as Storybook | null;
+  if (!val) throw new Error(`Generated book ${bookId} not found`);
+  return val;
+}
+
+export async function saveGeneratedBook(book: Storybook): Promise<void> {
+  const db = getClientDb();
+  await set(ref(db, `generated_books/${book.id}`), book);
+}
+
+export interface BookListEntry {
+  id: string;
+  titleKo: string;
+  coverEmoji: string;
+  source: "static" | "generated";
+  createdAt?: number;
+  authorName?: string;
+}
+
+export async function listGeneratedBooks(): Promise<BookListEntry[]> {
+  const db = getClientDb();
+  const snap = await get(ref(db, "generated_books"));
+  const val = snap.val() as Record<string, Storybook> | null;
+  if (!val) return [];
+  return Object.values(val)
+    .filter(Boolean)
+    .map((b) => ({
+      id: b.id,
+      titleKo: b.title?.ko || b.id,
+      coverEmoji: b.cover?.emoji || "📖",
+      source: "generated" as const,
+      createdAt: b.createdAt,
+      authorName: b.authorName,
+    }))
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+}
+
+export async function deleteGeneratedBook(bookId: string): Promise<void> {
+  const db = getClientDb();
+  await remove(ref(db, `generated_books/${bookId}`));
+}
+
+export async function updateGeneratedBookPageImage(
+  bookId: string,
+  pageIdx: number,
+  imageUrl: string,
+): Promise<void> {
+  const db = getClientDb();
+  const snap = await get(ref(db, `generated_books/${bookId}`));
+  const book = snap.val() as Storybook | null;
+  if (!book) throw new Error("book not found");
+  const page = book.pages.find((p) => p.idx === pageIdx);
+  if (!page) throw new Error("page not found");
+  page.illustration = { ...page.illustration, imageUrl };
+  await set(ref(db, `generated_books/${bookId}`), book);
 }
 
 // === Session ===
