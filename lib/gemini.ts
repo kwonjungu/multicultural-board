@@ -58,7 +58,7 @@ export async function generateJson<T = unknown>(
           { role: "user", content: opts.userPrompt },
         ],
         temperature: opts.temperature ?? 0.75,
-        max_tokens: opts.maxTokens ?? 2048,
+        max_tokens: opts.maxTokens ?? 8192,
         response_format: { type: "json_object" },
       });
       const raw = completion.choices[0]?.message?.content?.trim() || "";
@@ -67,16 +67,10 @@ export async function generateJson<T = unknown>(
         continue;
       }
       try {
-        const parsed = JSON.parse(raw) as T;
+        const parsed = extractJson<T>(raw);
         return { value: parsed, model };
-      } catch {
-        // Some models occasionally wrap in ```json fences despite response_format
-        const m = raw.match(/\{[\s\S]*\}/);
-        if (m) {
-          const parsed = JSON.parse(m[0]) as T;
-          return { value: parsed, model };
-        }
-        lastErr = new Error(`non-json reply from ${model}: ${raw.slice(0, 160)}`);
+      } catch (err) {
+        lastErr = new Error(`JSON parse failed on ${model}: ${(err as Error).message}. Raw start: ${raw.slice(0, 200)}`);
         continue;
       }
     } catch (err) {
@@ -87,6 +81,91 @@ export async function generateJson<T = unknown>(
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error("generateJson failed");
+}
+
+/**
+ * Robust JSON extraction from LLM output.
+ * Handles:
+ *   - markdown fences (```json ... ```)
+ *   - trailing garbage after closing brace
+ *   - truncated JSON (attempts to auto-close brackets)
+ */
+export function extractJson<T>(raw: string): T {
+  let text = raw.trim();
+
+  // Strip markdown fences if present
+  text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "");
+
+  // Fast path: clean JSON
+  try {
+    return JSON.parse(text) as T;
+  } catch { /* try salvage */ }
+
+  // Locate outermost { ... } block
+  const firstBrace = text.indexOf("{");
+  if (firstBrace === -1) throw new Error("no JSON object found");
+
+  // Walk forward finding the matched closing brace, respecting strings & escapes
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let lastValidEnd = -1;
+  for (let i = firstBrace; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\" && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        lastValidEnd = i;
+        break;
+      }
+    }
+  }
+
+  if (lastValidEnd !== -1) {
+    const candidate = text.slice(firstBrace, lastValidEnd + 1);
+    return JSON.parse(candidate) as T;
+  }
+
+  // Truncated: try to auto-close by counting open brackets/braces
+  const partial = text.slice(firstBrace);
+  const closed = autoClose(partial);
+  return JSON.parse(closed) as T;
+}
+
+// Brute-force auto-close: count unmatched { [ and append matching } ]
+function autoClose(text: string): string {
+  let depth = 0;
+  let bracketDepth = 0;
+  let inString = false;
+  let escape = false;
+  let lastSafe = text.length;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\" && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") depth--;
+    else if (ch === "[") bracketDepth++;
+    else if (ch === "]") bracketDepth--;
+    if (!inString && (ch === "," || ch === "]" || ch === "}")) lastSafe = i + 1;
+  }
+
+  // Cut at the last structurally-safe position to avoid partial value
+  let out = text.slice(0, lastSafe);
+  // Remove trailing comma if it is now dangling
+  out = out.replace(/,\s*$/, "");
+  // Close any remaining open arrays then objects
+  out += "]".repeat(Math.max(0, bracketDepth));
+  out += "}".repeat(Math.max(0, depth));
+  return out;
 }
 
 // === Image: REST call, returns base64 PNG ===

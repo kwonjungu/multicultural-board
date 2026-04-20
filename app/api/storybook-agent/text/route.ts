@@ -128,19 +128,23 @@ function buildReviseSystemPrompt(): string {
   return `You are the original children's book author. Given the previous draft JSON and a list of issues, produce a revised JSON with the same schema. Apply all the issues. Do not drop any pages or questions unless strictly required.`;
 }
 
-function buildTranslateSystemPrompt(targetLangs: string[]): string {
-  const langList = targetLangs.filter((l) => l !== "ko").join(", ");
-  return `You are translating a Korean children's picture book into these languages: ${langList}.
+// One-language translation prompt (smaller = safer JSON output)
+function buildPerLangTranslatePrompt(targetLang: string): string {
+  return `You translate a Korean children's picture book into ${targetLang}.
 
-Input JSON will contain a book with Korean text fields (titleKo, pages[].textKo, characters[].nameKo, questions[].textKo).
-Return JSON: {
-  "title": { "${targetLangs.join('": string, "')}": string },
-  "pages": { "<idx>": { "${targetLangs.join('": string, "')}": string } },
-  "characters": { "<id>": { "${targetLangs.join('": string, "')}": string } },
-  "questions": { "<id>": { "${targetLangs.join('": string, "')}": string } }
+Input JSON: { titleKo, pages[{idx,textKo}], characters[{id,nameKo}], questions[{id,textKo}] }.
+Output JSON exactly in this shape:
+{
+  "title": string,
+  "pages": { "<idx as string>": string },
+  "characters": { "<id>": string },
+  "questions": { "<id>": string }
 }
 
-Keep Korean as-is, and produce natural, age-appropriate translations for a 7-9 year-old. Preserve emojis and punctuation.`;
+Rules:
+- Translate into ${targetLang}. Natural, age-appropriate for 7-9 year-old.
+- Preserve emojis and punctuation.
+- Do not explain. Only JSON.`;
 }
 
 export async function POST(req: NextRequest) {
@@ -173,7 +177,7 @@ export async function POST(req: NextRequest) {
       systemPrompt: buildDraftSystemPrompt(),
       userPrompt: draftPrompt,
       temperature: 0.85,
-      maxTokens: 3500,
+      maxTokens: 8192,
     });
 
     // === Step 2: critique ===
@@ -190,7 +194,7 @@ export async function POST(req: NextRequest) {
           systemPrompt: buildReviseSystemPrompt(),
           userPrompt: `이전 초안:\n${JSON.stringify(draft1)}\n\n수정할 부분:\n${critique.issues.map((i) => "- " + i).join("\n")}`,
           temperature: 0.7,
-          maxTokens: 3500,
+          maxTokens: 8192,
         });
         final = revised;
       }
@@ -199,7 +203,7 @@ export async function POST(req: NextRequest) {
       console.warn("critique/revise failed, using draft", err);
     }
 
-    // === Step 3: translate (skipped if only ko requested) ===
+    // === Step 3: translate — parallel per language (safer JSON) ===
     const translations = {
       title: {} as Record<string, string>,
       pages: {} as Record<string, Record<string, string>>,
@@ -208,22 +212,53 @@ export async function POST(req: NextRequest) {
     };
     const nonKo = targetLangs.filter((l) => l !== "ko");
     if (nonKo.length > 0) {
-      try {
-        const translationInput = {
-          titleKo: final.titleKo,
-          pages: final.pages.map((p) => ({ idx: p.idx, textKo: p.textKo })),
-          characters: final.characters.map((c) => ({ id: c.id, nameKo: c.nameKo })),
-          questions: final.questions.map((q) => ({ id: q.id, textKo: q.textKo })),
-        };
-        const { value: tr } = await generateJson<typeof translations>({
-          systemPrompt: buildTranslateSystemPrompt(targetLangs),
-          userPrompt: JSON.stringify(translationInput),
-          temperature: 0.3,
-          maxTokens: 3500,
-        });
-        Object.assign(translations, tr);
-      } catch (err) {
-        console.warn("translation failed, ko-only", err);
+      const translationInput = {
+        titleKo: final.titleKo,
+        pages: final.pages.map((p) => ({ idx: p.idx, textKo: p.textKo })),
+        characters: final.characters.map((c) => ({ id: c.id, nameKo: c.nameKo })),
+        questions: final.questions.map((q) => ({ id: q.id, textKo: q.textKo })),
+      };
+      interface PerLangResult {
+        title: string;
+        pages: Record<string, string>;
+        characters: Record<string, string>;
+        questions: Record<string, string>;
+      }
+      const perLang = await Promise.all(
+        nonKo.map(async (lang) => {
+          try {
+            const { value } = await generateJson<PerLangResult>({
+              systemPrompt: buildPerLangTranslatePrompt(lang),
+              userPrompt: JSON.stringify(translationInput),
+              temperature: 0.3,
+              maxTokens: 4096,
+            });
+            return { lang, value };
+          } catch (err) {
+            console.warn(`translation failed for ${lang}`, err);
+            return null;
+          }
+        }),
+      );
+      for (const result of perLang) {
+        if (!result) continue;
+        const { lang, value } = result;
+        if (value.title) translations.title[lang] = value.title;
+        if (value.pages) {
+          for (const [idx, text] of Object.entries(value.pages)) {
+            translations.pages[idx] = { ...(translations.pages[idx] || {}), [lang]: text };
+          }
+        }
+        if (value.characters) {
+          for (const [id, name] of Object.entries(value.characters)) {
+            translations.characters[id] = { ...(translations.characters[id] || {}), [lang]: name };
+          }
+        }
+        if (value.questions) {
+          for (const [id, text] of Object.entries(value.questions)) {
+            translations.questions[id] = { ...(translations.questions[id] || {}), [lang]: text };
+          }
+        }
       }
     }
 

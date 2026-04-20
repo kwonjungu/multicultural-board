@@ -350,36 +350,39 @@ function InputForm({
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <div style={labelStyle}>주제 *</div>
-          <input
-            type="text"
+          <textarea
             value={input.topic}
             onChange={(e) => onChange({ ...input, topic: e.target.value })}
-            placeholder="예: 나눔, 우정, 용기…"
-            maxLength={40}
-            style={inputStyle}
+            placeholder="예: 나눔 / 우정 / 용기… 또는 구체적인 상황·배경을 길게 설명해도 돼요"
+            maxLength={1000}
+            rows={2}
+            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
           />
+          <CountBadge current={input.topic.length} max={1000} />
         </div>
         <div>
           <div style={labelStyle}>성취기준 *</div>
-          <input
-            type="text"
+          <textarea
             value={input.standard}
             onChange={(e) => onChange({ ...input, standard: e.target.value })}
-            placeholder="예: 2국05-04 이야기 속 인물의 마음 파악하기"
-            maxLength={120}
-            style={inputStyle}
+            placeholder="교육과정 코드 + 본문 전체를 그대로 붙여넣어도 됩니다 (예: 2국05-04 이야기 속 인물의 마음을 파악하며 글을 읽는다.)"
+            maxLength={2000}
+            rows={3}
+            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
           />
+          <CountBadge current={input.standard.length} max={2000} />
         </div>
         <div>
           <div style={labelStyle}>추가 조건 (선택)</div>
           <textarea
             value={input.conditions}
             onChange={(e) => onChange({ ...input, conditions: e.target.value })}
-            placeholder="예: 다문화 주인공, 따뜻한 그림체, 꿀벌 캐릭터 포함…"
-            maxLength={200}
-            rows={3}
-            style={{ ...inputStyle, resize: "vertical" }}
+            placeholder="예: 다문화 주인공 / 따뜻한 수채화 / 특정 캐릭터 / 피해야 할 내용 / 수업 상황 등 자유롭게 길게 적으세요"
+            maxLength={3000}
+            rows={5}
+            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
           />
+          <CountBadge current={input.conditions.length} max={3000} />
         </div>
         <div>
           <div style={labelStyle}>페이지 수</div>
@@ -510,6 +513,21 @@ function ProgressMonitor({
 function Row({ done, inProgress, label }: { done: boolean; inProgress?: boolean; label: string }) {
   const icon = done ? "✅" : inProgress ? "⏳" : "⏱";
   return <div>{icon} {label}</div>;
+}
+
+function CountBadge({ current, max }: { current: number; max: number }) {
+  const near = current >= max * 0.9;
+  return (
+    <div style={{
+      textAlign: "right",
+      fontSize: 10, fontWeight: 800,
+      color: near ? "#B91C1C" : "#92400E",
+      marginTop: 3,
+      letterSpacing: 0.2,
+    }}>
+      {current.toLocaleString()} / {max.toLocaleString()}
+    </div>
+  );
 }
 
 // ============================================================
