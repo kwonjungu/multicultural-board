@@ -48,10 +48,19 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
     if (!role) return;
     if (role === "teacher") {
       if (teacherCode !== roomCode) { setCodeError(true); return; }
+      // 교사는 이름 입력 단계를 건너뛰고 기본 이름으로 바로 허브 진입
+      onDone({
+        myLang,
+        myName: "선생님",
+        isTeacher: true,
+        teacherLangs: availableLangs,
+      });
+      return;
     }
     setStep("name");
   }
 
+  const totalSteps = role === "teacher" ? 2 : 3;
   const stepNum = step === "lang" ? 1 : step === "role" ? 2 : 3;
 
   return (
@@ -97,10 +106,10 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
           )}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 900, color: "#92400E", letterSpacing: 1 }}>
-              {tFmt("stepOfN", myLang, { n: stepNum, total: 3 })}
+              {tFmt("stepOfN", myLang, { n: stepNum, total: totalSteps })}
             </div>
             <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
-              {[1,2,3].map((i) => (
+              {Array.from({ length: totalSteps }, (_, i) => i + 1).map((i) => (
                 <div key={i} style={{
                   flex: 1, height: 6, borderRadius: 999,
                   background: i <= stepNum ? "linear-gradient(90deg, #F59E0B, #D97706)" : "#FEF3C7",
@@ -298,7 +307,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                     ? "0 10px 28px rgba(16,185,129,0.4), inset 0 -3px 0 rgba(0,0,0,0.15)"
                     : "0 10px 28px rgba(245,158,11,0.42), inset 0 -3px 0 rgba(0,0,0,0.15)",
               }}
-            >{t("nextBtn", myLang)}</button>
+            >{role === "teacher" ? t("enterAsTeacher", myLang) : t("nextBtn", myLang)}</button>
           </>
         )}
 
