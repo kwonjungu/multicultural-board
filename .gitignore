@@ -42,3 +42,8 @@ firebase-setup-notes.txt
 # asset generation runtime artifacts
 scripts/.gen_manifest.json
 scripts/.qa_report.json
+
+# api keys (로컬 전용 — 커밋 금지)
+api.txt
+*.apikey
+output_cards/

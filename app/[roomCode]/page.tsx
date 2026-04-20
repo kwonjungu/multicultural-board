@@ -11,6 +11,7 @@ import HomeHub, { HubView } from "@/components/HomeHub";
 import GameRoom from "@/components/GameRoom";
 import InterpreterDrawer from "@/components/InterpreterDrawer";
 import PraiseHive from "@/components/PraiseHive";
+import VocabHub from "@/components/VocabHub";
 import StickerGiveModal from "@/components/StickerGiveModal";
 import CosmeticPicker from "@/components/CosmeticPicker";
 import Toast from "@/components/Toast";
@@ -203,6 +204,19 @@ export default function RoomPage() {
     return (
       <>
         <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} />
+        {overlays}
+      </>
+    );
+  }
+
+  if (hubView === "vocab") {
+    return (
+      <>
+        <VocabHub
+          user={user}
+          roomCode={roomCode}
+          onBack={() => setHubView("hub")}
+        />
         {overlays}
       </>
     );

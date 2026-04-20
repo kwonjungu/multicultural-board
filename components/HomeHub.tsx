@@ -3,7 +3,7 @@
 import { UserConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 
-export type HubView = "board" | "interpreter" | "games" | "dashboard";
+export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab";
 
 interface SectionMeta {
   id: HubView;
@@ -58,6 +58,16 @@ const SECTIONS: SectionMeta[] = [
     color: "#10B981",
     bg: "linear-gradient(135deg, #D1FAE5, #A7F3D0)",
     accent: "#065F46",
+  },
+  {
+    id: "vocab",
+    titleKey: "hubSectionVocab",
+    sub: "Word Cards",
+    descKey: "hubSectionVocabDesc",
+    mascot: "/mascot/bee-think.png",
+    color: "#8B5CF6",
+    bg: "linear-gradient(135deg, #F5F3FF, #DDD6FE)",
+    accent: "#6D28D9",
   },
 ];
 
