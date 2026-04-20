@@ -3,7 +3,7 @@
 import { UserConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 
-export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab";
+export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab" | "storybook";
 
 interface SectionMeta {
   id: HubView;
@@ -69,6 +69,17 @@ const SECTIONS: SectionMeta[] = [
     bg: "linear-gradient(135deg, #F5F3FF, #DDD6FE)",
     accent: "#6D28D9",
   },
+  {
+    id: "storybook",
+    titleKey: "hubSectionStorybook",
+    sub: "Storybook",
+    descKey: "hubSectionStorybookDesc",
+    mascot: "/mascot/bee-welcome.png",
+    color: "#F59E0B",
+    bg: "linear-gradient(135deg, #FFF7ED, #FED7AA)",
+    accent: "#C2410C",
+    badge: "NEW",
+  },
 ];
 
 interface Props {
@@ -101,7 +112,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
         position: "relative", zIndex: 1,
       }}>
         {/* Header */}
-        <div style={{
+        <div data-tutorial-id="hub-header" style={{
           display: "flex", alignItems: "center", gap: 14, marginBottom: 24,
           background: "#fff", borderRadius: 24, padding: "14px 18px",
           border: "2px solid #FDE68A",
@@ -160,6 +171,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
             return (
               <button
                 key={s.id}
+                data-tutorial-id={`hub-section-${s.id}`}
                 onClick={() => !locked && onSelect(s.id)}
                 disabled={locked}
                 aria-label={`${t(s.titleKey, lang)} 열기`}

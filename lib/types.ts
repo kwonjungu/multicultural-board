@@ -172,3 +172,92 @@ export interface StudentCosmetics {
   pet: PetId;
   trophy: TrophyId;
 }
+
+// === Storybook ("그림책으로 공부하기") system ===
+
+export type StorybookPhase = "before" | "during" | "after" | "done";
+export type QuestionTier = "intro" | "check" | "core" | "deep" | "concept";
+export type IbConcept =
+  | "form" | "function" | "causation" | "change"
+  | "connection" | "perspective" | "responsibility" | "reflection";
+
+// Per-page illustration. In MVP we use emoji+gradient; later replaced with Gemini image URL.
+export interface StorybookIllustration {
+  emoji: string;              // e.g. "🐝🌸"
+  bgGradient: string;         // CSS gradient
+  imageUrl?: string;          // AI-generated or uploaded
+}
+
+export interface StorybookPage {
+  idx: number;                // 1-based; 0 reserved for cover
+  text: Record<string, string>;   // lang -> text
+  illustration: StorybookIllustration;
+  imagePrompt?: string;       // For future regenerate
+}
+
+export interface StorybookQuestion {
+  id: string;
+  tier: QuestionTier;
+  text: Record<string, string>;
+  pageIdx?: number;           // For 'check' questions tied to a page
+  ibConcept?: IbConcept;      // For 'concept' questions
+  standard?: string;          // For 'deep' questions linked to 성취기준
+}
+
+export interface StorybookCharacter {
+  id: string;
+  name: Record<string, string>;
+  avatarEmoji: string;        // MVP fallback; later replaced with avatarUrl
+  avatarUrl?: string;
+  personality: string;        // internal (system prompt only)
+  speechStyle: string;
+  bookContext: string;
+  systemPromptExtra?: string; // additional hardening
+}
+
+export interface Storybook {
+  id: string;
+  title: Record<string, string>;
+  cover: StorybookIllustration;
+  authorName: string;
+  createdAt: number;
+  pages: StorybookPage[];
+  characters: StorybookCharacter[];
+  questions: StorybookQuestion[];
+}
+
+export interface StorybookSession {
+  bookId: string;
+  phase: StorybookPhase;
+  currentPage: number;        // 0 = cover, 1..N = pages
+  currentQuestionId: string | null;
+  activeCharacterId: string | null;  // which character is being chatted with (after phase)
+  teacherClientId: string;
+  startedAt: number;
+}
+
+export interface StorybookResponse {
+  id: string;
+  questionId: string;
+  clientId: string;
+  studentName: string;
+  studentLang: string;
+  text: string;
+  timestamp: number;
+}
+
+export interface StorybookChatTurn {
+  id: string;
+  from: "student" | "character";
+  text: string;
+  timestamp: number;
+  flagged?: boolean;          // if safety filter triggered
+}
+
+export interface StorybookAlert {
+  id: string;
+  clientId: string;
+  studentName: string;
+  timestamp: number;
+  kind: "distress" | "turn_limit" | "repeated_block";
+}

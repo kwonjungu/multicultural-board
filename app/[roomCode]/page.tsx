@@ -12,9 +12,12 @@ import GameRoom from "@/components/GameRoom";
 import InterpreterDrawer from "@/components/InterpreterDrawer";
 import PraiseHive from "@/components/PraiseHive";
 import VocabHub from "@/components/VocabHub";
+import StorybookRoom from "@/components/StorybookRoom";
 import StickerGiveModal from "@/components/StickerGiveModal";
 import CosmeticPicker from "@/components/CosmeticPicker";
 import Toast from "@/components/Toast";
+import { TutorialProvider } from "@/components/tutorial/TutorialProvider";
+import HubTutorialBootstrap from "@/components/tutorial/HubTutorialBootstrap";
 import { subscribeStudentStickers } from "@/lib/stickers";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { t } from "@/lib/i18n";
@@ -178,7 +181,7 @@ export default function RoomPage() {
   // 허브 메인 화면
   if (hubView === "hub") {
     return (
-      <>
+      <TutorialProvider>
         <HomeHub
           user={user}
           roomCode={roomCode}
@@ -188,6 +191,7 @@ export default function RoomPage() {
           }}
           onLogout={() => setUser(null)}
         />
+        <HubTutorialBootstrap />
         {/* Interpreter은 drawer 오버레이, hub 위에서 직접 열림 */}
         <InterpreterDrawer
           open={interpreterOpen}
@@ -196,7 +200,7 @@ export default function RoomPage() {
           availableLangs={roomLangs}
         />
         {overlays}
-      </>
+      </TutorialProvider>
     );
   }
 
@@ -215,6 +219,20 @@ export default function RoomPage() {
         <VocabHub
           user={user}
           roomCode={roomCode}
+          onBack={() => setHubView("hub")}
+        />
+        {overlays}
+      </>
+    );
+  }
+
+  if (hubView === "storybook") {
+    return (
+      <>
+        <StorybookRoom
+          user={user}
+          roomCode={roomCode}
+          myClientId={myClientId}
           onBack={() => setHubView("hub")}
         />
         {overlays}

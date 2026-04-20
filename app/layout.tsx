@@ -47,6 +47,40 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             60%      { transform: scale(0.96); }
           }
 
+          /* Tutorial / BeeGuide */
+          @keyframes beeGuideIdle {
+            0%, 100% { transform: translateY(0) rotate(-2deg); }
+            50%      { transform: translateY(-10px) rotate(3deg); }
+          }
+          @keyframes beeGuidePop {
+            0%   { transform: scale(0.7); }
+            40%  { transform: scale(1.18); }
+            70%  { transform: scale(0.95); }
+            100% { transform: scale(1); }
+          }
+          @keyframes beeGuideHintPop {
+            0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+            70%  { transform: scale(1.25) rotate(6deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0); opacity: 1; }
+          }
+          @keyframes beeGuideParticle {
+            0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
+            20%  { opacity: 1; }
+            100% { transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(1); opacity: 0; }
+          }
+          @keyframes tutorialTargetPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.75), 0 0 0 4px rgba(251, 191, 36, 0.95); }
+            50%      { box-shadow: 0 0 0 18px rgba(251, 191, 36, 0), 0 0 0 4px rgba(251, 191, 36, 0.95); }
+          }
+          @keyframes tutorialDialogueIn {
+            from { transform: translateY(100%); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+          }
+          @keyframes tutorialCaret {
+            0%, 50%   { opacity: 1; }
+            51%, 100% { opacity: 0; }
+          }
+
           ::-webkit-scrollbar { width: 4px; height: 4px; }
           ::-webkit-scrollbar-thumb { background: #FDE68A; border-radius: 4px; }
           ::-webkit-scrollbar-track { background: transparent; }

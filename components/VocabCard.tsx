@@ -1,45 +1,12 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { VocabWord } from "@/lib/vocabWords";
+import { speakKorean } from "@/lib/ttsKorean";
 import { t } from "@/lib/i18n";
 import VocabRecorder from "./VocabRecorder";
-import DrawingCanvas from "./DrawingCanvas";
-
-const TTS_LANG_MAP: Record<string, string> = {
-  ko: "ko-KR", en: "en-US", vi: "vi-VN", zh: "zh-CN", fil: "fil-PH",
-  ja: "ja-JP", th: "th-TH", km: "km-KH", mn: "mn-MN", ru: "ru-RU",
-  uz: "uz-UZ", hi: "hi-IN", id: "id-ID", ar: "ar-SA", my: "my-MM",
-};
-
-const WEB_SPEECH_SUPPORTED = new Set(["ko", "en", "vi", "zh", "ja", "th", "ru", "hi", "id", "ar"]);
-
-let serverTtsAudio: HTMLAudioElement | null = null;
-
-async function speakKorean(text: string, rate = 1) {
-  if (typeof window === "undefined") return;
-  const voices = window.speechSynthesis?.getVoices() ?? [];
-  const hasVoice = voices.some((v) => v.lang.startsWith("ko"));
-  if (WEB_SPEECH_SUPPORTED.has("ko") && hasVoice) {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = TTS_LANG_MAP.ko;
-    u.rate = rate;
-    window.speechSynthesis.speak(u);
-    return;
-  }
-  try {
-    window.speechSynthesis?.cancel();
-    if (serverTtsAudio) { serverTtsAudio.pause(); serverTtsAudio = null; }
-    const url = `/api/tts?lang=ko&text=${encodeURIComponent(text.slice(0, 200))}`;
-    const audio = new Audio(url);
-    audio.playbackRate = rate;
-    serverTtsAudio = audio;
-    await audio.play();
-  } catch {
-    // silent
-  }
-}
+import ListenPanel from "./practice/ListenPanel";
+import WritePanel from "./practice/WritePanel";
 
 type Mode = "listen" | "speak" | "write";
 

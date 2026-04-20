@@ -1,0 +1,317 @@
+{
+  "id": "buzz-sharing",
+  "title": {
+    "ko": "붕붕이의 달콤한 나눔",
+    "en": "Buzzy's Sweet Sharing",
+    "vi": "Sự Chia Sẻ Ngọt Ngào Của Buzzy",
+    "zh": "小蜜蜂的甜蜜分享",
+    "fil": "Ang Matamis na Pagbabahagi ni Buzzy",
+    "ja": "ブンブンのあまい分けあい",
+    "th": "การแบ่งปันอันแสนหวานของบัซซี่",
+    "km": "ការចែករំលែកដ៏ផ្អែមល្ហែមរបស់ Buzzy",
+    "mn": "Зөгий Бузигийн амтат хуваалцал",
+    "ru": "Сладкое угощение Жужжика",
+    "uz": "Asalarining shirin bo'lishi",
+    "hi": "बज़ी का मीठा साझाकरण",
+    "id": "Berbagi Manis dari Buzzy",
+    "ar": "مشاركة بَزِّي الحلوة",
+    "my": "ပျားလေး၏ ချိုမြိန်သော ဝေငှမှု"
+  },
+  "cover": {
+    "emoji": "🐝🍯",
+    "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A 50%, #F59E0B)"
+  },
+  "authorName": "샘플 그림책",
+  "createdAt": 0,
+  "pages": [
+    {
+      "idx": 1,
+      "text": {
+        "ko": "붕붕이는 매일 아침 일찍 일어나 꽃밭으로 가요.",
+        "en": "Every morning, Buzzy wakes up early and flies to the flower field.",
+        "vi": "Mỗi sáng, Buzzy dậy sớm và bay đến cánh đồng hoa.",
+        "zh": "每天早晨,小蜜蜂布兹早早起床,飞向花田。",
+        "fil": "Tuwing umaga, maagang bumabangon si Buzzy at lumilipad sa bulaklakan.",
+        "ja": "ブンブンは まいあさ 早く おきて はなばたけへ いきます。"
+      },
+      "illustration": {
+        "emoji": "🌸🌼🌻",
+        "bgGradient": "linear-gradient(180deg, #FDE68A, #FEF3C7 60%, #D1FAE5)"
+      },
+      "imagePrompt": "A cute cartoon bee flying happily over a sunny flower field in the morning, soft watercolor style, warm colors"
+    },
+    {
+      "idx": 2,
+      "text": {
+        "ko": "꽃마다 꿀을 조금씩 모아요. \"오늘도 열심히!\"",
+        "en": "She collects a little nectar from each flower. \"Work hard today!\"",
+        "vi": "Cô thu một ít mật từ mỗi bông hoa. \"Hôm nay cũng chăm chỉ nhé!\"",
+        "zh": "她从每朵花上采一点点蜜。「今天也要加油!」",
+        "fil": "Nangongolekta siya ng kaunting nektar sa bawat bulaklak. \"Sikap ngayon!\"",
+        "ja": "花から すこしずつ みつを あつめます。「きょうも がんばろう!」"
+      },
+      "illustration": {
+        "emoji": "🐝💛🌼",
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A)"
+      },
+      "imagePrompt": "Close-up of a cute bee gathering nectar from a yellow flower, golden honey drop visible, warm sunlight"
+    },
+    {
+      "idx": 3,
+      "text": {
+        "ko": "벌집으로 돌아오니 꿀단지가 가득! 붕붕이는 아주 뿌듯했어요.",
+        "en": "Back at the hive, the honey jars are full! Buzzy felt so proud.",
+        "vi": "Trở về tổ, những lọ mật đã đầy! Buzzy cảm thấy rất tự hào.",
+        "zh": "回到蜂巢,蜜罐都满了!布兹非常自豪。",
+        "fil": "Pagdating sa pugad, puno na ang mga garapon ng pulot! Ipinagmalaki ito ni Buzzy.",
+        "ja": "すへ もどると みつの つぼが いっぱい! ブンブンは とても うれしかったです。"
+      },
+      "illustration": {
+        "emoji": "🏠🍯🍯🍯",
+        "bgGradient": "linear-gradient(135deg, #FCD34D, #FBBF24)"
+      },
+      "imagePrompt": "A cozy beehive interior with several overflowing honey jars, a proud smiling bee standing beside them"
+    },
+    {
+      "idx": 4,
+      "text": {
+        "ko": "그때 문 앞에 작은 손님이 왔어요. 배고픈 개미였어요.",
+        "en": "Just then, a tiny visitor came to the door. It was a hungry ant.",
+        "vi": "Ngay lúc đó, một vị khách nhỏ đến cửa. Đó là một chú kiến đang đói.",
+        "zh": "这时,门前来了一位小客人,是一只饥饿的蚂蚁。",
+        "fil": "Biglang may maliit na bisita sa pinto. Isang nagugutom na langgam.",
+        "ja": "そのとき ドアに 小さな おきゃくさまが きました。 おなかを すかせた アリでした。"
+      },
+      "illustration": {
+        "emoji": "🐜😢",
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #E5E7EB)"
+      },
+      "imagePrompt": "A small sad-looking ant knocking at the door of a beehive, cute cartoon style"
+    },
+    {
+      "idx": 5,
+      "text": {
+        "ko": "\"조금만 나눠줄래요? 우리 가족이 너무 배고파요.\" 개미가 말했어요.",
+        "en": "\"Could you share just a little? My family is so hungry,\" said the ant.",
+        "vi": "\"Cho cháu xin một chút được không? Gia đình cháu đang rất đói,\" chú kiến nói.",
+        "zh": "「可以分给我们一点点吗?我家人都很饿。」蚂蚁说。",
+        "fil": "\"Pwede ba akong humingi ng kaunti? Gutom na gutom ang pamilya ko,\" sabi ng langgam.",
+        "ja": "「すこしだけ わけて もらえますか? かぞくが とても おなかを すかせて いるんです」と アリは いいました。"
+      },
+      "illustration": {
+        "emoji": "🐜🙏🐜🐜",
+        "bgGradient": "linear-gradient(135deg, #E5E7EB, #D1D5DB)"
+      },
+      "imagePrompt": "A polite ant with hands together asking for help, other small hungry ants visible in the background"
+    },
+    {
+      "idx": 6,
+      "text": {
+        "ko": "붕붕이는 잠시 망설였어요. '내가 열심히 모은 건데…'",
+        "en": "Buzzy hesitated for a moment. 'I worked so hard for this...'",
+        "vi": "Buzzy ngập ngừng một lúc. 'Mình đã vất vả gom được mà...'",
+        "zh": "小蜜蜂犹豫了一下。「这可是我辛辛苦苦收集的……」",
+        "fil": "Sumandaling nag-alinlangan si Buzzy. 'Masipag akong nag-ipon nito...'",
+        "ja": "ブンブンは ちょっと まよいました。「わたしが がんばって あつめたのに…」"
+      },
+      "illustration": {
+        "emoji": "🐝😟🍯",
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #FED7AA)"
+      },
+      "imagePrompt": "A bee with a troubled expression hugging a honey jar, thought bubble showing hesitation"
+    },
+    {
+      "idx": 7,
+      "text": {
+        "ko": "하지만 붕붕이는 꿀단지를 열었어요. \"함께 먹으면 더 맛있을지도 몰라!\"",
+        "en": "But Buzzy opened a honey jar. \"Maybe it tastes better when we share!\"",
+        "vi": "Nhưng Buzzy đã mở nắp lọ mật. \"Có thể ăn chung sẽ ngon hơn!\"",
+        "zh": "但小蜜蜂打开了蜜罐。「也许一起吃会更香!」",
+        "fil": "Ngunit binuksan ni Buzzy ang garapon. \"Baka mas masarap kapag pinaghahatian!\"",
+        "ja": "でも ブンブンは みつの つぼを あけました。「いっしょに たべたら もっと おいしいかも!」"
+      },
+      "illustration": {
+        "emoji": "🐝🐜🍯🦋",
+        "bgGradient": "linear-gradient(135deg, #FDE68A, #FCA5A5 80%, #FECACA)"
+      },
+      "imagePrompt": "A bee, ants, and a butterfly happily sharing honey together around a table, warm joyful atmosphere"
+    },
+    {
+      "idx": 8,
+      "text": {
+        "ko": "그 날 밤, 붕붕이의 마음속은 꿀보다 달콤했어요. 🌟",
+        "en": "That night, Buzzy's heart felt sweeter than honey. 🌟",
+        "vi": "Đêm đó, lòng Buzzy còn ngọt ngào hơn cả mật ong. 🌟",
+        "zh": "那天晚上,小蜜蜂的心比蜂蜜还要甜。🌟",
+        "fil": "Nang gabing iyon, mas matamis ang puso ni Buzzy kaysa sa pulot. 🌟",
+        "ja": "その よる、ブンブンの こころは みつより あまかったのです。🌟"
+      },
+      "illustration": {
+        "emoji": "🌙⭐🐝💝",
+        "bgGradient": "linear-gradient(180deg, #1E3A8A, #3730A3 60%, #6366F1)"
+      },
+      "imagePrompt": "A starry night sky over a cozy beehive with a happy sleeping bee, warm glowing window"
+    }
+  ],
+  "characters": [
+    {
+      "id": "buzzy",
+      "name": {
+        "ko": "붕붕이",
+        "en": "Buzzy",
+        "vi": "Buzzy",
+        "zh": "布兹",
+        "fil": "Buzzy",
+        "ja": "ブンブン"
+      },
+      "avatarEmoji": "🐝",
+      "personality": "부지런하고 따뜻한 성격이지만 소중한 것을 나눌 때 처음엔 망설이기도 한다. 나눔의 기쁨을 알게 된 후엔 환하게 기뻐한다.",
+      "speechStyle": "말끝에 '~붕!' 붙이기, 짧고 밝게. 예: '안녕~붕!' '그랬어붕!'",
+      "bookContext": "꿀벌 붕붕이는 매일 꽃밭에서 꿀을 모았고, 배고픈 개미에게 처음엔 망설였지만 결국 꿀을 나누었다. 나누니까 마음이 꿀보다 더 달콤해진다는 것을 깨달았다."
+    },
+    {
+      "id": "ant",
+      "name": {
+        "ko": "개미 친구",
+        "en": "Ant Friend",
+        "vi": "Bạn Kiến",
+        "zh": "蚂蚁朋友",
+        "fil": "Kaibigang Langgam",
+        "ja": "アリさん"
+      },
+      "avatarEmoji": "🐜",
+      "personality": "예의 바르고 가족을 아끼며 도움을 받았을 때 진심으로 고마워한다.",
+      "speechStyle": "정중한 말투, '~답니다' '~해요' 체. 예: '고마워요' '정말 감사합니다'",
+      "bookContext": "배고픈 가족을 위해 용기를 내어 붕붕이에게 도움을 청했고, 붕붕이의 나눔 덕분에 가족 모두가 행복해졌다."
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-intro-1",
+      "tier": "intro",
+      "text": {
+        "ko": "표지의 붕붕이는 어떤 기분일 것 같아요?",
+        "en": "How do you think Buzzy on the cover is feeling?",
+        "vi": "Bạn nghĩ Buzzy trên bìa đang cảm thấy thế nào?",
+        "zh": "封面上的小蜜蜂心情怎么样呢?",
+        "fil": "Ano sa tingin mo ang nararamdaman ni Buzzy sa pabalat?",
+        "ja": "ひょうしの ブンブンは どんな きもちだと おもいますか?"
+      }
+    },
+    {
+      "id": "q-intro-2",
+      "tier": "intro",
+      "text": {
+        "ko": "꿀을 많이 모으면 기분이 어떨까요?",
+        "en": "How would you feel if you collected lots of honey?",
+        "vi": "Bạn sẽ cảm thấy thế nào nếu thu được rất nhiều mật?",
+        "zh": "如果收集到很多蜂蜜,你会是什么心情?",
+        "fil": "Ano ang mararamdaman mo kung marami kang pulot?",
+        "ja": "みつを たくさん あつめたら どんな きもちに なるかな?"
+      }
+    },
+    {
+      "id": "q-check-2",
+      "tier": "check",
+      "pageIdx": 2,
+      "text": {
+        "ko": "붕붕이는 어디에서 꿀을 모았어요?",
+        "en": "Where did Buzzy collect the nectar?",
+        "vi": "Buzzy đã thu mật ở đâu?",
+        "zh": "小蜜蜂在哪里采蜜?",
+        "fil": "Saan nangolekta ng nektar si Buzzy?",
+        "ja": "ブンブンは どこで みつを あつめましたか?"
+      }
+    },
+    {
+      "id": "q-check-4",
+      "tier": "check",
+      "pageIdx": 4,
+      "text": {
+        "ko": "문 앞에 온 작은 손님은 누구였어요?",
+        "en": "Who was the tiny visitor at the door?",
+        "vi": "Vị khách nhỏ đến cửa là ai?",
+        "zh": "来到门前的小客人是谁?",
+        "fil": "Sino ang maliit na bisita sa pinto?",
+        "ja": "ドアに きた 小さな おきゃくさまは だれでしたか?"
+      }
+    },
+    {
+      "id": "q-check-6",
+      "tier": "check",
+      "pageIdx": 6,
+      "text": {
+        "ko": "붕붕이가 망설인 이유는 무엇이었을까요?",
+        "en": "Why did Buzzy hesitate?",
+        "vi": "Vì sao Buzzy lại ngập ngừng?",
+        "zh": "小蜜蜂为什么会犹豫?",
+        "fil": "Bakit nag-alinlangan si Buzzy?",
+        "ja": "ブンブンが まよった りゆうは なんでしょう?"
+      }
+    },
+    {
+      "id": "q-core-1",
+      "tier": "core",
+      "text": {
+        "ko": "붕붕이가 꿀을 나눠주기로 마음먹게 된 까닭은 무엇일까요?",
+        "en": "What made Buzzy decide to share the honey?",
+        "vi": "Điều gì khiến Buzzy quyết định chia sẻ mật ong?",
+        "zh": "小蜜蜂为什么决定分享蜂蜜?",
+        "fil": "Bakit nagpasya si Buzzy na ibahagi ang pulot?",
+        "ja": "ブンブンが みつを わけあおうと きめた りゆうは なんでしょう?"
+      }
+    },
+    {
+      "id": "q-deep-1",
+      "tier": "deep",
+      "standard": "나누는 삶의 가치 이해하기",
+      "text": {
+        "ko": "너라면 네가 가장 아끼는 것을 나눌 수 있을까요? 무엇을요?",
+        "en": "Could you share something you treasure? What would it be?",
+        "vi": "Bạn có thể chia sẻ điều bạn quý nhất không? Đó là gì?",
+        "zh": "你愿意分享你最珍贵的东西吗?那是什么?",
+        "fil": "Kaya mo bang ibahagi ang isang bagay na mahal mo? Ano kaya iyon?",
+        "ja": "あなたなら あなたの たいせつな ものを わけられますか? それは なんですか?"
+      }
+    },
+    {
+      "id": "q-deep-2",
+      "tier": "deep",
+      "standard": "공감과 배려의 태도",
+      "text": {
+        "ko": "배고픈 개미의 마음이 되어본다면 어떤 기분일까요?",
+        "en": "If you imagine being the hungry ant, how would you feel?",
+        "vi": "Nếu bạn là chú kiến đói, bạn sẽ cảm thấy thế nào?",
+        "zh": "如果你是那只饥饿的蚂蚁,会是什么心情?",
+        "fil": "Kung ikaw ang nagugutom na langgam, ano ang mararamdaman mo?",
+        "ja": "おなかを すかせた アリの きもちに なったら どんな きもちでしょう?"
+      }
+    },
+    {
+      "id": "q-concept-1",
+      "tier": "concept",
+      "ibConcept": "change",
+      "text": {
+        "ko": "붕붕이에게 '나눔'은 어떤 변화를 가져왔을까요?",
+        "en": "What kind of 'change' did sharing bring to Buzzy?",
+        "vi": "'Sự chia sẻ' đã mang lại thay đổi gì cho Buzzy?",
+        "zh": "「分享」给小蜜蜂带来了什么样的变化?",
+        "fil": "Anong 'pagbabago' ang dulot ng pagbabahagi kay Buzzy?",
+        "ja": "ブンブンにとって「わけあい」は どんな へんかを もたらしたでしょう?"
+      }
+    },
+    {
+      "id": "q-concept-2",
+      "tier": "concept",
+      "ibConcept": "connection",
+      "text": {
+        "ko": "붕붕이와 개미의 '연결'은 무엇으로 시작되었을까요?",
+        "en": "What started the 'connection' between Buzzy and the ant?",
+        "vi": "Điều gì đã bắt đầu 'mối liên kết' giữa Buzzy và chú kiến?",
+        "zh": "小蜜蜂和蚂蚁之间的「联系」是怎么开始的?",
+        "fil": "Saan nagsimula ang 'koneksyon' nila Buzzy at ng langgam?",
+        "ja": "ブンブンと アリの「つながり」は なにから はじまったのでしょう?"
+      }
+    }
+  ]
+}
