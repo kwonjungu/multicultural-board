@@ -669,6 +669,7 @@ function BeforePhase({
 }
 
 function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
+  const title = pick(book.title, lang);
   return (
     <div
       style={{
@@ -677,12 +678,12 @@ function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
         boxShadow: "0 14px 36px rgba(180,83,9,0.2)",
         marginBottom: 14,
         overflow: "hidden",
+        background: book.cover.bgGradient,
       }}
     >
-      {/* Cover image area — much bigger */}
+      {/* Cover image with title overlay (Jua font) */}
       <div
         style={{
-          background: book.cover.bgGradient,
           minHeight: 460,
           aspectRatio: "4 / 3",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -694,28 +695,67 @@ function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
             src={book.cover.imageUrl}
             alt=""
             aria-hidden="true"
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            style={{
+              width: "100%", height: "100%", objectFit: "cover", display: "block",
+              position: "absolute", inset: 0,
+            }}
           />
         ) : (
           <div style={{ fontSize: 140, filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.15))" }}>
             {book.cover.emoji}
           </div>
         )}
-      </div>
-      {/* Title panel */}
-      <div style={{
-        padding: "20px 20px 22px",
-        background: "#fff",
-        textAlign: "center",
-      }}>
-        <div style={{
-          fontSize: 28, fontWeight: 900, color: "#1F2937",
-          letterSpacing: -0.4, lineHeight: 1.25,
-        }}>
-          {pick(book.title, lang)}
-        </div>
-        <div style={{ marginTop: 6, fontSize: 12, fontWeight: 800, color: "#92400E" }}>
-          {t("sbCover", lang)}
+
+        {/* Gradient scrim — keeps title readable over any image */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: 0, right: 0, bottom: 0,
+            height: "55%",
+            background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 55%, rgba(0,0,0,0.6) 100%)",
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* Title overlay — Jua 주아체, centered bottom */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0, right: 0, bottom: 0,
+            padding: "20px 24px 28px",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "flex-end",
+            textAlign: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'Jua', 'Noto Sans KR', sans-serif",
+              fontSize: "clamp(28px, 6vw, 44px)",
+              fontWeight: 400, // Jua is a single-weight display font
+              color: "#fff",
+              letterSpacing: -0.5,
+              lineHeight: 1.15,
+              textShadow:
+                "0 2px 0 rgba(180,83,9,0.55), 0 4px 14px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.5)",
+              wordBreak: "keep-all",
+              padding: "0 6px",
+            }}
+          >
+            {title}
+          </div>
+          <div style={{
+            marginTop: 8,
+            fontFamily: "'Jua', 'Noto Sans KR', sans-serif",
+            fontSize: 13,
+            color: "#FEF3C7",
+            textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+            letterSpacing: 0.5,
+          }}>
+            {t("sbCover", lang)}
+          </div>
         </div>
       </div>
     </div>

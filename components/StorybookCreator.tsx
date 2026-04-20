@@ -1018,7 +1018,7 @@ function PreviewPanel({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Header — editable title */}
+      {/* Header — editable title. Cover preview with Jua title overlay when image present. */}
       <div style={{
         background: "#fff", borderRadius: 22, padding: 18,
         border: "2px solid #FDE68A",
@@ -1029,6 +1029,7 @@ function PreviewPanel({
             width: "100%", aspectRatio: "4/3",
             borderRadius: 16, overflow: "hidden", marginBottom: 14,
             boxShadow: "0 6px 20px rgba(180,83,9,0.18)",
+            position: "relative",
           }}>
             <img
               src={book.cover.imageUrl}
@@ -1036,6 +1037,30 @@ function PreviewPanel({
               aria-hidden="true"
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
             />
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute", left: 0, right: 0, bottom: 0,
+                height: "55%",
+                background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 55%, rgba(0,0,0,0.6) 100%)",
+                pointerEvents: "none",
+              }}
+            />
+            <div style={{
+              position: "absolute", left: 0, right: 0, bottom: 0,
+              padding: "16px 20px 20px",
+              textAlign: "center",
+              pointerEvents: "none",
+              fontFamily: "'Jua', 'Noto Sans KR', sans-serif",
+              fontSize: "clamp(24px, 5vw, 38px)",
+              color: "#fff",
+              lineHeight: 1.15,
+              letterSpacing: -0.5,
+              textShadow: "0 2px 0 rgba(180,83,9,0.55), 0 4px 14px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.5)",
+              wordBreak: "keep-all",
+            }}>
+              {book.title?.ko || book.id}
+            </div>
           </div>
         )}
         {editingTitle ? (
