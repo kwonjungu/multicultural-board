@@ -367,6 +367,7 @@ export default function VocabCard({
         {mode === "speak" && (
           <VocabRecorder
             sentenceText={sentence.ko}
+            wordForms={[word.ko, ...word.conjugations]}
             onOriginalPlay={() => { speakKorean(sentence.ko, rate); onListenBump(); }}
             onComplete={handleDone}
             roomCode={roomCode}

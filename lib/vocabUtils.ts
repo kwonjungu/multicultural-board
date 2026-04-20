@@ -45,3 +45,48 @@ export function wordById(id: string): VocabWord | undefined {
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+/** 한국어 문장 유사도 (Jaccard 문자 집합 + 길이 비율). 0~1. */
+export function sentenceSimilarity(a: string, b: string): number {
+  if (!a || !b) return 0;
+  const normA = a.replace(/\s+/g, "").replace(/[.!?,~·•…'"()[\]]/g, "");
+  const normB = b.replace(/\s+/g, "").replace(/[.!?,~·•…'"()[\]]/g, "");
+  if (!normA || !normB) return 0;
+  const setA = new Set(normA.split(""));
+  const setB = new Set(normB.split(""));
+  const arrA = Array.from(setA);
+  const arrB = Array.from(setB);
+  const common = arrA.filter((c) => setB.has(c)).length;
+  const union = new Set(arrA.concat(arrB)).size;
+  const jaccard = common / union;
+  const lenRatio = Math.min(normA.length, normB.length) / Math.max(normA.length, normB.length);
+  return jaccard * 0.7 + lenRatio * 0.3;
+}
+
+/** 인식된 문장이 단어의 활용형(또는 원형) 중 하나를 포함하는지. */
+export function containsAnyForm(recognized: string, forms: string[]): boolean {
+  const norm = recognized.replace(/\s+/g, "");
+  return forms.some((f) => {
+    const nf = f.replace(/\s+/g, "");
+    if (nf.length < 2) return false;
+    return norm.includes(nf);
+  });
+}
+
+/**
+ * 말하기 통과 기준 검사.
+ * - 유사도 ≥ threshold (기본 0.7)
+ * - 단어 활용형 중 하나 포함
+ * @returns { passed, similarity, hasForm }
+ */
+export function checkSpeechMatch(params: {
+  recognized: string;
+  target: string;
+  wordForms: string[];
+  threshold?: number;
+}): { passed: boolean; similarity: number; hasForm: boolean } {
+  const similarity = sentenceSimilarity(params.recognized, params.target);
+  const hasForm = containsAnyForm(params.recognized, params.wordForms);
+  const passed = similarity >= (params.threshold ?? 0.7) && hasForm;
+  return { passed, similarity, hasForm };
+}
