@@ -49,9 +49,30 @@ export async function loadBook(bookId: string): Promise<Storybook> {
   return val;
 }
 
+// Firebase Realtime DB rejects `undefined`. Strip any undefined deeply before
+// writing. Null values are kept (they actively signal "clear this field").
+function stripUndefined<T>(value: T): T {
+  if (value === undefined) return value;
+  if (value === null) return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => stripUndefined(v))
+      .filter((v) => v !== undefined) as unknown as T;
+  }
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === undefined) continue;
+      out[k] = stripUndefined(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 export async function saveGeneratedBook(book: Storybook): Promise<void> {
   const db = getClientDb();
-  await set(ref(db, `generated_books/${book.id}`), book);
+  await set(ref(db, `generated_books/${book.id}`), stripUndefined(book));
 }
 
 export interface BookListEntry {
@@ -98,7 +119,7 @@ export async function updateGeneratedBookPageImage(
   const page = book.pages.find((p) => p.idx === pageIdx);
   if (!page) throw new Error("page not found");
   page.illustration = { ...page.illustration, imageUrl };
-  await set(ref(db, `generated_books/${bookId}`), book);
+  await set(ref(db, `generated_books/${bookId}`), stripUndefined(book));
 }
 
 // === Session ===
@@ -223,7 +244,7 @@ export async function appendChatTurn(
   const listRef = ref(db, chatPath(roomCode, clientId));
   const newRef = push(listRef);
   const id = newRef.key as string;
-  await set(newRef, { ...turn, id });
+  await set(newRef, stripUndefined({ ...turn, id }));
   return id;
 }
 
@@ -265,7 +286,7 @@ export async function raiseAlert(
   const listRef = ref(db, alertsPath(roomCode));
   const newRef = push(listRef);
   const id = newRef.key as string;
-  await set(newRef, { ...alert, id });
+  await set(newRef, stripUndefined({ ...alert, id }));
 }
 
 export function subscribeAlerts(
