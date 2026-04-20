@@ -6,7 +6,14 @@ import type {
   StickerType,
   StickerGoal,
   StudentCosmetics,
+  StickerSource,
 } from "./types";
+
+export interface GiveStickerOptions {
+  memo?: string;
+  source?: StickerSource;
+  missionId?: string;
+}
 
 // Path structure:
 //   rooms/{roomCode}/stickers/individual/{clientId}/{stickerId}: IndividualSticker
@@ -42,6 +49,7 @@ export async function giveIndividualSticker(
   type: StickerType,
   teacherName: string,
   teacherClientId: string,
+  options?: GiveStickerOptions,
 ): Promise<string> {
   const db = getClientDb();
   const listRef = ref(db, `${basePath(roomCode)}/individual/${studentClientId}`);
@@ -53,7 +61,10 @@ export async function giveIndividualSticker(
     fromTeacherName: teacherName,
     fromTeacherId: teacherClientId,
     timestamp: Date.now(),
+    source: options?.source ?? "teacher",
   };
+  if (options?.memo && options.memo.trim()) sticker.memo = options.memo.trim();
+  if (options?.missionId) sticker.missionId = options.missionId;
   await set(newRef, sticker);
   return id;
 }
@@ -64,6 +75,7 @@ export async function giveTeamSticker(
   type: StickerType,
   teacherName: string,
   teacherClientId: string,
+  options?: GiveStickerOptions,
 ): Promise<string> {
   const db = getClientDb();
   const listRef = ref(db, `${basePath(roomCode)}/team`);
@@ -76,9 +88,35 @@ export async function giveTeamSticker(
     fromTeacherId: teacherClientId,
     contributorClientId,
     timestamp: Date.now(),
+    source: options?.source ?? "teacher",
   };
+  if (options?.memo && options.memo.trim()) sticker.memo = options.memo.trim();
+  if (options?.missionId) sticker.missionId = options.missionId;
   await set(newRef, sticker);
   return id;
+}
+
+export async function giveStickersBatch(
+  roomCode: string,
+  target: { mode: "individual"; studentClientId: string } | { mode: "team"; contributorClientId: string },
+  counts: Partial<Record<StickerType, number>>,
+  teacherName: string,
+  teacherClientId: string,
+  options?: GiveStickerOptions,
+): Promise<number> {
+  const ops: Promise<string>[] = [];
+  for (const [type, n] of Object.entries(counts) as [StickerType, number][]) {
+    const qty = Math.max(0, Math.floor(n ?? 0));
+    for (let i = 0; i < qty; i++) {
+      if (target.mode === "individual") {
+        ops.push(giveIndividualSticker(roomCode, target.studentClientId, type, teacherName, teacherClientId, options));
+      } else {
+        ops.push(giveTeamSticker(roomCode, target.contributorClientId, type, teacherName, teacherClientId, options));
+      }
+    }
+  }
+  await Promise.all(ops);
+  return ops.length;
 }
 
 // === Remove ===

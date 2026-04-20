@@ -79,6 +79,15 @@ const TYPE_LABEL_KEY: Record<StickerType, string> = {
   curious: "stickerType_curious",
 };
 
+const TYPE_GUIDE_KEY: Record<StickerType, string> = {
+  helpful: "stickerGuide_helpful",
+  brave: "stickerGuide_brave",
+  creative: "stickerGuide_creative",
+  cooperative: "stickerGuide_cooperative",
+  persistent: "stickerGuide_persistent",
+  curious: "stickerGuide_curious",
+};
+
 const TYPE_COLOR: Record<StickerType, string> = {
   helpful: "#F59E0B",
   brave: "#F97316",
@@ -343,6 +352,7 @@ function MyHiveTab({
     pet: null,
     trophy: null,
   });
+  const [selectedSticker, setSelectedSticker] = useState<IndividualSticker | null>(null);
 
   useEffect(() => {
     const unsub = subscribeStudentStickers(roomCode, myClientId, setList);
@@ -362,11 +372,11 @@ function MyHiveTab({
   const nextStage: Stage | null =
     next === null
       ? null
-      : count < 3
+      : count < 2
       ? "larva"
-      : count < 6
+      : count < 4
       ? "pupa"
-      : count < 16
+      : count < 8
       ? "bee"
       : "queen";
 
@@ -575,6 +585,12 @@ function MyHiveTab({
         </button>
       </div>
 
+      {/* Recent praise feed — latest 3 received stickers, big cards */}
+      {count > 0 && <RecentPraiseFeed lang={lang} list={list} />}
+
+      {/* Praise guide accordion */}
+      <PraiseGuide lang={lang} />
+
       {/* Real honeycomb — absolute-positioned pointy-top hex tiling (pixel-perfect, no flex overlap) */}
       <div
         style={{
@@ -603,6 +619,7 @@ function MyHiveTab({
             return (
               <div
                 key={i}
+                onClick={() => { if (sticker) setSelectedSticker(sticker); }}
                 style={{
                   position: "absolute",
                   left: x,
@@ -617,7 +634,8 @@ function MyHiveTab({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  transition: "background 0.3s",
+                  transition: "background 0.3s, transform 0.15s",
+                  cursor: isFilled ? "pointer" : "default",
                 }}
                 title={sticker ? t(TYPE_LABEL_KEY[sticker.type], lang) : undefined}
               >
@@ -759,6 +777,15 @@ function MyHiveTab({
           </div>
         )}
       </div>
+
+      {/* Sticker detail popover (tap a hex cell) */}
+      {selectedSticker && (
+        <StickerDetailPopover
+          sticker={selectedSticker}
+          lang={lang}
+          onClose={() => setSelectedSticker(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1682,6 +1709,385 @@ function StatChip({ label, value }: { label: string; value: string }) {
         {label}
       </div>
       <div style={{ fontSize: 18, fontWeight: 900, color: HONEY.h800 }}>{value}</div>
+    </div>
+  );
+}
+
+// ============================================================
+// Recent Praise Feed — top 3 most recent stickers, big cards
+// ============================================================
+
+function RecentPraiseFeed({
+  lang,
+  list,
+}: {
+  lang: string;
+  list: IndividualSticker[];
+}) {
+  const recent = useMemo(
+    () => [...list].sort((a, b) => b.timestamp - a.timestamp).slice(0, 3),
+    [list],
+  );
+  if (recent.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 22,
+        padding: "14px 16px 16px",
+        border: `2px solid ${HONEY.h200}`,
+        boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 15,
+          fontWeight: 900,
+          color: HONEY.h800,
+          marginBottom: 10,
+        }}
+      >
+        {t("phRecentPraise", lang)}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {recent.map((s) => {
+          const fromLabel =
+            s.source === "mission"
+              ? t("phFromMission", lang)
+              : s.fromTeacherName || t("phFromTeacher", lang);
+          return (
+            <div
+              key={s.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "54px 1fr auto",
+                alignItems: "center",
+                gap: 12,
+                padding: "10px 12px",
+                background: `linear-gradient(135deg, ${HONEY.h50}, #fff)`,
+                borderRadius: 14,
+                border: `1.5px solid ${HONEY.h200}`,
+              }}
+            >
+              <img
+                src={`/stickers/sticker-${s.type}.png`}
+                alt=""
+                aria-hidden="true"
+                style={{
+                  width: 54,
+                  height: 54,
+                  objectFit: "contain",
+                  filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))",
+                }}
+              />
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 900,
+                    color: "#1F2937",
+                    letterSpacing: -0.2,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {t(TYPE_LABEL_KEY[s.type], lang)}
+                </div>
+                {s.memo && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: HONEY.h800,
+                      marginTop: 3,
+                      lineHeight: 1.3,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    "{s.memo}"
+                  </div>
+                )}
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: HONEY.h700,
+                    marginTop: 3,
+                  }}
+                >
+                  {fromLabel} · {timeAgo(s.timestamp, lang)}
+                </div>
+              </div>
+              <div style={{ fontSize: 20 }}>✨</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Praise Guide — collapsible guide listing 6 sticker types
+// ============================================================
+
+function PraiseGuide({ lang }: { lang: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 22,
+        padding: "12px 16px",
+        border: `2px solid ${HONEY.h200}`,
+        boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
+      }}
+    >
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          padding: "6px 0",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          fontSize: 15,
+          fontWeight: 900,
+          color: HONEY.h800,
+          letterSpacing: -0.2,
+          textAlign: "left",
+        }}
+      >
+        <span>{t("phGuideTitle", lang)}</span>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 800,
+            color: HONEY.h700,
+            background: HONEY.h50,
+            border: `1px solid ${HONEY.h200}`,
+            borderRadius: 999,
+            padding: "4px 10px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {open ? t("phGuideCollapse", lang) : t("phGuideExpand", lang)}
+          <span style={{ marginLeft: 4 }}>{open ? "▲" : "▼"}</span>
+        </span>
+      </button>
+      {open && (
+        <div
+          style={{
+            marginTop: 10,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          {STICKER_TYPES.map((tp) => (
+            <div
+              key={tp}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "40px 1fr",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 10px",
+                background: HONEY.h50,
+                borderRadius: 12,
+                border: `1px solid ${HONEY.h100}`,
+              }}
+            >
+              <img
+                src={`/stickers/sticker-${tp}.png`}
+                alt=""
+                aria-hidden="true"
+                style={{ width: 40, height: 40, objectFit: "contain" }}
+              />
+              <div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 900,
+                    color: "#1F2937",
+                    letterSpacing: -0.2,
+                  }}
+                >
+                  {t(TYPE_LABEL_KEY[tp], lang)}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: HONEY.h800,
+                    marginTop: 2,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {t(TYPE_GUIDE_KEY[tp], lang)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Sticker Detail Popover — tap a hex cell to see details
+// ============================================================
+
+function StickerDetailPopover({
+  sticker,
+  lang,
+  onClose,
+}: {
+  sticker: IndividualSticker;
+  lang: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const fromLabel =
+    sticker.source === "mission"
+      ? t("phFromMission", lang)
+      : sticker.fromTeacherName || t("phFromTeacher", lang);
+
+  return (
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(9,7,30,0.68)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 220,
+        padding: 20,
+        backdropFilter: "blur(4px)",
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 22,
+          padding: "22px 22px 18px",
+          maxWidth: 360,
+          width: "100%",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          border: `3px solid ${HONEY.h300}`,
+          animation: "phPopoverIn 0.2s ease",
+          textAlign: "center",
+          position: "relative",
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="close"
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            background: HONEY.h50,
+            border: `1.5px solid ${HONEY.h200}`,
+            fontSize: 14,
+            fontWeight: 900,
+            color: HONEY.h800,
+            cursor: "pointer",
+          }}
+        >
+          ✕
+        </button>
+        <img
+          src={`/stickers/sticker-${sticker.type}.png`}
+          alt=""
+          aria-hidden="true"
+          style={{
+            width: 110,
+            height: 110,
+            objectFit: "contain",
+            filter: "drop-shadow(0 6px 14px rgba(245,158,11,0.35))",
+            marginTop: 4,
+          }}
+        />
+        <div
+          style={{
+            fontSize: 20,
+            fontWeight: 900,
+            color: HONEY.h800,
+            marginTop: 8,
+            letterSpacing: -0.3,
+          }}
+        >
+          {t(TYPE_LABEL_KEY[sticker.type], lang)}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: HONEY.h700,
+            marginTop: 4,
+          }}
+        >
+          {t(TYPE_GUIDE_KEY[sticker.type], lang)}
+        </div>
+        {sticker.memo && (
+          <div
+            style={{
+              marginTop: 14,
+              padding: "10px 14px",
+              background: HONEY.h50,
+              border: `1px solid ${HONEY.h200}`,
+              borderRadius: 14,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#1F2937",
+              lineHeight: 1.4,
+              wordBreak: "break-word",
+            }}
+          >
+            "{sticker.memo}"
+          </div>
+        )}
+        <div
+          style={{
+            marginTop: 12,
+            fontSize: 12,
+            fontWeight: 800,
+            color: HONEY.h700,
+            letterSpacing: -0.1,
+          }}
+        >
+          {fromLabel} · {timeAgo(sticker.timestamp, lang)}
+        </div>
+      </div>
+      <style jsx global>{`
+        @keyframes phPopoverIn {
+          from { transform: scale(0.9); opacity: 0; }
+          to   { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

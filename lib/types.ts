@@ -136,12 +136,17 @@ export type HatId = "top" | "cap" | "ribbon" | "crown" | null;
 export type PetId = "dog" | "cat" | "rabbit" | "butterfly" | null;
 export type TrophyId = "gold" | "star" | null;
 
+export type StickerSource = "teacher" | "mission";
+
 export interface IndividualSticker {
   id: string;
   type: StickerType;
   fromTeacherName: string;
   fromTeacherId: string;
   timestamp: number;
+  memo?: string;
+  source?: StickerSource;
+  missionId?: string;
 }
 
 export interface TeamSticker {
@@ -151,6 +156,9 @@ export interface TeamSticker {
   fromTeacherId: string;
   contributorClientId: string;
   timestamp: number;
+  memo?: string;
+  source?: StickerSource;
+  missionId?: string;
 }
 
 export interface StickerGoal {

@@ -1,16 +1,16 @@
-// Test: stageOf(0)=egg, stageOf(3)=larva, stageOf(6)=pupa, stageOf(16)=bee, stageOf(30)=queen
-// Test: nextThreshold(0)=3, nextThreshold(16)=30, nextThreshold(30)=null
-// Test: progressInStage(8)=(current:2,total:10,percent:20)
+// Test: stageOf(0)=egg, stageOf(2)=larva, stageOf(4)=pupa, stageOf(8)=bee, stageOf(15)=queen
+// Test: nextThreshold(0)=2, nextThreshold(8)=15, nextThreshold(15)=null
+// Test: progressInStage(5)=(current:1,total:4,percent:25)
 
 import type { Stage, SkinId, HatId, PetId, TrophyId } from "./types";
 
 // Stage thresholds: [min, max] inclusive. queen has no upper bound.
 export const STAGE_THRESHOLDS: Record<Stage, { min: number; max: number | null }> = {
-  egg:   { min: 0,  max: 2 },
-  larva: { min: 3,  max: 5 },
-  pupa:  { min: 6,  max: 15 },
-  bee:   { min: 16, max: 29 },
-  queen: { min: 30, max: null },
+  egg:   { min: 0,  max: 1 },
+  larva: { min: 2,  max: 3 },
+  pupa:  { min: 4,  max: 7 },
+  bee:   { min: 8,  max: 14 },
+  queen: { min: 15, max: null },
 };
 
 const STAGE_ORDER: Stage[] = ["egg", "larva", "pupa", "bee", "queen"];
