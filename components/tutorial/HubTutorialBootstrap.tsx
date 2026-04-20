@@ -1,31 +1,37 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useTutorial } from "./TutorialProvider";
-import { mainHubScenario } from "@/lib/tutorial/scenarios/main";
+import { getMainHubScenario } from "@/lib/tutorial/scenarios/main";
+
+interface Props {
+  isTeacher: boolean;
+}
 
 /**
  * Mount this inside the hub view. On first mount (once per session) it
- * launches the main-hub scenario if the user hasn't completed/skipped it.
+ * launches the main-hub scenario appropriate for the user's role.
+ * Teachers and students see separate content & tone.
  *
  * Also renders a small "?" button for manual re-run.
  */
-export default function HubTutorialBootstrap() {
+export default function HubTutorialBootstrap({ isTeacher }: Props) {
   const { startIfNotCompleted, start, running } = useTutorial();
+  const scenario = useMemo(() => getMainHubScenario(isTeacher), [isTeacher]);
 
   useEffect(() => {
     // Delay slightly so HomeHub has painted → selectors resolve
     const id = window.setTimeout(() => {
-      void startIfNotCompleted(mainHubScenario);
+      void startIfNotCompleted(scenario);
     }, 400);
     return () => window.clearTimeout(id);
-  }, [startIfNotCompleted]);
+  }, [startIfNotCompleted, scenario]);
 
   if (running) return null;
 
   return (
     <button
-      onClick={() => start(mainHubScenario)}
+      onClick={() => start(scenario)}
       aria-label="튜토리얼 다시 보기"
       style={{
         position: "fixed", bottom: 20, right: 20,

@@ -64,6 +64,24 @@ function pick(map: Record<string, string> | undefined, lang: string): string {
   return map[lang] || map.ko || map.en || Object.values(map)[0] || "";
 }
 
+// For non-Korean students: return { primary: userLang, secondary: ko } so the
+// UI can render both. For Korean students: return { primary: ko, secondary: null }.
+function bilingual(
+  map: Record<string, string> | undefined,
+  lang: string,
+): { primary: string; secondary: string | null } {
+  if (!map) return { primary: "", secondary: null };
+  if (lang === "ko") {
+    return { primary: map.ko || Object.values(map)[0] || "", secondary: null };
+  }
+  const primary = map[lang] || "";
+  const ko = map.ko || "";
+  if (!primary && !ko) return { primary: Object.values(map)[0] || "", secondary: null };
+  if (!primary) return { primary: ko, secondary: null };
+  if (!ko || ko === primary) return { primary, secondary: null };
+  return { primary, secondary: ko };
+}
+
 // ============================================================
 // Main Shell — routes by session.phase & user.isTeacher
 // ============================================================
@@ -177,46 +195,61 @@ function TeacherAlertBanner({ lang, roomCode }: { lang: string; roomCode: string
     return () => unsub();
   }, [roomCode]);
 
-  const distressAlerts = useMemo(
-    () => alerts.filter((a) => a.kind === "distress"),
+  const visible = useMemo(
+    () => alerts.filter((a) => a.kind === "distress" || a.kind === "repeated_block"),
     [alerts],
   );
 
-  if (distressAlerts.length === 0) return null;
+  if (visible.length === 0) return null;
 
   return (
     <div style={{
       marginBottom: 12,
-      padding: "10px 12px",
-      background: "linear-gradient(135deg, #FEE2E2, #FECACA)",
-      border: "3px solid #DC2626",
-      borderRadius: 14,
-      boxShadow: "0 6px 18px rgba(220,38,38,0.3)",
-      display: "flex", flexDirection: "column", gap: 6,
+      display: "flex", flexDirection: "column", gap: 8,
     }}>
-      {distressAlerts.slice(0, 5).map((a) => (
-        <div key={a.id} style={{
-          display: "flex", alignItems: "center", gap: 10,
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 900, color: "#991B1B", letterSpacing: -0.2 }}>
-              {tFmt("sbTeacherAlertDistress", lang, { name: a.studentName })}
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#B91C1C", marginTop: 2 }}>
-              {new Date(a.timestamp).toLocaleTimeString()}
-            </div>
-          </div>
-          <button
-            onClick={() => clearAlert(roomCode, a.id)}
+      {visible.slice(0, 5).map((a) => {
+        const isDistress = a.kind === "distress";
+        const label = isDistress
+          ? tFmt("sbTeacherAlertDistress", lang, { name: a.studentName })
+          : `⚠️ ${a.studentName} 학생이 부적절한 말을 반복했어요`;
+        const borderColor = isDistress ? "#DC2626" : "#D97706";
+        const bg = isDistress
+          ? "linear-gradient(135deg, #FEE2E2, #FECACA)"
+          : "linear-gradient(135deg, #FEF3C7, #FDE68A)";
+        const textColor = isDistress ? "#991B1B" : "#92400E";
+        const btnBorder = isDistress ? "#DC2626" : "#D97706";
+        return (
+          <div
+            key={a.id}
             style={{
-              minHeight: 36, padding: "6px 12px",
-              background: "#fff", border: "2px solid #DC2626",
-              color: "#991B1B", fontSize: 12, fontWeight: 900,
-              borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap",
+              padding: "10px 12px",
+              background: bg,
+              border: `3px solid ${borderColor}`,
+              borderRadius: 14,
+              boxShadow: `0 6px 18px ${borderColor}44`,
+              display: "flex", alignItems: "center", gap: 10,
             }}
-          >확인 ✓</button>
-        </div>
-      ))}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: textColor, letterSpacing: -0.2 }}>
+                {label}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: textColor, opacity: 0.8, marginTop: 2 }}>
+                {new Date(a.timestamp).toLocaleTimeString()}
+              </div>
+            </div>
+            <button
+              onClick={() => clearAlert(roomCode, a.id)}
+              style={{
+                minHeight: 36, padding: "6px 12px",
+                background: "#fff", border: `2px solid ${btnBorder}`,
+                color: textColor, fontSize: 12, fontWeight: 900,
+                borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap",
+              }}
+            >확인 ✓</button>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -638,28 +671,51 @@ function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
   return (
     <div
       style={{
-        background: book.cover.bgGradient,
         borderRadius: 26,
-        padding: "32px 20px",
         border: "3px solid #F59E0B",
         boxShadow: "0 14px 36px rgba(180,83,9,0.2)",
-        textAlign: "center",
         marginBottom: 14,
-        minHeight: 280,
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        overflow: "hidden",
       }}
     >
-      <div style={{ fontSize: 96, filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.15))" }}>
-        {book.cover.emoji}
+      {/* Cover image area — much bigger */}
+      <div
+        style={{
+          background: book.cover.bgGradient,
+          minHeight: 460,
+          aspectRatio: "4 / 3",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative",
+        }}
+      >
+        {book.cover.imageUrl ? (
+          <img
+            src={book.cover.imageUrl}
+            alt=""
+            aria-hidden="true"
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        ) : (
+          <div style={{ fontSize: 140, filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.15))" }}>
+            {book.cover.emoji}
+          </div>
+        )}
       </div>
+      {/* Title panel */}
       <div style={{
-        marginTop: 14, fontSize: 26, fontWeight: 900, color: "#1F2937",
-        letterSpacing: -0.4, lineHeight: 1.25,
+        padding: "20px 20px 22px",
+        background: "#fff",
+        textAlign: "center",
       }}>
-        {pick(book.title, lang)}
-      </div>
-      <div style={{ marginTop: 6, fontSize: 12, fontWeight: 800, color: "#92400E" }}>
-        {t("sbCover", lang)}
+        <div style={{
+          fontSize: 28, fontWeight: 900, color: "#1F2937",
+          letterSpacing: -0.4, lineHeight: 1.25,
+        }}>
+          {pick(book.title, lang)}
+        </div>
+        <div style={{ marginTop: 6, fontSize: 12, fontWeight: 800, color: "#92400E" }}>
+          {t("sbCover", lang)}
+        </div>
       </div>
     </div>
   );
@@ -753,7 +809,8 @@ function PageCard({
       <div
         style={{
           background: page.illustration.bgGradient,
-          minHeight: 280,
+          minHeight: 440,
+          aspectRatio: "4 / 3",
           display: "flex", alignItems: "center", justifyContent: "center",
           position: "relative",
         }}
@@ -763,11 +820,11 @@ function PageCard({
             src={page.illustration.imageUrl}
             alt=""
             aria-hidden="true"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           />
         ) : (
           <div style={{
-            fontSize: 100, letterSpacing: "0.05em",
+            fontSize: 140, letterSpacing: "0.05em",
             filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.15))",
             textAlign: "center",
           }}>
@@ -775,24 +832,55 @@ function PageCard({
           </div>
         )}
         <div style={{
-          position: "absolute", top: 12, right: 14,
-          fontSize: 11, fontWeight: 900, color: "#B45309",
-          background: "#FFFBEB", padding: "4px 10px", borderRadius: 999,
+          position: "absolute", top: 14, right: 16,
+          fontSize: 12, fontWeight: 900, color: "#B45309",
+          background: "#FFFBEB", padding: "5px 12px", borderRadius: 999,
           border: "1.5px solid #FDE68A",
         }}>
           {tFmt("sbPageOf", lang, { cur: page.idx, total })}
         </div>
       </div>
 
-      {/* Text panel */}
-      <div style={{ padding: "18px 20px 22px", position: "relative" }}>
-        <div style={{
-          fontSize: 18, fontWeight: 700, color: "#1F2937",
-          letterSpacing: -0.2, lineHeight: 1.6,
-        }}>
-          {pick(page.text, lang)}
-        </div>
+      {/* Text panel — bilingual for non-Korean students */}
+      <BilingualText map={page.text} lang={lang} size="page" />
+    </div>
+  );
+}
+
+// Shared bilingual text block. For non-Korean students, shows primary (their lang)
+// + smaller Korean line underneath for language-learning support.
+function BilingualText({
+  map, lang, size,
+}: {
+  map: Record<string, string> | undefined;
+  lang: string;
+  size: "page" | "question";
+}) {
+  const { primary, secondary } = bilingual(map, lang);
+  const primarySize = size === "page" ? 20 : 18;
+  const secondarySize = size === "page" ? 16 : 15;
+  const padding = size === "page" ? "20px 22px 22px" : "0";
+
+  return (
+    <div style={{ padding, position: "relative" }}>
+      <div style={{
+        fontSize: primarySize, fontWeight: 700, color: "#1F2937",
+        letterSpacing: -0.2, lineHeight: 1.55,
+      }}>
+        {primary}
       </div>
+      {secondary && (
+        <div style={{
+          marginTop: 8,
+          paddingTop: 8,
+          borderTop: "1px dashed #FDE68A",
+          fontSize: secondarySize, fontWeight: 600, color: "#B45309",
+          letterSpacing: -0.1, lineHeight: 1.5,
+          fontFamily: "'Noto Sans KR', sans-serif",
+        }}>
+          🇰🇷 {secondary}
+        </div>
+      )}
     </div>
   );
 }
@@ -883,12 +971,29 @@ function QuestionCard({
       }}>
         {t(TIER_KEY[q.tier], lang)}
       </div>
-      <div style={{
-        fontSize: 18, fontWeight: 900, color: "#1F2937",
-        letterSpacing: -0.3, lineHeight: 1.35,
-      }}>
-        {pick(q.text, lang)}
-      </div>
+      {(() => {
+        const { primary, secondary } = bilingual(q.text, lang);
+        return (
+          <div>
+            <div style={{
+              fontSize: 18, fontWeight: 900, color: "#1F2937",
+              letterSpacing: -0.3, lineHeight: 1.35,
+            }}>
+              {primary}
+            </div>
+            {secondary && (
+              <div style={{
+                marginTop: 6, paddingTop: 6,
+                borderTop: "1px dashed #BFDBFE",
+                fontSize: 14, fontWeight: 700, color: "#1E40AF",
+                letterSpacing: -0.1, lineHeight: 1.4,
+              }}>
+                🇰🇷 {secondary}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {!isTeacher && (
         <div style={{ marginTop: 12 }}>
@@ -1325,13 +1430,28 @@ function CharacterChat({
       return;
     }
     if (pre.blocked) {
+      // Escalation: count prior flagged student turns in this session.
+      // 1st offense → soft warning that tells the student the teacher
+      // will be notified on repeat. 2nd+ offense → fire teacher alert.
+      const priorFlagged = turns.filter((tt) => tt.from === "student" && tt.flagged).length;
+      const isRepeat = priorFlagged >= 1;
+
       await appendChatTurn(roomCode, myClientId, {
         from: "student", text, timestamp: Date.now(), flagged: true,
       });
       await appendChatTurn(roomCode, myClientId, {
-        from: "character", text: replyForSafety(lang, "block"),
+        from: "character",
+        text: replyForSafety(lang, isRepeat ? "block" : "warning"),
         timestamp: Date.now() + 1,
       });
+      if (isRepeat) {
+        await raiseAlert(roomCode, {
+          clientId: myClientId,
+          studentName: user.myName,
+          timestamp: Date.now(),
+          kind: "repeated_block",
+        });
+      }
       setBusy(false);
       return;
     }

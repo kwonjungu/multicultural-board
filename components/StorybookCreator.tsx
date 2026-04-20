@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Storybook, StorybookPage, StorybookCharacter, StorybookQuestion, QuestionTier, IbConcept } from "@/lib/types";
-import { saveGeneratedBook, updateGeneratedBookPageImage } from "@/lib/storybook";
+import { saveGeneratedBook, updateGeneratedBookPageImage, updateGeneratedBookField } from "@/lib/storybook";
 
 interface Props {
   teacherName: string;
@@ -12,12 +12,41 @@ interface Props {
 
 type Stage = "input" | "generating" | "preview" | "error";
 
+type TextLength = "short" | "medium" | "long";
+
 interface CreatorInput {
   topic: string;
   standard: string;
   conditions: string;
   pageCount: number;
+  textLength: TextLength;
 }
+
+const LENGTH_OPTIONS: Array<{
+  id: TextLength;
+  label: string;
+  desc: string;
+  example: string;
+}> = [
+  {
+    id: "short",
+    label: "짧게",
+    desc: "1문장 · 8~15자",
+    example: "\"붕붕이는 꽃밭으로 갔어요.\"",
+  },
+  {
+    id: "medium",
+    label: "중간",
+    desc: "2~3문장 · 각 15~30자",
+    example: "\"붕붕이는 꿀을 모으러 꽃밭에 갔어요. 오늘도 열심히! 햇살이 따뜻했어요.\"",
+  },
+  {
+    id: "long",
+    label: "길게",
+    desc: "3~5문장 · 각 20~40자",
+    example: "\"아침 해가 떠오르자, 붕붕이는 날개를 반짝이며 꽃밭으로 날아갔어요. 노란 민들레가 고개를 들고 인사했죠. '오늘도 안녕!' 붕붕이의 마음은 두근두근했어요.\"",
+  },
+];
 
 // Hue gradient map — mirrors server. Keep minimal; fallback is warm.
 const HUE: Record<string, string> = {
@@ -31,6 +60,7 @@ const HUE: Record<string, string> = {
 
 interface TextAgentBook {
   titleKo: string;
+  coverImagePrompt: string;
   characters: Array<{
     id: string;
     nameKo: string;
@@ -100,6 +130,7 @@ function agentToStorybook(
     cover: {
       emoji: firstEmoji,
       bgGradient: HUE[src.pages[0]?.illustrationHueHint || "warm"] || HUE.warm,
+      imagePrompt: src.coverImagePrompt,
     },
     authorName,
     createdAt: now,
@@ -116,6 +147,7 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
     standard: "",
     conditions: "",
     pageCount: 6,
+    textLength: "medium",
   });
   const [progress, setProgress] = useState<{
     message: string;
@@ -152,6 +184,7 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
           standard: input.standard,
           conditions: input.conditions,
           pageCount: input.pageCount,
+          textLength: input.textLength,
           targetLangs: ["ko", "en", "vi", "zh", "fil"],
         }),
       });
@@ -167,30 +200,53 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
       const storybook = agentToStorybook(textData.book, bookId, teacherName);
       await saveGeneratedBook(storybook);
       setBook(storybook);
-      setProgress((p) => ({ ...p, textDone: true, message: "🎨 페이지 이미지를 그리고 있어요…" }));
+      const imageCount = storybook.pages.length + 1; // +1 for cover
+      setProgress((p) => ({
+        ...p, textDone: true,
+        imageTotal: imageCount,
+        message: "🎨 표지와 페이지 이미지를 그리고 있어요…",
+      }));
 
-      // Step 2: generate images in parallel
-      const imagePromises = storybook.pages.map(async (page) => {
+      // Step 2: generate cover + pages in parallel
+      interface ImgTask { idx: number; prompt: string; emoji: string }
+      const tasks: ImgTask[] = [
+        {
+          idx: 0,
+          prompt: textData.book.coverImagePrompt
+            || `Book cover illustration: "${storybook.title?.ko}". Cute cartoon, soft watercolor, warm palette.`,
+          emoji: storybook.cover.emoji,
+        },
+        ...storybook.pages.map((p) => ({
+          idx: p.idx,
+          prompt: p.imagePrompt || `A children's book illustration of: ${p.illustration.emoji}`,
+          emoji: p.illustration.emoji,
+        })),
+      ];
+
+      const imagePromises = tasks.map(async (task) => {
         try {
           const res = await fetch("/api/storybook-agent/image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               bookId,
-              pageIdx: page.idx,
-              prompt: page.imagePrompt || `A children's book illustration of: ${page.illustration.emoji}`,
+              pageIdx: task.idx,
+              prompt: task.prompt,
             }),
           });
           if (!res.ok) return;
           const data = await res.json() as { ok: boolean; url?: string };
           if (data.ok && data.url) {
-            await updateGeneratedBookPageImage(bookId, page.idx, data.url);
+            await updateGeneratedBookPageImage(bookId, task.idx, data.url);
             setBook((prev) => {
               if (!prev) return prev;
+              if (task.idx === 0) {
+                return { ...prev, cover: { ...prev.cover, imageUrl: data.url } };
+              }
               return {
                 ...prev,
                 pages: prev.pages.map((p) =>
-                  p.idx === page.idx
+                  p.idx === task.idx
                     ? { ...p, illustration: { ...p.illustration, imageUrl: data.url } }
                     : p,
                 ),
@@ -198,12 +254,12 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
             });
           }
         } catch (err) {
-          console.warn("image gen failed for page", page.idx, err);
+          console.warn("image gen failed for", task.idx, err);
         } finally {
           setProgress((p) => ({
             ...p,
             imageDoneCount: p.imageDoneCount + 1,
-            message: `🎨 페이지 이미지를 그리고 있어요… (${p.imageDoneCount + 1}/${p.imageTotal})`,
+            message: `🎨 이미지를 그리고 있어요… (${p.imageDoneCount + 1}/${p.imageTotal})`,
           }));
         }
       });
@@ -260,6 +316,7 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
         {stage === "preview" && book && (
           <PreviewPanel
             book={book}
+            onBookChange={(next) => setBook(next)}
             onAccept={() => onCreated(book.id)}
             onRegenerateImage={async (pageIdx, prompt) => {
               try {
@@ -277,6 +334,9 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
                   await updateGeneratedBookPageImage(book.id, pageIdx, data.url);
                   setBook((prev) => {
                     if (!prev) return prev;
+                    if (pageIdx === 0) {
+                      return { ...prev, cover: { ...prev.cover, imageUrl: data.url } };
+                    }
                     return {
                       ...prev,
                       pages: prev.pages.map((p) =>
@@ -407,6 +467,49 @@ function InputForm({
           </div>
         </div>
 
+        <div>
+          <div style={labelStyle}>페이지 글 길이</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {LENGTH_OPTIONS.map((opt) => {
+              const selected = input.textLength === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => onChange({ ...input, textLength: opt.id })}
+                  style={{
+                    textAlign: "left",
+                    padding: "10px 14px",
+                    background: selected
+                      ? "linear-gradient(135deg, #FEF3C7, #FDE68A)"
+                      : "#fff",
+                    color: "#1F2937",
+                    border: `2px solid ${selected ? "#F59E0B" : "#FDE68A"}`,
+                    borderRadius: 14,
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                    boxShadow: selected ? "0 4px 12px rgba(245,158,11,0.25)" : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ fontSize: 15, fontWeight: 900, color: "#B45309" }}>
+                      {opt.label}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#92400E" }}>
+                      {opt.desc}
+                    </span>
+                  </div>
+                  <div style={{
+                    marginTop: 4, fontSize: 12, fontWeight: 600,
+                    color: "#1F2937", lineHeight: 1.4, fontStyle: "italic",
+                  }}>
+                    {opt.example}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {error && (
           <div style={{
             background: "#FEF2F2", color: "#991B1B",
@@ -531,33 +634,425 @@ function CountBadge({ current, max }: { current: number; max: number }) {
 }
 
 // ============================================================
+// Inline editors — shared small primitives for Preview
+// ============================================================
+
+const miniBtnPrimary: React.CSSProperties = {
+  minHeight: 32, padding: "4px 12px",
+  background: "linear-gradient(135deg, #F59E0B, #D97706)",
+  color: "#fff", border: "none",
+  borderRadius: 10, fontSize: 12, fontWeight: 900,
+  cursor: "pointer", fontFamily: "inherit",
+};
+const miniBtnGhost: React.CSSProperties = {
+  minHeight: 32, padding: "4px 10px",
+  background: "#fff", border: "1.5px solid #FDE68A",
+  color: "#92400E", fontSize: 12, fontWeight: 900,
+  borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+};
+
+function PageTextEditor({
+  initial, onSave,
+}: {
+  initial: string;
+  onSave: (next: string) => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const [editing, setEditing] = useState(false);
+  // Sync draft when parent book changes externally (e.g. regenerated)
+  useEffect(() => { if (!editing) setDraft(initial); }, [initial, editing]);
+
+  if (!editing) {
+    return (
+      <div
+        onClick={() => setEditing(true)}
+        style={{
+          fontSize: 13, fontWeight: 600, color: "#1F2937",
+          marginTop: 2, lineHeight: 1.4, wordBreak: "break-word",
+          cursor: "text",
+          padding: "4px 6px",
+          borderRadius: 6,
+          border: "1px dashed transparent",
+          transition: "border 0.15s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.border = "1px dashed #F59E0B")}
+        onMouseLeave={(e) => (e.currentTarget.style.border = "1px dashed transparent")}
+        title="클릭해서 편집"
+      >
+        {initial || <span style={{ color: "#9CA3AF" }}>본문 없음 — 클릭해서 작성</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        rows={3}
+        autoFocus
+        maxLength={500}
+        style={{
+          width: "100%",
+          padding: "6px 10px",
+          border: "2px solid #F59E0B",
+          borderRadius: 10,
+          fontSize: 13, fontWeight: 600, fontFamily: "inherit",
+          color: "#1F2937", lineHeight: 1.4,
+          resize: "vertical", outline: "none",
+        }}
+      />
+      <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+        <button onClick={() => { onSave(draft.trim()); setEditing(false); }} style={miniBtnPrimary}>
+          저장
+        </button>
+        <button onClick={() => { setDraft(initial); setEditing(false); }} style={miniBtnGhost}>
+          취소
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function QuestionEditor({
+  q, onSave, onDelete,
+}: {
+  q: { id: string; tier: string; text?: Record<string, string> };
+  onSave: (next: string) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(q.text?.ko || "");
+  useEffect(() => { if (!editing) setDraft(q.text?.ko || ""); }, [q.text?.ko, editing]);
+
+  return (
+    <div style={{
+      padding: "8px 10px", background: "#FFFBEB",
+      border: "1px solid #FDE68A", borderRadius: 10,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "flex-start", gap: 8,
+      }}>
+        <span style={{
+          fontSize: 10, fontWeight: 900, color: "#B45309",
+          background: "#FEF3C7", padding: "2px 8px", borderRadius: 999,
+          whiteSpace: "nowrap", marginTop: 2,
+        }}>
+          {q.tier}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {editing ? (
+            <>
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={2}
+                autoFocus
+                maxLength={250}
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  border: "2px solid #F59E0B",
+                  borderRadius: 8,
+                  fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+                  color: "#1F2937", lineHeight: 1.4,
+                  resize: "vertical", outline: "none",
+                }}
+              />
+              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                <button onClick={() => { onSave(draft.trim()); setEditing(false); }} style={miniBtnPrimary}>저장</button>
+                <button onClick={() => { setDraft(q.text?.ko || ""); setEditing(false); }} style={miniBtnGhost}>취소</button>
+              </div>
+            </>
+          ) : (
+            <div
+              onClick={() => setEditing(true)}
+              style={{
+                fontSize: 12, fontWeight: 700, color: "#1F2937",
+                lineHeight: 1.4, cursor: "text",
+              }}
+            >{q.text?.ko}</div>
+          )}
+        </div>
+        {!editing && (
+          <button onClick={onDelete} style={{
+            ...miniBtnGhost, border: "1.5px solid #FCA5A5", color: "#B91C1C",
+            fontSize: 11, minHeight: 28, padding: "2px 8px",
+          }}>🗑</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CharacterEditor({
+  c, onSaveField,
+}: {
+  c: {
+    id: string; avatarEmoji: string;
+    name?: Record<string, string>;
+    personality: string; speechStyle: string; bookContext: string;
+  };
+  onSaveField: (field: "name" | "personality" | "speechStyle" | "bookContext", value: string) => void;
+}) {
+  return (
+    <div style={{
+      padding: 12, background: "#FFFBEB",
+      border: "1px solid #FDE68A", borderRadius: 12,
+      display: "grid", gridTemplateColumns: "60px 1fr", gap: 10,
+    }}>
+      <div style={{ fontSize: 44, textAlign: "center" }}>{c.avatarEmoji}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <EditableLine
+          label="이름"
+          value={c.name?.ko || ""}
+          onSave={(v) => onSaveField("name", v)}
+          strong
+        />
+        <EditableLine
+          label="성격"
+          value={c.personality}
+          onSave={(v) => onSaveField("personality", v)}
+          multiline
+        />
+        <EditableLine
+          label="말투"
+          value={c.speechStyle}
+          onSave={(v) => onSaveField("speechStyle", v)}
+          multiline
+        />
+        <EditableLine
+          label="책에서의 역할"
+          value={c.bookContext}
+          onSave={(v) => onSaveField("bookContext", v)}
+          multiline
+        />
+      </div>
+    </div>
+  );
+}
+
+function EditableLine({
+  label, value, onSave, strong, multiline,
+}: {
+  label: string;
+  value: string;
+  onSave: (v: string) => void;
+  strong?: boolean;
+  multiline?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
+
+  return (
+    <div>
+      <div style={{ fontSize: 10, fontWeight: 900, color: "#92400E", letterSpacing: 0.2 }}>
+        {label}
+      </div>
+      {editing ? (
+        <div style={{ marginTop: 2 }}>
+          {multiline ? (
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={2}
+              autoFocus
+              maxLength={400}
+              style={{
+                width: "100%",
+                padding: "6px 10px",
+                border: "2px solid #F59E0B",
+                borderRadius: 8,
+                fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+                color: "#1F2937", lineHeight: 1.4,
+                resize: "vertical", outline: "none",
+              }}
+            />
+          ) : (
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { onSave(draft.trim()); setEditing(false); } }}
+              autoFocus
+              maxLength={80}
+              style={{
+                width: "100%",
+                padding: "6px 10px",
+                border: "2px solid #F59E0B",
+                borderRadius: 8,
+                fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+                color: "#1F2937",
+                outline: "none",
+              }}
+            />
+          )}
+          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+            <button onClick={() => { onSave(draft.trim()); setEditing(false); }} style={miniBtnPrimary}>저장</button>
+            <button onClick={() => { setDraft(value); setEditing(false); }} style={miniBtnGhost}>취소</button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onClick={() => setEditing(true)}
+          style={{
+            fontSize: strong ? 14 : 11,
+            fontWeight: strong ? 900 : 600,
+            color: strong ? "#1F2937" : "#4B5563",
+            lineHeight: 1.4,
+            cursor: "text",
+            padding: "3px 4px",
+            borderRadius: 4,
+            marginTop: 1,
+            wordBreak: "break-word",
+          }}
+          title="클릭해서 편집"
+        >
+          {value || <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>비어있음</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // Preview panel
 // ============================================================
 
 function PreviewPanel({
-  book, onAccept, onRegenerateImage,
+  book, onBookChange, onAccept, onRegenerateImage,
 }: {
   book: Storybook;
+  onBookChange: (next: Storybook) => void;
   onAccept: () => void;
   onRegenerateImage: (pageIdx: number, prompt: string) => Promise<void>;
 }) {
   const [editingPage, setEditingPage] = useState<number | null>(null);
   const [editPrompt, setEditPrompt] = useState<string>("");
   const [busyPage, setBusyPage] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(book.title?.ko || "");
+
+  async function saveTitle() {
+    const next = { ...book, title: { ...book.title, ko: titleDraft.trim() || book.title?.ko || "" } };
+    onBookChange(next);
+    try { await updateGeneratedBookField(book.id, { title: next.title }); } catch (err) { console.error(err); }
+    setEditingTitle(false);
+  }
+
+  async function savePageText(pageIdx: number, nextKo: string) {
+    const next = {
+      ...book,
+      pages: book.pages.map((p) =>
+        p.idx === pageIdx
+          ? { ...p, text: { ...p.text, ko: nextKo } }
+          : p,
+      ),
+    };
+    onBookChange(next);
+    try { await updateGeneratedBookField(book.id, { pages: next.pages }); } catch (err) { console.error(err); }
+  }
+
+  async function saveQuestionText(qid: string, nextKo: string) {
+    const next = {
+      ...book,
+      questions: book.questions.map((q) =>
+        q.id === qid ? { ...q, text: { ...q.text, ko: nextKo } } : q,
+      ),
+    };
+    onBookChange(next);
+    try { await updateGeneratedBookField(book.id, { questions: next.questions }); } catch (err) { console.error(err); }
+  }
+
+  async function deleteQuestion(qid: string) {
+    const next = {
+      ...book,
+      questions: book.questions.filter((q) => q.id !== qid),
+    };
+    onBookChange(next);
+    try { await updateGeneratedBookField(book.id, { questions: next.questions }); } catch (err) { console.error(err); }
+  }
+
+  async function saveCharacterField(cid: string, field: "name" | "personality" | "speechStyle" | "bookContext", value: string) {
+    const next = {
+      ...book,
+      characters: book.characters.map((c) => {
+        if (c.id !== cid) return c;
+        if (field === "name") return { ...c, name: { ...c.name, ko: value } };
+        return { ...c, [field]: value };
+      }),
+    };
+    onBookChange(next);
+    try { await updateGeneratedBookField(book.id, { characters: next.characters }); } catch (err) { console.error(err); }
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Header */}
+      {/* Header — editable title */}
       <div style={{
         background: "#fff", borderRadius: 22, padding: 18,
         border: "2px solid #FDE68A",
         boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
-        textAlign: "center",
       }}>
-        <div style={{ fontSize: 22, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-          📖 {book.title?.ko || book.id}
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginTop: 4 }}>
+        {book.cover.imageUrl && (
+          <div style={{
+            width: "100%", aspectRatio: "4/3",
+            borderRadius: 16, overflow: "hidden", marginBottom: 14,
+            boxShadow: "0 6px 20px rgba(180,83,9,0.18)",
+          }}>
+            <img
+              src={book.cover.imageUrl}
+              alt=""
+              aria-hidden="true"
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          </div>
+        )}
+        {editingTitle ? (
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveTitle(); }}
+              maxLength={80}
+              style={{
+                flex: 1, minHeight: 44, padding: "8px 12px",
+                border: "2px solid #F59E0B", borderRadius: 12,
+                fontSize: 18, fontWeight: 900, color: "#1F2937",
+                fontFamily: "inherit", outline: "none",
+              }}
+            />
+            <button onClick={saveTitle} style={miniBtnPrimary}>저장</button>
+            <button onClick={() => { setTitleDraft(book.title?.ko || ""); setEditingTitle(false); }} style={miniBtnGhost}>취소</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3, textAlign: "center" }}>
+              📖 {book.title?.ko || book.id}
+            </div>
+            <button
+              onClick={() => { setTitleDraft(book.title?.ko || ""); setEditingTitle(true); }}
+              style={miniBtnGhost}
+              aria-label="제목 수정"
+            >✏️</button>
+            <button
+              onClick={() => {
+                const prompt = window.prompt(
+                  "표지 이미지 프롬프트 (영어로 자세히)",
+                  book.cover.imagePrompt || "",
+                );
+                if (prompt && prompt.trim()) {
+                  onRegenerateImage(0, prompt.trim());
+                }
+              }}
+              style={miniBtnGhost}
+              aria-label="표지 이미지 재생성"
+            >🔄 표지</button>
+          </div>
+        )}
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginTop: 8, textAlign: "center" }}>
           {book.pages.length}장 · 질문 {book.questions.length}개 · 등장인물 {book.characters.length}명
         </div>
       </div>
@@ -580,17 +1075,17 @@ function PreviewPanel({
                 key={p.idx}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "80px 1fr",
-                  gap: 10,
-                  padding: 10,
+                  gridTemplateColumns: "140px 1fr",
+                  gap: 12,
+                  padding: 12,
                   background: "#FFFBEB",
                   border: "1.5px solid #FDE68A",
                   borderRadius: 14,
                 }}
               >
                 <div style={{
-                  width: 80, height: 80,
-                  borderRadius: 10, overflow: "hidden",
+                  width: 140, height: 140,
+                  borderRadius: 12, overflow: "hidden",
                   background: p.illustration.bgGradient,
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
@@ -602,19 +1097,17 @@ function PreviewPanel({
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
                   ) : (
-                    <div style={{ fontSize: 32 }}>{p.illustration.emoji}</div>
+                    <div style={{ fontSize: 56 }}>{p.illustration.emoji}</div>
                   )}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color: "#B45309" }}>
                     {p.idx}쪽
                   </div>
-                  <div style={{
-                    fontSize: 13, fontWeight: 600, color: "#1F2937",
-                    marginTop: 2, lineHeight: 1.4, wordBreak: "break-word",
-                  }}>
-                    {p.text?.ko || ""}
-                  </div>
+                  <PageTextEditor
+                    initial={p.text?.ko || ""}
+                    onSave={(next) => savePageText(p.idx, next)}
+                  />
                   {!isEditing && (
                     <button
                       onClick={() => {
@@ -684,7 +1177,7 @@ function PreviewPanel({
         </div>
       </div>
 
-      {/* Questions strip */}
+      {/* Questions strip — editable */}
       <div style={{
         background: "#fff", borderRadius: 22, padding: 14,
         border: "2px solid #FDE68A",
@@ -695,25 +1188,19 @@ function PreviewPanel({
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {book.questions.map((q) => (
-            <div
+            <QuestionEditor
               key={q.id}
-              style={{
-                padding: "8px 10px", background: "#FFFBEB",
-                border: "1px solid #FDE68A", borderRadius: 10,
-                fontSize: 12, fontWeight: 700, color: "#1F2937",
-                lineHeight: 1.4,
+              q={q}
+              onSave={(next) => saveQuestionText(q.id, next)}
+              onDelete={() => {
+                if (window.confirm("이 질문을 삭제할까요?")) deleteQuestion(q.id);
               }}
-            >
-              <span style={{ fontWeight: 900, color: "#B45309", marginRight: 6 }}>
-                [{q.tier}]
-              </span>
-              {q.text?.ko}
-            </div>
+            />
           ))}
         </div>
       </div>
 
-      {/* Characters strip */}
+      {/* Characters strip — editable */}
       <div style={{
         background: "#fff", borderRadius: 22, padding: 14,
         border: "2px solid #FDE68A",
@@ -722,25 +1209,13 @@ function PreviewPanel({
         <div style={{ fontSize: 14, fontWeight: 900, color: "#92400E", marginBottom: 10 }}>
           🎭 등장인물
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {book.characters.map((c) => (
-            <div
+            <CharacterEditor
               key={c.id}
-              style={{
-                flex: "1 1 140px",
-                padding: 12, background: "#FFFBEB",
-                border: "1px solid #FDE68A", borderRadius: 12,
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: 40 }}>{c.avatarEmoji}</div>
-              <div style={{ fontSize: 14, fontWeight: 900, color: "#1F2937", marginTop: 4 }}>
-                {c.name?.ko}
-              </div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: "#6B7280", marginTop: 4, lineHeight: 1.3 }}>
-                {c.personality}
-              </div>
-            </div>
+              c={c}
+              onSaveField={(field, value) => saveCharacterField(c.id, field, value)}
+            />
           ))}
         </div>
       </div>

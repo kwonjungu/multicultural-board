@@ -7,16 +7,26 @@
 // Obvious profanity, sexual content, severe violence. Not exhaustive — the
 // server-side LLM also has hardening in its system prompt.
 const BLOCK_SUBSTRINGS: string[] = [
-  // Korean
-  "씨발", "시발", "개새끼", "병신", "좆", "꺼져", "죽어", "뒤져",
-  "섹스", "야동", "성관계", "포르노",
+  // Korean — profanity
+  "씨발", "시발", "씨빨", "시빨", "씨팔", "시팔",
+  "개새끼", "개새", "개자식", "개놈", "개년", "개쓰레기",
+  "병신", "븅신", "미친놈", "미친년",
+  "좆", "좇", "존나", "졸라",
+  "꺼져", "닥쳐",
+  "죽어", "뒤져", "뒤질",
+  "지랄", "지럴",
+  "ㅅㅂ", "ㅆㅂ", "ㅂㅅ", "ㅄ", "ㅈㄹ",
+  // Korean — sexual
+  "섹스", "야동", "성관계", "포르노", "자지", "보지", "꼴리",
+  // Korean — meta / jailbreak hints
+  "욕해", "욕 해", "욕해봐", "욕해줘", "나쁜말", "나쁜 말",
   // English
   "fuck", "shit", "bitch", "asshole", "dick", "pussy", "cunt",
-  "porn", "sex ", "nude", "naked",
+  "porn", "sex ", "nude", "naked", "bastard",
   // Vietnamese
   "đụ", "địt", "cặc", "lồn",
   // Chinese simplified / traditional
-  "操你", "傻逼", "滚开", "去死",
+  "操你", "傻逼", "滚开", "去死", "混蛋",
   // Japanese
   "死ね", "馬鹿野郎", "くそ", "ちんこ", "まんこ",
   // Filipino/Tagalog
@@ -99,6 +109,26 @@ export const DISTRESS_REPLY: Record<string, string> = {
   my: "ဒါကိုဆရာ သို့မဟုတ် မိသားစုကိုပြောပြပါ။ သင်အရမ်းအရေးကြီးပါတယ်။",
 };
 
+// First-offense warning when a block is detected. Explicitly tells the student
+// that continuing will notify the teacher.
+export const BLOCK_WARNING: Record<string, string> = {
+  ko: "그런 말은 우리 이야기에 어울리지 않아. 계속하면 선생님께 알림이 가요. 다른 이야기를 해볼까?",
+  en: "That word doesn't fit our story. If you keep saying it, your teacher will be notified. Let's talk about something else!",
+  vi: "Lời đó không hợp với câu chuyện của chúng ta. Nếu bạn tiếp tục, thầy cô sẽ được thông báo. Hãy nói chuyện khác nhé!",
+  zh: "这样的话不适合我们的故事哦。如果继续说,老师会收到通知。我们聊点别的吧!",
+  fil: "Hindi bagay ang salitang iyon sa kwento natin. Kung magpapatuloy ka, aabisuhan ang guro mo. Mag-usap tayo ng iba!",
+  ja: "その ことばは おはなしに あわないよ。つづけたら せんせいに しらせが いくよ。 ほかの おはなしを しよう!",
+  th: "คำนั้นไม่เหมาะกับเรื่องของเรา ถ้ายังพูดต่อ ครูจะได้รับแจ้ง คุยเรื่องอื่นกันดีกว่า!",
+  km: "ពាក្យនេះមិនសមនឹងរឿងយើងទេ។ បើបន្ត គ្រូនឹងទទួលការជូនដំណឹង។ តោះនិយាយរឿងផ្សេង!",
+  mn: "Энэ үг манай түүхэнд тохиромжгүй. Үргэлжлүүлбэл багшид мэдэгдэнэ. Өөр юм ярьцгаая!",
+  ru: "Такое слово не подходит к нашей истории. Если продолжишь, учителю придёт уведомление. Давай о другом!",
+  uz: "Bu so'z bizning ertagimizga mos emas. Davom etsangiz, o'qituvchingizga xabar boradi. Boshqa narsa haqida gaplashaylik!",
+  hi: "ऐसा शब्द हमारी कहानी में नहीं चलता। अगर फिर कहोगे तो शिक्षक को सूचना जाएगी। कुछ और बात करें!",
+  id: "Kata itu tidak cocok untuk cerita kita. Kalau diteruskan, guru akan mendapat pemberitahuan. Ayo bicarakan hal lain!",
+  ar: "هذه الكلمة لا تناسب قصتنا. إذا استمريت فسيتم إخطار معلمك. لنتحدث في موضوع آخر!",
+  my: "ဒီစကားက ကျွန်တော်တို့ပုံပြင်နဲ့ မဆီလျော်ဘူး။ ဆက်ပြောရင် ဆရာကို အသိပေးလိုက်မယ်။ တခြားစကားပြောရအောင်!",
+};
+
 // Shown when input is blocked but not distress (e.g. profanity).
 // Soft redirect — stays in character flavor if possible.
 export const BLOCK_REPLY: Record<string, string> = {
@@ -119,7 +149,10 @@ export const BLOCK_REPLY: Record<string, string> = {
   my: "ဟမ်… အဲဒါ ကျွန်တော်တို့ရဲ့ပုံပြင်နဲ့ အဆင်မပြေဘူး။ တခြားမေးပါ!",
 };
 
-export function replyForSafety(lang: string, kind: "distress" | "block"): string {
-  const table = kind === "distress" ? DISTRESS_REPLY : BLOCK_REPLY;
+export function replyForSafety(lang: string, kind: "distress" | "block" | "warning"): string {
+  const table =
+    kind === "distress" ? DISTRESS_REPLY
+    : kind === "warning" ? BLOCK_WARNING
+    : BLOCK_REPLY;
   return table[lang] || table.ko || table.en;
 }

@@ -5,17 +5,36 @@ import { generateJson } from "@/lib/gemini";
 // rounds (draft + critique-revise) on a single fast model.
 export const maxDuration = 60;
 
+export type TextLength = "short" | "medium" | "long";
+
 interface TextAgentRequest {
   topic: string;
   standard: string;    // 성취기준 free-form text or code
   conditions: string;  // free-form extra conditions
   pageCount: number;   // 4..12
   targetLangs: string[];  // e.g. ["ko","en","vi","zh","fil"]
+  textLength?: TextLength;
 }
+
+const LENGTH_SPEC: Record<TextLength, { instruction: string; example: string }> = {
+  short: {
+    instruction: "페이지당 1문장 8~15자 이내. 리듬감 있게, 그림책 저학년용.",
+    example: "예: \"붕붕이는 꽃밭으로 갔어요.\"",
+  },
+  medium: {
+    instruction: "페이지당 2~3문장, 각 15~30자. 간결하지만 감정을 담아.",
+    example: "예: \"붕붕이는 꿀을 모으러 꽃밭에 갔어요. 오늘도 열심히! 햇살이 따뜻했어요.\"",
+  },
+  long: {
+    instruction: "페이지당 3~5문장, 각 20~40자. 장면 묘사와 감정 변화를 풍부하게.",
+    example: "예: \"아침 해가 떠오르자, 붕붕이는 날개를 반짝이며 꽃밭으로 날아갔어요. 노란 민들레가 고개를 들고 인사했죠. '오늘도 안녕!' 붕붕이의 마음은 두근두근했어요. 한 방울씩 모은 꿀이 벌써 꽤 쌓였거든요.\"",
+  },
+};
 
 // What the model returns. Keep flat/simple; no nested meta.
 interface DraftBook {
   titleKo: string;
+  coverImagePrompt: string;  // English prompt for the book cover (separate from page 1)
   characters: Array<{
     id: string;
     nameKo: string;
@@ -63,7 +82,8 @@ const HUE_GRADIENTS: Record<string, string> = {
   garden: "linear-gradient(180deg, #FDE68A, #D1FAE5)",
 };
 
-function buildDraftSystemPrompt(): string {
+function buildDraftSystemPrompt(textLength: TextLength): string {
+  const spec = LENGTH_SPEC[textLength];
   return `You are a children's picture book author and curriculum designer writing for Korean elementary school (ages 7-9) in a multicultural classroom.
 
 Your job: generate a warm, age-appropriate picture book along with reading-comprehension questions and short character personas.
@@ -74,6 +94,7 @@ form, function, causation, change, connection, perspective, responsibility, refl
 You MUST reply with valid JSON matching this schema (all text in Korean unless the field name ends in "Ko" or unless stated):
 {
   "titleKo": string,
+  "coverImagePrompt": string (English, detailed book-COVER illustration prompt — a title-card style scene featuring the protagonist and theme. Include art style: "soft watercolor children's book cover, warm colors, cute cartoon, gentle palette, dreamy lighting"),
   "characters": [
     {
       "id": string (kebab-case),
@@ -87,7 +108,7 @@ You MUST reply with valid JSON matching this schema (all text in Korean unless t
   "pages": [
     {
       "idx": number (1-based),
-      "textKo": string (Korean, 1-2 short sentences suitable for a picture book page),
+      "textKo": string (Korean, follows the LENGTH specification below),
       "illustrationEmoji": string (1-4 emoji representing the scene),
       "illustrationHueHint": "warm" | "cool" | "night" | "spring" | "sunset" | "garden",
       "imagePrompt": string (English, describes the scene in detail for an image generator. Include art style: "soft watercolor children's book illustration, warm colors, cute cartoon")
@@ -102,13 +123,17 @@ You MUST reply with valid JSON matching this schema (all text in Korean unless t
   ]
 }
 
+=== Page text LENGTH requirement (strict) ===
+${spec.instruction}
+${spec.example}
+
 Rules:
-- Keep text short. Page text: 1-2 sentences max. Questions: single sentence.
 - Warm, hopeful tone. No scary, violent, or sexual content.
 - Imagery must be gentle and cute. Avoid photorealism.
 - IB concept questions should use the Korean word naturally (e.g. '변화', '책임', '연결').
 - Character speechStyle should include an example phrase in quotes so the downstream chatbot stays consistent.
-- Use kebab-case ids like "q-intro-1", "q-check-2", "q-core-1", "char-buzz".`;
+- Use kebab-case ids like "q-intro-1", "q-check-2", "q-core-1", "char-buzz".
+- The cover prompt must visually match page 1's style to keep the art consistent.`;
 }
 
 function buildCritiqueSystemPrompt(): string {
@@ -166,15 +191,17 @@ export async function POST(req: NextRequest) {
 
   try {
     // === Step 1: draft ===
+    const textLength: TextLength = body.textLength || "medium";
     const draftPrompt = `주제: ${body.topic}
 성취기준: ${body.standard}
 추가 조건: ${body.conditions || "(없음)"}
 페이지 수: ${pageCount}
+페이지 글 길이: ${textLength === "short" ? "짧게" : textLength === "long" ? "길게" : "중간"}
 
-위 정보로 Korean elementary picture book을 작성하세요. 스키마를 정확히 지켜야 합니다.`;
+위 정보로 Korean elementary picture book을 작성하세요. 스키마와 길이 규칙을 정확히 지켜야 합니다.`;
 
     const { value: draft1, model } = await generateJson<DraftBook>({
-      systemPrompt: buildDraftSystemPrompt(),
+      systemPrompt: buildDraftSystemPrompt(textLength),
       userPrompt: draftPrompt,
       temperature: 0.85,
       maxTokens: 8192,
@@ -191,7 +218,7 @@ export async function POST(req: NextRequest) {
       });
       if (critique.needsRevision && critique.issues.length > 0) {
         const { value: revised } = await generateJson<DraftBook>({
-          systemPrompt: buildReviseSystemPrompt(),
+          systemPrompt: buildReviseSystemPrompt() + "\n\n" + LENGTH_SPEC[textLength].instruction,
           userPrompt: `이전 초안:\n${JSON.stringify(draft1)}\n\n수정할 부분:\n${critique.issues.map((i) => "- " + i).join("\n")}`,
           temperature: 0.7,
           maxTokens: 8192,

@@ -116,10 +116,27 @@ export async function updateGeneratedBookPageImage(
   const snap = await get(ref(db, `generated_books/${bookId}`));
   const book = snap.val() as Storybook | null;
   if (!book) throw new Error("book not found");
-  const page = book.pages.find((p) => p.idx === pageIdx);
-  if (!page) throw new Error("page not found");
-  page.illustration = { ...page.illustration, imageUrl };
+  if (pageIdx === 0) {
+    // Cover image
+    book.cover = { ...book.cover, imageUrl };
+  } else {
+    const page = book.pages.find((p) => p.idx === pageIdx);
+    if (!page) throw new Error("page not found");
+    page.illustration = { ...page.illustration, imageUrl };
+  }
   await set(ref(db, `generated_books/${bookId}`), stripUndefined(book));
+}
+
+export async function updateGeneratedBookField(
+  bookId: string,
+  updates: Partial<Storybook>,
+): Promise<void> {
+  const db = getClientDb();
+  const snap = await get(ref(db, `generated_books/${bookId}`));
+  const book = snap.val() as Storybook | null;
+  if (!book) throw new Error("book not found");
+  const merged = { ...book, ...updates };
+  await set(ref(db, `generated_books/${bookId}`), stripUndefined(merged));
 }
 
 // === Session ===

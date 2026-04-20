@@ -186,6 +186,7 @@ export interface StorybookIllustration {
   emoji: string;              // e.g. "🐝🌸"
   bgGradient: string;         // CSS gradient
   imageUrl?: string;          // AI-generated or uploaded
+  imagePrompt?: string;       // Used for cover (page uses StorybookPage.imagePrompt)
 }
 
 export interface StorybookPage {

@@ -9,7 +9,7 @@ export const maxDuration = 60;
 
 interface ImageAgentRequest {
   bookId: string;         // Firebase-side key where the book lives
-  pageIdx: number;
+  pageIdx: number;        // 0 = cover, 1+ = regular pages
   prompt: string;         // English art-style prompt
   styleReferenceUrl?: string;  // Optional: previous page to keep style consistent (future)
 }
@@ -28,7 +28,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json<ImageAgentResponse>({ ok: false, error: "bad json" }, { status: 400 });
   }
 
-  if (!body?.bookId || !body?.pageIdx || !body?.prompt) {
+  // pageIdx 0 = cover is valid; allow any non-negative integer
+  if (!body?.bookId || body?.pageIdx == null || body.pageIdx < 0 || !body?.prompt) {
     return NextResponse.json<ImageAgentResponse>({ ok: false, error: "missing bookId/pageIdx/prompt" }, { status: 400 });
   }
 
@@ -51,7 +52,9 @@ export async function POST(req: NextRequest) {
 
     // === Upload to Firebase Storage ===
     const token = randomUUID();
-    const filename = `storybooks/${body.bookId}/page-${body.pageIdx}.png`;
+    const filename = body.pageIdx === 0
+      ? `storybooks/${body.bookId}/cover.png`
+      : `storybooks/${body.bookId}/page-${body.pageIdx}.png`;
 
     const app = getAdminApp();
     const storage = getStorage(app);

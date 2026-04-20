@@ -20,6 +20,7 @@ import { TutorialProvider } from "@/components/tutorial/TutorialProvider";
 import HubTutorialBootstrap from "@/components/tutorial/HubTutorialBootstrap";
 import SectionCaption from "@/components/tutorial/SectionCaption";
 import { subscribeStudentStickers } from "@/lib/stickers";
+import { subscribeSession } from "@/lib/storybook";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { t } from "@/lib/i18n";
 
@@ -48,6 +49,21 @@ export default function RoomPage() {
     });
     return () => unsub();
   }, [roomCode, user]);
+
+  // 그림책 세션이 시작되면 학생을 강제로 그림책 화면으로 이동
+  // (교사는 본인이 시작한 화면에 이미 있음. 세션 null→있음 전환만 반응)
+  const [lastSessionId, setLastSessionId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeSession(roomCode, (session) => {
+      const currentSessionKey = session ? `${session.bookId}-${session.startedAt}` : null;
+      if (currentSessionKey && currentSessionKey !== lastSessionId && !user.isTeacher) {
+        setHubView("storybook");
+      }
+      setLastSessionId(currentSessionKey);
+    });
+    return () => unsub();
+  }, [roomCode, user, lastSessionId]);
 
   // 재방문 시 저장된 설정으로 바로 보드 입장
   useEffect(() => {
@@ -192,7 +208,7 @@ export default function RoomPage() {
           }}
           onLogout={() => setUser(null)}
         />
-        <HubTutorialBootstrap />
+        <HubTutorialBootstrap isTeacher={user.isTeacher} />
         {/* Interpreter은 drawer 오버레이, hub 위에서 직접 열림 */}
         <InterpreterDrawer
           open={interpreterOpen}
@@ -200,7 +216,7 @@ export default function RoomPage() {
           viewerLang={user.myLang}
           availableLangs={roomLangs}
         />
-        {interpreterOpen && <SectionCaption section="interpreter" />}
+        {interpreterOpen && <SectionCaption section="interpreter" isTeacher={user.isTeacher} />}
         {overlays}
       </TutorialProvider>
     );
@@ -210,7 +226,7 @@ export default function RoomPage() {
     return (
       <>
         <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} />
-        <SectionCaption section="games" />
+        <SectionCaption section="games" isTeacher={user.isTeacher} />
         {overlays}
       </>
     );
@@ -224,7 +240,7 @@ export default function RoomPage() {
           roomCode={roomCode}
           onBack={() => setHubView("hub")}
         />
-        <SectionCaption section="vocab" />
+        <SectionCaption section="vocab" isTeacher={user.isTeacher} />
         {overlays}
       </>
     );
@@ -239,6 +255,7 @@ export default function RoomPage() {
           myClientId={myClientId}
           onBack={() => setHubView("hub")}
         />
+        <SectionCaption section="storybook" isTeacher={user.isTeacher} />
         {overlays}
       </>
     );
@@ -256,7 +273,7 @@ export default function RoomPage() {
           onOpenGive={(clientId, name) => setGiveModalFor({ clientId, name })}
           onOpenCosmetics={() => setCosmeticsOpen(true)}
         />
-        <SectionCaption section="praise" />
+        <SectionCaption section="praise" isTeacher={user.isTeacher} />
         {overlays}
       </>
     );
@@ -274,7 +291,7 @@ export default function RoomPage() {
         myClientId={myClientId}
         onPraiseStudent={(clientId, name) => setGiveModalFor({ clientId, name })}
       />
-      <SectionCaption section="board" />
+      <SectionCaption section="board" isTeacher={user.isTeacher} />
       {overlays}
     </>
   );
