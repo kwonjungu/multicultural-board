@@ -7,6 +7,7 @@ import { t } from "@/lib/i18n";
 import DrawingCanvas from "./DrawingCanvas";
 import WorksheetTab from "./WorksheetTab";
 import BeeMascot from "./BeeMascot";
+import { WorksheetAnalyzeView } from "./WorksheetAnalyzeModal";
 import { compressToUnder1MB, fmtBytes } from "@/lib/imageUtils";
 
 function extractYouTubeId(url: string): string | null {
@@ -37,7 +38,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([u8arr], { type: mime });
 }
 
-type ModalMode = CardType | "worksheet";
+type ModalMode = CardType | "worksheet" | "analyze";
 
 interface Props {
   colId: string;
@@ -76,7 +77,10 @@ export default function PostModal({
     { key: "image",     icon: "🖼️", label: t("tabPhoto", lang)     },
     { key: "youtube",   icon: "📺", label: "YouTube"               },
     { key: "drawing",   icon: "✏️", label: t("tabDraw", lang)      },
-    ...(editCard ? [] : [{ key: "worksheet" as ModalMode, icon: "📋", label: t("tabWorksheet", lang) }]),
+    ...(editCard ? [] : [
+      { key: "analyze"   as ModalMode, icon: "📸", label: "활동지"     },
+      { key: "worksheet" as ModalMode, icon: "📋", label: t("tabWorksheet", lang) },
+    ]),
   ];
 
   const initialMode: ModalMode = editCard
@@ -283,6 +287,7 @@ export default function PostModal({
     if (mode === "image")     return !!compressedBlob;
     if (mode === "drawing")   return !!drawingDataUrl;
     if (mode === "worksheet") return false;
+    if (mode === "analyze")   return false;
     return false;
   };
 
@@ -481,7 +486,27 @@ export default function PostModal({
                 </button>
               ))}
             </div>
-            {/* 활동지 (worksheet) 진입 — 전체 폭 보조 카드 */}
+            {/* 활동지 찍어 올리기 — 학생 진입용, 사진 OCR → 자동 포스트 */}
+            <button
+              onClick={() => { setMode("analyze"); setShowEntry(false); }}
+              style={{
+                width: "100%", minHeight: 72, borderRadius: 18,
+                background: "linear-gradient(135deg, #FCD34D, #F59E0B)",
+                border: "none",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                cursor: "pointer", fontSize: 16, fontWeight: 900, color: "#7C2D12",
+                marginBottom: 8,
+                boxShadow: "0 10px 24px rgba(245,158,11,0.32)",
+                transition: "transform 0.15s",
+              }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
+              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              <span style={{ fontSize: 28 }}>📸</span>
+              활동지 찍어 올리기
+            </button>
+            {/* 활동지 번역 — 보조 (기존) */}
             <button
               onClick={() => { setMode("worksheet"); setShowEntry(false); }}
               style={{
@@ -803,11 +828,43 @@ export default function PostModal({
             onClose={onClose}
           />
         )}
+
+        {/* ── 활동지 찍어 올리기 (OCR → 자동 카드 포스트) ── */}
+        {mode === "analyze" && !isEdit && (
+          <WorksheetAnalyzeView
+            submitLabel="이 내용으로 올리기"
+            requireConfirm={true}
+            onComplete={async ({ content, previewUrl }) => {
+              // OCR 결과를 카드로 바로 포스트. 이미지 data URL을 blob으로 변환해 서버에 업로드,
+              // 실패 시 텍스트 전용 카드로 폴백.
+              try {
+                const blob = dataUrlToBlob(previewUrl);
+                const compressed = await compressToUnder1MB(blob);
+                setUploading(true);
+                const imageUrl = await uploadToServer(compressed);
+                onPost({
+                  cardType: "image",
+                  text: content,
+                  writeLang,
+                  imageUrl,
+                });
+              } catch (err) {
+                console.error("활동지 이미지 업로드 실패 → 텍스트 카드로 폴백:", err);
+                onPost({
+                  cardType: "text",
+                  text: content,
+                  writeLang,
+                });
+              }
+              setUploading(false);
+            }}
+          />
+        )}
         </div>
         )}{/* end tabpanel */}
 
         {/* Bottom submit */}
-        {!showEntry && !(mode === "drawing" && !drawingDataUrl) && mode !== "worksheet" && (
+        {!showEntry && !(mode === "drawing" && !drawingDataUrl) && mode !== "worksheet" && mode !== "analyze" && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
             <span style={{ fontSize: 11, color: "#CBD5E1" }}>
               {mode === "text" ? "Ctrl+Enter" : ""}

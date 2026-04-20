@@ -47,7 +47,8 @@ interface Props {
 
 // MVP: single hard-coded book. Phase 3 will add a library.
 const AVAILABLE_BOOKS = [
-  { id: "buzz-sharing", titleKo: "붕붕이의 달콤한 나눔", cover: "🐝🍯" },
+  { id: "curious-worlds",  titleKo: "붕붕이의 궁금 여행",    cover: "🐝🌍✨" },
+  { id: "seasons-beauty",  titleKo: "붕붕이의 사계절 산책",  cover: "🐝🌸🍁❄️" },
 ];
 
 const TIER_KEY: Record<QuestionTier, string> = {
@@ -1342,7 +1343,7 @@ function CharacterPicker({
             key={c.id}
             onClick={() => onPick(c.id)}
             style={{
-              padding: "20px 12px",
+              padding: "16px 12px 14px",
               background: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
               border: "3px solid #F59E0B55",
               borderRadius: 20,
@@ -1356,10 +1357,27 @@ function CharacterPicker({
             onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            <div style={{ fontSize: 64, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.12))" }}>
-              {c.avatarEmoji}
-            </div>
-            <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937", marginTop: 8, letterSpacing: -0.2 }}>
+            {c.avatarUrl ? (
+              <div style={{
+                width: 120, height: 120, margin: "0 auto",
+                borderRadius: "50%", overflow: "hidden",
+                background: "#fff",
+                boxShadow: "0 4px 12px rgba(180,83,9,0.2)",
+                border: "3px solid #fff",
+              }}>
+                <img
+                  src={c.avatarUrl}
+                  alt=""
+                  aria-hidden="true"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+              </div>
+            ) : (
+              <div style={{ fontSize: 80, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.12))" }}>
+                {c.avatarEmoji}
+              </div>
+            )}
+            <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937", marginTop: 10, letterSpacing: -0.2 }}>
               {pick(c.name, lang)}
             </div>
           </button>

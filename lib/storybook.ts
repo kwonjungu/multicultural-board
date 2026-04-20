@@ -33,7 +33,7 @@ function alertsPath(roomCode: string): string {
 // Static books live under /public/storybooks/{id}/book.json.
 // Generated books live under Firebase at generated_books/{id}.
 
-const STATIC_BOOK_IDS = ["buzz-sharing"];
+const STATIC_BOOK_IDS = ["curious-worlds", "seasons-beauty"];
 
 export async function loadBook(bookId: string): Promise<Storybook> {
   if (STATIC_BOOK_IDS.includes(bookId)) {
@@ -137,6 +137,21 @@ export async function updateGeneratedBookField(
   if (!book) throw new Error("book not found");
   const merged = { ...book, ...updates };
   await set(ref(db, `generated_books/${bookId}`), stripUndefined(merged));
+}
+
+export async function updateGeneratedBookCharacterAvatar(
+  bookId: string,
+  characterId: string,
+  avatarUrl: string,
+): Promise<void> {
+  const db = getClientDb();
+  const snap = await get(ref(db, `generated_books/${bookId}`));
+  const book = snap.val() as Storybook | null;
+  if (!book) throw new Error("book not found");
+  book.characters = book.characters.map((c) =>
+    c.id === characterId ? { ...c, avatarUrl } : c,
+  );
+  await set(ref(db, `generated_books/${bookId}`), stripUndefined(book));
 }
 
 // === Session ===

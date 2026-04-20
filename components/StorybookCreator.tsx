@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Storybook, StorybookPage, StorybookCharacter, StorybookQuestion, QuestionTier, IbConcept } from "@/lib/types";
-import { saveGeneratedBook, updateGeneratedBookPageImage, updateGeneratedBookField } from "@/lib/storybook";
+import { saveGeneratedBook, updateGeneratedBookPageImage, updateGeneratedBookField, updateGeneratedBookCharacterAvatar } from "@/lib/storybook";
 
 interface Props {
   teacherName: string;
@@ -65,6 +65,7 @@ interface TextAgentBook {
     id: string;
     nameKo: string;
     avatarEmoji: string;
+    avatarImagePrompt?: string;
     personality: string;
     speechStyle: string;
     bookContext: string;
@@ -109,6 +110,7 @@ function agentToStorybook(
     id: c.id,
     name: src.characterNames[c.id] || { ko: c.nameKo },
     avatarEmoji: c.avatarEmoji,
+    avatarImagePrompt: c.avatarImagePrompt,
     personality: c.personality,
     speechStyle: c.speechStyle,
     bookContext: c.bookContext,
@@ -200,49 +202,65 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
       const storybook = agentToStorybook(textData.book, bookId, teacherName);
       await saveGeneratedBook(storybook);
       setBook(storybook);
-      const imageCount = storybook.pages.length + 1; // +1 for cover
+      const imageCount = storybook.pages.length + 1 + storybook.characters.length; // pages + cover + character portraits
       setProgress((p) => ({
         ...p, textDone: true,
         imageTotal: imageCount,
-        message: "🎨 표지와 페이지 이미지를 그리고 있어요…",
+        message: "🎨 표지·페이지·등장인물 이미지를 그리고 있어요…",
       }));
 
-      // Step 2: generate cover + pages in parallel
-      interface ImgTask { idx: number; prompt: string; emoji: string }
+      // Step 2: generate cover + pages + character portraits in parallel
+      type ImgTask =
+        | { kind: "cover"; prompt: string }
+        | { kind: "page"; idx: number; prompt: string }
+        | { kind: "char"; characterId: string; prompt: string };
+
       const tasks: ImgTask[] = [
         {
-          idx: 0,
+          kind: "cover",
           prompt: textData.book.coverImagePrompt
             || `Book cover illustration: "${storybook.title?.ko}". Cute cartoon, soft watercolor, warm palette.`,
-          emoji: storybook.cover.emoji,
         },
         ...storybook.pages.map((p) => ({
+          kind: "page" as const,
           idx: p.idx,
           prompt: p.imagePrompt || `A children's book illustration of: ${p.illustration.emoji}`,
-          emoji: p.illustration.emoji,
         })),
+        ...storybook.characters
+          .filter((c) => c.avatarImagePrompt)
+          .map((c) => ({
+            kind: "char" as const,
+            characterId: c.id,
+            prompt: c.avatarImagePrompt!,
+          })),
       ];
 
       const imagePromises = tasks.map(async (task) => {
         try {
+          const reqBody: Record<string, unknown> = {
+            bookId,
+            prompt: task.prompt,
+          };
+          if (task.kind === "cover") reqBody.pageIdx = 0;
+          else if (task.kind === "page") reqBody.pageIdx = task.idx;
+          else reqBody.characterId = task.characterId;
+
           const res = await fetch("/api/storybook-agent/image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              bookId,
-              pageIdx: task.idx,
-              prompt: task.prompt,
-            }),
+            body: JSON.stringify(reqBody),
           });
           if (!res.ok) return;
           const data = await res.json() as { ok: boolean; url?: string };
-          if (data.ok && data.url) {
+          if (!data.ok || !data.url) return;
+
+          if (task.kind === "cover") {
+            await updateGeneratedBookPageImage(bookId, 0, data.url);
+            setBook((prev) => prev ? { ...prev, cover: { ...prev.cover, imageUrl: data.url } } : prev);
+          } else if (task.kind === "page") {
             await updateGeneratedBookPageImage(bookId, task.idx, data.url);
             setBook((prev) => {
               if (!prev) return prev;
-              if (task.idx === 0) {
-                return { ...prev, cover: { ...prev.cover, imageUrl: data.url } };
-              }
               return {
                 ...prev,
                 pages: prev.pages.map((p) =>
@@ -252,9 +270,20 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
                 ),
               };
             });
+          } else {
+            await updateGeneratedBookCharacterAvatar(bookId, task.characterId, data.url);
+            setBook((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                characters: prev.characters.map((c) =>
+                  c.id === task.characterId ? { ...c, avatarUrl: data.url } : c,
+                ),
+              };
+            });
           }
         } catch (err) {
-          console.warn("image gen failed for", task.idx, err);
+          console.warn("image gen failed for", task, err);
         } finally {
           setProgress((p) => ({
             ...p,

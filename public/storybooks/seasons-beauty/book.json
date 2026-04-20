@@ -1,0 +1,343 @@
+{
+  "id": "seasons-beauty",
+  "title": {
+    "ko": "붕붕이의 사계절 산책",
+    "en": "Buzzy's Four Seasons Walk",
+    "vi": "Chuyến Dạo Bốn Mùa Của Buzzy",
+    "zh": "小蜜蜂的四季散步",
+    "fil": "Ang Paglalakad ni Buzzy sa Apat na Panahon",
+    "ja": "ブンブンの しきの さんぽ"
+  },
+  "cover": {
+    "emoji": "🐝🌸🍁❄️",
+    "bgGradient": "linear-gradient(135deg, #FBCFE8, #A7F3D0 40%, #FDE68A 70%, #BFDBFE)",
+    "imagePrompt": "A cute cartoon bee wearing a tiny scarf standing in the center of a circular wreath divided into four seasons — spring cherry blossoms, summer green leaves, autumn red maple, winter snowflakes. Soft watercolor children's book cover, gentle pastel palette, centered composition, no text."
+  },
+  "authorName": "샘플 그림책 (2즐01-04)",
+  "createdAt": 0,
+  "pages": [
+    {
+      "idx": 1,
+      "text": {
+        "ko": "붕붕이는 사계절을 모두 좋아해요. 날씨가 바뀔 때마다 새로운 냄새가 나거든요. 오늘은 어떤 계절일까요?",
+        "en": "Buzzy loves all four seasons. Every time the weather changes, there's a new smell. What season is today?",
+        "vi": "Buzzy yêu cả bốn mùa. Mỗi khi thời tiết thay đổi, lại có một mùi mới. Hôm nay là mùa nào nhỉ?",
+        "zh": "小蜜蜂喜欢四个季节。每次天气变化,就有新的味道。今天是什么季节呢?",
+        "fil": "Mahal ni Buzzy ang apat na panahon. Sa bawat pagbabago ng panahon, may bagong amoy. Anong panahon kaya ngayon?",
+        "ja": "ブンブンは しきの ぜんぶが だいすき。きせつが かわる たびに あたらしい かおりが するから。きょうは どんな きせつかな?"
+      },
+      "illustration": {
+        "emoji": "🐝🌤️",
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A, #FBCFE8)"
+      },
+      "imagePrompt": "A cute cartoon bee standing at a window looking outside, with a small calendar on the wall. Warm morning light, soft watercolor children's book style."
+    },
+    {
+      "idx": 2,
+      "text": {
+        "ko": "밖에 나오니 봄이에요! 분홍색 꽃잎이 바람에 살랑살랑 춤추고 있었어요. \"와, 꽃 향기가 달콤해!\"",
+        "en": "Outside is spring! Pink petals were dancing softly in the breeze. \"Wow, the flowers smell so sweet!\"",
+        "vi": "Ra ngoài là mùa xuân! Những cánh hoa hồng đang nhảy múa nhẹ nhàng trong gió. \"Ôi, hoa thơm quá!\"",
+        "zh": "外面是春天!粉红色的花瓣在风中轻轻地跳舞。「哇,花香真甜!」",
+        "fil": "Sa labas ay tagsibol! Mahinahong sumasayaw ang mga rosas na talulot sa hangin. \"Ang bango ng mga bulaklak!\"",
+        "ja": "そとに でると はるでした!ピンクの はなびらが かぜで ひらひら おどっています。「わあ、はなの かおりが あまい!」"
+      },
+      "illustration": {
+        "emoji": "🌸🌷🦋",
+        "bgGradient": "linear-gradient(180deg, #FBCFE8, #FCE7F3, #FEF3C7)"
+      },
+      "imagePrompt": "A cute cartoon bee flying through a spring scene with pink cherry blossoms, pastel tulips, and a small butterfly. Soft watercolor children's book style, warm spring light, cheerful mood."
+    },
+    {
+      "idx": 3,
+      "text": {
+        "ko": "꽃잎 한 장을 손바닥에 받아보았어요. \"이건 핑크, 저건 노랑…\" 붕붕이는 공책에 봄의 색을 그렸어요.",
+        "en": "Buzzy caught a petal in her palm. \"This is pink, that one yellow…\" She drew the colors of spring in her notebook.",
+        "vi": "Buzzy hứng một cánh hoa trong lòng bàn tay. \"Cánh này hồng, cánh kia vàng…\" Bạn vẽ màu mùa xuân vào sổ tay.",
+        "zh": "小蜜蜂把一片花瓣接在手心。「这是粉色,那是黄色……」她把春天的颜色画在本子上。",
+        "fil": "Sinalo ni Buzzy ang isang talulot sa palad. \"Pink ito, dilaw iyon…\" Iginuhit niya ang mga kulay ng tagsibol sa notebook.",
+        "ja": "はなびらを てのひらで うけとめました。「これは ピンク、あれは きいろ…」ブンブンは ノートに はるの いろを かきました。"
+      },
+      "illustration": {
+        "emoji": "🌸📓🖍️",
+        "bgGradient": "linear-gradient(135deg, #FCE7F3, #FEF3C7)"
+      },
+      "imagePrompt": "A cute cartoon bee sitting on a flower drawing in a small sketchbook, with colored petals and a crayon nearby. Soft pastel pink and yellow watercolor palette, children's book style."
+    },
+    {
+      "idx": 4,
+      "text": {
+        "ko": "여름이 왔어요! 나무가 진한 초록으로 빛났어요. 붕붕이는 시원한 개울물에 발을 담가보았지요.",
+        "en": "Summer came! The trees shone bright green. Buzzy dipped her feet in the cool stream.",
+        "vi": "Mùa hè đến rồi! Cây cối toả sáng xanh đậm. Buzzy nhúng chân vào dòng suối mát.",
+        "zh": "夏天来了!树木闪着浓绿的光。小蜜蜂把脚伸进凉爽的小溪里。",
+        "fil": "Dumating na ang tag-init! Makintab ang malalagong puno. Isinawsaw ni Buzzy ang paa sa malamig na batis.",
+        "ja": "なつが きました!きが こい みどりで かがやいて います。ブンブンは つめたい おがわに あしを つけて みました。"
+      },
+      "illustration": {
+        "emoji": "🌳💧☀️",
+        "bgGradient": "linear-gradient(180deg, #22D3EE, #86EFAC, #FDE68A)"
+      },
+      "imagePrompt": "A cute cartoon bee resting by a small stream surrounded by lush green trees and sunlight dappling through leaves. Soft watercolor summer scene, children's book style."
+    },
+    {
+      "idx": 5,
+      "text": {
+        "ko": "\"매미가 저렇게 크게 노래하네!\" 친구 나비가 살포시 내려앉았어요. 여름은 소리까지 싱그러웠답니다.",
+        "en": "\"The cicadas are singing so loud!\" A butterfly friend landed gently. Summer was fresh even in its sounds.",
+        "vi": "\"Ve sầu hát to quá!\" Bạn bướm nhẹ nhàng đậu xuống. Mùa hè tươi mát cả trong âm thanh.",
+        "zh": "「蝉叫得好大声!」蝴蝶朋友轻轻地落下来。夏天连声音都清新。",
+        "fil": "\"Ang lakas ng huni ng kuliglig!\" Dahan-dahang dumapo ang kaibigang paruparo. Sariwa ang tag-init kahit sa mga tunog.",
+        "ja": "「セミが おおきな こえで うたっているね!」 ともだちの チョウチョが そっと とまりました。なつは おとまで すがすがしいんです。"
+      },
+      "illustration": {
+        "emoji": "🦋🎵🌻",
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #A7F3D0)"
+      },
+      "imagePrompt": "A cute cartoon bee and a pastel butterfly resting on a sunflower in a lush summer meadow, with little music notes floating. Soft watercolor children's book style."
+    },
+    {
+      "idx": 6,
+      "text": {
+        "ko": "가을이 되자 잎들이 빨강과 노랑으로 옷을 갈아입었어요. 붕붕이는 가장 예쁜 잎을 골라 책갈피로 만들었지요.",
+        "en": "In autumn, the leaves changed into red and yellow clothes. Buzzy picked the prettiest leaf and made a bookmark.",
+        "vi": "Mùa thu đến, lá thay áo đỏ và vàng. Buzzy chọn chiếc lá đẹp nhất và làm dấu trang.",
+        "zh": "秋天到了,叶子换上了红色和黄色的衣服。小蜜蜂挑了一片最漂亮的叶子做书签。",
+        "fil": "Pagdating ng taglagas, nagpalit ng pula at dilaw na damit ang mga dahon. Pumili si Buzzy ng pinakamagandang dahon at ginawang bookmark.",
+        "ja": "あきに なると はっぱは あかと きいろの ふくに きがえました。ブンブンは いちばん きれいな はっぱを えらんで しおりを つくりました。"
+      },
+      "illustration": {
+        "emoji": "🍁🍂📖",
+        "bgGradient": "linear-gradient(180deg, #F97316, #FBBF24, #FDE68A)"
+      },
+      "imagePrompt": "A cute cartoon bee holding a bright red maple leaf near a pile of autumn leaves, with a small picture book nearby. Warm orange and amber watercolor palette, cozy children's book style."
+    },
+    {
+      "idx": 7,
+      "text": {
+        "ko": "바람이 '사각사각' 낙엽을 밟는 소리를 들려주었어요. 붕붕이는 그 소리를 흉내 내며 웃었답니다. \"가을은 음악이야!\"",
+        "en": "The wind made a \"crunch-crunch\" sound in the fallen leaves. Buzzy giggled as she mimicked it. \"Autumn is music!\"",
+        "vi": "Gió phát ra tiếng 'sột soạt' khi đạp lên lá rụng. Buzzy cười khúc khích khi bắt chước âm đó. \"Mùa thu là âm nhạc!\"",
+        "zh": "风在落叶上发出「沙沙」的声音。小蜜蜂一边模仿一边笑。「秋天是音乐!」",
+        "fil": "Gumawa ang hangin ng 'kaluskos' na tunog sa mga nalaglag na dahon. Tumawa si Buzzy habang ginagaya ito. \"Musika ang taglagas!\"",
+        "ja": "かぜが 'さくさく' らくようを ふむ おとを きかせて くれました。ブンブンは その おとを まねしながら わらいました。「あきは おんがく だね!」"
+      },
+      "illustration": {
+        "emoji": "🍃🎶",
+        "bgGradient": "linear-gradient(135deg, #FBBF24, #EA580C)"
+      },
+      "imagePrompt": "A cute cartoon bee happily dancing on a pile of crunchy autumn leaves, with little music notes in the air. Warm sunset palette, soft watercolor children's book style."
+    },
+    {
+      "idx": 8,
+      "text": {
+        "ko": "겨울이 찾아왔어요. 눈송이가 조용조용 내려앉았지요. 세상이 하얀 솜이불을 덮은 것 같았어요.",
+        "en": "Winter arrived. Snowflakes settled down quietly. It looked like the world had pulled up a white cotton blanket.",
+        "vi": "Mùa đông đến. Những bông tuyết nhẹ nhàng đáp xuống. Cả thế giới như trùm một chiếc chăn bông trắng.",
+        "zh": "冬天来了。雪花静静地飘落。世界像盖上了白色的棉被。",
+        "fil": "Dumating na ang taglamig. Tahimik na bumagsak ang mga niyebe. Tila nagsuot ng puting kumot ng bulak ang mundo.",
+        "ja": "ふゆが やってきました。ゆきが しずかに しずかに ふりて きます。せかいが しろい わたの ふとんを かけた みたい でした。"
+      },
+      "illustration": {
+        "emoji": "❄️☃️",
+        "bgGradient": "linear-gradient(180deg, #DBEAFE, #E0E7FF, #F3F4F6)"
+      },
+      "imagePrompt": "A cute cartoon bee wearing a tiny scarf gazing at softly falling snowflakes over a white hill, with a small snowman in the distance. Gentle pastel blue and cream watercolor palette, children's book style."
+    },
+    {
+      "idx": 9,
+      "text": {
+        "ko": "붕붕이는 스케치북을 꺼내 사계절을 모두 그려봤어요. 봄의 분홍, 여름의 초록, 가을의 빨강, 겨울의 하양.",
+        "en": "Buzzy opened her sketchbook and drew all four seasons. Spring pink, summer green, autumn red, winter white.",
+        "vi": "Buzzy mở sổ vẽ và vẽ cả bốn mùa. Hồng mùa xuân, xanh mùa hè, đỏ mùa thu, trắng mùa đông.",
+        "zh": "小蜜蜂打开画册,把四季都画了下来。春天的粉、夏天的绿、秋天的红、冬天的白。",
+        "fil": "Binuksan ni Buzzy ang sketchbook at iginuhit ang lahat ng panahon. Rosas ng tagsibol, luntian ng tag-init, pula ng taglagas, puti ng taglamig.",
+        "ja": "ブンブンは スケッチブックを ひらいて しきを ぜんぶ かいて みました。はるの ピンク、なつの みどり、あきの あか、ふゆの しろ。"
+      },
+      "illustration": {
+        "emoji": "🎨📓",
+        "bgGradient": "linear-gradient(135deg, #FBCFE8, #A7F3D0, #FCA5A5, #E0E7FF)"
+      },
+      "imagePrompt": "A cute cartoon bee painting four small landscapes of spring, summer, autumn, and winter on a sketchbook, with color swatches beside it. Warm cozy desk scene, soft watercolor children's book style."
+    },
+    {
+      "idx": 10,
+      "text": {
+        "ko": "\"자연은 매일 매일 다르게 아름다워.\" 붕붕이의 마음은 네 가지 색으로 가득 찼답니다. 🌈",
+        "en": "\"Nature is beautiful in a different way every single day.\" Buzzy's heart filled with four colors. 🌈",
+        "vi": "\"Thiên nhiên đẹp theo một cách khác nhau mỗi ngày.\" Trái tim Buzzy tràn ngập bốn màu sắc. 🌈",
+        "zh": "「大自然每天都有不一样的美。」小蜜蜂的心被四种颜色填满了。🌈",
+        "fil": "\"Ang kalikasan ay maganda sa iba't ibang paraan araw-araw.\" Napuno ng apat na kulay ang puso ni Buzzy. 🌈",
+        "ja": "「しぜんは まいにち ちがう うつくしさが あるんだ。」 ブンブンの こころは 4つの いろで いっぱいに なりました。🌈"
+      },
+      "illustration": {
+        "emoji": "🌈🐝💛",
+        "bgGradient": "linear-gradient(135deg, #FBCFE8, #FDE68A, #A7F3D0, #BFDBFE)"
+      },
+      "imagePrompt": "A cute cartoon bee standing under a soft rainbow arch with petals, leaves, and snowflakes gently swirling around her. Dreamy pastel palette, warm hopeful glow, watercolor children's book style."
+    }
+  ],
+  "characters": [
+    {
+      "id": "buzzy",
+      "name": {
+        "ko": "붕붕이",
+        "en": "Buzzy",
+        "vi": "Buzzy",
+        "zh": "布兹",
+        "fil": "Buzzy",
+        "ja": "ブンブン"
+      },
+      "avatarEmoji": "🐝",
+      "avatarImagePrompt": "A cute cartoon bee character portrait — friendly smile, big gentle eyes, wearing a tiny pastel-pink scarf, little yellow-and-black striped body, holding a small sketchbook. Soft watercolor children's book style, clean cream solid background, character centered, no text, no scene.",
+      "personality": "감수성이 풍부하고 자연의 작은 변화를 금방 알아차리는 꿀벌. 자기 느낌을 색과 소리로 표현하는 걸 좋아한다.",
+      "speechStyle": "말끝에 '~붕!' 붙이기. 감탄할 땐 '와~붕!' 생각에 잠길 땐 '음… 이건 뭐지~붕?'",
+      "bookContext": "봄·여름·가을·겨울을 차례로 느끼며, 자연의 아름다움을 자신만의 방식(그림·소리·색)으로 표현할 수 있다는 걸 배웠다."
+    },
+    {
+      "id": "butterfly-friend",
+      "name": {
+        "ko": "나비 친구",
+        "en": "Butterfly Friend",
+        "vi": "Bạn Bướm",
+        "zh": "蝴蝶朋友",
+        "fil": "Kaibigang Paruparo",
+        "ja": "チョウチョの ともだち"
+      },
+      "avatarEmoji": "🦋",
+      "avatarImagePrompt": "A cute cartoon butterfly character portrait — pastel pink and purple wings with gentle patterns, kind eyes, small smile, soft antennae. Watercolor children's book style, clean pastel-cream solid background, character centered, no text, no scene.",
+      "personality": "부드럽고 상냥하다. 붕붕이 곁에서 함께 계절을 느끼는 친구.",
+      "speechStyle": "살랑살랑 부드러운 말투, '~해요~' 체. 예: '이 꽃 좀 봐요~' '같이 날아요~'",
+      "bookContext": "여름에 붕붕이 곁에 날아와 함께 매미 소리를 듣고, 계절마다 다시 찾아오는 친구."
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-intro-1",
+      "tier": "intro",
+      "text": {
+        "ko": "표지에는 어떤 계절들이 보이나요?",
+        "en": "Which seasons can you see on the cover?",
+        "vi": "Trên bìa bạn thấy những mùa nào?",
+        "zh": "封面上能看到哪些季节?",
+        "fil": "Anong mga panahon ang nakikita mo sa pabalat?",
+        "ja": "ひょうしには どんな きせつが みえますか?"
+      }
+    },
+    {
+      "id": "q-intro-2",
+      "tier": "intro",
+      "text": {
+        "ko": "여러분이 가장 좋아하는 계절은 무엇인가요?",
+        "en": "Which season do you love most?",
+        "vi": "Bạn thích mùa nào nhất?",
+        "zh": "你最喜欢哪个季节?",
+        "fil": "Anong panahon ang pinaka-gusto mo?",
+        "ja": "あなたが いちばん すきな きせつは なんですか?"
+      }
+    },
+    {
+      "id": "q-check-2",
+      "tier": "check",
+      "pageIdx": 2,
+      "text": {
+        "ko": "봄에 붕붕이가 맡은 향기는 무엇이었나요?",
+        "en": "What scent did Buzzy smell in spring?",
+        "vi": "Mùa xuân, Buzzy ngửi thấy mùi gì?",
+        "zh": "春天小蜜蜂闻到了什么味道?",
+        "fil": "Anong amoy ang naamoy ni Buzzy sa tagsibol?",
+        "ja": "はるに ブンブンが かいだ かおりは なんでしたか?"
+      }
+    },
+    {
+      "id": "q-check-4",
+      "tier": "check",
+      "pageIdx": 4,
+      "text": {
+        "ko": "여름에 붕붕이는 무엇을 했나요?",
+        "en": "What did Buzzy do in summer?",
+        "vi": "Mùa hè, Buzzy đã làm gì?",
+        "zh": "夏天小蜜蜂做了什么?",
+        "fil": "Ano ang ginawa ni Buzzy sa tag-init?",
+        "ja": "なつに ブンブンは なにを しましたか?"
+      }
+    },
+    {
+      "id": "q-check-6",
+      "tier": "check",
+      "pageIdx": 6,
+      "text": {
+        "ko": "가을에 붕붕이가 만든 것은 무엇이었나요?",
+        "en": "What did Buzzy make in autumn?",
+        "vi": "Mùa thu, Buzzy đã làm ra gì?",
+        "zh": "秋天小蜜蜂做了什么?",
+        "fil": "Ano ang ginawa ni Buzzy sa taglagas?",
+        "ja": "あきに ブンブンが つくったのは なんでしたか?"
+      }
+    },
+    {
+      "id": "q-core-1",
+      "tier": "core",
+      "text": {
+        "ko": "붕붕이는 왜 계절마다 새로운 아름다움을 느꼈을까요?",
+        "en": "Why did Buzzy feel a new beauty in every season?",
+        "vi": "Vì sao Buzzy cảm nhận vẻ đẹp mới trong mỗi mùa?",
+        "zh": "为什么小蜜蜂每个季节都能感受到新的美?",
+        "fil": "Bakit nakakaramdam si Buzzy ng bagong ganda sa bawat panahon?",
+        "ja": "ブンブンは なぜ きせつごとに あたらしい うつくしさを かんじたのでしょう?"
+      }
+    },
+    {
+      "id": "q-deep-1",
+      "tier": "deep",
+      "standard": "2즐01-04 자연의 아름다움 감상·표현",
+      "text": {
+        "ko": "여러분은 오늘 자연의 어떤 아름다움을 보거나 들었나요? 그림이나 소리로 표현해봅시다.",
+        "en": "What beauty of nature did you see or hear today? Try to express it in a drawing or a sound.",
+        "vi": "Hôm nay bạn đã thấy hoặc nghe vẻ đẹp nào của thiên nhiên? Hãy thử vẽ hoặc phát ra âm thanh.",
+        "zh": "今天你看到或听到了大自然怎样的美?可以用画或声音表现出来。",
+        "fil": "Anong ganda ng kalikasan ang iyong nakita o narinig ngayon? Subukan mong ipakita sa guhit o tunog.",
+        "ja": "きょう あなたは しぜんの どんな うつくしさを みたり きいたりしましたか? えや おとで あらわしてみよう。"
+      }
+    },
+    {
+      "id": "q-deep-2",
+      "tier": "deep",
+      "standard": "2즐01-04 계절 변화 인식",
+      "text": {
+        "ko": "계절이 바뀌는 걸 알 수 있는 신호는 무엇일까요? (냄새·소리·색 등)",
+        "en": "How can you tell a season is changing? (smells, sounds, colors...)",
+        "vi": "Làm sao bạn biết mùa đang thay đổi? (mùi, âm thanh, màu sắc...)",
+        "zh": "怎么知道季节在变化?(气味、声音、颜色……)",
+        "fil": "Paano mo malalaman na nagbabago ang panahon? (amoy, tunog, kulay...)",
+        "ja": "きせつが かわるのが わかる しるしは なんでしょう?(においや おと、いろなど)"
+      }
+    },
+    {
+      "id": "q-concept-1",
+      "tier": "concept",
+      "ibConcept": "change",
+      "text": {
+        "ko": "사계절의 '변화'는 우리 마음에 어떤 느낌을 줄까요?",
+        "en": "How does the 'change' of seasons make our heart feel?",
+        "vi": "Sự 'thay đổi' của bốn mùa mang lại cảm xúc gì cho trái tim ta?",
+        "zh": "四季的「变化」给我们的心带来什么感觉?",
+        "fil": "Anong pakiramdam ang dulot sa puso natin ng 'pagbabago' ng mga panahon?",
+        "ja": "しきの『へんか』は わたしたちの こころに どんな きもちを もたらしますか?"
+      }
+    },
+    {
+      "id": "q-concept-2",
+      "tier": "concept",
+      "ibConcept": "perspective",
+      "text": {
+        "ko": "같은 봄이라도 사람마다 느끼는 것이 달라요. 여러분만의 '관점'은 어떤가요?",
+        "en": "Even in the same spring, people feel differently. What is your own 'perspective'?",
+        "vi": "Cùng là mùa xuân, nhưng mỗi người cảm nhận khác nhau. 'Góc nhìn' của bạn là gì?",
+        "zh": "同样是春天,每个人的感受都不同。你自己的「观点」是什么?",
+        "fil": "Sa iisang tagsibol, iba-iba ang nararamdaman ng tao. Ano ang iyong 'pananaw'?",
+        "ja": "おなじ はるでも ひとによって かんじかたが ちがいます。あなたの『みかた』は どんなものですか?"
+      }
+    }
+  ]
+}

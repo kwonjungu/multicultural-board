@@ -1,0 +1,343 @@
+{
+  "id": "curious-worlds",
+  "title": {
+    "ko": "붕붕이의 궁금 여행",
+    "en": "Buzzy's Curious Trip",
+    "vi": "Chuyến Du Hành Tò Mò Của Buzzy",
+    "zh": "小蜜蜂的好奇之旅",
+    "fil": "Ang Mausisang Paglalakbay ni Buzzy",
+    "ja": "ブンブンの ふしぎなたび"
+  },
+  "cover": {
+    "emoji": "🐝🌍✨",
+    "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A 40%, #A5B4FC)",
+    "imagePrompt": "A cute cartoon bee wearing a little explorer cap with goggles, holding a glowing globe, surrounded by a tiny rocket, a seashell, a tree root, and a VR headset icon. Soft watercolor children's book cover, warm honey palette with pastel blues and purples, dreamy soft lighting, centered composition, no text."
+  },
+  "authorName": "샘플 그림책 (2슬02-04)",
+  "createdAt": 0,
+  "pages": [
+    {
+      "idx": 1,
+      "text": {
+        "ko": "붕붕이는 오늘도 궁금한 게 많아요. 책장 앞에 서서 큰 지도를 보았어요. \"세상은 얼마나 넓을까?\"",
+        "en": "Buzzy is full of questions today. Standing by the bookshelf, she looks at a big map. \"How wide is the world?\"",
+        "vi": "Hôm nay Buzzy có nhiều thắc mắc. Đứng cạnh kệ sách, bạn nhìn tấm bản đồ to. \"Thế giới rộng bao nhiêu nhỉ?\"",
+        "zh": "小蜜蜂今天有好多好奇的事。她站在书架前看着一张大地图。「世界有多大呢?」",
+        "fil": "Maraming tanong si Buzzy ngayon. Tumingin siya sa malaking mapa sa tabi ng istante. \"Gaano kalaki ang mundo?\"",
+        "ja": "ブンブンは きょうも きになる ことが たくさんです。ほんだなの まえで 大きな ちずを みました。「せかいは どれくらい ひろいのかな?」"
+      },
+      "illustration": {
+        "emoji": "🐝📖🗺️",
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #FDE68A)"
+      },
+      "imagePrompt": "A cute cartoon bee standing on a stack of picture books, looking up at a giant colorful world map on the wall. Cozy warm room, sunlight streaming in, soft watercolor children's book style."
+    },
+    {
+      "idx": 2,
+      "text": {
+        "ko": "먼저 우주로 떠났어요! 작은 로켓을 타고 별 사이를 날아갔어요. 창밖엔 푸른 행성과 반짝이는 별들이 가득했지요.",
+        "en": "First, off to space! Buzzy flies a little rocket between the stars. Through the window she sees blue planets and twinkling stars everywhere.",
+        "vi": "Đầu tiên, bay lên vũ trụ! Buzzy lái tên lửa nhỏ giữa các vì sao. Qua cửa sổ, bạn thấy những hành tinh xanh và những ngôi sao lấp lánh.",
+        "zh": "她先去了太空!乘着小火箭飞过星星之间。窗外是蓝色的行星和闪烁的星星。",
+        "fil": "Una, sa kalawakan! Lumipad si Buzzy gamit ang maliit na rocket sa gitna ng mga bituin. Sa bintana, makikita ang mga asul na planeta at kumikislap na mga bituin.",
+        "ja": "さいしょは うちゅうへ!小さな ロケットに のって ほしの あいだを とびました。まどの そとには 青い ほしや きらめく ほしが いっぱいです。"
+      },
+      "illustration": {
+        "emoji": "🚀⭐🪐",
+        "bgGradient": "linear-gradient(180deg, #1E3A8A, #3730A3 60%, #6366F1)"
+      },
+      "imagePrompt": "A cute cartoon bee piloting a small colorful rocket through a purple-blue starry sky with pastel planets and swirling stardust. Soft watercolor children's book illustration, whimsical and dreamy."
+    },
+    {
+      "idx": 3,
+      "text": {
+        "ko": "별 할아버지가 다가와 말씀하셨어요. \"별은 아주아주 멀리서 빛을 보내준단다.\" 붕붕이의 눈도 반짝 빛났어요.",
+        "en": "Grandpa Star came over and said, \"Stars send their light from very, very far away.\" Buzzy's eyes sparkled too.",
+        "vi": "Ông Sao đến gần và nói: \"Các vì sao gửi ánh sáng từ rất, rất xa đấy.\" Mắt Buzzy cũng lấp lánh.",
+        "zh": "星爷爷走过来说:「星星从很远很远的地方送来光。」小蜜蜂的眼睛也闪闪发亮。",
+        "fil": "Lumapit si Lolo Bituin at nagsabi, \"Ang mga bituin ay nagpapadala ng liwanag mula sa napakalayong lugar.\" Kumislap din ang mga mata ni Buzzy.",
+        "ja": "ほしじいさんが ちかづいて いいました。「ほしは とおく とおくから ひかりを おくっているんじゃよ。」ブンブンの めも きらきらしました。"
+      },
+      "illustration": {
+        "emoji": "🌟👴✨",
+        "bgGradient": "linear-gradient(180deg, #312E81, #4338CA, #818CF8)"
+      },
+      "imagePrompt": "A friendly wise old star character with a long beard and kind smile, floating next to a cute bee in space. Pastel starry background with sparkles, soft watercolor children's book illustration, warm magical glow."
+    },
+    {
+      "idx": 4,
+      "text": {
+        "ko": "이번엔 바닷속으로! 잠수복을 입고 깊이 내려갔어요. 색색의 산호와 물고기들이 춤을 추고 있었답니다.",
+        "en": "Next, down into the sea! Buzzy put on a diving suit and sank deep. Colorful corals and fish were dancing all around.",
+        "vi": "Lần này xuống đáy biển! Buzzy mặc bộ lặn và lặn sâu xuống. San hô và cá nhiều màu đang nhảy múa khắp nơi.",
+        "zh": "这次潜入海底!小蜜蜂穿上潜水服潜到深处。五颜六色的珊瑚和鱼儿正在跳舞。",
+        "fil": "Sunod, papunta sa ilalim ng dagat! Nagsuot si Buzzy ng diving suit at bumaba sa malalim. Nagsasayawan ang makukulay na coral at mga isda.",
+        "ja": "つぎは うみの そこへ!せんすいふくを きて ふかく もぐりました。いろんな いろの さんごや さかなたちが おどって いました。"
+      },
+      "illustration": {
+        "emoji": "🐟🐚🌊",
+        "bgGradient": "linear-gradient(180deg, #06B6D4, #22D3EE, #A5F3FC)"
+      },
+      "imagePrompt": "A cute cartoon bee wearing a small diving suit and round helmet swimming among colorful coral reefs with smiling fish. Soft underwater light, pastel aqua palette, gentle bubbles, watercolor children's book style."
+    },
+    {
+      "idx": 5,
+      "text": {
+        "ko": "\"안녕! 여기 내려온 건 처음이지?\" 문어 친구가 반겨주었어요. 바닷속에도 말하는 친구들이 있었지요.",
+        "en": "\"Hi there! First time down here?\" An octopus friend greeted her. There are chatty friends under the sea too!",
+        "vi": "\"Xin chào! Lần đầu xuống đây à?\" Bạn bạch tuộc chào đón. Dưới biển cũng có những bạn biết nói!",
+        "zh": "「你好!第一次来到这里吧?」章鱼朋友热情地打招呼。海底也有会说话的朋友呢!",
+        "fil": "\"Kumusta! Unang beses mo dito?\" bati ng kaibigang pugita. May mga kaibigang marunong magsalita rin sa ilalim ng dagat.",
+        "ja": "「こんにちは!ここは はじめてでしょ?」タコの ともだちが よろこんで むかえて くれました。うみの なかにも おしゃべりな ともだちが いるんです。"
+      },
+      "illustration": {
+        "emoji": "🐙💬",
+        "bgGradient": "linear-gradient(180deg, #0E7490, #06B6D4, #67E8F9)"
+      },
+      "imagePrompt": "A friendly cartoon purple octopus with a big smile waving its tentacles, greeting the bee in a diving suit. Soft watercolor underwater scene, pastel teal colors, cheerful mood."
+    },
+    {
+      "idx": 6,
+      "text": {
+        "ko": "땅속으로 파고 들어가 보았어요. 지렁이 친구가 길을 알려줬지요. \"여기 뿌리 사이에 반짝이는 돌이 있단다!\"",
+        "en": "Buzzy dug into the ground. An earthworm friend showed her the way. \"There's a sparkly stone between the roots!\"",
+        "vi": "Buzzy chui xuống lòng đất. Bạn giun đất dẫn đường. \"Giữa các rễ cây có hòn đá lấp lánh đấy!\"",
+        "zh": "小蜜蜂钻进了地下。蚯蚓朋友给她带路:「树根之间有闪闪发光的石头!」",
+        "fil": "Dumungaw si Buzzy sa lupa. Pinakita ng kaibigang bulate ang daan. \"Sa gitna ng mga ugat, may makinang na bato!\"",
+        "ja": "つちの なかへ もぐっていきました。ミミズの ともだちが みちを おしえて くれました。「ねっこの あいだに きらきら ひかる いしが あるよ!」"
+      },
+      "illustration": {
+        "emoji": "🌱🐛💎",
+        "bgGradient": "linear-gradient(180deg, #78350F, #B45309, #FBBF24)"
+      },
+      "imagePrompt": "A cute cartoon bee and a smiling earthworm exploring tree roots underground, with sparkling gem stones glowing between the roots. Warm brown and amber palette, watercolor children's book illustration."
+    },
+    {
+      "idx": 7,
+      "text": {
+        "ko": "이제 가상 공간이에요! 작은 헤드셋을 쓰자 눈앞에 새로운 세계가 펼쳐졌어요. 픽셀로 만든 숲이 반짝였지요.",
+        "en": "Now, into the virtual world! As Buzzy put on a tiny headset, a new world opened in front of her eyes. A pixel-made forest shimmered.",
+        "vi": "Giờ đến thế giới ảo! Buzzy đội chiếc kính nhỏ, và một thế giới mới mở ra trước mắt. Khu rừng bằng pixel lấp lánh.",
+        "zh": "现在是虚拟空间!戴上小耳机,眼前就展开了新世界。像素森林闪闪发光。",
+        "fil": "Ngayon, sa virtual na mundo! Nang isuot ni Buzzy ang maliit na headset, bumukas ang bagong mundo sa harap niya. Kumikislap ang pixel na kagubatan.",
+        "ja": "つぎは バーチャルな せかい!小さな ヘッドセットを かけると めの まえに あたらしい せかいが ひらきました。ピクセルで できた もりが きらきら しました。"
+      },
+      "illustration": {
+        "emoji": "🥽💻🌲",
+        "bgGradient": "linear-gradient(135deg, #C7D2FE, #A5B4FC, #EC4899)"
+      },
+      "imagePrompt": "A cute cartoon bee wearing a small VR headset standing in front of a glowing portal showing a magical pixel forest. Soft pastel purple-pink palette, shimmering geometric leaves, watercolor children's book style."
+    },
+    {
+      "idx": 8,
+      "text": {
+        "ko": "화면 속에서는 무엇이든 만들 수 있었어요. 붕붕이는 하늘을 나는 고래도 그려보았어요. \"여기선 상상이 다 이루어지네!\"",
+        "en": "In the screen world, anything could be made. Buzzy even drew a flying whale. \"Here, every dream comes true!\"",
+        "vi": "Trong thế giới màn hình, bạn có thể tạo bất cứ gì. Buzzy còn vẽ cả một con cá voi biết bay. \"Ở đây, mọi điều tưởng tượng đều thành hiện thực!\"",
+        "zh": "在屏幕里什么都能做。小蜜蜂还画了一只会飞的鲸鱼。「这里,想象都能实现!」",
+        "fil": "Sa loob ng screen, kahit ano ay maaaring gawin. Nagdrawing pa si Buzzy ng lumilipad na balyena. \"Dito, lahat ng pangarap ay nagiging totoo!\"",
+        "ja": "がめんの なかでは なんでも つくれました。ブンブンは そらを とぶ クジラも かいて みました。「ここでは そうぞうが ぜんぶ かなうんだ!」"
+      },
+      "illustration": {
+        "emoji": "🐋💫",
+        "bgGradient": "linear-gradient(135deg, #FBCFE8, #C7D2FE, #93C5FD)"
+      },
+      "imagePrompt": "A cute cartoon bee drawing a flying whale in a dreamy digital space with sparkles and floating geometric shapes. Soft pastel pink and blue palette, magical atmosphere, watercolor children's book style."
+    },
+    {
+      "idx": 9,
+      "text": {
+        "ko": "여행을 마치고 집에 돌아온 붕붕이는 책과 태블릿을 함께 펼쳤어요. 책, 영상, 게임 — 궁금한 건 여러 방법으로 알 수 있답니다.",
+        "en": "Back home, Buzzy opened both a book and a tablet. Books, videos, games — so many ways to explore what we're curious about!",
+        "vi": "Trở về nhà, Buzzy mở cả sách và máy tính bảng. Sách, video, trò chơi — có nhiều cách để khám phá điều ta thắc mắc!",
+        "zh": "回到家,小蜜蜂打开了书和平板电脑。书、视频、游戏——好奇的事有很多方法去了解!",
+        "fil": "Pag-uwi, binuksan ni Buzzy ang libro at tablet. Libro, video, laro — maraming paraan para tuklasin ang ating mga tanong!",
+        "ja": "たびから いえに もどった ブンブンは ほんと タブレットを ひらきました。ほん、どうが、ゲーム — きになる ことは いろんな ほうほうで しれるんだ!"
+      },
+      "illustration": {
+        "emoji": "📚📱🎮",
+        "bgGradient": "linear-gradient(135deg, #FEF3C7, #A7F3D0, #BFDBFE)"
+      },
+      "imagePrompt": "A cute cartoon bee at a cozy desk with an open picture book, a tablet playing video, and a small game controller. Warm pastel palette, cozy evening light, watercolor children's book style."
+    },
+    {
+      "idx": 10,
+      "text": {
+        "ko": "\"다음엔 어디로 가볼까?\" 붕붕이의 마음이 반짝였어요. 세상에는 아직 알고 싶은 게 너무 많거든요. ✨",
+        "en": "\"Where shall we go next?\" Buzzy's heart sparkled. There is still so much she wants to know about the world. ✨",
+        "vi": "\"Lần sau mình đi đâu nhỉ?\" Tim Buzzy lấp lánh. Trên đời vẫn còn rất nhiều điều bạn muốn biết. ✨",
+        "zh": "「下一次去哪儿呢?」小蜜蜂的心闪闪发光。世界上还有好多想知道的事情呢!✨",
+        "fil": "\"Saan kaya tayo susunod?\" Kumikinang ang puso ni Buzzy. Marami pa rin siyang gustong malaman tungkol sa mundo. ✨",
+        "ja": "「つぎは どこへ いこうかな?」 ブンブンの こころが きらきら。せかいには まだまだ しりたい ことが いっぱい あるんです。✨"
+      },
+      "illustration": {
+        "emoji": "🗺️💫🐝",
+        "bgGradient": "linear-gradient(180deg, #FBBF24, #FCD34D, #FEF3C7)"
+      },
+      "imagePrompt": "A cute cartoon bee standing in front of a giant colorful wall map with stickers marking space, ocean, earth, and digital worlds, with stars and sparkles around. Warm sunset glow, hopeful mood, watercolor children's book style."
+    }
+  ],
+  "characters": [
+    {
+      "id": "buzzy",
+      "name": {
+        "ko": "붕붕이",
+        "en": "Buzzy",
+        "vi": "Buzzy",
+        "zh": "布兹",
+        "fil": "Buzzy",
+        "ja": "ブンブン"
+      },
+      "avatarEmoji": "🐝",
+      "avatarImagePrompt": "A cute cartoon bee character portrait — friendly smile, big curious eyes, wearing a small explorer cap with tiny goggles on top, little yellow-and-black striped body, soft watercolor children's book style, clean pastel-cream solid background, character centered, no text, no scene, just the character.",
+      "personality": "호기심이 아주 많고 씩씩한 탐험가 꿀벌. 새로운 걸 보면 눈이 반짝반짝 빛난다.",
+      "speechStyle": "말끝에 '~붕!' 붙이기. 신날 땐 '우와~붕!' 궁금할 땐 '그래서? ~붕?'",
+      "bookContext": "우주·바닷속·땅속·가상공간을 차례로 탐험하며, 책·영상·VR 등 여러 매체로 궁금한 것을 알아볼 수 있다는 걸 배웠다."
+    },
+    {
+      "id": "star-grandpa",
+      "name": {
+        "ko": "별 할아버지",
+        "en": "Grandpa Star",
+        "vi": "Ông Sao",
+        "zh": "星爷爷",
+        "fil": "Lolo Bituin",
+        "ja": "ほしじいさん"
+      },
+      "avatarEmoji": "🌟",
+      "avatarImagePrompt": "A friendly wise old star character portrait — long white beard, kind warm smile, cosmic pointed hat, tiny twinkle sparkles around. Soft watercolor children's book style, clean pastel deep-blue solid background, character centered, no text, no scene.",
+      "personality": "따뜻하고 느긋한 어른. 우주의 별들을 오래 지켜본 현명한 가이드.",
+      "speechStyle": "느긋하게 '~란다' 체. 예: '별은 참 신기하단다.' 가끔 '허허~' 하고 웃음.",
+      "bookContext": "우주로 여행 온 붕붕이를 만나 별이 왜 반짝이는지 이야기해준 가이드."
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-intro-1",
+      "tier": "intro",
+      "text": {
+        "ko": "표지의 붕붕이는 어디로 가려는 것 같나요?",
+        "en": "Where do you think Buzzy on the cover is going?",
+        "vi": "Bạn nghĩ Buzzy trên bìa sẽ đi đâu?",
+        "zh": "你觉得封面上的小蜜蜂要去哪里?",
+        "fil": "Saan sa tingin mo pupunta si Buzzy sa pabalat?",
+        "ja": "ひょうしの ブンブンは どこへ いこうと しているのかな?"
+      }
+    },
+    {
+      "id": "q-intro-2",
+      "tier": "intro",
+      "text": {
+        "ko": "여러분이 가장 가보고 싶은 곳은 어디인가요?",
+        "en": "Where would you most like to go?",
+        "vi": "Bạn muốn đến đâu nhất?",
+        "zh": "你最想去的地方是哪里?",
+        "fil": "Saan mo pinaka-gustong pumunta?",
+        "ja": "いちばん いってみたい ところは どこですか?"
+      }
+    },
+    {
+      "id": "q-check-2",
+      "tier": "check",
+      "pageIdx": 2,
+      "text": {
+        "ko": "붕붕이는 우주에 갈 때 무엇을 탔나요?",
+        "en": "What did Buzzy ride to space?",
+        "vi": "Buzzy đi bằng gì lên vũ trụ?",
+        "zh": "小蜜蜂去太空时乘了什么?",
+        "fil": "Ano ang sinakyan ni Buzzy papuntang kalawakan?",
+        "ja": "ブンブンは うちゅうに いくとき なにに のりましたか?"
+      }
+    },
+    {
+      "id": "q-check-5",
+      "tier": "check",
+      "pageIdx": 5,
+      "text": {
+        "ko": "바닷속에서 붕붕이에게 인사한 친구는 누구였나요?",
+        "en": "Who said hi to Buzzy under the sea?",
+        "vi": "Dưới biển, bạn nào chào Buzzy?",
+        "zh": "海底下谁跟小蜜蜂打招呼?",
+        "fil": "Sino ang kumumusta kay Buzzy sa ilalim ng dagat?",
+        "ja": "うみの なかで ブンブンに あいさつした ともだちは だれですか?"
+      }
+    },
+    {
+      "id": "q-check-7",
+      "tier": "check",
+      "pageIdx": 7,
+      "text": {
+        "ko": "가상 공간에 들어가려고 붕붕이가 쓴 건 무엇인가요?",
+        "en": "What did Buzzy put on to enter the virtual world?",
+        "vi": "Buzzy đã đội gì để vào thế giới ảo?",
+        "zh": "小蜜蜂戴了什么才进入虚拟空间?",
+        "fil": "Ano ang isinuot ni Buzzy para makapasok sa virtual na mundo?",
+        "ja": "バーチャルな せかいに はいるとき ブンブンは なにを かぶりましたか?"
+      }
+    },
+    {
+      "id": "q-core-1",
+      "tier": "core",
+      "text": {
+        "ko": "붕붕이는 왜 여러 곳을 탐험했을까요?",
+        "en": "Why did Buzzy explore so many places?",
+        "vi": "Vì sao Buzzy khám phá nhiều nơi đến vậy?",
+        "zh": "小蜜蜂为什么要去这么多地方?",
+        "fil": "Bakit maraming lugar na pinuntahan si Buzzy?",
+        "ja": "ブンブンは どうして いろんな ばしょを たんけんしたのでしょう?"
+      }
+    },
+    {
+      "id": "q-deep-1",
+      "tier": "deep",
+      "standard": "2슬02-04 궁금한 세계를 다양한 매체로 탐색한다.",
+      "text": {
+        "ko": "내가 가장 궁금한 세계는 어디인가요? 어떤 방법(책·영상·VR 등)으로 알아볼 수 있을까요?",
+        "en": "What world are you most curious about? How could you explore it — books, videos, VR?",
+        "vi": "Bạn tò mò nhất về thế giới nào? Bạn sẽ khám phá bằng cách nào — sách, video, VR?",
+        "zh": "你最好奇的世界是哪里?你会用什么方法(书、视频、VR…)去了解?",
+        "fil": "Anong mundo ang pinaka-gusto mong alamin? Paano mo ito tuklasin — sa libro, video, VR?",
+        "ja": "いちばん きになる せかいは どこですか? どんな ほうほう(ほん・どうが・VRなど)で しらべますか?"
+      }
+    },
+    {
+      "id": "q-deep-2",
+      "tier": "deep",
+      "standard": "2슬02-04 호기심·탐구 태도",
+      "text": {
+        "ko": "궁금한 것을 알아갈 때 내 마음은 어떻게 바뀌나요?",
+        "en": "How does your heart change when you learn something you were curious about?",
+        "vi": "Khi biết điều mình thắc mắc, cảm xúc của bạn thay đổi thế nào?",
+        "zh": "当你弄明白好奇的事时,心情有什么变化?",
+        "fil": "Paano nagbabago ang pakiramdam mo kapag natuklasan mo ang iyong tanong?",
+        "ja": "きになる ことが わかったとき きもちは どのように かわりますか?"
+      }
+    },
+    {
+      "id": "q-concept-1",
+      "tier": "concept",
+      "ibConcept": "connection",
+      "text": {
+        "ko": "책, 영상, VR은 서로 어떤 '연결'이 있을까요?",
+        "en": "How are books, videos, and VR 'connected' to each other?",
+        "vi": "Sách, video và VR có 'mối liên kết' gì với nhau?",
+        "zh": "书、视频、VR 之间有什么「联系」?",
+        "fil": "Paano 'magkakaugnay' ang libro, video, at VR?",
+        "ja": "ほん・どうが・VRは どんな『つながり』が ありますか?"
+      }
+    },
+    {
+      "id": "q-concept-2",
+      "tier": "concept",
+      "ibConcept": "change",
+      "text": {
+        "ko": "탐험을 하고 나서 붕붕이에게는 어떤 '변화'가 생겼을까요?",
+        "en": "What 'change' happened to Buzzy after exploring?",
+        "vi": "Buzzy có 'thay đổi' gì sau chuyến khám phá?",
+        "zh": "探险之后,小蜜蜂发生了什么「变化」?",
+        "fil": "Anong 'pagbabago' ang nangyari kay Buzzy pagkatapos?",
+        "ja": "たんけんの あとで ブンブンには どんな『へんか』が ありましたか?"
+      }
+    }
+  ]
+}

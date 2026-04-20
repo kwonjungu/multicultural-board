@@ -9,7 +9,8 @@ export const maxDuration = 60;
 
 interface ImageAgentRequest {
   bookId: string;         // Firebase-side key where the book lives
-  pageIdx: number;        // 0 = cover, 1+ = regular pages
+  pageIdx?: number;       // 0 = cover, 1+ = regular pages (use when characterId is absent)
+  characterId?: string;   // If set, this is a character portrait (clean bg, subject only)
   prompt: string;         // English art-style prompt
   styleReferenceUrl?: string;  // Optional: previous page to keep style consistent (future)
 }
@@ -28,9 +29,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json<ImageAgentResponse>({ ok: false, error: "bad json" }, { status: 400 });
   }
 
-  // pageIdx 0 = cover is valid; allow any non-negative integer
-  if (!body?.bookId || body?.pageIdx == null || body.pageIdx < 0 || !body?.prompt) {
-    return NextResponse.json<ImageAgentResponse>({ ok: false, error: "missing bookId/pageIdx/prompt" }, { status: 400 });
+  // Either pageIdx (non-negative) or characterId must be provided.
+  const hasPage = body?.pageIdx != null && body.pageIdx >= 0;
+  const hasChar = !!body?.characterId;
+  if (!body?.bookId || !body?.prompt || (!hasPage && !hasChar)) {
+    return NextResponse.json<ImageAgentResponse>({ ok: false, error: "missing bookId/target/prompt" }, { status: 400 });
   }
 
   const bucketEnv = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
@@ -44,17 +47,23 @@ export async function POST(req: NextRequest) {
   try {
     // === Generate ===
     // Reinforce child-book style in every prompt so page-to-page stays coherent.
-    const styleGuard = "Soft watercolor children's picture book illustration. Warm, gentle palette. Cute cartoon characters. No scary, violent, or photorealistic imagery. No text in the image.";
-    const fullPrompt = `${body.prompt}\n\nStyle: ${styleGuard}`;
+    // Character portraits get an extra isolation guard so the subject is clean.
+    const baseStyleGuard = "Soft watercolor children's picture book illustration. Warm, gentle palette. Cute cartoon characters. No scary, violent, or photorealistic imagery. No text in the image.";
+    const portraitGuard = hasChar
+      ? " The character alone on a clean solid pastel-cream background. No scene, no other characters, no props, no text, just the character centered."
+      : "";
+    const fullPrompt = `${body.prompt}\n\nStyle: ${baseStyleGuard}${portraitGuard}`;
 
     const img = await generateImage(fullPrompt);
     const buffer = Buffer.from(img.base64, "base64");
 
     // === Upload to Firebase Storage ===
     const token = randomUUID();
-    const filename = body.pageIdx === 0
-      ? `storybooks/${body.bookId}/cover.png`
-      : `storybooks/${body.bookId}/page-${body.pageIdx}.png`;
+    const filename = hasChar
+      ? `storybooks/${body.bookId}/char-${body.characterId}.png`
+      : body.pageIdx === 0
+        ? `storybooks/${body.bookId}/cover.png`
+        : `storybooks/${body.bookId}/page-${body.pageIdx}.png`;
 
     const app = getAdminApp();
     const storage = getStorage(app);

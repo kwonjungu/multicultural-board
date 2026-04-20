@@ -39,6 +39,7 @@ interface DraftBook {
     id: string;
     nameKo: string;
     avatarEmoji: string;
+    avatarImagePrompt: string;  // English prompt for character portrait (clean bg)
     personality: string;
     speechStyle: string;
     bookContext: string;
@@ -100,6 +101,7 @@ You MUST reply with valid JSON matching this schema (all text in Korean unless t
       "id": string (kebab-case),
       "nameKo": string,
       "avatarEmoji": string (1 emoji),
+      "avatarImagePrompt": string (English, PORTRAIT-ONLY prompt: a character portrait with clean solid pastel background, no scene, no other characters, just the subject centered. Include art style and colors matching the book. The same character must be visually consistent with how they appear in the pages.),
       "personality": string (Korean, 1-2 sentences, used by chatbot system prompt),
       "speechStyle": string (Korean, describes speech quirks and give an example),
       "bookContext": string (Korean, summary of this character's arc in the book)

@@ -4,30 +4,114 @@ import { useRef, useState } from "react";
 
 type Stage = "entry" | "uploading" | "processing" | "result" | "error";
 
-interface Props {
+export interface AnalyzeResult {
+  content: string;
+  previewUrl: string;
+  model: string;
+}
+
+interface ViewProps {
+  /** Fires once OCR completes. Parent decides what to do (post, translate, etc). */
+  onComplete?: (result: AnalyzeResult) => void;
+  /** Label for the final confirm button (default: "이 내용 사용하기"). */
+  submitLabel?: string;
+  /** If true, show a submit button on the result stage; if false, auto-fire onComplete. */
+  requireConfirm?: boolean;
+  /** Optional: hide the initial entry/upload area padding for embedded use. */
+  compact?: boolean;
+}
+
+interface Props extends ViewProps {
   open: boolean;
   onClose: () => void;
-  /** Called once analysis is done. Allows the parent to forward the text into a post, translation, etc. */
-  onResult?: (result: { content: string; previewUrl: string; model: string }) => void;
+  /** @deprecated alias for onComplete. */
+  onResult?: (result: AnalyzeResult) => void;
 }
 
 const MAX_DIM = 2048;        // 장변 다운스케일 기준 — OCR 품질 유지 + 토큰 절약
 const JPEG_QUALITY = 0.9;
 
 /**
- * 사진 업로드를 메인으로, 첨부파일을 보조로 하는 활동지 OCR 모달.
+ * 전체 오버레이 모달 버전 — 독립적으로 열리는 다이얼로그.
+ * PostModal 등에 직접 박아 넣을 때는 WorksheetAnalyzeView를 사용한다.
+ */
+export default function WorksheetAnalyzeModal({
+  open, onClose, onResult, onComplete, submitLabel, requireConfirm,
+}: Props) {
+  if (!open) return null;
+  const handleComplete = (r: AnalyzeResult) => {
+    onResult?.(r);
+    onComplete?.(r);
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="활동지 올리기"
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 2000,
+        background: "rgba(17, 24, 39, 0.55)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 16,
+        fontFamily: "'Noto Sans KR', sans-serif",
+        animation: "fadeSlideIn 240ms ease-out both",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%", maxWidth: 560,
+          background: "#FFFBEB", borderRadius: 24,
+          border: "3px solid #FDE68A",
+          boxShadow: "0 30px 60px rgba(17,24,39,0.35)",
+          padding: "18px 20px 22px",
+          maxHeight: "92vh", overflowY: "auto",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ fontSize: 18, fontWeight: 900, color: "#92400E" }}>
+            📋 활동지 올리기
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="닫기"
+            style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: "#FEF3C7", border: "1px solid #FDE68A",
+              color: "#92400E", fontWeight: 900, cursor: "pointer",
+            }}
+          >✕</button>
+        </div>
+        <WorksheetAnalyzeView
+          onComplete={(r) => { handleComplete(r); onClose(); }}
+          submitLabel={submitLabel}
+          requireConfirm={requireConfirm}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 임베딩 가능한 활동지 OCR 뷰. PostModal 탭 내부에 박아 쓸 수 있다.
  * 사진 선택 → 클라이언트 리사이즈 → base64 → /api/worksheet-analyze → 마크다운 결과.
  */
-export default function WorksheetAnalyzeModal({ open, onClose, onResult }: Props) {
+export function WorksheetAnalyzeView({
+  onComplete,
+  submitLabel = "이 내용 사용하기",
+  requireConfirm = true,
+  compact = false,
+}: ViewProps) {
   const [stage, setStage] = useState<Stage>("entry");
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [progress, setProgress] = useState<string>("");
   const [result, setResult] = useState<string>("");
+  const [model, setModel] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  if (!open) return null;
 
   function reset() {
     setStage("entry");
@@ -70,106 +154,72 @@ export default function WorksheetAnalyzeModal({ open, onClose, onResult }: Props
       if (!content) throw new Error("글자를 인식하지 못했어요. 더 밝은 곳에서 다시 찍어보세요.");
 
       setResult(content);
+      setModel(body.model || "");
       setStage("result");
-      onResult?.({ content, previewUrl: dataUrl, model: body.model || "" });
+
+      // If auto-mode, fire completion immediately. Otherwise wait for user confirm.
+      if (!requireConfirm) {
+        onComplete?.({ content, previewUrl: dataUrl, model: body.model || "" });
+      }
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "알 수 없는 오류");
       setStage("error");
     }
   }
 
-  // ── render by stage ──────────────────────────────────────────────
+  function submit() {
+    onComplete?.({ content: result, previewUrl, model });
+  }
+
+  // ── render by stage (embeddable, no modal chrome) ───────────────
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="활동지 올리기"
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 2000,
-        background: "rgba(17, 24, 39, 0.55)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 16,
-        fontFamily: "'Noto Sans KR', sans-serif",
-        animation: "fadeSlideIn 240ms ease-out both",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%", maxWidth: 560,
-          background: "#FFFBEB", borderRadius: 24,
-          border: "3px solid #FDE68A",
-          boxShadow: "0 30px 60px rgba(17,24,39,0.35)",
-          padding: "18px 20px 22px",
-          maxHeight: "92vh", overflowY: "auto",
+    <div style={{ padding: compact ? 0 : 2 }}>
+      {stage === "entry" && (
+        <EntryStage
+          onPickCamera={() => cameraInputRef.current?.click()}
+          onPickFile={() => fileInputRef.current?.click()}
+        />
+      )}
+      {(stage === "uploading" || stage === "processing") && (
+        <BusyStage previewUrl={previewUrl} progress={progress} />
+      )}
+      {stage === "result" && (
+        <ResultStage
+          previewUrl={previewUrl}
+          content={result}
+          requireConfirm={requireConfirm}
+          submitLabel={submitLabel}
+          onAgain={reset}
+          onSubmit={submit}
+        />
+      )}
+      {stage === "error" && (
+        <ErrorStage message={errorMsg} onRetry={reset} />
+      )}
+      {/* Hidden file inputs — camera one requests rear camera on mobile */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          handlePick(f);
         }}
-      >
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, color: "#92400E" }}>
-            📋 활동지 올리기
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="닫기"
-            style={{
-              width: 32, height: 32, borderRadius: 10,
-              background: "#FEF3C7", border: "1px solid #FDE68A",
-              color: "#92400E", fontWeight: 900, cursor: "pointer",
-            }}
-          >✕</button>
-        </div>
-
-        {stage === "entry" && (
-          <EntryStage
-            onPickCamera={() => cameraInputRef.current?.click()}
-            onPickFile={() => fileInputRef.current?.click()}
-          />
-        )}
-
-        {(stage === "uploading" || stage === "processing") && (
-          <BusyStage previewUrl={previewUrl} progress={progress} />
-        )}
-
-        {stage === "result" && (
-          <ResultStage
-            previewUrl={previewUrl}
-            content={result}
-            onAgain={reset}
-            onClose={onClose}
-          />
-        )}
-
-        {stage === "error" && (
-          <ErrorStage message={errorMsg} onRetry={reset} />
-        )}
-
-        {/* Hidden file inputs — two separate inputs so the camera one can request the rear camera on mobile */}
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            e.target.value = "";
-            handlePick(f);
-          }}
-        />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            e.target.value = "";
-            handlePick(f);
-          }}
-        />
-      </div>
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          handlePick(f);
+        }}
+      />
     </div>
   );
 }
@@ -282,8 +332,15 @@ function BusyStage({ previewUrl, progress }: { previewUrl: string; progress: str
 }
 
 function ResultStage({
-  previewUrl, content, onAgain, onClose,
-}: { previewUrl: string; content: string; onAgain: () => void; onClose: () => void }) {
+  previewUrl, content, requireConfirm, submitLabel, onAgain, onSubmit,
+}: {
+  previewUrl: string;
+  content: string;
+  requireConfirm: boolean;
+  submitLabel: string;
+  onAgain: () => void;
+  onSubmit: () => void;
+}) {
   return (
     <>
       {previewUrl && (
@@ -314,35 +371,38 @@ function ResultStage({
 
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         <button
-          onClick={() => navigator.clipboard?.writeText(content)}
-          style={{
-            flex: 1, padding: "11px 14px",
-            background: "#fff", border: "2px solid #FDE68A",
-            borderRadius: 12, color: "#92400E",
-            fontWeight: 800, fontSize: 13, cursor: "pointer",
-            fontFamily: "inherit",
-          }}
-        >📋 복사</button>
-        <button
           onClick={onAgain}
           style={{
-            flex: 1, padding: "11px 14px",
+            flex: "0 0 auto", padding: "11px 14px",
             background: "#FEF3C7", border: "2px solid #FDE68A",
             borderRadius: 12, color: "#92400E",
             fontWeight: 800, fontSize: 13, cursor: "pointer",
             fontFamily: "inherit",
           }}
-        >🔄 다시 찍기</button>
+        >🔄 다시</button>
         <button
-          onClick={onClose}
+          onClick={() => navigator.clipboard?.writeText(content)}
           style={{
-            flex: 1, padding: "11px 14px",
-            background: "#F59E0B", border: "none",
-            borderRadius: 12, color: "#fff",
-            fontWeight: 900, fontSize: 13, cursor: "pointer",
+            flex: "0 0 auto", padding: "11px 14px",
+            background: "#fff", border: "2px solid #FDE68A",
+            borderRadius: 12, color: "#92400E",
+            fontWeight: 800, fontSize: 13, cursor: "pointer",
             fontFamily: "inherit",
           }}
-        >완료</button>
+        >📋</button>
+        {requireConfirm && (
+          <button
+            onClick={onSubmit}
+            style={{
+              flex: 1, padding: "11px 14px",
+              background: "#F59E0B", border: "none",
+              borderRadius: 12, color: "#fff",
+              fontWeight: 900, fontSize: 14, cursor: "pointer",
+              fontFamily: "inherit",
+              boxShadow: "0 6px 16px rgba(245,158,11,0.3)",
+            }}
+          >📨 {submitLabel}</button>
+        )}
       </div>
     </>
   );

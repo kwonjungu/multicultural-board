@@ -208,8 +208,9 @@ export interface StorybookQuestion {
 export interface StorybookCharacter {
   id: string;
   name: Record<string, string>;
-  avatarEmoji: string;        // MVP fallback; later replaced with avatarUrl
-  avatarUrl?: string;
+  avatarEmoji: string;        // Fallback when avatarUrl is not yet generated
+  avatarUrl?: string;         // Subject-isolated portrait (character only, clean bg)
+  avatarImagePrompt?: string; // English prompt used to generate avatarUrl
   personality: string;        // internal (system prompt only)
   speechStyle: string;
   bookContext: string;
