@@ -80,6 +80,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             0%, 50%   { opacity: 1; }
             51%, 100% { opacity: 0; }
           }
+          @keyframes captionSlideIn {
+            0%   { transform: translateX(calc(100% + 40px)) scale(0.9); opacity: 0; }
+            70%  { transform: translateX(-6px) scale(1.02);              opacity: 1; }
+            100% { transform: translateX(0) scale(1);                    opacity: 1; }
+          }
+          @keyframes captionProgress {
+            from { transform: scaleX(1); }
+            to   { transform: scaleX(0); }
+          }
 
           ::-webkit-scrollbar { width: 4px; height: 4px; }
           ::-webkit-scrollbar-thumb { background: #FDE68A; border-radius: 4px; }

@@ -6,6 +6,7 @@ import DialogueBox from "./DialogueBox";
 import Spotlight from "./Spotlight";
 import { TutorialBus } from "@/lib/tutorial/bus";
 import { markCompleted } from "@/lib/tutorial/progress";
+import { markCompletedRemote } from "@/lib/tutorial/firebase-progress";
 import type {
   AnchorSpec,
   DialogueLine,
@@ -19,6 +20,9 @@ interface Props {
   speakerName?: string;
   muted?: boolean;
   onExit: (reason: "completed" | "skipped") => void;
+  /** For mandatory scenarios: persist completion to Firebase keyed by (roomCode, userName). */
+  roomCode?: string;
+  userName?: string;
 }
 
 /**
@@ -31,6 +35,8 @@ export default function TutorialHost({
   speakerName = "꿀벌 선생님",
   muted = false,
   onExit,
+  roomCode,
+  userName,
 }: Props) {
   const [stepIdx, setStepIdx] = useState(0);
   const [dialogueDone, setDialogueDone] = useState(false);
@@ -94,6 +100,9 @@ export default function TutorialHost({
     if (unmountedRef.current) return;
     if (stepIdx >= scenario.steps.length - 1) {
       markCompleted(scenario.id);
+      if (scenario.mandatory && roomCode && userName) {
+        void markCompletedRemote(roomCode, userName, scenario.id);
+      }
       onExit("completed");
       return;
     }
@@ -127,21 +136,23 @@ export default function TutorialHost({
 
   return (
     <>
-      {/* Skip button — always available */}
-      <button
-        onClick={() => onExit("skipped")}
-        style={{
-          position: "fixed", top: 16, right: 16, zIndex: 10001,
-          background: "rgba(255,255,255,0.9)",
-          border: "2px solid #FDE68A",
-          borderRadius: 999, padding: "8px 16px",
-          fontSize: 13, fontWeight: 800, color: "#92400E",
-          cursor: "pointer",
-          boxShadow: "0 6px 16px rgba(180,83,9,0.2)",
-        }}
-      >
-        튜토리얼 건너뛰기
-      </button>
+      {/* Skip button — hidden for mandatory tutorials */}
+      {!scenario.mandatory && (
+        <button
+          onClick={() => onExit("skipped")}
+          style={{
+            position: "fixed", top: 16, right: 16, zIndex: 10001,
+            background: "rgba(255,255,255,0.9)",
+            border: "2px solid #FDE68A",
+            borderRadius: 999, padding: "8px 16px",
+            fontSize: 13, fontWeight: 800, color: "#92400E",
+            cursor: "pointer",
+            boxShadow: "0 6px 16px rgba(180,83,9,0.2)",
+          }}
+        >
+          튜토리얼 건너뛰기
+        </button>
+      )}
 
       {/* Spotlight overlay for highlight/await steps */}
       {showSpotlight && <Spotlight selector={(step as any).target} />}

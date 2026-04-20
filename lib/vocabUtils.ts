@@ -76,17 +76,18 @@ export function containsAnyForm(recognized: string, forms: string[]): boolean {
 /**
  * 말하기 통과 기준 검사.
  * - 유사도 ≥ threshold (기본 0.7)
- * - 단어 활용형 중 하나 포함
+ * - wordForms 비어있지 않으면 활용형 중 하나 포함 (임의 문장 연습 시 생략 가능)
  * @returns { passed, similarity, hasForm }
  */
 export function checkSpeechMatch(params: {
   recognized: string;
   target: string;
-  wordForms: string[];
+  wordForms?: string[];
   threshold?: number;
 }): { passed: boolean; similarity: number; hasForm: boolean } {
   const similarity = sentenceSimilarity(params.recognized, params.target);
-  const hasForm = containsAnyForm(params.recognized, params.wordForms);
+  const forms = params.wordForms ?? [];
+  const hasForm = forms.length === 0 ? true : containsAnyForm(params.recognized, forms);
   const passed = similarity >= (params.threshold ?? 0.7) && hasForm;
   return { passed, similarity, hasForm };
 }

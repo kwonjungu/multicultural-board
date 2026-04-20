@@ -15,7 +15,9 @@ export default function HubTutorialBootstrap() {
 
   useEffect(() => {
     // Delay slightly so HomeHub has painted → selectors resolve
-    const id = window.setTimeout(() => startIfNotCompleted(mainHubScenario), 400);
+    const id = window.setTimeout(() => {
+      void startIfNotCompleted(mainHubScenario);
+    }, 400);
     return () => window.clearTimeout(id);
   }, [startIfNotCompleted]);
 

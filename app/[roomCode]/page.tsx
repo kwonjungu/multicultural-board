@@ -18,6 +18,7 @@ import CosmeticPicker from "@/components/CosmeticPicker";
 import Toast from "@/components/Toast";
 import { TutorialProvider } from "@/components/tutorial/TutorialProvider";
 import HubTutorialBootstrap from "@/components/tutorial/HubTutorialBootstrap";
+import SectionCaption from "@/components/tutorial/SectionCaption";
 import { subscribeStudentStickers } from "@/lib/stickers";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { t } from "@/lib/i18n";
@@ -181,7 +182,7 @@ export default function RoomPage() {
   // 허브 메인 화면
   if (hubView === "hub") {
     return (
-      <TutorialProvider>
+      <TutorialProvider roomCode={roomCode} userName={user.myName}>
         <HomeHub
           user={user}
           roomCode={roomCode}
@@ -199,6 +200,7 @@ export default function RoomPage() {
           viewerLang={user.myLang}
           availableLangs={roomLangs}
         />
+        {interpreterOpen && <SectionCaption section="interpreter" />}
         {overlays}
       </TutorialProvider>
     );
@@ -208,6 +210,7 @@ export default function RoomPage() {
     return (
       <>
         <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} />
+        <SectionCaption section="games" />
         {overlays}
       </>
     );
@@ -221,6 +224,7 @@ export default function RoomPage() {
           roomCode={roomCode}
           onBack={() => setHubView("hub")}
         />
+        <SectionCaption section="vocab" />
         {overlays}
       </>
     );
@@ -252,6 +256,7 @@ export default function RoomPage() {
           onOpenGive={(clientId, name) => setGiveModalFor({ clientId, name })}
           onOpenCosmetics={() => setCosmeticsOpen(true)}
         />
+        <SectionCaption section="praise" />
         {overlays}
       </>
     );
@@ -269,6 +274,7 @@ export default function RoomPage() {
         myClientId={myClientId}
         onPraiseStudent={(clientId, name) => setGiveModalFor({ clientId, name })}
       />
+      <SectionCaption section="board" />
       {overlays}
     </>
   );

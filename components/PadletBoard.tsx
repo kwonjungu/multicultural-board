@@ -13,6 +13,8 @@ import DiscussionCreateModal from "./DiscussionCreateModal";
 import DiscussionSession from "./DiscussionSession";
 import GameRoom from "./GameRoom";
 import InterpreterDrawer from "./InterpreterDrawer";
+import SentencePracticeModal from "./SentencePracticeModal";
+import { filterTodayCards } from "@/lib/sentencePractice";
 import { columnIconFor } from "@/lib/assets";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -44,6 +46,7 @@ const COL_COLORS = [
 
 export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomConfig, myClientId, onPraiseStudent }: Props) {
   const [cards, setCards] = useState<CardData[]>([]);
+  const [practiceOpen, setPracticeOpen] = useState(false);
   const [columns, setColumns] = useState<FirebaseColumn[]>(
     COLUMNS_DEFAULT.map((col, i) => ({ ...col, order: i }))
   );
@@ -696,6 +699,38 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               padding: "2px 6px", borderRadius: 999, letterSpacing: 0.5,
             }}>BETA</span>
           </button>
+
+          {/* 📖 학습하기 — student-only, when today's cards exist */}
+          {!isTeacher && (() => {
+            const cardsById: Record<string, CardData> = {};
+            for (const c of cards) cardsById[c.id] = c;
+            const today = filterTodayCards(cardsById);
+            if (today.length === 0) return null;
+            return (
+              <button
+                onClick={() => setPracticeOpen(true)}
+                aria-label="오늘의 문장 연습"
+                style={{
+                  background: "linear-gradient(135deg, #8B5CF6, #6D28D9)",
+                  border: "none", color: "#fff",
+                  borderRadius: 16, padding: "10px 16px",
+                  fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 44,
+                  boxShadow: "0 6px 18px rgba(139,92,246,0.4)",
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  transition: "transform 0.12s",
+                }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                📖 학습하기
+                <span style={{
+                  fontSize: 11, fontWeight: 900, background: "rgba(255,255,255,0.25)", color: "#fff",
+                  padding: "2px 8px", borderRadius: 999,
+                }}>{today.length}</span>
+              </button>
+            );
+          })()}
 
           {/* Teacher-only buttons */}
           {isTeacher && (
@@ -1412,6 +1447,20 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         viewerLang={lang}
         availableLangs={teacherLangs.length > 0 ? teacherLangs : Object.keys(LANGUAGES)}
       />
+
+      {/* ── 📖 오늘의 문장 연습 (학생) ── */}
+      {practiceOpen && !isTeacher && (
+        <SentencePracticeModal
+          user={user}
+          roomCode={roomCode}
+          cards={(() => {
+            const byId: Record<string, CardData> = {};
+            for (const c of cards) byId[c.id] = c;
+            return filterTodayCards(byId);
+          })()}
+          onClose={() => setPracticeOpen(false)}
+        />
+      )}
 
       {/* ── 의견 나누기: 생성 모달 (교사) ── */}
       {showDiscussionCreate && isTeacher && (

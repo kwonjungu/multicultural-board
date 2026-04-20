@@ -73,6 +73,12 @@ export interface TutorialScenario {
   title: string;                  // ko label ("메인 허브 둘러보기")
   estimatedMinutes: number;
   steps: TutorialStep[];
+  /**
+   * Mandatory tutorials (e.g., main hub intro) hide the Skip button and
+   * track completion in Firebase so the user can't evade them by reloading
+   * or switching devices.
+   */
+  mandatory?: boolean;
 }
 
 export interface TutorialProgress {

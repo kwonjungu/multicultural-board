@@ -16,7 +16,7 @@ const RED = "#EF4444";
 
 interface Props {
   sentenceText: string;
-  wordForms: string[];           // 단어 원형 + 활용형 — 포함 여부 검사
+  wordForms?: string[];          // 선택 — 있으면 활용형 포함 여부도 체크, 없으면 유사도만
   onOriginalPlay: () => void;
   onComplete: () => void;
   roomCode: string;
@@ -35,7 +35,7 @@ interface CheckResult {
 }
 
 export default function VocabRecorder({
-  sentenceText, wordForms, onOriginalPlay, onComplete,
+  sentenceText, wordForms = [], onOriginalPlay, onComplete,
   roomCode, clientId, wordId, sentenceIdx,
 }: Props) {
   const [state, setState] = useState<State>("idle");

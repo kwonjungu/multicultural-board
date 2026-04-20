@@ -12,6 +12,7 @@ export const mainHubScenario: TutorialScenario = {
   id: "main",
   title: "메인 허브 둘러보기",
   estimatedMinutes: 3,
+  mandatory: true,    // 첫 입장 시 반드시 완주 + Firebase 트래킹
   steps: [
     // 1. 등장 + 자기소개
     {
