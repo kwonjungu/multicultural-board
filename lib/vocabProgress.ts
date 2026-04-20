@@ -12,6 +12,10 @@ export interface WordProgress {
   doneSentences: number[]; // 완료한 예문 index (0,1,2 중)
   listenCount: number;     // 듣기 탭한 횟수 (참고용)
   lastStudied: number;     // ms timestamp
+  // 시험(VocabTest) 이력 — 기본값 0 (optional 이므로 필드 없을 수 있음)
+  testPassed?: number;
+  testFailed?: number;
+  lastTested?: number;
 }
 
 export type ProgressMap = Record<string, WordProgress>;
@@ -83,6 +87,24 @@ export function bumpListen(map: ProgressMap, wordId: string): ProgressMap {
   };
 }
 
+/** 시험 결과 기록 — passed 면 testPassed++, 아니면 testFailed++. */
+export function markTestResult(
+  map: ProgressMap,
+  wordId: string,
+  passed: boolean,
+): ProgressMap {
+  const prev = map[wordId] ?? { doneSentences: [], listenCount: 0, lastStudied: 0 };
+  return {
+    ...map,
+    [wordId]: {
+      ...prev,
+      testPassed: (prev.testPassed ?? 0) + (passed ? 1 : 0),
+      testFailed: (prev.testFailed ?? 0) + (passed ? 0 : 1),
+      lastTested: Date.now(),
+    },
+  };
+}
+
 export function wordDoneCount(map: ProgressMap, wordId: string): number {
   return map[wordId]?.doneSentences.length ?? 0;
 }
@@ -111,6 +133,9 @@ export function mergeProgress(a: ProgressMap, b: ProgressMap): ProgressMap {
       doneSentences: Array.from(sentSet).sort((x, y) => x - y),
       listenCount: Math.max(pa.listenCount ?? 0, pb.listenCount ?? 0),
       lastStudied: Math.max(pa.lastStudied ?? 0, pb.lastStudied ?? 0),
+      testPassed: Math.max(pa.testPassed ?? 0, pb.testPassed ?? 0),
+      testFailed: Math.max(pa.testFailed ?? 0, pb.testFailed ?? 0),
+      lastTested: Math.max(pa.lastTested ?? 0, pb.lastTested ?? 0),
     };
   }
   return out;

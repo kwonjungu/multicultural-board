@@ -5,17 +5,19 @@ import { ref, onValue } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { VOCAB_WORDS, VocabWord } from "@/lib/vocabWords";
 import {
-  loadProgress, saveProgress, markSentenceDone, bumpListen,
+  loadProgress, saveProgress, markSentenceDone, bumpListen, markTestResult,
   wordDoneCount, masteredCount, ProgressMap,
   subscribeProgress, writeWordProgress, mergeProgress,
 } from "@/lib/vocabProgress";
 import { extractVocabLocal, MatchedWord, wordById } from "@/lib/vocabUtils";
 import { checkAndAward, RewardRule, getAwardedIds } from "@/lib/vocabRewards";
 import { cleanupExpiredRecordings } from "@/lib/vocabRecordings";
+import { buildQuiz, QuizQuestion } from "@/lib/vocabTest";
 import { UserConfig, CardData } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import VocabCard from "./VocabCard";
 import VocabNotebook from "./VocabNotebook";
+import VocabTest from "./VocabTest";
 
 const PURPLE = "#8B5CF6";
 const PURPLE_DARK = "#6D28D9";
@@ -59,6 +61,9 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
 
   // 뷰 모드 (그리드 / 단어장)
   const [viewMode, setViewMode] = useState<"grid" | "notebook">("grid");
+
+  // 시험
+  const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
 
   useEffect(() => {
     setProgress(loadProgress(roomCode, user.myName));
@@ -223,6 +228,58 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           🏆 {masteredTotal}
         </div>
       </div>
+
+      {/* Test CTA banner */}
+      {(() => {
+        const studied = Object.values(progress).filter((p) => (p.doneSentences?.length ?? 0) > 0).length;
+        const canTest = studied >= 1;
+        return (
+          <div
+            onClick={() => {
+              if (!canTest) return;
+              const fallback = matched.map((m) => m.wordId);
+              const q = buildQuiz(progress, Math.min(5, Math.max(3, studied)), fallback);
+              if (q.length > 0) setQuiz(q);
+            }}
+            style={{
+              maxWidth: 760, margin: "0 auto 14px",
+              background: canTest
+                ? "linear-gradient(135deg, #FDBA74, #F97316)"
+                : "#F3F4F6",
+              borderRadius: 20,
+              padding: "14px 18px",
+              display: "flex", alignItems: "center", gap: 14,
+              cursor: canTest ? "pointer" : "default",
+              boxShadow: canTest ? "0 10px 26px rgba(249, 115, 22, 0.35)" : "none",
+              border: canTest ? "none" : "2px dashed #D1D5DB",
+              transition: "transform 0.15s",
+            }}
+            onMouseDown={(e) => canTest && (e.currentTarget.style.transform = "scale(0.98)")}
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            <div style={{ fontSize: 40, flexShrink: 0 }}>{canTest ? "📝" : "🔒"}</div>
+            <div style={{ flex: 1, minWidth: 0, color: canTest ? "#fff" : "#6B7280" }}>
+              <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: -0.3 }}>
+                {canTest ? "오늘의 단어 시험" : "아직 시험 볼 수 없어요"}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2, opacity: 0.95 }}>
+                {canTest
+                  ? `배운 단어 ${studied}개 중에서 빈칸 채우기 · 말하기 or 입력`
+                  : "먼저 카드를 열어 예문을 하나라도 완료해 보세요"}
+              </div>
+            </div>
+            {canTest && (
+              <div style={{
+                background: "rgba(255,255,255,0.25)",
+                color: "#fff", fontSize: 14, fontWeight: 900,
+                padding: "8px 14px", borderRadius: 12,
+                flexShrink: 0,
+              }}>시작 →</div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* View mode toggle */}
       <div style={{
@@ -482,6 +539,20 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           onClose={() => setOpenWord(null)}
           roomCode={roomCode}
           clientId={user.myName}
+        />
+      )}
+
+      {/* Test modal */}
+      {quiz && (
+        <VocabTest
+          questions={quiz}
+          onWordResult={(wordId, passed) => {
+            persist(markTestResult(progress, wordId, passed), {
+              touchedWordId: wordId,
+              checkRewards: passed,   // 통과 시 보상 체크 (단어 수 증가는 이미 done 인 기준)
+            });
+          }}
+          onClose={() => setQuiz(null)}
         />
       )}
 
