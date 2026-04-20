@@ -35,6 +35,7 @@ import {
   type BookListEntry,
 } from "@/lib/storybook";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
+import { speak as speakText } from "@/lib/ttsMulti";
 import StorybookCreator from "./StorybookCreator";
 import { t, tFmt } from "@/lib/i18n";
 
@@ -158,6 +159,21 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
   }
 
   // ── Phase routing ────────────────────────────────────────
+  // While a session is active (phase != "done"), back navigation is blocked.
+  // Students stay fully synced. Teacher uses "수업 마치기" button to exit.
+  const sessionActive = session.phase !== "done";
+  const guardedBack = () => {
+    if (sessionActive) {
+      if (isTeacher) {
+        window.alert("수업 중입니다. '수업 마치기' 버튼을 눌러 먼저 수업을 마쳐주세요.");
+      } else {
+        window.alert("선생님이 수업을 진행 중이에요. 조금만 더 기다려주세요.");
+      }
+      return;
+    }
+    onBack();
+  };
+
   return (
     <div
       style={{
@@ -176,7 +192,7 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
           session={session}
           book={book}
           isTeacher={isTeacher}
-          onBack={onBack}
+          onBack={guardedBack}
           onEnd={handleEnd}
         />
 
@@ -387,6 +403,16 @@ function TeacherSetup({
             {allBooks.map((b) => (
               <div
                 key={b.id}
+                onClick={async (e) => {
+                  // Ignore clicks that land on the delete button (has its own handler)
+                  if ((e.target as HTMLElement).closest("button")) return;
+                  if (busy) return;
+                  setBusy(true);
+                  try { await onStart(b.id); } finally { setBusy(false); }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${b.titleKo} 시작`}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "88px 1fr auto",
@@ -399,7 +425,13 @@ function TeacherSetup({
                   border: `3px solid ${b.source === "generated" ? "#8B5CF655" : "#F59E0B55"}`,
                   borderRadius: 18,
                   boxShadow: "0 6px 20px rgba(180,83,9,0.15)",
+                  cursor: busy ? "wait" : "pointer",
+                  transition: "transform 0.12s",
+                  opacity: busy ? 0.75 : 1,
                 }}
+                onMouseDown={(e) => { if (!busy) e.currentTarget.style.transform = "scale(0.98)"; }}
+                onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
               >
                 {b.coverImageUrl ? (
                   <div style={{
@@ -963,21 +995,7 @@ function BilingualText({
   );
 }
 
-function speakText(text: string, lang: string) {
-  if (typeof window === "undefined") return;
-  const synth = window.speechSynthesis;
-  if (!synth) return;
-  synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  const langMap: Record<string, string> = {
-    ko: "ko-KR", en: "en-US", vi: "vi-VN", zh: "zh-CN", fil: "fil-PH",
-    ja: "ja-JP", th: "th-TH", ru: "ru-RU", hi: "hi-IN", id: "id-ID",
-    ar: "ar-SA",
-  };
-  u.lang = langMap[lang] || "en-US";
-  u.rate = 0.95;
-  synth.speak(u);
-}
+// speakText is imported from lib/ttsMulti — uses voice selection + per-lang tuning.
 
 // ============================================================
 // Question card (shared between phases)

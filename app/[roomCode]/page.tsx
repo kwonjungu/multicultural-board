@@ -50,20 +50,20 @@ export default function RoomPage() {
     return () => unsub();
   }, [roomCode, user]);
 
-  // 그림책 세션이 시작되면 학생을 강제로 그림책 화면으로 이동
-  // (교사는 본인이 시작한 화면에 이미 있음. 세션 null→있음 전환만 반응)
-  const [lastSessionId, setLastSessionId] = useState<string | null>(null);
+  // 그림책 수업 세션 활성 상태. 학생은 계속 강제 동기화, 교사도 수업 중 이탈 방지용.
+  const [storybookActive, setStorybookActive] = useState(false);
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeSession(roomCode, (session) => {
-      const currentSessionKey = session ? `${session.bookId}-${session.startedAt}` : null;
-      if (currentSessionKey && currentSessionKey !== lastSessionId && !user.isTeacher) {
+      const active = !!session && session.phase !== "done";
+      setStorybookActive(active);
+      if (active && !user.isTeacher) {
+        // 학생은 세션 활성 동안 항상 그림책 화면으로 강제 동기화
         setHubView("storybook");
       }
-      setLastSessionId(currentSessionKey);
     });
     return () => unsub();
-  }, [roomCode, user, lastSessionId]);
+  }, [roomCode, user]);
 
   // 재방문 시 저장된 설정으로 바로 보드 입장
   useEffect(() => {
