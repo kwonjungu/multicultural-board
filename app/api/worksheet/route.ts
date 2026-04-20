@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { LANGUAGES } from "@/lib/constants";
 import { translateBatch, translateLongText } from "@/lib/groq-translate";
+import { withGroqKeyFallback } from "@/lib/groq-client";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
-
-function getGroqClient() {
-  return new OpenAI({
-    apiKey: process.env.GROQ_API_KEY || "placeholder",
-    baseURL: "https://api.groq.com/openai/v1",
-  });
-}
 
 
 export async function POST(req: NextRequest) {
@@ -25,8 +18,6 @@ export async function POST(req: NextRequest) {
     if (!file || !fromLang || !toLang || !type) {
       return NextResponse.json({ error: "필수 파라미터 누락" }, { status: 400 });
     }
-
-    const groq = getGroqClient();
 
     // ── PDF: extract text → translate ──────────────────────────────
     if (type === "pdf") {
@@ -92,27 +83,37 @@ Rules:
 
       let raw = "";
       let visionErr: unknown;
-      for (const model of VISION_MODELS) {
-        try {
-          const completion = await groq.chat.completions.create({
-            model,
-            messages: [{
-              role: "user",
-              content: [
-                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
-                { type: "text", text: prompt },
-              ],
-            }],
-            max_tokens: 3000,
-            temperature: 0.1,
-          });
-          raw = (completion.choices[0]?.message?.content || "{}").replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-          visionErr = null;
-          break;
-        } catch (e) {
-          console.error(`Vision model ${model} failed:`, e);
-          visionErr = e;
-        }
+      try {
+        raw = await withGroqKeyFallback(async (groq) => {
+          let inner = "";
+          let innerErr: unknown;
+          for (const model of VISION_MODELS) {
+            try {
+              const completion = await groq.chat.completions.create({
+                model,
+                messages: [{
+                  role: "user",
+                  content: [
+                    { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+                    { type: "text", text: prompt },
+                  ],
+                }],
+                max_tokens: 3000,
+                temperature: 0.1,
+              });
+              inner = (completion.choices[0]?.message?.content || "{}").replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+              innerErr = null;
+              break;
+            } catch (e) {
+              console.error(`Vision model ${model} failed:`, e);
+              innerErr = e;
+            }
+          }
+          if (innerErr && !inner) throw innerErr;
+          return inner;
+        });
+      } catch (e) {
+        visionErr = e;
       }
 
       if (visionErr && !raw) {

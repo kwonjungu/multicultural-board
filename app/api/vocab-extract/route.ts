@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { VOCAB_WORDS } from "@/lib/vocabWords";
 import { extractVocabLocal, MatchedWord } from "@/lib/vocabUtils";
+import { withGroqKeyFallback, getGroqApiKeys } from "@/lib/groq-client";
 
 const GROQ_MODELS = [
   "llama-3.3-70b-versatile",
@@ -9,13 +9,6 @@ const GROQ_MODELS = [
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",
 ];
-
-function groqClient() {
-  return new OpenAI({
-    apiKey: process.env.GROQ_API_KEY || "placeholder",
-    baseURL: "https://api.groq.com/openai/v1",
-  });
-}
 
 function shouldSkipModel(err: unknown): boolean {
   const status = (err as { status?: number })?.status;
@@ -44,8 +37,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<ExtractResponse>({ matched: [], fallback: false });
     }
 
-    // GROQ 키 없으면 바로 폴백
-    if (!process.env.GROQ_API_KEY) {
+    // GROQ 키 (기본+예비) 모두 없으면 바로 로컬 폴백
+    if (getGroqApiKeys().length === 0) {
       const local = extractVocabLocal(texts, limit);
       return NextResponse.json<ExtractResponse>({ matched: local, fallback: true });
     }
@@ -66,8 +59,6 @@ export async function POST(req: NextRequest) {
 }
 
 async function extractWithLLM(cardTexts: string[], limit: number): Promise<MatchedWord[]> {
-  const groq = groqClient();
-
   // 토큰 절약 — 앞 20개 카드, 각 300자만
   const clipped = cardTexts.slice(0, 20).map((t) => t.slice(0, 300));
 
@@ -93,32 +84,32 @@ JSON 배열로만 응답 (markdown/설명 금지):
 [{"wordId":"happy","score":5,"reason":"'기뻐요' 2회"}]
 상위 ${limit}개까지.`;
 
-  for (const model of GROQ_MODELS) {
-    try {
-      const completion = await groq.chat.completions.create({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 1200,
-        temperature: 0.2,
-      });
-      const raw = (completion.choices[0]?.message?.content || "")
-        .replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+  return withGroqKeyFallback(async (groq) => {
+    for (const model of GROQ_MODELS) {
+      try {
+        const completion = await groq.chat.completions.create({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 1200,
+          temperature: 0.2,
+        });
+        const raw = (completion.choices[0]?.message?.content || "")
+          .replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
 
-      const parsed = safeParseMatched(raw);
-      if (parsed.length === 0) continue;
+        const parsed = safeParseMatched(raw);
+        if (parsed.length === 0) continue;
 
-      // 알려진 wordId 만 통과시키고 점수 3 이상
-      const valid = new Set(VOCAB_WORDS.map((w) => w.id));
-      return parsed
-        .filter((m) => valid.has(m.wordId) && m.score >= 3)
-        .slice(0, limit);
-    } catch (err) {
-      if (shouldSkipModel(err)) continue;
-      throw err;
+        const valid = new Set(VOCAB_WORDS.map((w) => w.id));
+        return parsed
+          .filter((m) => valid.has(m.wordId) && m.score >= 3)
+          .slice(0, limit);
+      } catch (err) {
+        if (shouldSkipModel(err)) continue;
+        throw err;
+      }
     }
-  }
-
-  throw new Error("모든 Groq 모델 소진");
+    throw new Error("모든 Groq 모델 소진");
+  });
 }
 
 function safeParseMatched(raw: string): MatchedWord[] {

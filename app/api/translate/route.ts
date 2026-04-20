@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { LANGUAGES } from "@/lib/constants";
 import { TranslateRequest } from "@/lib/types";
-
-function getGroqClient() {
-  return new OpenAI({
-    apiKey: process.env.GROQ_API_KEY || "placeholder",
-    baseURL: "https://api.groq.com/openai/v1",
-  });
-}
+import { withGroqKeyFallback } from "@/lib/groq-client";
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,12 +47,14 @@ Tasks:
 Respond ONLY with raw JSON (no markdown, no explanation):
 {"translations":{${targetLangs.map((l) => `"${l}":""`).join(",")}},"safe":true,"reason":""}`;
 
-      const completion = await getGroqClient().chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 800,
-        temperature: 0.3,
-      });
+      const completion = await withGroqKeyFallback((groq) =>
+        groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 800,
+          temperature: 0.3,
+        })
+      );
 
       const raw = (completion.choices[0]?.message?.content || "{}")
         .replace(/```json|```/g, "")

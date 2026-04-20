@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-
-function getGroqClient() {
-  return new OpenAI({
-    apiKey: process.env.GROQ_API_KEY || "placeholder",
-    baseURL: "https://api.groq.com/openai/v1",
-  });
-}
+import { withGroqKeyFallback } from "@/lib/groq-client";
 
 // BCP-47 → Whisper ISO-639-1 hints (subset covering LANGUAGES)
 const WHISPER_LANG: Record<string, string> = {
@@ -33,16 +26,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "오디오가 너무 큽니다 (최대 25MB)" }, { status: 413 });
     }
 
-    const groq = getGroqClient();
     const hint = WHISPER_LANG[lang];
 
-    // Groq whisper-large-v3 accepts File directly
-    const transcription = await groq.audio.transcriptions.create({
-      file: audio,
-      model: "whisper-large-v3",
-      response_format: "json",
-      temperature: 0,
-      ...(hint ? { language: hint } : {}),
+    const transcription = await withGroqKeyFallback(async (groq) => {
+      return groq.audio.transcriptions.create({
+        file: audio,
+        model: "whisper-large-v3",
+        response_format: "json",
+        temperature: 0,
+        ...(hint ? { language: hint } : {}),
+      });
     });
 
     const text = (transcription.text || "").trim();

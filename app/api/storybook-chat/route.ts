@@ -1,22 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
+import { withGroqKeyFallback } from "@/lib/groq-client";
 import type { StorybookCharacter } from "@/lib/types";
 
-// Groq inference provider (OpenAI-compatible). Shares the same key already in use
-// by the translation pipeline (GROQ_API_KEY).
+// Groq inference provider (OpenAI-compatible). Primary key: GROQ_API_KEY.
+// Backup key: GROQ_API_KEY_BACKUP (auto-fallback on 429/401/403 via withGroqKeyFallback).
 const GROQ_MODELS = [
   "llama-3.3-70b-versatile",        // primary — best quality for child-safe chat
   "openai/gpt-oss-120b",            // fallback 1
   "llama-3.1-8b-instant",           // fallback 2 — fast small model
 ];
-
-function groqClient() {
-  return new OpenAI({
-    apiKey: process.env.GROQ_API_KEY || "placeholder",
-    baseURL: "https://api.groq.com/openai/v1",
-  });
-}
 
 const LANG_DISPLAY: Record<string, string> = {
   ko: "한국어", en: "English", vi: "Tiếng Việt", zh: "中文", fil: "Filipino",
@@ -129,51 +122,52 @@ export async function POST(req: NextRequest) {
     { role: "user" as const, content: body.studentText.trim() },
   ];
 
-  const client = groqClient();
-  let lastErr: unknown = null;
-  for (const model of GROQ_MODELS) {
-    try {
-      const completion = await client.chat.completions.create({
-        model,
-        messages,
-        temperature: 0.7,
-        max_tokens: 180,
-      });
-      const raw = completion.choices[0]?.message?.content?.trim() || "";
-      if (!raw) {
-        lastErr = new Error(`empty reply from ${model}`);
-        continue;
-      }
+  try {
+    const result = await withGroqKeyFallback(async (client) => {
+      let lastErr: unknown = null;
+      for (const model of GROQ_MODELS) {
+        try {
+          const completion = await client.chat.completions.create({
+            model,
+            messages,
+            temperature: 0.7,
+            max_tokens: 180,
+          });
+          const raw = completion.choices[0]?.message?.content?.trim() || "";
+          if (!raw) {
+            lastErr = new Error(`empty reply from ${model}`);
+            continue;
+          }
 
-      // === Layer 3: post-check the LLM's reply ===
-      const outSafety = checkSafety(raw);
-      if (outSafety.blocked || outSafety.distress) {
-        return NextResponse.json<ChatResponse>({
-          reply: replyForSafety(body.studentLang, outSafety.distress ? "distress" : "block"),
-          kind: outSafety.distress ? "distress" : "block",
-          model,
-        });
+          // === Layer 3: post-check the LLM's reply ===
+          const outSafety = checkSafety(raw);
+          if (outSafety.blocked || outSafety.distress) {
+            return {
+              reply: replyForSafety(body.studentLang, outSafety.distress ? "distress" : "block"),
+              kind: outSafety.distress ? "distress" : "block",
+              model,
+            } as ChatResponse;
+          }
+          return { reply: raw, kind: "normal", model } as ChatResponse;
+        } catch (err) {
+          lastErr = err;
+          const e = err as { status?: number };
+          const status = e?.status ?? 0;
+          // 400/404(모델 미지원) 는 이 키 내에서 다음 모델 시도
+          if (status === 400 || status === 404) continue;
+          // 429/401/403 는 withGroqKeyFallback 이 잡도록 re-throw
+          throw err;
+        }
       }
-
-      return NextResponse.json<ChatResponse>({
-        reply: raw,
-        kind: "normal",
-        model,
-      });
-    } catch (err) {
-      lastErr = err;
-      const e = err as { status?: number; code?: string; message?: string };
-      const status = e?.status ?? 0;
-      // Rate limit or model-not-found → try next
-      if (status === 429 || status === 400 || status === 404) continue;
-      break;
-    }
+      throw lastErr ?? new Error("storybook-chat: all models empty");
+    });
+    return NextResponse.json<ChatResponse>(result);
+  } catch (err) {
+    console.error("storybook-chat all keys+models failed", err);
+    return NextResponse.json<ChatResponse>({
+      reply: replyForSafety(body.studentLang, "block"),
+      kind: "error",
+      error: (err as Error)?.message || "chat failed",
+    }, { status: 500 });
   }
-
-  console.error("storybook-chat all models failed", lastErr);
-  return NextResponse.json<ChatResponse>({
-    reply: replyForSafety(body.studentLang, "block"),
-    kind: "error",
-    error: (lastErr as Error)?.message || "chat failed",
-  }, { status: 500 });
 }

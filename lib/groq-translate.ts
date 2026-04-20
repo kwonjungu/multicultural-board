@@ -15,6 +15,7 @@
  */
 
 import OpenAI from "openai";
+import { withGroqKeyFallback } from "./groq-client";
 
 const GROQ_MODELS = [
   // ── Production ──────────────────────────────────────────────────
@@ -26,13 +27,6 @@ const GROQ_MODELS = [
   "qwen/qwen3-32b",                             // 다국어 특화
   "meta-llama/llama-4-scout-17b-16e-instruct",  // 비전 겸용 텍스트
 ];
-
-function groqClient() {
-  return new OpenAI({
-    apiKey: process.env.GROQ_API_KEY || "placeholder",
-    baseURL: "https://api.groq.com/openai/v1",
-  });
-}
 
 /** 429 rate limit 또는 모델 미지원(400/404) → 다음 모델로 스킵 */
 function shouldSkipModel(err: unknown): boolean {
@@ -100,39 +94,39 @@ async function translateChunkWithFallback(
   fromName: string,
   toName: string,
 ): Promise<string[]> {
-  const groq = groqClient();
   const prompt = buildPrompt(chunk, fromName, toName);
 
-  for (const model of GROQ_MODELS) {
-    try {
-      const completion = await groq.chat.completions.create({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 4000,
-        temperature: 0.2,
-      });
-
-      const raw = (completion.choices[0]?.message?.content || "")
-        .replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-
-      let parsed: string[] = [];
+  return withGroqKeyFallback(async (groq) => {
+    for (const model of GROQ_MODELS) {
       try {
-        const json = JSON.parse(raw);
-        if (Array.isArray(json)) parsed = json.map((x) => String(x ?? ""));
-      } catch { parsed = []; }
+        const completion = await groq.chat.completions.create({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 4000,
+          temperature: 0.2,
+        });
 
-      while (parsed.length < chunk.length) parsed.push(chunk[parsed.length]);
-      return parsed.slice(0, chunk.length);
-    } catch (err) {
-      if (shouldSkipModel(err)) {
-        console.warn(`[groq-translate] ${model} skipped (${(err as { status?: number }).status ?? "err"}), trying next…`);
-        continue;
+        const raw = (completion.choices[0]?.message?.content || "")
+          .replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+
+        let parsed: string[] = [];
+        try {
+          const json = JSON.parse(raw);
+          if (Array.isArray(json)) parsed = json.map((x) => String(x ?? ""));
+        } catch { parsed = []; }
+
+        while (parsed.length < chunk.length) parsed.push(chunk[parsed.length]);
+        return parsed.slice(0, chunk.length);
+      } catch (err) {
+        if (shouldSkipModel(err)) {
+          console.warn(`[groq-translate] ${model} skipped (${(err as { status?: number }).status ?? "err"}), trying next…`);
+          continue;
+        }
+        throw err;
       }
-      throw err;
     }
-  }
-
-  throw new Error("번역 한도 초과: 모든 Groq 모델 소진. 잠시 후 다시 시도하거나 LibreTranslate를 설정하세요.");
+    throw new Error("번역 한도 초과: 모든 Groq 모델 소진. 잠시 후 다시 시도하거나 LibreTranslate를 설정하세요.");
+  });
 }
 
 function buildPrompt(chunk: string[], fromName: string, toName: string): string {
@@ -145,34 +139,34 @@ ${JSON.stringify(chunk)}`;
 }
 
 /**
- * 긴 텍스트(PDF 전문 등) 단건 번역. 모델 폴백 적용.
+ * 긴 텍스트(PDF 전문 등) 단건 번역. 모델 폴백 + 키 폴백 적용.
  */
 export async function translateLongText(
   text: string,
   fromName: string,
   toName: string,
 ): Promise<string> {
-  const groq = groqClient();
   const prompt = `Translate the following ${fromName} text to ${toName}.\nReturn ONLY the translated text, nothing else.\n\n${text}`;
 
-  for (const model of GROQ_MODELS) {
-    try {
-      const completion = await groq.chat.completions.create({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 3000,
-        temperature: 0.3,
-      });
-      const result = completion.choices[0]?.message?.content?.trim();
-      if (result) return result;
-    } catch (err) {
-      if (shouldSkipModel(err)) {
-        console.warn(`[groq-translate] ${model} skipped (long text), trying next…`);
-        continue;
+  return withGroqKeyFallback(async (groq) => {
+    for (const model of GROQ_MODELS) {
+      try {
+        const completion = await groq.chat.completions.create({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 3000,
+          temperature: 0.3,
+        });
+        const result = completion.choices[0]?.message?.content?.trim();
+        if (result) return result;
+      } catch (err) {
+        if (shouldSkipModel(err)) {
+          console.warn(`[groq-translate] ${model} skipped (long text), trying next…`);
+          continue;
+        }
+        throw err;
       }
-      throw err;
     }
-  }
-
-  throw new Error("번역 한도 초과: 모든 Groq 모델 소진. 잠시 후 다시 시도하거나 LibreTranslate를 설정하세요.");
+    throw new Error("번역 한도 초과: 모든 Groq 모델 소진. 잠시 후 다시 시도하거나 LibreTranslate를 설정하세요.");
+  });
 }
