@@ -72,6 +72,9 @@ export default function VocabCard({
   const [nativeMap, setNativeMap] = useState<Record<string, string> | null>(null);
   const [nativeLoading, setNativeLoading] = useState(false);
 
+  // 학습 단계: 먼저 단어 자체를 익히고(intro), 그 다음 예문(study)
+  const [phase, setPhase] = useState<"intro" | "study">("intro");
+
   const sentence = word.sentences[idx];
   const doneSet = useMemo(() => new Set(doneSentences), [doneSentences]);
   const isDone = doneSet.has(idx);
@@ -153,10 +156,46 @@ export default function VocabCard({
           <button onClick={onClose} aria-label="닫기" style={headerBtnStyle}>
             {t("vocabBack", lang)}
           </button>
-          <div style={{ fontSize: 13, fontWeight: 800, color: "#6B7280" }}>
-            {idx + 1} / 3
-          </div>
+          {phase === "study" ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                onClick={() => setPhase("intro")}
+                style={{
+                  background: "transparent", border: "1.5px solid " + PURPLE + "66",
+                  borderRadius: 10, padding: "5px 10px",
+                  fontSize: 11, fontWeight: 800, color: PURPLE_DARK,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >🔄 단어 다시</button>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#6B7280" }}>
+                {idx + 1} / 3
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, fontWeight: 800, color: PURPLE_DARK }}>
+              📖 단어 배우기
+            </div>
+          )}
         </div>
+
+        {phase === "intro" && (
+          <IntroPanel
+            word={word}
+            lang={lang}
+            showNative={showNative}
+            setShowNative={setShowNative}
+            nativeWord={nativeWord}
+            nativeLoading={nativeLoading}
+            onListen={(text) => { speakKorean(text, rate); onListenBump(); }}
+            mastered={doneSet.size >= 3}
+            doneCount={doneSet.size}
+            onStartStudy={() => { setPhase("study"); setIdx(0); setMode("listen"); }}
+          />
+        )}
+
+        {phase === "study" && (
+          <>
+          {/* study phase content follows */}
 
         {/* Word title */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "14px 0 10px" }}>
@@ -372,12 +411,167 @@ export default function VocabCard({
             {word.conjugations.join(" · ")}
           </div>
         )}
+        </>
+        )}
       </div>
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
         @keyframes slideUp { from { transform: translateY(60px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
       `}</style>
+    </div>
+  );
+}
+
+// ────────────── Intro panel (단어 자체 학습) ──────────────
+
+function IntroPanel({
+  word, lang, showNative, setShowNative, nativeWord, nativeLoading,
+  onListen, mastered, doneCount, onStartStudy,
+}: {
+  word: VocabWord; lang: string;
+  showNative: boolean; setShowNative: (v: boolean) => void;
+  nativeWord: string | undefined; nativeLoading: boolean;
+  onListen: (text: string) => void;
+  mastered: boolean; doneCount: number;
+  onStartStudy: () => void;
+}) {
+  return (
+    <div>
+      {/* Big icon + word */}
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+        margin: "18px 0 14px",
+      }}>
+        <div style={{
+          width: 140, height: 140, borderRadius: 28,
+          background: "linear-gradient(135deg, " + PURPLE_LIGHT + ", #EDE9FE)",
+          border: "3px solid " + PURPLE + "55",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 10,
+          boxShadow: "0 14px 36px rgba(139, 92, 246, 0.25)",
+        }}>
+          <img
+            src={`/vocab-images/icons/${word.id}.png`}
+            alt={word.ko}
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        </div>
+        <div style={{
+          fontSize: 42, fontWeight: 900, color: "#1F2937",
+          letterSpacing: -0.5, textAlign: "center",
+        }}>{word.ko}</div>
+
+        {/* Native translation */}
+        {lang !== "ko" && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            background: showNative ? "#ECFDF5" : PURPLE_LIGHT,
+            border: "2px dashed " + (showNative ? "#10B981" : PURPLE + "55"),
+            borderRadius: 12, padding: "8px 14px",
+            fontSize: 16, fontWeight: 700,
+            color: showNative ? "#059669" : PURPLE_DARK,
+          }}>
+            🌐
+            {showNative
+              ? (nativeWord ?? (nativeLoading ? "번역 중…" : "번역 없음"))
+              : <span style={{ fontSize: 13 }}>모국어로 보기</span>}
+            <button
+              onClick={() => setShowNative(!showNative)}
+              style={{
+                background: showNative ? "#10B981" : PURPLE,
+                color: "#fff", border: "none", borderRadius: 8,
+                padding: "4px 10px", fontSize: 11, fontWeight: 900,
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >{showNative ? "끄기" : "켜기"}</button>
+          </div>
+        )}
+
+        <div style={{
+          display: "flex", gap: 6,
+          fontSize: 11, fontWeight: 800, color: PURPLE_DARK,
+          letterSpacing: 0.3,
+        }}>
+          <span style={{ background: PURPLE_LIGHT, padding: "3px 10px", borderRadius: 999 }}>
+            {word.subcategory}
+          </span>
+          <span style={{ background: "#FEF3C7", color: "#92400E", padding: "3px 10px", borderRadius: 999 }}>
+            {word.category}
+          </span>
+          {mastered && (
+            <span style={{
+              background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
+              color: "#78350F", padding: "3px 10px", borderRadius: 999,
+            }}>🏆 완주</span>
+          )}
+        </div>
+      </div>
+
+      {/* Listen word button */}
+      <button
+        onClick={() => onListen(word.ko)}
+        style={{
+          width: "100%",
+          background: "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")",
+          color: "#fff", border: "none", borderRadius: 16,
+          padding: "14px", fontSize: 18, fontWeight: 900,
+          cursor: "pointer", fontFamily: "inherit",
+          boxShadow: "0 8px 20px rgba(139, 92, 246, 0.4)",
+          marginBottom: 14,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+        }}
+      >🔊 단어 듣기</button>
+
+      {/* Conjugations — 각 탭해서 TTS */}
+      {word.conjugations.length > 0 && (
+        <div style={{
+          background: "#FAFAFA", borderRadius: 14,
+          padding: "12px 14px", marginBottom: 14,
+          border: "1.5px solid #E5E7EB",
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color: PURPLE_DARK, marginBottom: 8, letterSpacing: 0.3 }}>
+            활용형 (탭해서 듣기)
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {word.conjugations.map((c) => (
+              <button
+                key={c}
+                onClick={() => onListen(c)}
+                style={{
+                  background: "#fff",
+                  border: "1.5px solid " + PURPLE + "55",
+                  borderRadius: 999, padding: "6px 14px",
+                  fontSize: 15, fontWeight: 800, color: "#1F2937",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >🔊 {c}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Progress hint */}
+      {doneCount > 0 && (
+        <div style={{
+          textAlign: "center", fontSize: 12, fontWeight: 700, color: "#6B7280",
+          marginBottom: 10,
+        }}>예문 {doneCount}/3 완료됨</div>
+      )}
+
+      {/* Start study */}
+      <button
+        onClick={onStartStudy}
+        style={{
+          width: "100%",
+          background: "linear-gradient(135deg, #F59E0B, #D97706)",
+          color: "#fff", border: "none", borderRadius: 16,
+          padding: "16px", fontSize: 18, fontWeight: 900,
+          cursor: "pointer", fontFamily: "inherit",
+          boxShadow: "0 10px 24px rgba(245, 158, 11, 0.4)",
+        }}
+      >📖 예문 배우기 시작 →</button>
     </div>
   );
 }
