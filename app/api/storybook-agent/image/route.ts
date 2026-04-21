@@ -3,6 +3,7 @@ import { generateImage } from "@/lib/gemini";
 import { getAdminApp } from "@/lib/firebase-admin";
 import { getStorage } from "firebase-admin/storage";
 import { randomUUID } from "crypto";
+import { removeLightBackground } from "@/lib/image-bg-removal";
 
 // Nano Banana image calls take 10-30s each. Run up to 60s budget.
 export const maxDuration = 60;
@@ -55,7 +56,18 @@ export async function POST(req: NextRequest) {
     const fullPrompt = `${body.prompt}\n\nStyle: ${baseStyleGuard}${portraitGuard}`;
 
     const img = await generateImage(fullPrompt);
-    const buffer = Buffer.from(img.base64, "base64");
+    let buffer: Buffer = Buffer.from(img.base64, "base64");
+
+    // === Character portrait post-processing ===
+    // Flood-fill the cream/white background to transparent so the character
+    // floats cleanly on any page color without a baked-in square.
+    if (hasChar) {
+      try {
+        buffer = Buffer.from(await removeLightBackground(buffer));
+      } catch (bgErr) {
+        console.warn("removeLightBackground failed, using raw image", bgErr);
+      }
+    }
 
     // === Upload to Firebase Storage ===
     const token = randomUUID();
