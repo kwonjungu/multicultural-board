@@ -11,6 +11,7 @@ import { getClientDb } from "@/lib/firebase-client";
 import { BRAND_GRADIENT, LANGUAGES } from "@/lib/constants";
 import { compressToUnder1MB } from "@/lib/imageUtils";
 import { SessionMeta, SessionResponse } from "@/lib/types";
+import { BOOK_STUDY_SAMPLES, BookStudySample } from "@/lib/bookStudySamples";
 
 /* ─────────── Types ─────────── */
 type InputMode = "text" | "voice" | "draw";
@@ -302,11 +303,13 @@ export default function BookStudy({
               newBody={newBody}
               setNewBody={setNewBody}
               characterImg={characterImg}
+              setCharacterImg={setCharacterImg}
               uploading={uploading}
               creating={creating}
               error={error}
               onImageUpload={handleImageUpload}
               onCreate={handleCreate}
+              myLang={myLang}
             />
           ) : (
             <WaitingScreen />
@@ -927,14 +930,25 @@ function DrawingInput({ onText, draft }: { onText: (t: string) => void; draft: s
 function TeacherCreatePanel({
   newTitle, setNewTitle, newBody, setNewBody,
   characterImg, uploading, creating, error,
-  onImageUpload, onCreate,
+  onImageUpload, onCreate, setCharacterImg, myLang,
 }: {
   newTitle: string; setNewTitle: (s: string) => void;
   newBody: string; setNewBody: (s: string) => void;
   characterImg: string; uploading: boolean; creating: boolean; error: string;
   onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onCreate: () => void;
+  setCharacterImg: (s: string) => void;
+  myLang: string;
 }) {
+  const [showSamples, setShowSamples] = useState(false);
+
+  function applySample(sample: BookStudySample, questionIdx: number) {
+    const q = sample.questions[questionIdx];
+    setNewTitle(q.text[myLang] || q.text.ko);
+    setCharacterImg(sample.character.imageUrl);
+    setShowSamples(false);
+  }
+
   return (
     <div style={{
       background: "#fff", borderRadius: 24, padding: "28px 22px",
@@ -951,8 +965,81 @@ function TeacherCreatePanel({
           그림책 질문 만들기
         </h2>
         <p style={{ fontSize: 13, color: "#B45309" }}>
-          캐릭터 이미지를 업로드하면 캐릭터가 직접 질문해요!
+          캐릭터 이미지를 업로드하거나, 아래 샘플을 선택해보세요!
         </p>
+      </div>
+
+      {/* ── Sample picker ── */}
+      <div style={{ marginBottom: 18 }}>
+        <button
+          onClick={() => setShowSamples(!showSamples)}
+          style={{
+            width: "100%", padding: "12px 16px", borderRadius: 14,
+            background: "linear-gradient(135deg, #EDE9FE, #DDD6FE)",
+            border: "2px solid #C4B5FD",
+            fontSize: 14, fontWeight: 800, color: "#5B21B6",
+            cursor: "pointer", display: "flex", alignItems: "center",
+            justifyContent: "center", gap: 8,
+          }}
+        >
+          📚 샘플 그림책에서 불러오기 {showSamples ? "▲" : "▼"}
+        </button>
+
+        {showSamples && (
+          <div style={{
+            marginTop: 10, background: "#F5F3FF", borderRadius: 16,
+            padding: 14, border: "1px solid #DDD6FE",
+            maxHeight: 320, overflowY: "auto",
+          }}>
+            {BOOK_STUDY_SAMPLES.map((sample) => (
+              <div key={sample.id} style={{ marginBottom: 14 }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  marginBottom: 8,
+                }}>
+                  <img
+                    src={sample.character.imageUrl}
+                    alt=""
+                    style={{
+                      width: 40, height: 40, borderRadius: "50%",
+                      objectFit: "cover", border: "2px solid #C4B5FD",
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#5B21B6" }}>
+                      {sample.character.emoji} {sample.character.name[myLang] || sample.character.name.ko}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#7C3AED" }}>
+                      {sample.bookTitle[myLang] || sample.bookTitle.ko}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 50 }}>
+                  {sample.questions.map((q, qi) => (
+                    <button
+                      key={q.id}
+                      onClick={() => applySample(sample, qi)}
+                      style={{
+                        textAlign: "left", padding: "8px 12px", borderRadius: 10,
+                        background: "#fff", border: "1px solid #E5E7EB",
+                        fontSize: 12, color: "#374151", cursor: "pointer",
+                        lineHeight: 1.4,
+                        transition: "border-color 0.2s",
+                      }}
+                      onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.borderColor = "#8B5CF6"; }}
+                      onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.borderColor = "#E5E7EB"; }}
+                    >
+                      <span style={{ fontSize: 10, fontWeight: 800, color: "#9CA3AF", marginRight: 6 }}>
+                        {q.tier === "intro" ? "도입" : q.tier === "core" ? "핵심" : q.tier === "deep" ? "심화" : "개념"}
+                      </span>
+                      {q.text[myLang] || q.text.ko}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Character image upload */}
