@@ -1106,6 +1106,23 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
   vocabSub_일상동사: { ko: "동사", en: "Verbs" },
   vocabSub_일상형용사: { ko: "형용사", en: "Adjectives" },
   vocabSub_인사: { ko: "인사", en: "Greetings" },
+  hubSectionBook: {
+    ko: "그림책 공부", en: "Book Study", vi: "Học qua sách",
+    zh: "绘本学习", fil: "Pag-aaral ng Libro", ja: "絵本のべんきょう",
+    th: "เรียนจากหนังสือ", km: "រៀនពីសៀវភៅ", mn: "Номын судалгаа",
+    ru: "Изучение книги", uz: "Kitob o'rganish",
+    hi: "किताब से पढ़ाई", id: "Belajar dari Buku",
+    ar: "دراسة الكتاب", my: "စာအုပ်လေ့လာခြင်း",
+  },
+  hubSectionBookDesc: {
+    ko: "캐릭터와 함께 생각해요", en: "Think with characters",
+    vi: "Suy nghĩ cùng nhân vật", zh: "和角色一起思考",
+    fil: "Mag-isip kasama ang karakter", ja: "キャラクターと一緒に考えよう",
+    th: "คิดไปกับตัวละคร", km: "គិតជាមួយតួអង្គ", mn: "Дүрүүдтэй хамт бод",
+    ru: "Думай с персонажами", uz: "Qahramonlar bilan o'yla",
+    hi: "पात्रों के साथ सोचो", id: "Berpikir bersama karakter",
+    ar: "فكّر مع الشخصيات", my: "ဇာတ်ကောင်နှင့်အတူတွေးပါ",
+  },
   hubSoon: {
     ko: "🔒 곧 나와요", en: "🔒 Coming soon", vi: "🔒 Sắp ra mắt",
     zh: "🔒 即将推出", fil: "🔒 Malapit na", ja: "🔒 まもなく",

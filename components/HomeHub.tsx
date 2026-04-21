@@ -3,7 +3,7 @@
 import { UserConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 
-export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab" | "storybook";
+export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab" | "storybook" | "bookStudy";
 
 interface SectionMeta {
   id: HubView;
@@ -78,6 +78,16 @@ const SECTIONS: SectionMeta[] = [
     color: "#F59E0B",
     bg: "linear-gradient(135deg, #FFF7ED, #FED7AA)",
     accent: "#C2410C",
+  },
+  {
+    id: "bookStudy",
+    titleKey: "hubSectionBook",
+    sub: "Book Study",
+    descKey: "hubSectionBookDesc",
+    mascot: "/mascot/bee-think.png",
+    color: "#6366F1",
+    bg: "linear-gradient(135deg, #EDE9FE, #DDD6FE)",
+    accent: "#5B21B6",
     badge: "NEW",
   },
 ];

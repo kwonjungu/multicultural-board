@@ -13,6 +13,7 @@ import InterpreterDrawer from "@/components/InterpreterDrawer";
 import PraiseHive from "@/components/PraiseHive";
 import VocabHub from "@/components/VocabHub";
 import StorybookRoom from "@/components/StorybookRoom";
+import BookStudy from "@/components/BookStudy";
 import StickerGiveModal from "@/components/StickerGiveModal";
 import CosmeticPicker from "@/components/CosmeticPicker";
 import Toast from "@/components/Toast";
@@ -274,6 +275,23 @@ export default function RoomPage() {
           onOpenCosmetics={() => setCosmeticsOpen(true)}
         />
         <SectionCaption section="praise" isTeacher={user.isTeacher} />
+        {overlays}
+      </>
+    );
+  }
+
+  if (hubView === "bookStudy") {
+    return (
+      <>
+        <BookStudy
+          roomCode={roomCode}
+          isTeacher={user.isTeacher}
+          myClientId={myClientId}
+          myName={user.myName}
+          myLang={user.myLang}
+          roomLangs={roomLangs}
+          onBack={() => setHubView("hub")}
+        />
         {overlays}
       </>
     );
