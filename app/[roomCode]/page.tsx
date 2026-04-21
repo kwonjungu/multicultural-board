@@ -13,7 +13,6 @@ import InterpreterDrawer from "@/components/InterpreterDrawer";
 import PraiseHive from "@/components/PraiseHive";
 import VocabHub from "@/components/VocabHub";
 import StorybookRoom from "@/components/StorybookRoom";
-import BookStudy from "@/components/BookStudy";
 import StickerGiveModal from "@/components/StickerGiveModal";
 import CosmeticPicker from "@/components/CosmeticPicker";
 import Toast from "@/components/Toast";
@@ -280,22 +279,7 @@ export default function RoomPage() {
     );
   }
 
-  if (hubView === "bookStudy") {
-    return (
-      <>
-        <BookStudy
-          roomCode={roomCode}
-          isTeacher={user.isTeacher}
-          myClientId={myClientId}
-          myName={user.myName}
-          myLang={user.myLang}
-          roomLangs={roomLangs}
-          onBack={() => setHubView("hub")}
-        />
-        {overlays}
-      </>
-    );
-  }
+
 
   // 기본: 소통창 — 교사가 카드별 칭찬 버튼으로 스티커 지급
   return (

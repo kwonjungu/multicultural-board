@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   UserConfig,
   Storybook,
@@ -719,6 +719,7 @@ function BeforePhase({
           myClientId={myClientId}
           q={currentQ}
           isTeacher={isTeacher}
+          book={book}
         />
       )}
 
@@ -879,6 +880,7 @@ function DuringPhase({
           myClientId={myClientId}
           q={currentQ}
           isTeacher={isTeacher}
+          book={book}
         />
       )}
 
@@ -1000,9 +1002,17 @@ function BilingualText({
 // ============================================================
 // Question card (shared between phases)
 // ============================================================
+// Redesigned: Character asks via speech bubble + post-it responses + 3 input modes
+
+type QInputMode = "text" | "voice" | "draw";
+
+const POSTIT_COLORS = [
+  "#FEF3C7", "#DBEAFE", "#FCE7F3", "#D1FAE5", "#EDE9FE",
+  "#FEE2E2", "#FFEDD5", "#E0F2FE", "#F3E8FF", "#FEF9C3",
+];
 
 function QuestionCard({
-  lang, roomCode, user, myClientId, q, isTeacher,
+  lang, roomCode, user, myClientId, q, isTeacher, book,
 }: {
   lang: string;
   roomCode: string;
@@ -1010,11 +1020,20 @@ function QuestionCard({
   myClientId: string;
   q: StorybookQuestion;
   isTeacher: boolean;
+  book?: Storybook;
 }) {
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [responses, setResponses] = useState<StorybookResponse[]>([]);
+  const [inputMode, setInputMode] = useState<QInputMode>("text");
+  const [recording, setRecording] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const mediaRef = React.useRef<MediaRecorder | null>(null);
+  const chunksRef = React.useRef<Blob[]>([]);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const [drawing, setDrawing] = useState(false);
+  const lastPos = React.useRef<{ x: number; y: number } | null>(null);
 
   // Reset when question changes
   useEffect(() => {
@@ -1047,120 +1066,278 @@ function QuestionCard({
     setBusy(false);
   }
 
+  // Voice recording
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : undefined;
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
+        setProcessing(true);
+        try {
+          const form = new FormData();
+          form.append("audio", blob, "rec.webm");
+          form.append("lang", lang);
+          const res = await fetch("/api/stt", { method: "POST", body: form });
+          const data = await res.json();
+          if (data.text) setDraft(data.text);
+          else alert("음성을 인식하지 못했어요. 다시 시도해주세요.");
+        } catch { alert("음성 인식 실패"); }
+        setProcessing(false);
+      };
+      recorder.start();
+      mediaRef.current = recorder;
+      setRecording(true);
+    } catch { alert("마이크를 사용할 수 없어요."); }
+  }
+  function stopRecording() { mediaRef.current?.stop(); setRecording(false); }
+
+  // Drawing helpers
+  function getCanvasPos(e: React.MouseEvent | React.TouchEvent) {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    if ("touches" in e) {
+      const touch = e.touches[0] || e.changedTouches[0];
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    }
+    return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top };
+  }
+  function drawStart(e: React.MouseEvent | React.TouchEvent) { e.preventDefault(); setDrawing(true); lastPos.current = getCanvasPos(e); }
+  function drawMove(e: React.MouseEvent | React.TouchEvent) {
+    if (!drawing) return; e.preventDefault();
+    const pos = getCanvasPos(e);
+    const ctx = canvasRef.current?.getContext("2d");
+    if (ctx && lastPos.current) {
+      ctx.strokeStyle = "#1F2937"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+    }
+    lastPos.current = pos;
+  }
+  function drawEnd() { setDrawing(false); lastPos.current = null; }
+  function clearCanvas() { const ctx = canvasRef.current?.getContext("2d"); if (ctx) ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height); }
+
+  // Get active character avatar
+  const activeChar = book?.characters?.[0];
+  const charImg = activeChar?.avatarUrl || "/mascot/bee-think.png";
+  const charName = activeChar ? pick(activeChar.name, lang) : "🐝";
+
+  const { primary, secondary } = bilingual(q.text, lang);
+
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 22,
-        padding: "18px 18px 16px",
-        border: "3px solid #60A5FA",
-        boxShadow: "0 10px 28px rgba(59,130,246,0.18)",
-        marginBottom: 14,
-      }}
-    >
-      <div style={{
-        display: "inline-block",
-        padding: "3px 10px",
-        background: "#DBEAFE", color: "#1E40AF",
-        fontSize: 11, fontWeight: 900, borderRadius: 999,
-        marginBottom: 8,
-      }}>
-        {t(TIER_KEY[q.tier], lang)}
-      </div>
-      {(() => {
-        const { primary, secondary } = bilingual(q.text, lang);
-        return (
-          <div>
-            <div style={{
-              fontSize: 18, fontWeight: 900, color: "#1F2937",
-              letterSpacing: -0.3, lineHeight: 1.35,
-            }}>
-              {primary}
+    <div style={{ marginBottom: 14 }}>
+      {/* ── Character speech bubble ── */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: "50%", flexShrink: 0,
+          background: `url(${charImg}) center/cover no-repeat`,
+          border: "3px solid #fff",
+          boxShadow: "0 4px 12px rgba(245,158,11,0.3)",
+        }} />
+        <div style={{
+          flex: 1, position: "relative",
+          background: "#fff", borderRadius: 18, padding: "14px 16px",
+          border: "2px solid #60A5FA",
+          boxShadow: "0 6px 18px rgba(59,130,246,0.12)",
+        }}>
+          {/* Triangle */}
+          <div style={{
+            position: "absolute", left: -8, top: 16,
+            width: 0, height: 0,
+            borderTop: "8px solid transparent",
+            borderBottom: "8px solid transparent",
+            borderRight: "8px solid #60A5FA",
+          }} />
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
+          }}>
+            <span style={{
+              fontSize: 10, fontWeight: 900, color: "#1E40AF",
+              background: "#DBEAFE", padding: "2px 8px", borderRadius: 99,
+            }}>{t(TIER_KEY[q.tier], lang)}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#6B7280" }}>{charName}</span>
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937", lineHeight: 1.4 }}>
+            {primary}
+          </div>
+          {secondary && (
+            <div style={{ marginTop: 6, fontSize: 13, fontWeight: 700, color: "#3B82F6", lineHeight: 1.4 }}>
+              🇰🇷 {secondary}
             </div>
-            {secondary && (
-              <div style={{
-                marginTop: 6, paddingTop: 6,
-                borderTop: "1px dashed #BFDBFE",
-                fontSize: 14, fontWeight: 700, color: "#1E40AF",
-                letterSpacing: -0.1, lineHeight: 1.4,
-              }}>
-                🇰🇷 {secondary}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {!isTeacher && (
-        <div style={{ marginTop: 12 }}>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={t("sbAnswerPlaceholder", lang)}
-            disabled={busy || saved}
-            rows={3}
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              border: "2px solid #DBEAFE",
-              borderRadius: 14,
-              fontSize: 14,
-              fontFamily: "inherit",
-              resize: "vertical",
-              outline: "none",
-              background: saved ? "#F0F9FF" : "#fff",
-              color: "#1F2937",
-            }}
-          />
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-            {saved ? (
-              <div style={{ fontSize: 13, fontWeight: 900, color: "#059669" }}>
-                {t("sbAnswerSaved", lang)}
-              </div>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={busy || !draft.trim()}
-                style={{
-                  minHeight: 40, padding: "8px 20px",
-                  background: !draft.trim() ? "#E5E7EB" : "linear-gradient(135deg, #3B82F6, #2563EB)",
-                  color: !draft.trim() ? "#9CA3AF" : "#fff",
-                  fontSize: 14, fontWeight: 900, border: "none",
-                  borderRadius: 12, cursor: !draft.trim() || busy ? "not-allowed" : "pointer",
-                  boxShadow: !draft.trim() ? "none" : "0 4px 12px rgba(59,130,246,0.3)",
-                }}
-              >{t("sbSubmitAnswer", lang)}</button>
-            )}
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Responses feed (teacher always, students after submit) */}
-      {(isTeacher || saved) && responses.length > 0 && (
-        <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed #CBD5E1" }}>
-          <div style={{ fontSize: 12, fontWeight: 900, color: "#475569", marginBottom: 6 }}>
-            {t("sbResponsesTitle", lang)} ({responses.length})
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto" }}>
-            {responses.map((r) => (
-              <div
-                key={r.id}
-                style={{
-                  padding: "8px 12px",
-                  background: r.clientId === myClientId ? "#EFF6FF" : "#F9FAFB",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: 10,
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#6B7280" }}>{r.studentName}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1F2937", marginTop: 2, lineHeight: 1.4 }}>
-                  {r.text}
-                </div>
-              </div>
+      {/* ── Student input: 3 modes ── */}
+      {!isTeacher && !saved && (
+        <div style={{
+          background: "#fff", borderRadius: 18, padding: "14px 16px",
+          border: "2px solid #E5E7EB", marginBottom: 12,
+        }}>
+          {/* Mode tabs */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 12, background: "#F3F4F6", borderRadius: 10, padding: 3 }}>
+            {([
+              { id: "text" as QInputMode, label: "✏️ 글자" },
+              { id: "voice" as QInputMode, label: "🎤 말" },
+              { id: "draw" as QInputMode, label: "🖌️ 그리기" },
+            ]).map((tab) => (
+              <button key={tab.id} onClick={() => setInputMode(tab.id)} style={{
+                flex: 1, padding: "7px 4px", borderRadius: 8,
+                background: inputMode === tab.id ? "#fff" : "transparent",
+                border: inputMode === tab.id ? "1.5px solid #3B82F6" : "1.5px solid transparent",
+                fontSize: 12, fontWeight: 800, color: inputMode === tab.id ? "#1E40AF" : "#6B7280",
+                cursor: "pointer",
+              }}>{tab.label}</button>
             ))}
           </div>
+
+          {inputMode === "text" && (
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={t("sbAnswerPlaceholder", lang)}
+              disabled={busy}
+              rows={3}
+              style={{
+                width: "100%", padding: "10px 12px",
+                border: "2px solid #DBEAFE", borderRadius: 12,
+                fontSize: 14, fontFamily: "inherit", resize: "vertical",
+                outline: "none", background: "#FAFAFA", color: "#1F2937",
+                boxSizing: "border-box",
+              }}
+              onFocus={(e) => { e.target.style.borderColor = "#3B82F6"; }}
+              onBlur={(e) => { e.target.style.borderColor = "#DBEAFE"; }}
+            />
+          )}
+
+          {inputMode === "voice" && (
+            <div style={{ textAlign: "center", padding: "14px 0" }}>
+              {processing ? (
+                <div style={{ fontSize: 13, color: "#6B7280" }}>🔄 음성 변환 중...</div>
+              ) : (
+                <button
+                  onClick={recording ? stopRecording : startRecording}
+                  style={{
+                    width: 64, height: 64, borderRadius: "50%",
+                    background: recording ? "linear-gradient(135deg,#EF4444,#DC2626)" : "linear-gradient(135deg,#3B82F6,#2563EB)",
+                    border: "none", cursor: "pointer", fontSize: 24, color: "#fff",
+                    boxShadow: recording ? "0 0 0 6px rgba(239,68,68,0.2)" : "0 4px 12px rgba(59,130,246,0.3)",
+                    animation: recording ? "pulse 1s ease-in-out infinite" : "none",
+                  }}
+                >{recording ? "⏹" : "🎤"}</button>
+              )}
+              <div style={{ fontSize: 11, color: "#6B7280", marginTop: 8 }}>
+                {recording ? "녹음 중... 눌러서 멈추기" : "버튼을 눌러 말해보세요"}
+              </div>
+              {draft && <div style={{ marginTop: 8, fontSize: 13, color: "#1F2937", fontWeight: 600 }}>인식: &ldquo;{draft}&rdquo;</div>}
+            </div>
+          )}
+
+          {inputMode === "draw" && (
+            <div>
+              <div style={{ border: "2px solid #E5E7EB", borderRadius: 10, overflow: "hidden", touchAction: "none", background: "#fff" }}>
+                <canvas
+                  ref={canvasRef}
+                  width={360} height={140}
+                  style={{ width: "100%", height: 140, display: "block", cursor: "crosshair" }}
+                  onMouseDown={drawStart} onMouseMove={drawMove} onMouseUp={drawEnd} onMouseLeave={drawEnd}
+                  onTouchStart={drawStart} onTouchMove={drawMove} onTouchEnd={drawEnd}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                <button onClick={clearCanvas} style={{ flex: 1, padding: "7px", borderRadius: 8, background: "#F3F4F6", border: "1px solid #E5E7EB", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🗑️ 지우기</button>
+                <button onClick={() => { const text = prompt("그린 글자를 입력해주세요:"); if (text) setDraft(text); }} style={{ flex: 1, padding: "7px", borderRadius: 8, background: "#DBEAFE", border: "1px solid #BFDBFE", fontSize: 12, fontWeight: 700, color: "#1E40AF", cursor: "pointer" }}>✨ 글자 인식</button>
+              </div>
+            </div>
+          )}
+
+          {/* Preview + submit */}
+          {draft && inputMode !== "text" && (
+            <div style={{ marginTop: 8, padding: "8px 10px", background: "#F9FAFB", borderRadius: 8, fontSize: 13, color: "#374151" }}>
+              <strong>입력:</strong> {draft}
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+            <button
+              onClick={handleSubmit}
+              disabled={busy || !draft.trim()}
+              style={{
+                minHeight: 40, padding: "8px 20px",
+                background: !draft.trim() ? "#E5E7EB" : "linear-gradient(135deg, #3B82F6, #2563EB)",
+                color: !draft.trim() ? "#9CA3AF" : "#fff",
+                fontSize: 14, fontWeight: 900, border: "none",
+                borderRadius: 12, cursor: !draft.trim() || busy ? "not-allowed" : "pointer",
+                boxShadow: !draft.trim() ? "none" : "0 4px 12px rgba(59,130,246,0.3)",
+              }}
+            >{busy ? "제출 중..." : "📨 포스트잇 붙이기"}</button>
+          </div>
         </div>
       )}
+
+      {/* Saved confirmation */}
+      {!isTeacher && saved && (
+        <div style={{
+          padding: "10px 14px", background: "#ECFDF5", borderRadius: 12,
+          border: "1px solid #A7F3D0", marginBottom: 12,
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{ fontSize: 18 }}>✅</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: "#065F46" }}>{t("sbAnswerSaved", lang)}</span>
+        </div>
+      )}
+
+      {/* ── Post-it style responses ── */}
+      {(isTeacher || saved) && responses.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, color: "#475569", marginBottom: 8 }}>
+            {t("sbResponsesTitle", lang)} ({responses.length})
+          </div>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+            gap: 10,
+          }}>
+            {responses.map((r, i) => {
+              const bg = POSTIT_COLORS[i % POSTIT_COLORS.length];
+              const rotation = ((i * 5 + 2) % 7) - 3;
+              return (
+                <div key={r.id} style={{
+                  background: bg, borderRadius: 4, padding: "12px 10px 8px",
+                  boxShadow: "2px 3px 10px rgba(0,0,0,0.1)",
+                  transform: `rotate(${rotation}deg)`,
+                  position: "relative", minHeight: 70,
+                  display: "flex", flexDirection: "column", justifyContent: "space-between",
+                  transition: "transform 0.2s",
+                }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "rotate(0deg) scale(1.05)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = `rotate(${rotation}deg)`; }}
+                >
+                  {/* Tape */}
+                  <div style={{
+                    position: "absolute", top: -4, left: "50%", transform: "translateX(-50%)",
+                    width: 30, height: 8, background: "rgba(59,130,246,0.2)", borderRadius: 2,
+                  }} />
+                  <div style={{ fontSize: 12, color: "#1F2937", lineHeight: 1.4, wordBreak: "break-word" }}>
+                    {r.text}
+                  </div>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: "#6B7280", marginTop: 6, borderTop: "1px dashed rgba(0,0,0,0.08)", paddingTop: 4 }}>
+                    {r.studentName}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <style jsx global>{`
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+      `}</style>
     </div>
   );
 }
