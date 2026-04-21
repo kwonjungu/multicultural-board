@@ -1014,6 +1014,31 @@ const POSTIT_COLORS = [
 
 const FRUIT_BG = ["#EF4444","#FDBA74","#8B5CF6","#FDE047","#3B82F6","#DC2626","#10B981","#F472B6"];
 
+/** Animal-Crossing-style babble beep per character */
+function playIntroBeep(ctxRef: React.MutableRefObject<AudioContext | null>, ch: string) {
+  if (!ch || /\s/.test(ch)) return;
+  try {
+    if (!ctxRef.current) {
+      const Ctor = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
+        || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) return;
+      ctxRef.current = new Ctor();
+    }
+    const ctx = ctxRef.current!;
+    const pitch = 420 + ((ch.charCodeAt(0) % 9) * 22);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = pitch;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.06, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+  } catch { /* audio unavailable */ }
+}
+
 function QuestionCard({
   lang, roomCode, user, myClientId, q, isTeacher, book,
 }: {
@@ -1034,6 +1059,11 @@ function QuestionCard({
   const [processing, setProcessing] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [selectedFruit, setSelectedFruit] = useState<number | null>(null);
+  // Tutorial-style entrance for students
+  const [showIntro, setShowIntro] = useState(false);
+  const [introTyped, setIntroTyped] = useState(0);
+  const introTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1041,8 +1071,14 @@ function QuestionCard({
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const ttsPlayedRef = useRef<string>("");
 
-  // Reset when question changes
-  useEffect(() => { setDraft(""); setSaved(false); setSelectedFruit(null); }, [q.id]);
+  // Reset when question changes — trigger tutorial intro for students
+  useEffect(() => {
+    setDraft(""); setSaved(false); setSelectedFruit(null);
+    if (!isTeacher) {
+      setShowIntro(true);
+      setIntroTyped(0);
+    }
+  }, [q.id, isTeacher]);
 
   useEffect(() => {
     const unsub = subscribeResponses(roomCode, q.id, setResponses);
@@ -1052,16 +1088,36 @@ function QuestionCard({
   const mine = responses.find((r) => r.clientId === myClientId);
   useEffect(() => { if (mine && !saved) { setSaved(true); setDraft(mine.text); } }, [mine, saved]);
 
-  // ── TTS auto-play when question appears ──
+  // ── Typewriter effect for student intro ──
+  const introText = pick(q.text, lang);
   useEffect(() => {
-    if (ttsPlayedRef.current === q.id) return; // already played
-    ttsPlayedRef.current = q.id;
-    const text = pick(q.text, lang);
-    if (text) {
+    if (!showIntro || isTeacher || !introText) return;
+    let i = 0;
+    const speed = 35;
+    const tick = () => {
+      i++;
+      setIntroTyped(i);
+      // beep sound per char
+      const ch = introText[i - 1] || "";
+      if (ch && !/\s/.test(ch)) playIntroBeep(audioCtxRef, ch);
+      if (i >= introText.length) return;
+      const delay = /[.,!?~…]/.test(ch) ? speed * 5 : speed;
+      introTimerRef.current = setTimeout(tick, delay);
+    };
+    introTimerRef.current = setTimeout(tick, 400); // wait for entrance
+    return () => { if (introTimerRef.current) clearTimeout(introTimerRef.current); };
+  }, [showIntro, isTeacher, introText]);
+
+  // ── TTS auto-play when intro finishes typing ──
+  useEffect(() => {
+    if (!showIntro || isTeacher) return;
+    if (introTyped >= introText.length && introText.length > 0) {
+      if (ttsPlayedRef.current === q.id) return;
+      ttsPlayedRef.current = q.id;
       setSpeaking(true);
-      speakText(text, lang).finally(() => setSpeaking(false));
+      speakText(introText, lang).finally(() => setSpeaking(false));
     }
-  }, [q.id, lang]);
+  }, [introTyped, introText, showIntro, isTeacher, q.id, lang]);
 
   function handleTtsReplay() {
     const text = pick(q.text, lang);
@@ -1126,9 +1182,113 @@ function QuestionCard({
   const charName = activeChar ? pick(activeChar.name, lang) : "🐝";
   const { primary, secondary } = bilingual(q.text, lang);
 
+  function dismissIntro() {
+    // skip typewriter instantly if still typing, or dismiss overlay
+    if (introTyped < introText.length) {
+      if (introTimerRef.current) clearTimeout(introTimerRef.current);
+      setIntroTyped(introText.length);
+    } else {
+      setShowIntro(false);
+    }
+  }
+
   return (
     <div style={{ marginBottom: 14 }}>
-      {/* ── Character with wobble animation + speech bubble ── */}
+      {/* ═══ Student tutorial-style intro overlay ═══ */}
+      {!isTeacher && showIntro && (
+        <div
+          onClick={dismissIntro}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9990,
+            background: "rgba(9,7,30,0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            cursor: "pointer",
+            animation: "fadeIn 0.3s ease",
+          }}
+        >
+          {/* Character — big entrance */}
+          <img
+            src={charImg}
+            alt={charName}
+            style={{
+              width: 140, height: 140, objectFit: "contain",
+              filter: "drop-shadow(0 10px 24px rgba(245,158,11,0.5))",
+              animation: "charBounceIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both, beeGuideIdle 2.8s ease-in-out 0.5s infinite",
+              marginBottom: 16,
+            }}
+          />
+
+          {/* Dialogue box — Animal Crossing style */}
+          <div
+            onClick={(e) => { e.stopPropagation(); dismissIntro(); }}
+            style={{
+              width: "min(600px, calc(100vw - 40px))",
+              background: "#FFFBEB",
+              border: "4px solid #F59E0B",
+              borderRadius: 24,
+              padding: "22px 26px 24px",
+              boxShadow: "0 20px 50px rgba(180,83,9,0.4)",
+              position: "relative",
+              fontFamily: "'Noto Sans KR', sans-serif",
+              animation: "bubblePop 0.35s cubic-bezier(0.17,0.89,0.32,1.28) 0.2s both",
+              cursor: "pointer",
+            }}
+          >
+            {/* Speaker tag */}
+            <div style={{
+              position: "absolute", top: -18, left: 22,
+              background: "#F59E0B", color: "#fff",
+              padding: "6px 16px", borderRadius: 999,
+              fontSize: 13, fontWeight: 900,
+              boxShadow: "0 4px 10px rgba(180,83,9,0.3)",
+            }}>
+              {activeChar?.avatarEmoji || "🐝"} {charName}
+            </div>
+
+            {/* Typewriter text */}
+            <div style={{
+              fontSize: 20, lineHeight: 1.6, fontWeight: 700,
+              minHeight: 60, whiteSpace: "pre-wrap", color: "#1F2937",
+              marginTop: 6,
+            }}>
+              {introText.slice(0, introTyped)}
+              {introTyped < introText.length && (
+                <span style={{
+                  display: "inline-block", width: 2, marginLeft: 3,
+                  borderRight: "3px solid #F59E0B", height: "1em",
+                  verticalAlign: "text-bottom",
+                  animation: "tutorialCaret 600ms steps(1) infinite",
+                }} />
+              )}
+            </div>
+
+            {/* Secondary (Korean) for non-Korean students */}
+            {secondary && introTyped >= introText.length && (
+              <div style={{
+                marginTop: 8, paddingTop: 8, borderTop: "1px dashed #FDE68A",
+                fontSize: 15, fontWeight: 700, color: "#B45309", lineHeight: 1.5,
+                animation: "questionSlideIn 0.3s ease both",
+              }}>
+                🇰🇷 {secondary}
+              </div>
+            )}
+
+            {/* Bottom hint */}
+            <div style={{
+              display: "flex", justifyContent: "flex-end", marginTop: 14,
+              fontSize: 13, fontWeight: 800, color: "#92400E",
+              alignItems: "center", gap: 6,
+            }}>
+              {introTyped < introText.length ? "건너뛰기" : "답변하기"}
+              <span style={{ animation: "fadeSlideIn 700ms ease-in-out infinite alternate", fontSize: 16 }}>▼</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Character with wobble animation + speech bubble (inline, after intro) ── */}
       <div style={{
         display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14,
         animation: "questionSlideIn 0.5s ease both",
@@ -1380,6 +1540,24 @@ function QuestionCard({
       )}
 
       <style jsx global>{`
+        @keyframes charBounceIn {
+          0% { opacity: 0; transform: scale(0.2) translateY(40px); }
+          60% { opacity: 1; transform: scale(1.15) translateY(-10px); }
+          80% { transform: scale(0.95) translateY(2px); }
+          100% { transform: scale(1) translateY(0); }
+        }
+        @keyframes beeGuideIdle {
+          0%,100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes tutorialCaret {
+          0%,49% { opacity: 1; }
+          50%,100% { opacity: 0; }
+        }
+        @keyframes fadeSlideIn {
+          from { transform: translateY(0); opacity: 0.6; }
+          to { transform: translateY(3px); opacity: 1; }
+        }
         @keyframes charWobble {
           0%, 100% { transform: rotate(0deg) scale(1); }
           15% { transform: rotate(-6deg) scale(1.05); }
