@@ -1002,14 +1002,17 @@ function BilingualText({
 // ============================================================
 // Question card (shared between phases)
 // ============================================================
-// Redesigned: Character asks via speech bubble + post-it responses + 3 input modes
+// v3: Character wobble + TTS auto-play + post-it + fruit-tree result + 3 input modes
 
 type QInputMode = "text" | "voice" | "draw";
 
 const POSTIT_COLORS = [
   "#FEF3C7", "#DBEAFE", "#FCE7F3", "#D1FAE5", "#EDE9FE",
   "#FEE2E2", "#FFEDD5", "#E0F2FE", "#F3E8FF", "#FEF9C3",
+  "#CFFAFE", "#FDE68A", "#C7D2FE", "#FECACA", "#BBF7D0",
 ];
+
+const FRUIT_BG = ["#EF4444","#FDBA74","#8B5CF6","#FDE047","#3B82F6","#DC2626","#10B981","#F472B6"];
 
 function QuestionCard({
   lang, roomCode, user, myClientId, q, isTeacher, book,
@@ -1029,17 +1032,17 @@ function QuestionCard({
   const [inputMode, setInputMode] = useState<QInputMode>("text");
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const mediaRef = React.useRef<MediaRecorder | null>(null);
-  const chunksRef = React.useRef<Blob[]>([]);
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const [selectedFruit, setSelectedFruit] = useState<number | null>(null);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
-  const lastPos = React.useRef<{ x: number; y: number } | null>(null);
+  const lastPos = useRef<{ x: number; y: number } | null>(null);
+  const ttsPlayedRef = useRef<string>("");
 
   // Reset when question changes
-  useEffect(() => {
-    setDraft("");
-    setSaved(false);
-  }, [q.id]);
+  useEffect(() => { setDraft(""); setSaved(false); setSelectedFruit(null); }, [q.id]);
 
   useEffect(() => {
     const unsub = subscribeResponses(roomCode, q.id, setResponses);
@@ -1047,12 +1050,23 @@ function QuestionCard({
   }, [roomCode, q.id]);
 
   const mine = responses.find((r) => r.clientId === myClientId);
+  useEffect(() => { if (mine && !saved) { setSaved(true); setDraft(mine.text); } }, [mine, saved]);
+
+  // ── TTS auto-play when question appears ──
   useEffect(() => {
-    if (mine && !saved) {
-      setSaved(true);
-      setDraft(mine.text);
+    if (ttsPlayedRef.current === q.id) return; // already played
+    ttsPlayedRef.current = q.id;
+    const text = pick(q.text, lang);
+    if (text) {
+      setSpeaking(true);
+      speakText(text, lang).finally(() => setSpeaking(false));
     }
-  }, [mine, saved]);
+  }, [q.id, lang]);
+
+  function handleTtsReplay() {
+    const text = pick(q.text, lang);
+    if (text) { setSpeaking(true); speakText(text, lang).finally(() => setSpeaking(false)); }
+  }
 
   async function handleSubmit() {
     if (!draft.trim() || busy) return;
@@ -1060,9 +1074,7 @@ function QuestionCard({
     try {
       await submitResponse(roomCode, q.id, myClientId, user.myName, user.myLang, draft);
       setSaved(true);
-    } catch (err) {
-      console.error("submitResponse failed", err);
-    }
+    } catch (err) { console.error("submitResponse failed", err); }
     setBusy(false);
   }
 
@@ -1070,99 +1082,104 @@ function QuestionCard({
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm"
         : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : undefined;
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
+        stream.getTracks().forEach((tr) => tr.stop());
         setProcessing(true);
         try {
           const form = new FormData();
-          form.append("audio", blob, "rec.webm");
+          form.append("audio", new Blob(chunksRef.current, { type: mimeType || "audio/webm" }), "rec.webm");
           form.append("lang", lang);
           const res = await fetch("/api/stt", { method: "POST", body: form });
           const data = await res.json();
-          if (data.text) setDraft(data.text);
-          else alert("음성을 인식하지 못했어요. 다시 시도해주세요.");
+          if (data.text) setDraft(data.text); else alert("음성을 인식하지 못했어요.");
         } catch { alert("음성 인식 실패"); }
         setProcessing(false);
       };
-      recorder.start();
-      mediaRef.current = recorder;
-      setRecording(true);
+      recorder.start(); mediaRef.current = recorder; setRecording(true);
     } catch { alert("마이크를 사용할 수 없어요."); }
   }
   function stopRecording() { mediaRef.current?.stop(); setRecording(false); }
 
-  // Drawing helpers
+  // Canvas drawing
   function getCanvasPos(e: React.MouseEvent | React.TouchEvent) {
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    if ("touches" in e) {
-      const touch = e.touches[0] || e.changedTouches[0];
-      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
-    }
+    const rect = canvasRef.current!.getBoundingClientRect();
+    if ("touches" in e) { const t = e.touches[0] || e.changedTouches[0]; return { x: t.clientX - rect.left, y: t.clientY - rect.top }; }
     return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top };
   }
   function drawStart(e: React.MouseEvent | React.TouchEvent) { e.preventDefault(); setDrawing(true); lastPos.current = getCanvasPos(e); }
   function drawMove(e: React.MouseEvent | React.TouchEvent) {
     if (!drawing) return; e.preventDefault();
-    const pos = getCanvasPos(e);
-    const ctx = canvasRef.current?.getContext("2d");
-    if (ctx && lastPos.current) {
-      ctx.strokeStyle = "#1F2937"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round";
-      ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
-    }
+    const pos = getCanvasPos(e); const ctx = canvasRef.current?.getContext("2d");
+    if (ctx && lastPos.current) { ctx.strokeStyle = "#1F2937"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
     lastPos.current = pos;
   }
   function drawEnd() { setDrawing(false); lastPos.current = null; }
   function clearCanvas() { const ctx = canvasRef.current?.getContext("2d"); if (ctx) ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height); }
 
-  // Get active character avatar
   const activeChar = book?.characters?.[0];
   const charImg = activeChar?.avatarUrl || "/mascot/bee-think.png";
   const charName = activeChar ? pick(activeChar.name, lang) : "🐝";
-
   const { primary, secondary } = bilingual(q.text, lang);
 
   return (
     <div style={{ marginBottom: 14 }}>
-      {/* ── Character speech bubble ── */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+      {/* ── Character with wobble animation + speech bubble ── */}
+      <div style={{
+        display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14,
+        animation: "questionSlideIn 0.5s ease both",
+      }}>
+        {/* Character avatar — wobble animation */}
         <div style={{
-          width: 56, height: 56, borderRadius: "50%", flexShrink: 0,
+          width: 60, height: 60, borderRadius: "50%", flexShrink: 0,
           background: `url(${charImg}) center/cover no-repeat`,
-          border: "3px solid #fff",
-          boxShadow: "0 4px 12px rgba(245,158,11,0.3)",
-        }} />
+          border: "3px solid #FDE68A",
+          boxShadow: "0 6px 16px rgba(245,158,11,0.35)",
+          animation: "charWobble 2s ease-in-out infinite",
+          cursor: "pointer",
+        }} onClick={handleTtsReplay} title="다시 들려주기" />
+
+        {/* Speech bubble */}
         <div style={{
           flex: 1, position: "relative",
-          background: "#fff", borderRadius: 18, padding: "14px 16px",
+          background: "#fff", borderRadius: 20, padding: "14px 18px",
           border: "2px solid #60A5FA",
-          boxShadow: "0 6px 18px rgba(59,130,246,0.12)",
+          boxShadow: "0 8px 24px rgba(59,130,246,0.12)",
+          animation: "bubblePop 0.4s cubic-bezier(.17,.89,.32,1.28) 0.15s both",
         }}>
-          {/* Triangle */}
+          {/* Triangle pointer */}
           <div style={{
-            position: "absolute", left: -8, top: 16,
+            position: "absolute", left: -9, top: 18,
             width: 0, height: 0,
-            borderTop: "8px solid transparent",
-            borderBottom: "8px solid transparent",
-            borderRight: "8px solid #60A5FA",
+            borderTop: "9px solid transparent", borderBottom: "9px solid transparent",
+            borderRight: "9px solid #60A5FA",
           }} />
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
-          }}>
-            <span style={{
-              fontSize: 10, fontWeight: 900, color: "#1E40AF",
-              background: "#DBEAFE", padding: "2px 8px", borderRadius: 99,
-            }}>{t(TIER_KEY[q.tier], lang)}</span>
+          <div style={{ position: "absolute", left: -6, top: 20, width: 0, height: 0, borderTop: "7px solid transparent", borderBottom: "7px solid transparent", borderRight: "7px solid #fff" }} />
+
+          {/* Header: tier + name + TTS button */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 900, color: "#1E40AF", background: "#DBEAFE", padding: "2px 10px", borderRadius: 99 }}>
+              {t(TIER_KEY[q.tier], lang)}
+            </span>
             <span style={{ fontSize: 11, fontWeight: 700, color: "#6B7280" }}>{charName}</span>
+            <button
+              onClick={handleTtsReplay}
+              title="다시 듣기"
+              style={{
+                marginLeft: "auto", width: 28, height: 28, borderRadius: "50%",
+                background: speaking ? "#DBEAFE" : "#F3F4F6", border: "none",
+                cursor: "pointer", fontSize: 14,
+                animation: speaking ? "pulse 1s ease-in-out infinite" : "none",
+              }}
+            >🔊</button>
           </div>
-          <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937", lineHeight: 1.4 }}>
+
+          {/* Question text */}
+          <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", lineHeight: 1.4, letterSpacing: -0.3 }}>
             {primary}
           </div>
           {secondary && (
@@ -1176,167 +1193,214 @@ function QuestionCard({
       {/* ── Student input: 3 modes ── */}
       {!isTeacher && !saved && (
         <div style={{
-          background: "#fff", borderRadius: 18, padding: "14px 16px",
+          background: "#fff", borderRadius: 18, padding: "16px 18px",
           border: "2px solid #E5E7EB", marginBottom: 12,
+          animation: "questionSlideIn 0.4s ease 0.3s both",
         }}>
-          {/* Mode tabs */}
-          <div style={{ display: "flex", gap: 4, marginBottom: 12, background: "#F3F4F6", borderRadius: 10, padding: 3 }}>
+          <div style={{ display: "flex", gap: 0, marginBottom: 14, background: "#F3F4F6", borderRadius: 12, padding: 3, border: "1px solid #E5E7EB" }}>
             {([
-              { id: "text" as QInputMode, label: "✏️ 글자" },
-              { id: "voice" as QInputMode, label: "🎤 말" },
-              { id: "draw" as QInputMode, label: "🖌️ 그리기" },
+              { id: "text" as QInputMode, icon: "✏️", label: "글자" },
+              { id: "voice" as QInputMode, icon: "🎤", label: "말" },
+              { id: "draw" as QInputMode, icon: "🖌️", label: "그리기" },
             ]).map((tab) => (
               <button key={tab.id} onClick={() => setInputMode(tab.id)} style={{
-                flex: 1, padding: "7px 4px", borderRadius: 8,
+                flex: 1, padding: "9px 6px", borderRadius: 10,
                 background: inputMode === tab.id ? "#fff" : "transparent",
-                border: inputMode === tab.id ? "1.5px solid #3B82F6" : "1.5px solid transparent",
-                fontSize: 12, fontWeight: 800, color: inputMode === tab.id ? "#1E40AF" : "#6B7280",
-                cursor: "pointer",
-              }}>{tab.label}</button>
+                border: inputMode === tab.id ? "2px solid #3B82F6" : "2px solid transparent",
+                boxShadow: inputMode === tab.id ? "0 2px 8px rgba(59,130,246,0.15)" : "none",
+                fontSize: 13, fontWeight: 800, color: inputMode === tab.id ? "#1E40AF" : "#9CA3AF",
+                cursor: "pointer", transition: "all 0.15s",
+              }}>{tab.icon} {tab.label}</button>
             ))}
           </div>
 
           {inputMode === "text" && (
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={t("sbAnswerPlaceholder", lang)}
-              disabled={busy}
-              rows={3}
-              style={{
-                width: "100%", padding: "10px 12px",
-                border: "2px solid #DBEAFE", borderRadius: 12,
-                fontSize: 14, fontFamily: "inherit", resize: "vertical",
-                outline: "none", background: "#FAFAFA", color: "#1F2937",
-                boxSizing: "border-box",
-              }}
-              onFocus={(e) => { e.target.style.borderColor = "#3B82F6"; }}
-              onBlur={(e) => { e.target.style.borderColor = "#DBEAFE"; }}
+            <textarea value={draft} onChange={(e) => setDraft(e.target.value)}
+              placeholder={t("sbAnswerPlaceholder", lang)} disabled={busy} rows={3}
+              style={{ width: "100%", padding: "12px 14px", border: "2px solid #DBEAFE", borderRadius: 14, fontSize: 15, fontFamily: "inherit", resize: "vertical", outline: "none", background: "#FAFAFA", color: "#1F2937", boxSizing: "border-box", lineHeight: 1.5 }}
+              onFocus={(e) => { e.target.style.borderColor = "#3B82F6"; e.target.style.background = "#fff"; }}
+              onBlur={(e) => { e.target.style.borderColor = "#DBEAFE"; e.target.style.background = "#FAFAFA"; }}
             />
           )}
 
           {inputMode === "voice" && (
-            <div style={{ textAlign: "center", padding: "14px 0" }}>
-              {processing ? (
-                <div style={{ fontSize: 13, color: "#6B7280" }}>🔄 음성 변환 중...</div>
-              ) : (
-                <button
-                  onClick={recording ? stopRecording : startRecording}
-                  style={{
-                    width: 64, height: 64, borderRadius: "50%",
-                    background: recording ? "linear-gradient(135deg,#EF4444,#DC2626)" : "linear-gradient(135deg,#3B82F6,#2563EB)",
-                    border: "none", cursor: "pointer", fontSize: 24, color: "#fff",
-                    boxShadow: recording ? "0 0 0 6px rgba(239,68,68,0.2)" : "0 4px 12px rgba(59,130,246,0.3)",
-                    animation: recording ? "pulse 1s ease-in-out infinite" : "none",
-                  }}
-                >{recording ? "⏹" : "🎤"}</button>
+            <div style={{ textAlign: "center", padding: "18px 0" }}>
+              {processing ? <div style={{ fontSize: 13, color: "#6B7280" }}>🔄 음성 변환 중...</div> : (
+                <button onClick={recording ? stopRecording : startRecording} style={{
+                  width: 72, height: 72, borderRadius: "50%",
+                  background: recording ? "linear-gradient(135deg,#EF4444,#DC2626)" : "linear-gradient(135deg,#3B82F6,#2563EB)",
+                  border: "none", cursor: "pointer", fontSize: 28, color: "#fff",
+                  boxShadow: recording ? "0 0 0 8px rgba(239,68,68,0.2)" : "0 6px 16px rgba(59,130,246,0.3)",
+                  animation: recording ? "pulse 1s ease-in-out infinite" : "none",
+                }}>{recording ? "⏹" : "🎤"}</button>
               )}
-              <div style={{ fontSize: 11, color: "#6B7280", marginTop: 8 }}>
-                {recording ? "녹음 중... 눌러서 멈추기" : "버튼을 눌러 말해보세요"}
-              </div>
-              {draft && <div style={{ marginTop: 8, fontSize: 13, color: "#1F2937", fontWeight: 600 }}>인식: &ldquo;{draft}&rdquo;</div>}
+              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 10 }}>{recording ? "녹음 중... 눌러서 멈추기" : "버튼을 눌러 말해보세요"}</div>
+              {draft && <div style={{ marginTop: 10, fontSize: 14, color: "#1F2937", fontWeight: 600 }}>&ldquo;{draft}&rdquo;</div>}
             </div>
           )}
 
           {inputMode === "draw" && (
             <div>
-              <div style={{ border: "2px solid #E5E7EB", borderRadius: 10, overflow: "hidden", touchAction: "none", background: "#fff" }}>
-                <canvas
-                  ref={canvasRef}
-                  width={360} height={140}
-                  style={{ width: "100%", height: 140, display: "block", cursor: "crosshair" }}
+              <div style={{ border: "2px solid #E5E7EB", borderRadius: 12, overflow: "hidden", touchAction: "none", background: "#fff", position: "relative" }}>
+                <canvas ref={canvasRef} width={400} height={160}
+                  style={{ width: "100%", height: 160, display: "block", cursor: "crosshair" }}
                   onMouseDown={drawStart} onMouseMove={drawMove} onMouseUp={drawEnd} onMouseLeave={drawEnd}
-                  onTouchStart={drawStart} onTouchMove={drawMove} onTouchEnd={drawEnd}
-                />
+                  onTouchStart={drawStart} onTouchMove={drawMove} onTouchEnd={drawEnd} />
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                <button onClick={clearCanvas} style={{ flex: 1, padding: "7px", borderRadius: 8, background: "#F3F4F6", border: "1px solid #E5E7EB", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🗑️ 지우기</button>
-                <button onClick={() => { const text = prompt("그린 글자를 입력해주세요:"); if (text) setDraft(text); }} style={{ flex: 1, padding: "7px", borderRadius: 8, background: "#DBEAFE", border: "1px solid #BFDBFE", fontSize: 12, fontWeight: 700, color: "#1E40AF", cursor: "pointer" }}>✨ 글자 인식</button>
+                <button onClick={clearCanvas} style={{ flex: 1, padding: "8px", borderRadius: 10, background: "#F3F4F6", border: "1px solid #E5E7EB", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🗑️ 지우기</button>
+                <button onClick={() => { const text = prompt("그린 글자를 입력해주세요:"); if (text) setDraft(text); }} style={{ flex: 1, padding: "8px", borderRadius: 10, background: "#DBEAFE", border: "1px solid #BFDBFE", fontSize: 12, fontWeight: 700, color: "#1E40AF", cursor: "pointer" }}>✨ 글자 인식</button>
               </div>
             </div>
           )}
 
-          {/* Preview + submit */}
           {draft && inputMode !== "text" && (
-            <div style={{ marginTop: 8, padding: "8px 10px", background: "#F9FAFB", borderRadius: 8, fontSize: 13, color: "#374151" }}>
-              <strong>입력:</strong> {draft}
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "#F0F9FF", borderRadius: 10, fontSize: 13, color: "#1E40AF", fontWeight: 600 }}>
+              입력: &ldquo;{draft}&rdquo;
             </div>
           )}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-            <button
-              onClick={handleSubmit}
-              disabled={busy || !draft.trim()}
-              style={{
-                minHeight: 40, padding: "8px 20px",
-                background: !draft.trim() ? "#E5E7EB" : "linear-gradient(135deg, #3B82F6, #2563EB)",
-                color: !draft.trim() ? "#9CA3AF" : "#fff",
-                fontSize: 14, fontWeight: 900, border: "none",
-                borderRadius: 12, cursor: !draft.trim() || busy ? "not-allowed" : "pointer",
-                boxShadow: !draft.trim() ? "none" : "0 4px 12px rgba(59,130,246,0.3)",
-              }}
-            >{busy ? "제출 중..." : "📨 포스트잇 붙이기"}</button>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+            <button onClick={handleSubmit} disabled={busy || !draft.trim()} style={{
+              minHeight: 44, padding: "10px 24px",
+              background: !draft.trim() ? "#E5E7EB" : "linear-gradient(135deg, #3B82F6, #2563EB)",
+              color: !draft.trim() ? "#9CA3AF" : "#fff",
+              fontSize: 15, fontWeight: 900, border: "none", borderRadius: 14,
+              cursor: !draft.trim() || busy ? "not-allowed" : "pointer",
+              boxShadow: !draft.trim() ? "none" : "0 6px 16px rgba(59,130,246,0.3)",
+              transition: "all 0.2s",
+            }}>{busy ? "제출 중..." : "📨 포스트잇 붙이기"}</button>
           </div>
         </div>
       )}
 
-      {/* Saved confirmation */}
       {!isTeacher && saved && (
-        <div style={{
-          padding: "10px 14px", background: "#ECFDF5", borderRadius: 12,
-          border: "1px solid #A7F3D0", marginBottom: 12,
-          display: "flex", alignItems: "center", gap: 8,
-        }}>
-          <span style={{ fontSize: 18 }}>✅</span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: "#065F46" }}>{t("sbAnswerSaved", lang)}</span>
+        <div style={{ padding: "12px 16px", background: "#ECFDF5", borderRadius: 14, border: "1px solid #A7F3D0", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 20 }}>✅</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: "#065F46" }}>{t("sbAnswerSaved", lang)}</span>
         </div>
       )}
 
-      {/* ── Post-it style responses ── */}
+      {/* ── Fruit-tree style responses (열매나무) ── */}
       {(isTeacher || saved) && responses.length > 0 && (
         <div>
-          <div style={{ fontSize: 11, fontWeight: 900, color: "#475569", marginBottom: 8 }}>
-            {t("sbResponsesTitle", lang)} ({responses.length})
+          <div style={{ fontSize: 12, fontWeight: 900, color: "#475569", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+            🍎 {t("sbResponsesTitle", lang)} ({responses.length})
           </div>
           <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-            gap: 10,
+            position: "relative",
+            minHeight: responses.length <= 6 ? 200 : 280,
+            background: "linear-gradient(180deg, #E8F5FF 0%, #F0F7E8 100%)",
+            borderRadius: 20, overflow: "hidden",
+            border: "1px solid #D1FAE5",
           }}>
+            {/* Mini tree SVG */}
+            <svg viewBox="0 0 400 200" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} aria-hidden>
+              <ellipse cx="200" cy="195" rx="180" ry="12" fill="#A4D68B" opacity="0.4" />
+              <path d="M195 195 Q190 140 198 100 Q200 90 205 100 Q212 140 208 195 Z" fill="#8B5A3C" />
+              <ellipse cx="200" cy="85" rx="120" ry="70" fill="#7AB96A" />
+              <ellipse cx="140" cy="70" rx="60" ry="45" fill="#86C87A" />
+              <ellipse cx="260" cy="70" rx="60" ry="45" fill="#86C87A" />
+              <ellipse cx="200" cy="50" rx="50" ry="40" fill="#92D387" />
+            </svg>
+
+            {/* Fruits = responses */}
             {responses.map((r, i) => {
-              const bg = POSTIT_COLORS[i % POSTIT_COLORS.length];
-              const rotation = ((i * 5 + 2) % 7) - 3;
+              const n = responses.length;
+              const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+              const rx = Math.min(38, 24 + n);
+              const ry = Math.min(32, 20 + n);
+              const cx = 50 + Math.cos(angle) * rx;
+              const cy = 46 + Math.sin(angle) * ry;
+              const fruitColor = FRUIT_BG[i % FRUIT_BG.length];
+
               return (
-                <div key={r.id} style={{
-                  background: bg, borderRadius: 4, padding: "12px 10px 8px",
-                  boxShadow: "2px 3px 10px rgba(0,0,0,0.1)",
-                  transform: `rotate(${rotation}deg)`,
-                  position: "relative", minHeight: 70,
-                  display: "flex", flexDirection: "column", justifyContent: "space-between",
-                  transition: "transform 0.2s",
+                <button key={r.id} onClick={() => setSelectedFruit(i)} style={{
+                  position: "absolute", left: `${cx}%`, top: `${cy}%`,
+                  transform: "translate(-50%, -50%)", zIndex: 2,
+                  animation: `fruitPop 0.4s cubic-bezier(.17,.89,.32,1.28) ${i * 0.06}s both`,
+                  background: "transparent", border: "none", cursor: "pointer", padding: 0,
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                  filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.2))",
                 }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "rotate(0deg) scale(1.05)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = `rotate(${rotation}deg)`; }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = "translate(-50%, -55%) scale(1.15)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = "translate(-50%, -50%) scale(1)"; }}
                 >
-                  {/* Tape */}
+                  <svg width="36" height="40" viewBox="0 0 36 40">
+                    <path d={`M18 4 Q16 2 18 0`} stroke="#78350F" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                    <g transform="translate(20 3) rotate(30)"><path d="M0 0 Q5 -1 7 3 Q4 4 0 0 Z" fill="#16A34A" /></g>
+                    <ellipse cx="18" cy="24" rx="14" ry="14" fill={fruitColor} />
+                    <ellipse cx="14" cy="18" rx="4" ry="5" fill="#fff" opacity="0.5" />
+                    <circle cx="12" cy="15" r="1.5" fill="#fff" opacity="0.7" />
+                  </svg>
                   <div style={{
-                    position: "absolute", top: -4, left: "50%", transform: "translateX(-50%)",
-                    width: 30, height: 8, background: "rgba(59,130,246,0.2)", borderRadius: 2,
-                  }} />
-                  <div style={{ fontSize: 12, color: "#1F2937", lineHeight: 1.4, wordBreak: "break-word" }}>
-                    {r.text}
-                  </div>
-                  <div style={{ fontSize: 9, fontWeight: 800, color: "#6B7280", marginTop: 6, borderTop: "1px dashed rgba(0,0,0,0.08)", paddingTop: 4 }}>
-                    {r.studentName}
-                  </div>
-                </div>
+                    background: "rgba(255,255,255,0.92)", color: "#1F2937",
+                    padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 800,
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.1)", whiteSpace: "nowrap",
+                    maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis",
+                  }}>{r.studentName}</div>
+                </button>
               );
             })}
+
+            {/* Center question label */}
+            <div style={{
+              position: "absolute", left: "50%", top: "46%", transform: "translate(-50%, -50%)",
+              zIndex: 3, background: "#fff", borderRadius: 14, padding: "8px 14px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.12)", border: "2px solid #F59E0B",
+              fontSize: 10, fontWeight: 900, color: "#92400E", textAlign: "center",
+              maxWidth: 120,
+            }}>❓ {responses.length}명</div>
           </div>
+
+          {/* Fruit detail modal */}
+          {selectedFruit !== null && responses[selectedFruit] && (
+            <div onClick={() => setSelectedFruit(null)} style={{
+              position: "fixed", inset: 0, zIndex: 500, background: "rgba(17,24,39,0.5)",
+              backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 20, animation: "fadeIn 0.2s",
+            }}>
+              <div onClick={(e) => e.stopPropagation()} style={{
+                background: POSTIT_COLORS[selectedFruit % POSTIT_COLORS.length],
+                borderRadius: 16, maxWidth: 380, width: "100%", padding: "22px 20px",
+                boxShadow: "4px 8px 30px rgba(0,0,0,0.25)", position: "relative",
+                animation: "bubblePop 0.3s cubic-bezier(.17,.89,.32,1.28)",
+              }}>
+                <div style={{ position: "absolute", top: -6, left: "50%", transform: "translateX(-50%)", width: 50, height: 12, background: "rgba(245,158,11,0.3)", borderRadius: 3 }} />
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#6B7280", marginBottom: 8 }}>{responses[selectedFruit].studentName}</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: "#1F2937", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{responses[selectedFruit].text}</div>
+                <button onClick={() => setSelectedFruit(null)} style={{
+                  width: "100%", marginTop: 14, padding: "10px 0", borderRadius: 12,
+                  background: "rgba(0,0,0,0.06)", border: "none", fontSize: 13, fontWeight: 800,
+                  color: "#374151", cursor: "pointer",
+                }}>닫기</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       <style jsx global>{`
+        @keyframes charWobble {
+          0%, 100% { transform: rotate(0deg) scale(1); }
+          15% { transform: rotate(-6deg) scale(1.05); }
+          30% { transform: rotate(5deg) scale(1.03); }
+          45% { transform: rotate(-3deg) scale(1.02); }
+          60% { transform: rotate(2deg) scale(1); }
+        }
+        @keyframes questionSlideIn {
+          0% { opacity: 0; transform: translateY(16px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes bubblePop {
+          0% { opacity: 0; transform: scale(0.85); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fruitPop {
+          0% { opacity: 0; transform: translate(-50%,-50%) scale(0.3); }
+          100% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+        }
         @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
   );
