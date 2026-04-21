@@ -1108,16 +1108,7 @@ function QuestionCard({
     return () => { if (introTimerRef.current) clearTimeout(introTimerRef.current); };
   }, [showIntro, isTeacher, introText]);
 
-  // ── TTS auto-play when intro finishes typing ──
-  useEffect(() => {
-    if (!showIntro || isTeacher) return;
-    if (introTyped >= introText.length && introText.length > 0) {
-      if (ttsPlayedRef.current === q.id) return;
-      ttsPlayedRef.current = q.id;
-      setSpeaking(true);
-      speakText(introText, lang).finally(() => setSpeaking(false));
-    }
-  }, [introTyped, introText, showIntro, isTeacher, q.id, lang]);
+  // TTS is now manual — no auto-play
 
   function handleTtsReplay() {
     const text = pick(q.text, lang);
@@ -1275,14 +1266,32 @@ function QuestionCard({
               </div>
             )}
 
-            {/* Bottom hint */}
+            {/* Bottom: TTS button + hint */}
             <div style={{
-              display: "flex", justifyContent: "flex-end", marginTop: 14,
-              fontSize: 13, fontWeight: 800, color: "#92400E",
-              alignItems: "center", gap: 6,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginTop: 14,
             }}>
-              {introTyped < introText.length ? "건너뛰기" : "답변하기"}
-              <span style={{ animation: "fadeSlideIn 700ms ease-in-out infinite alternate", fontSize: 16 }}>▼</span>
+              {introTyped >= introText.length ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleTtsReplay(); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "8px 16px", borderRadius: 99,
+                    background: speaking ? "#FDE68A" : "#FEF3C7",
+                    border: "2px solid #F59E0B",
+                    fontSize: 13, fontWeight: 800, color: "#92400E",
+                    cursor: "pointer",
+                    animation: speaking ? "pulse 1s ease-in-out infinite" : "none",
+                  }}
+                >🔊 {speaking ? "재생 중..." : "들어보기"}</button>
+              ) : <div />}
+              <div style={{
+                fontSize: 13, fontWeight: 800, color: "#92400E",
+                display: "flex", alignItems: "center", gap: 6,
+              }}>
+                {introTyped < introText.length ? "건너뛰기" : "답변하기"}
+                <span style={{ animation: "fadeSlideIn 700ms ease-in-out infinite alternate", fontSize: 16 }}>▼</span>
+              </div>
             </div>
           </div>
         </div>
