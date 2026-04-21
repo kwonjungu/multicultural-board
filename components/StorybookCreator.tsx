@@ -235,66 +235,107 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
           })),
       ];
 
-      const imagePromises = tasks.map(async (task) => {
-        try {
-          const reqBody: Record<string, unknown> = {
-            bookId,
-            prompt: task.prompt,
-          };
-          if (task.kind === "cover") reqBody.pageIdx = 0;
-          else if (task.kind === "page") reqBody.pageIdx = task.idx;
-          else reqBody.characterId = task.characterId;
+      /**
+       * Run one image task, THROWING on any failure so the retry pool can
+       * pick it up. Silent early-returns here were the whole bug — a
+       * rate-limited request would pass through, the promise would resolve,
+       * progress would tick forward, and the page was left with no imageUrl.
+       */
+      const runOne = async (task: ImgTask) => {
+        const reqBody: Record<string, unknown> = { bookId, prompt: task.prompt };
+        if (task.kind === "cover") reqBody.pageIdx = 0;
+        else if (task.kind === "page") reqBody.pageIdx = task.idx;
+        else reqBody.characterId = task.characterId;
 
-          const res = await fetch("/api/storybook-agent/image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(reqBody),
+        const res = await fetch("/api/storybook-agent/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(reqBody),
+        });
+        if (!res.ok) throw new Error(`image gen ${res.status} for ${JSON.stringify(task)}`);
+        const data = await res.json() as { ok: boolean; url?: string; error?: string };
+        if (!data.ok || !data.url) throw new Error(data.error || "no url");
+
+        if (task.kind === "cover") {
+          await updateGeneratedBookPageImage(bookId, 0, data.url);
+          setBook((prev) => prev ? { ...prev, cover: { ...prev.cover, imageUrl: data.url } } : prev);
+        } else if (task.kind === "page") {
+          await updateGeneratedBookPageImage(bookId, task.idx, data.url);
+          setBook((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              pages: prev.pages.map((p) =>
+                p.idx === task.idx
+                  ? { ...p, illustration: { ...p.illustration, imageUrl: data.url } }
+                  : p,
+              ),
+            };
           });
-          if (!res.ok) return;
-          const data = await res.json() as { ok: boolean; url?: string };
-          if (!data.ok || !data.url) return;
+        } else {
+          await updateGeneratedBookCharacterAvatar(bookId, task.characterId, data.url);
+          setBook((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              characters: prev.characters.map((c) =>
+                c.id === task.characterId ? { ...c, avatarUrl: data.url } : c,
+              ),
+            };
+          });
+        }
+      };
 
-          if (task.kind === "cover") {
-            await updateGeneratedBookPageImage(bookId, 0, data.url);
-            setBook((prev) => prev ? { ...prev, cover: { ...prev.cover, imageUrl: data.url } } : prev);
-          } else if (task.kind === "page") {
-            await updateGeneratedBookPageImage(bookId, task.idx, data.url);
-            setBook((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                pages: prev.pages.map((p) =>
-                  p.idx === task.idx
-                    ? { ...p, illustration: { ...p.illustration, imageUrl: data.url } }
-                    : p,
-                ),
-              };
-            });
-          } else {
-            await updateGeneratedBookCharacterAvatar(bookId, task.characterId, data.url);
-            setBook((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                characters: prev.characters.map((c) =>
-                  c.id === task.characterId ? { ...c, avatarUrl: data.url } : c,
-                ),
-              };
-            });
+      /**
+       * Concurrency-limited worker pool with exponential-backoff retry.
+       * Nano Banana + parallel fan-out = rate limits. Cap at 3 in flight,
+       * retry each task up to 2 times (total 3 attempts), then give up.
+       */
+      const failures: ImgTask[] = [];
+      const POOL = 3;
+      const MAX_ATTEMPTS = 3;
+      let cursor = 0;
+      const worker = async () => {
+        while (cursor < tasks.length) {
+          const i = cursor++;
+          const task = tasks[i];
+          let attempt = 0;
+          let lastErr: unknown = null;
+          while (attempt < MAX_ATTEMPTS) {
+            try {
+              await runOne(task);
+              lastErr = null;
+              break;
+            } catch (err) {
+              lastErr = err;
+              attempt++;
+              if (attempt < MAX_ATTEMPTS) {
+                const delay = 800 * Math.pow(2, attempt - 1) + Math.random() * 400;
+                await new Promise((r) => setTimeout(r, delay));
+              }
+            }
           }
-        } catch (err) {
-          console.warn("image gen failed for", task, err);
-        } finally {
+          if (lastErr) {
+            console.warn("image gen gave up after retries", task, lastErr);
+            failures.push(task);
+          }
           setProgress((p) => ({
             ...p,
             imageDoneCount: p.imageDoneCount + 1,
             message: `🎨 이미지를 그리고 있어요… (${p.imageDoneCount + 1}/${p.imageTotal})`,
           }));
         }
-      });
-      await Promise.all(imagePromises);
+      };
+      await Promise.all(Array.from({ length: POOL }, worker));
 
-      setProgress((p) => ({ ...p, message: "✨ 완성! 미리보기를 확인하세요." }));
+      if (failures.length > 0) {
+        setProgress((p) => ({
+          ...p,
+          message: `⚠️ 이미지 ${failures.length}개 생성 실패 — 미리보기에서 개별 재생성하세요.`,
+        }));
+      } else {
+        setProgress((p) => ({ ...p, message: "✨ 완성! 미리보기를 확인하세요." }));
+      }
       setStage("preview");
     } catch (err) {
       console.error("generation failed", err);
@@ -576,6 +617,83 @@ function InputForm({
 // Progress monitor
 // ============================================================
 
+/**
+ * Encouragement lines that rotate every few seconds while the agent runs.
+ * Mix of flavor, gentle waits, and status reassurance. First line is the
+ * anchor ("커피 한 잔 드세요!") — others cycle in after that.
+ */
+/**
+ * 5 agent personas — each cycles through its own pool of flavor lines so the
+ * wait feels alive. text + bee mood rotate in sync.
+ */
+interface AgentPersona {
+  bee: string;
+  lines: string[];
+}
+
+const AGENTS: AgentPersona[] = [
+  {
+    bee: "/mascot/bee-think.png",
+    lines: [
+      "✍️ 작가 에이전트가 이야기를 쓰고 있습니다.",
+      "✍️ 작가 에이전트가 문장을 한 줄씩 다듬는 중…",
+      "📝 편집 에이전트가 어휘를 초등 수준으로 고르고 있어요.",
+    ],
+  },
+  {
+    bee: "/mascot/bee-cheer.png",
+    lines: [
+      "🎨 일러스트 에이전트가 붓을 들었습니다.",
+      "🎨 일러스트 에이전트가 색을 입히고 있어요.",
+      "🖌️ 그림을 한 장씩 그리는 중이에요…",
+    ],
+  },
+  {
+    bee: "/mascot/bee-loading.png",
+    lines: [
+      "🧐 검토 에이전트가 철저히 검토 중입니다.",
+      "🧐 검토 에이전트가 흐름을 다시 읽는 중…",
+      "📐 레이아웃 에이전트가 페이지를 짜고 있어요.",
+    ],
+  },
+  {
+    bee: "/mascot/bee-welcome.png",
+    lines: [
+      "🌏 번역 에이전트가 다국어를 준비 중이에요.",
+      "🌏 번역 에이전트가 문장을 아이들 눈높이로 맞추는 중…",
+      "💬 다국어로도 읽을 수 있게 정리하고 있어요.",
+    ],
+  },
+  {
+    bee: "/mascot/bee-shh.png",
+    lines: [
+      "🛡️ 안전 에이전트가 표현을 점검 중입니다.",
+      "🛡️ 안전 에이전트가 부적절한 문장을 걸러내는 중…",
+      "🍀 이 멘트를 발견하신 당신, 오늘 행운이네요!",    // easter egg
+    ],
+  },
+];
+
+/**
+ * Cycles through the 5 agents. Each tick:
+ *   - advance agent index
+ *   - pick a random line from that agent's pool so repeat visits feel fresh
+ */
+function useRotatingAgent(intervalMs: number = 3500): { bee: string; text: string } {
+  const [agentIdx, setAgentIdx] = useState(0);
+  const [lineIdx, setLineIdx] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setAgentIdx((i) => (i + 1) % AGENTS.length);
+      setLineIdx(Math.floor(Math.random() * 100));   // randomness seed
+    }, intervalMs);
+    return () => window.clearInterval(id);
+  }, [intervalMs]);
+  const agent = AGENTS[agentIdx];
+  const text = agent.lines[lineIdx % agent.lines.length];
+  return { bee: agent.bee, text };
+}
+
 function ProgressMonitor({
   progress,
 }: {
@@ -589,6 +707,7 @@ function ProgressMonitor({
   const overallPct = progress.textDone
     ? 20 + (progress.imageDoneCount / Math.max(1, progress.imageTotal)) * 80
     : 10;
+  const agent = useRotatingAgent(3500);
   return (
     <div style={{
       background: "#fff", borderRadius: 22, padding: 28,
@@ -597,18 +716,31 @@ function ProgressMonitor({
       textAlign: "center",
     }}>
       <img
-        src="/mascot/bee-loading.png"
+        key={agent.bee}
+        src={agent.bee}
         alt=""
         aria-hidden="true"
-        style={{ width: 120, height: 120, animation: "heroBeeFloat 1.5s ease-in-out infinite" }}
+        style={{
+          width: 120, height: 120,
+          animation: "heroBeeFloat 1.5s ease-in-out infinite, fadeSlideIn 400ms ease both",
+          filter: "drop-shadow(0 6px 14px rgba(245,158,11,0.35))",
+        }}
       />
       <div style={{
         fontSize: 17, fontWeight: 900, color: "#1F2937",
         marginTop: 12, letterSpacing: -0.2, lineHeight: 1.4,
       }}>
         🤖 에이전트가 그림책을 만들고 있어요<br />
-        <span style={{ fontSize: 13, color: "#92400E", fontWeight: 700 }}>
-          커피 한 잔 드세요!
+        <span
+          key={agent.text}
+          style={{
+            display: "inline-block",
+            fontSize: 13, color: "#92400E", fontWeight: 700,
+            marginTop: 4,
+            animation: "fadeSlideIn 400ms ease both",
+          }}
+        >
+          {agent.text}
         </span>
       </div>
       <div style={{
