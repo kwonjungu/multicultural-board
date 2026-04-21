@@ -109,30 +109,115 @@ async function ensureVoicesReady(): Promise<void> {
   });
 }
 
+// Languages where Web Speech API rarely has a usable voice. For these we
+// skip the browser and go straight to the server /api/tts (Google Translate
+// proxy), which covers all 15 supported languages.
+const WEBSPEECH_UNRELIABLE = new Set(["fil", "km", "mn", "uz", "my"]);
+
+// Tracks the current HTML5 audio element so cancelSpeak() can stop it.
+let currentAudio: HTMLAudioElement | null = null;
+
+/**
+ * Split long text into ≤200-char chunks (Google Translate TTS hard limit).
+ * Breaks on sentence-ending punctuation when possible, else on whitespace.
+ */
+function chunkText(text: string, limit = 180): string[] {
+  const out: string[] = [];
+  let rest = text.trim();
+  while (rest.length > limit) {
+    // Prefer sentence boundary
+    let cut = -1;
+    const punct = [". ", "! ", "? ", "。", "！", "？", "…\n", "…"];
+    for (const p of punct) {
+      const idx = rest.lastIndexOf(p, limit);
+      if (idx > cut) cut = idx + p.length;
+    }
+    if (cut <= 0) {
+      // Fall back to last whitespace before limit
+      const wsIdx = rest.lastIndexOf(" ", limit);
+      cut = wsIdx > 0 ? wsIdx + 1 : limit;
+    }
+    out.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) out.push(rest);
+  return out;
+}
+
+async function playServerTts(text: string, langShort: string): Promise<void> {
+  const chunks = chunkText(text);
+  for (const part of chunks) {
+    const url = `/api/tts?lang=${encodeURIComponent(langShort)}&text=${encodeURIComponent(part)}`;
+    await new Promise<void>((resolve, reject) => {
+      const audio = new Audio(url);
+      currentAudio = audio;
+      const tuning = TUNING[langShort] || DEFAULT_TUNING;
+      audio.playbackRate = tuning.rate;
+      audio.volume = tuning.volume;
+      audio.addEventListener("ended", () => {
+        if (currentAudio === audio) currentAudio = null;
+        resolve();
+      }, { once: true });
+      audio.addEventListener("error", () => {
+        if (currentAudio === audio) currentAudio = null;
+        reject(new Error("audio error"));
+      }, { once: true });
+      audio.play().catch(reject);
+    });
+    // If speaking was cancelled between chunks, stop
+    if (!currentAudio) break;
+  }
+}
+
 export async function speak(text: string, langShort: string): Promise<void> {
   if (typeof window === "undefined" || !text.trim()) return;
-  const synth = window.speechSynthesis;
-  if (!synth) return;
 
-  synth.cancel(); // kill previous utterance
+  // Stop any previous playback
+  cancelSpeak();
 
-  await ensureVoicesReady();
+  // For reliably-unsupported languages, skip browser entirely.
+  const goServerFirst = WEBSPEECH_UNRELIABLE.has(langShort);
 
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = BCP47[langShort] || "en-US";
+  if (!goServerFirst) {
+    const synth = window.speechSynthesis;
+    if (synth) {
+      await ensureVoicesReady();
+      const voice = pickVoice(langShort);
+      if (voice) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = BCP47[langShort] || "en-US";
+        u.voice = voice;
+        const tuning = TUNING[langShort] || DEFAULT_TUNING;
+        u.rate = tuning.rate;
+        u.pitch = tuning.pitch;
+        u.volume = tuning.volume;
+        synth.speak(u);
+        return;
+      }
+    }
+    // else: no voice found → fall through to server TTS
+  }
 
-  const voice = pickVoice(langShort);
-  if (voice) u.voice = voice;
-
-  const tuning = TUNING[langShort] || DEFAULT_TUNING;
-  u.rate = tuning.rate;
-  u.pitch = tuning.pitch;
-  u.volume = tuning.volume;
-
-  synth.speak(u);
+  try {
+    await playServerTts(text, langShort);
+  } catch (err) {
+    console.warn("server TTS failed, trying browser default", err);
+    // Final fallback: browser with default voice (may read in English)
+    const synth = window.speechSynthesis;
+    if (synth) {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = BCP47[langShort] || "en-US";
+      synth.speak(u);
+    }
+  }
 }
 
 export function cancelSpeak() {
   if (typeof window === "undefined") return;
   window.speechSynthesis?.cancel();
+  if (currentAudio) {
+    try { currentAudio.pause(); } catch {}
+    currentAudio.src = "";
+    currentAudio = null;
+  }
 }
