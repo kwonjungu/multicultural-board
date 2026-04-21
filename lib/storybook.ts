@@ -1,4 +1,4 @@
-import { ref, set, update, push, onValue, off, remove, get } from "firebase/database";
+import { ref, set, update, push, onValue, remove, get } from "firebase/database";
 import { getClientDb } from "./firebase-client";
 import type {
   StorybookSession,
@@ -192,7 +192,7 @@ export function subscribeSession(
     const val = snap.val() as StorybookSession | null;
     cb(val ?? null);
   });
-  return () => { off(r); void unsub; };
+  return () => { unsub(); };
 }
 
 export async function setPhase(roomCode: string, phase: StorybookPhase): Promise<void> {
@@ -264,7 +264,7 @@ export function subscribeResponses(
       : [];
     cb(list);
   });
-  return () => { off(r); void unsub; };
+  return () => { unsub(); };
 }
 
 // === Chat ===
@@ -298,7 +298,7 @@ export function subscribeChat(
       : [];
     cb(list);
   });
-  return () => { off(r); void unsub; };
+  return () => { unsub(); };
 }
 
 export async function getChatTurnCount(roomCode: string, clientId: string): Promise<number> {
@@ -338,7 +338,7 @@ export function subscribeAlerts(
       : [];
     cb(list);
   });
-  return () => { off(r); void unsub; };
+  return () => { unsub(); };
 }
 
 export async function clearAlert(roomCode: string, alertId: string): Promise<void> {
