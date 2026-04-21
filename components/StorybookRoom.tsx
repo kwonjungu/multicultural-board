@@ -1059,6 +1059,10 @@ function QuestionCard({
   const [processing, setProcessing] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [selectedFruit, setSelectedFruit] = useState<number | null>(null);
+  // Translation cache for responses: key = `${responseId}:${toLang}`
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translating, setTranslating] = useState<Record<string, boolean>>({});
+  const [showOriginal, setShowOriginal] = useState<Record<string, boolean>>({});
   // Tutorial-style entrance for students
   const [showIntro, setShowIntro] = useState(false);
   const [introTyped, setIntroTyped] = useState(0);
@@ -1087,6 +1091,40 @@ function QuestionCard({
 
   const mine = responses.find((r) => r.clientId === myClientId);
   useEffect(() => { if (mine && !saved) { setSaved(true); setDraft(mine.text); } }, [mine, saved]);
+
+  // Auto-translate a response's text to the current viewer's language on demand.
+  // Cached per-response. Skips when languages match or own response.
+  const ensureTranslation = useCallback(async (r: StorybookResponse) => {
+    const key = `${r.id}:${lang}`;
+    if (!r.studentLang || r.studentLang === lang) return;
+    if (translations[key] || translating[key]) return;
+    setTranslating((s) => ({ ...s, [key]: true }));
+    try {
+      const res = await fetch("/api/storybook-translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texts: [r.text], fromLang: r.studentLang, toLang: lang }),
+      });
+      const data = await res.json() as { ok: boolean; translated?: string[] };
+      if (data.ok && data.translated && data.translated[0]) {
+        setTranslations((s) => ({ ...s, [key]: data.translated![0] }));
+      }
+    } catch (err) {
+      console.warn("translate failed", err);
+    } finally {
+      setTranslating((s) => {
+        const { [key]: _, ...rest } = s;
+        return rest;
+      });
+    }
+  }, [lang, translations, translating]);
+
+  // When the selected fruit changes, trigger translation if needed
+  useEffect(() => {
+    if (selectedFruit === null) return;
+    const r = responses[selectedFruit];
+    if (r) ensureTranslation(r);
+  }, [selectedFruit, responses, ensureTranslation]);
 
   // ── Typewriter effect for student intro ──
   const introText = pick(q.text, lang);
@@ -1521,30 +1559,99 @@ function QuestionCard({
             }}>❓ {responses.length}명</div>
           </div>
 
-          {/* Fruit detail modal */}
-          {selectedFruit !== null && responses[selectedFruit] && (
-            <div onClick={() => setSelectedFruit(null)} style={{
-              position: "fixed", inset: 0, zIndex: 500, background: "rgba(17,24,39,0.5)",
-              backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center",
-              padding: 20, animation: "fadeIn 0.2s",
-            }}>
-              <div onClick={(e) => e.stopPropagation()} style={{
-                background: POSTIT_COLORS[selectedFruit % POSTIT_COLORS.length],
-                borderRadius: 16, maxWidth: 380, width: "100%", padding: "22px 20px",
-                boxShadow: "4px 8px 30px rgba(0,0,0,0.25)", position: "relative",
-                animation: "bubblePop 0.3s cubic-bezier(.17,.89,.32,1.28)",
+          {/* Fruit detail modal — auto-translates into the viewer's language */}
+          {selectedFruit !== null && responses[selectedFruit] && (() => {
+            const r = responses[selectedFruit];
+            const key = `${r.id}:${lang}`;
+            const needsTranslation = !!r.studentLang && r.studentLang !== lang;
+            const translated = translations[key];
+            const isTranslating = !!translating[key];
+            const isOwn = r.clientId === myClientId;
+            const showOrig = !!showOriginal[r.id];
+            const displayText = needsTranslation && translated && !showOrig ? translated : r.text;
+
+            return (
+              <div onClick={() => setSelectedFruit(null)} style={{
+                position: "fixed", inset: 0, zIndex: 500, background: "rgba(17,24,39,0.5)",
+                backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center",
+                padding: 20, animation: "fadeIn 0.2s",
               }}>
-                <div style={{ position: "absolute", top: -6, left: "50%", transform: "translateX(-50%)", width: 50, height: 12, background: "rgba(245,158,11,0.3)", borderRadius: 3 }} />
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#6B7280", marginBottom: 8 }}>{responses[selectedFruit].studentName}</div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: "#1F2937", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{responses[selectedFruit].text}</div>
-                <button onClick={() => setSelectedFruit(null)} style={{
-                  width: "100%", marginTop: 14, padding: "10px 0", borderRadius: 12,
-                  background: "rgba(0,0,0,0.06)", border: "none", fontSize: 13, fontWeight: 800,
-                  color: "#374151", cursor: "pointer",
-                }}>닫기</button>
+                <div onClick={(e) => e.stopPropagation()} style={{
+                  background: POSTIT_COLORS[selectedFruit % POSTIT_COLORS.length],
+                  borderRadius: 16, maxWidth: 420, width: "100%", padding: "22px 20px",
+                  boxShadow: "4px 8px 30px rgba(0,0,0,0.25)", position: "relative",
+                  animation: "bubblePop 0.3s cubic-bezier(.17,.89,.32,1.28)",
+                }}>
+                  <div style={{ position: "absolute", top: -6, left: "50%", transform: "translateX(-50%)", width: 50, height: 12, background: "rgba(245,158,11,0.3)", borderRadius: 3 }} />
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#6B7280" }}>
+                      {r.studentName}
+                    </div>
+                    {r.studentLang && r.studentLang !== lang && (
+                      <div style={{
+                        fontSize: 10, fontWeight: 800, color: "#92400E",
+                        background: "rgba(255,255,255,0.6)", padding: "2px 8px", borderRadius: 999,
+                        border: "1px solid rgba(245,158,11,0.4)",
+                      }}>
+                        {(r.studentLang || "").toUpperCase()} → {lang.toUpperCase()}
+                      </div>
+                    )}
+                    {isTranslating && (
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280" }}>
+                        ⟳ 번역 중…
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{
+                    fontSize: 16, fontWeight: 600, color: "#1F2937",
+                    lineHeight: 1.6, whiteSpace: "pre-wrap",
+                  }}>
+                    {displayText}
+                  </div>
+
+                  {needsTranslation && translated && !showOrig && !isOwn && (
+                    <div style={{
+                      marginTop: 10, padding: "8px 12px",
+                      background: "rgba(255,255,255,0.55)",
+                      borderRadius: 10,
+                      borderLeft: "3px solid rgba(245,158,11,0.5)",
+                      fontSize: 12, fontWeight: 500, color: "#4B5563",
+                      lineHeight: 1.5, whiteSpace: "pre-wrap",
+                    }}>
+                      <div style={{ fontSize: 9, fontWeight: 800, color: "#92400E", marginBottom: 3, letterSpacing: 0.3 }}>
+                        ORIGINAL · {(r.studentLang || "").toUpperCase()}
+                      </div>
+                      {r.text}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
+                    {needsTranslation && translated && (
+                      <button
+                        onClick={() => setShowOriginal((s) => ({ ...s, [r.id]: !showOrig }))}
+                        style={{
+                          flex: 1, padding: "10px 0", borderRadius: 12,
+                          background: "rgba(255,255,255,0.7)",
+                          border: "1.5px solid rgba(245,158,11,0.4)",
+                          fontSize: 12, fontWeight: 800,
+                          color: "#92400E", cursor: "pointer",
+                        }}
+                      >
+                        {showOrig ? "🌐 번역 보기" : "📜 원문만 보기"}
+                      </button>
+                    )}
+                    <button onClick={() => setSelectedFruit(null)} style={{
+                      flex: 1, padding: "10px 0", borderRadius: 12,
+                      background: "rgba(0,0,0,0.06)", border: "none", fontSize: 13, fontWeight: 800,
+                      color: "#374151", cursor: "pointer",
+                    }}>닫기</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
