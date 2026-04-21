@@ -1237,15 +1237,18 @@ function QuestionCard({
             animation: "fadeIn 0.3s ease",
           }}
         >
-          {/* Character — big entrance */}
+          {/* Character — big entrance (tablet-max, transparent bg) */}
           <img
             src={charImg}
             alt={charName}
             style={{
-              width: 140, height: 140, objectFit: "contain",
-              filter: "drop-shadow(0 10px 24px rgba(245,158,11,0.5))",
+              width: "min(460px, 60vw, 55vh)",
+              height: "min(460px, 60vw, 55vh)",
+              objectFit: "contain",
+              background: "transparent",
+              filter: "drop-shadow(0 16px 36px rgba(245,158,11,0.55))",
               animation: "charBounceIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both, beeGuideIdle 2.8s ease-in-out 0.5s infinite",
-              marginBottom: 16,
+              marginBottom: 18,
             }}
           />
 
@@ -1340,15 +1343,22 @@ function QuestionCard({
         display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14,
         animation: "questionSlideIn 0.5s ease both",
       }}>
-        {/* Character avatar — wobble animation */}
-        <div style={{
-          width: 60, height: 60, borderRadius: "50%", flexShrink: 0,
-          background: `url(${charImg}) center/cover no-repeat`,
-          border: "3px solid #FDE68A",
-          boxShadow: "0 6px 16px rgba(245,158,11,0.35)",
-          animation: "charWobble 2s ease-in-out infinite",
-          cursor: "pointer",
-        }} onClick={handleTtsReplay} title="다시 들려주기" />
+        {/* Character avatar — transparent PNG, wobble animation */}
+        <img
+          src={charImg}
+          alt=""
+          aria-hidden="true"
+          onClick={handleTtsReplay}
+          title="다시 들려주기"
+          style={{
+            width: "min(160px, 22vw)", height: "min(160px, 22vw)",
+            flexShrink: 0, objectFit: "contain",
+            background: "transparent",
+            filter: "drop-shadow(0 8px 20px rgba(245,158,11,0.45))",
+            animation: "charWobble 2s ease-in-out infinite",
+            cursor: "pointer",
+          }}
+        />
 
         {/* Speech bubble */}
         <div style={{
@@ -1965,21 +1975,21 @@ function CharacterPicker({
       </div>
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-        gap: 12,
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: 14,
       }}>
         {book.characters.map((c) => (
           <button
             key={c.id}
             onClick={() => onPick(c.id)}
             style={{
-              padding: "16px 12px 14px",
+              padding: "18px 14px 16px",
               background: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
               border: "3px solid #F59E0B55",
-              borderRadius: 20,
+              borderRadius: 22,
               textAlign: "center",
               cursor: "pointer",
-              boxShadow: "0 6px 18px rgba(245,158,11,0.25)",
+              boxShadow: "0 8px 20px rgba(245,158,11,0.25)",
               fontFamily: "inherit",
               transition: "transform 0.15s",
             }}
@@ -1988,26 +1998,27 @@ function CharacterPicker({
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
             {c.avatarUrl ? (
-              <div style={{
-                width: 120, height: 120, margin: "0 auto",
-                borderRadius: "50%", overflow: "hidden",
-                background: "#fff",
-                boxShadow: "0 4px 12px rgba(180,83,9,0.2)",
-                border: "3px solid #fff",
-              }}>
-                <img
-                  src={c.avatarUrl}
-                  alt=""
-                  aria-hidden="true"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                />
-              </div>
+              <img
+                src={c.avatarUrl}
+                alt=""
+                aria-hidden="true"
+                style={{
+                  width: "min(220px, 26vw)", height: "min(220px, 26vw)",
+                  margin: "0 auto", display: "block",
+                  objectFit: "contain",
+                  background: "transparent",
+                  filter: "drop-shadow(0 10px 22px rgba(180,83,9,0.28))",
+                }}
+              />
             ) : (
-              <div style={{ fontSize: 80, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.12))" }}>
+              <div style={{
+                fontSize: "min(140px, 20vw)", lineHeight: 1,
+                filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.15))",
+              }}>
                 {c.avatarEmoji}
               </div>
             )}
-            <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937", marginTop: 10, letterSpacing: -0.2 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", marginTop: 12, letterSpacing: -0.2 }}>
               {pick(c.name, lang)}
             </div>
           </button>
@@ -2173,22 +2184,23 @@ function CharacterChat({
         borderBottom: "2px solid #F59E0B33",
       }}>
         {character.avatarUrl ? (
-          <div style={{
-            width: 52, height: 52, borderRadius: "50%",
-            overflow: "hidden", background: "#fff",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-            border: "2px solid #fff",
-            flexShrink: 0,
-          }}>
-            <img
-              src={character.avatarUrl}
-              alt=""
-              aria-hidden="true"
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
-          </div>
+          <img
+            src={character.avatarUrl}
+            alt=""
+            aria-hidden="true"
+            style={{
+              width: "min(104px, 16vw)", height: "min(104px, 16vw)",
+              objectFit: "contain",
+              background: "transparent",
+              flexShrink: 0,
+              filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.18))",
+            }}
+          />
         ) : (
-          <div style={{ fontSize: 40, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.1))" }}>
+          <div style={{
+            fontSize: "min(72px, 12vw)", flexShrink: 0, lineHeight: 1,
+            filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.15))",
+          }}>
             {character.avatarEmoji}
           </div>
         )}
@@ -2323,20 +2335,23 @@ function ChatBubble({
     }}>
       {!isStudent && (
         character.avatarUrl ? (
-          <div style={{
-            width: 32, height: 32, borderRadius: "50%",
-            overflow: "hidden", flexShrink: 0, background: "#fff",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-          }}>
-            <img
-              src={character.avatarUrl}
-              alt=""
-              aria-hidden="true"
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
-          </div>
+          <img
+            src={character.avatarUrl}
+            alt=""
+            aria-hidden="true"
+            style={{
+              width: 56, height: 56,
+              objectFit: "contain",
+              background: "transparent",
+              flexShrink: 0,
+              filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.15))",
+            }}
+          />
         ) : (
-          <div style={{ fontSize: 22, flexShrink: 0 }}>{character.avatarEmoji}</div>
+          <div style={{
+            fontSize: 38, flexShrink: 0, lineHeight: 1,
+            filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))",
+          }}>{character.avatarEmoji}</div>
         )
       )}
       <div style={{
@@ -2488,19 +2503,23 @@ function TeacherAfterView({
             }}
           >
             {c.avatarUrl ? (
-              <div style={{
-                width: 64, height: 64, margin: "0 auto",
-                borderRadius: "50%", overflow: "hidden", background: "#fff",
-              }}>
-                <img
-                  src={c.avatarUrl}
-                  alt=""
-                  aria-hidden="true"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                />
-              </div>
+              <img
+                src={c.avatarUrl}
+                alt=""
+                aria-hidden="true"
+                style={{
+                  width: "min(140px, 18vw)", height: "min(140px, 18vw)",
+                  margin: "0 auto", display: "block",
+                  objectFit: "contain",
+                  background: "transparent",
+                  filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.18))",
+                }}
+              />
             ) : (
-              <div style={{ fontSize: 40 }}>{c.avatarEmoji}</div>
+              <div style={{
+                fontSize: "min(88px, 14vw)", lineHeight: 1,
+                filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.15))",
+              }}>{c.avatarEmoji}</div>
             )}
             <div style={{ fontSize: 13, fontWeight: 900, color: "#1F2937", marginTop: 6 }}>
               {pick(c.name, lang)}
