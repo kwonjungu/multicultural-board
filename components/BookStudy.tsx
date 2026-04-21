@@ -130,13 +130,10 @@ export default function BookStudy({
       }
 
       const db = getClientDb();
-      const meta: SessionMeta = {
+      const meta: Record<string, unknown> = {
         id: "bookStudy",
         title: newTitle.trim(),
         titleTranslations,
-        bodyText: newBody.trim() || undefined,
-        bodyTextTranslations: newBody.trim() ? bodyTextTranslations : undefined,
-        imageUrl: characterImg || undefined,
         startedAt: Date.now(),
         status: "active",
         teacherClientId: myClientId,
@@ -144,6 +141,14 @@ export default function BookStudy({
         teacherName: myName,
         targetLangs: roomLangs,
       };
+      // Firebase rejects undefined — only add optional fields if they have values
+      if (newBody.trim()) {
+        meta.bodyText = newBody.trim();
+        meta.bodyTextTranslations = bodyTextTranslations;
+      }
+      if (characterImg) {
+        meta.imageUrl = characterImg;
+      }
       await set(ref(db, `${basePath}/meta`), meta);
       await set(ref(db, `${basePath}/responses`), null);
       setNewTitle("");
