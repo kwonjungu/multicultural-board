@@ -89,7 +89,7 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
   const ActiveGame = GAMES.find((g) => g.id === gameId);
 
   // 한국 학생끼리도 플레이 가능하도록 같은 언어 중복 선택 허용 (filter 제거)
-  const availableFriendLangs = FRIEND_LANG_CODES;
+  const availableFriendLangs = friendLangCodes;
 
   return (
     <div style={{
