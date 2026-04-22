@@ -225,7 +225,7 @@ export default function RoomPage() {
   if (hubView === "games") {
     return (
       <>
-        <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} />
+        <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} roomLangs={roomLangs} />
         <SectionCaption section="games" isTeacher={user.isTeacher} />
         {overlays}
       </>

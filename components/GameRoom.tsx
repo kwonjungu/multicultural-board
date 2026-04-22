@@ -76,10 +76,11 @@ function GameIcon({ icon, iconImg, size }: { icon: string; iconImg?: string; siz
   );
 }
 
-const FRIEND_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
+const DEFAULT_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
 
-export default function GameRoom({ myLang, onClose }: { myLang: string; onClose: () => void }) {
-  const defaultFriend = FRIEND_LANG_CODES.find((c) => c !== (myLang || "ko")) || "en";
+export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: string; onClose: () => void; roomLangs?: string[] }) {
+  const friendLangCodes = roomLangs && roomLangs.length > 0 ? roomLangs : DEFAULT_LANG_CODES;
+  const defaultFriend = friendLangCodes.find((c) => c !== (myLang || "ko")) || "en";
   const [friendLang, setFriendLang] = useState<string>(defaultFriend);
   const [showLangPick, setShowLangPick] = useState(false);
   const [gameId, setGameId] = useState<string | null>(null);
