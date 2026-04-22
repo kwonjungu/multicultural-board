@@ -10,10 +10,15 @@ import type {
   StickerGoal,
   StudentCosmetics,
   Stage,
+  SkinId,
+  HatId,
 } from "@/lib/types";
 import {
   stageOf,
   stageImage,
+  stageImageWithSkin,
+  stageImageWithHat,
+  stageImageWithSkinAndHat,
   nextThreshold,
   progressInStage,
 } from "@/lib/stage";
@@ -145,6 +150,48 @@ function timeAgo(ts: number, lang: string): string {
 
 function daysSince(ts: number): number {
   return Math.max(0, Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24)));
+}
+
+/** Character image with multi-step fallback chain:
+ *  skin+hat composite → skin-only → classic+hat composite → plain stage.
+ *  각 404 시 onError 로 다음 후보 시도. 최종 폴백까지 실패하면 emoji 숨김.
+ */
+function CharacterImage({
+  stage,
+  skin,
+  hat,
+}: {
+  stage: Stage;
+  skin: SkinId;
+  hat: HatId;
+}) {
+  // 후보 URL 배열 (순서대로 시도). classic & !hat 은 [stageImage] 하나만.
+  const candidates: string[] = [];
+  if (hat) {
+    candidates.push(stageImageWithSkinAndHat(stage, skin, hat));
+    if (skin !== "classic") candidates.push(stageImageWithHat(stage, hat));
+  }
+  if (skin !== "classic") candidates.push(stageImageWithSkin(stage, skin));
+  candidates.push(stageImage(stage));
+  const [idx, setIdx] = useState(0);
+  const src = candidates[Math.min(idx, candidates.length - 1)];
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      onError={() => setIdx((i) => i + 1)}
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        animation: "heroBeeFloat 3s ease-in-out infinite",
+        filter: "drop-shadow(0 8px 18px rgba(245,158,11,0.4))",
+        zIndex: 1,
+      }}
+    />
+  );
 }
 
 // ============================================================
@@ -380,16 +427,17 @@ function MyHiveTab({
       ? "bee"
       : "queen";
 
-  // Character image: use skin override if not classic
-  const charImg =
-    cosmetics.skin === "classic"
-      ? stageImage(stage)
-      : `/stickers/skin-${cosmetics.skin}.png`;
-
-  const anchorKey =
-    cosmetics.skin === "classic"
-      ? STAGE_ANCHOR_KEY[stage]
-      : `skin-${cosmetics.skin}`;
+  // 이미지 합성 우선순위:
+  //  1) skin+hat 조합: /stickers/skin-hats/ (100장, classic 포함 full coverage via stage-hats fallback)
+  //  2) skin 만: stage+skin 재채색본
+  //  3) 모자만: classic+hat 합성본
+  //  4) 기본: stage 원본
+  // useCompositeHat: 합성본 이미지 (skin+hat 또는 classic+hat) 사용 가능 여부
+  const useCompositeHat = cosmetics.hat !== null;
+  const charImg = useCompositeHat && cosmetics.hat
+    ? stageImageWithSkinAndHat(stage, cosmetics.skin, cosmetics.hat)
+    : stageImageWithSkin(stage, cosmetics.skin);
+  const anchorKey = STAGE_ANCHOR_KEY[stage];
   const anchor = ANCHORS[anchorKey] ?? FALLBACK_ANCHOR;
 
   // Character box size (px). Keep square.
@@ -466,23 +514,15 @@ function MyHiveTab({
               }}
             />
           )}
-          {/* Main character fills the wrapper */}
-          <img
-            src={charImg}
-            alt=""
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              animation: "heroBeeFloat 3s ease-in-out infinite",
-              filter: "drop-shadow(0 8px 18px rgba(245,158,11,0.4))",
-              zIndex: 1,
-            }}
+          {/* Main character fills the wrapper — 다단계 폴백:
+              skin+hat 합성 → skin 단독 → stage 기본 */}
+          <CharacterImage
+            stage={stage}
+            skin={cosmetics.skin}
+            hat={cosmetics.hat}
           />
-          {/* Hat — anchored to measured head coordinates */}
-          {cosmetics.hat && (
+          {/* Hat overlay: 사용 안 함 — CharacterImage 가 합성본/폴백 전부 처리. */}
+          {false && cosmetics.hat && !useCompositeHat && (
             <img
               src={`/stickers/hat-${cosmetics.hat}.png`}
               alt=""

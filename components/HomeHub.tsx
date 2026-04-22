@@ -54,7 +54,7 @@ const SECTIONS: SectionMeta[] = [
     titleKey: "hubSectionStickers",
     sub: "Praise Hive",
     descKey: "hubSectionStickersDesc",
-    mascot: "/mascot/bee-celebrate.png",
+    mascot: "/mascot/bee-student.png",
     color: "#10B981",
     bg: "linear-gradient(135deg, #D1FAE5, #A7F3D0)",
     accent: "#065F46",

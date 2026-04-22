@@ -645,7 +645,13 @@ export default function Home() {
                   onMouseEnter={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#F59E0B"; el.style.background = "rgba(245,158,11,0.06)"; }}
                   onMouseLeave={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#D1D5DB"; el.style.background = "transparent"; }}
                 >
-                  <div style={{ fontSize: 36, marginBottom: 10 }}>📤</div>
+                  <img
+                    src="/interpreter/drag-drop.png"
+                    alt=""
+                    aria-hidden="true"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).outerHTML = '<div style="font-size:36px;margin-bottom:10px">📤</div>'; }}
+                    style={{ width: 88, height: 88, objectFit: "contain", margin: "0 auto 10px", display: "block" }}
+                  />
                   <div style={{ fontWeight: 700, fontSize: 14, color: "#374151", marginBottom: 4 }}>
                     문서 파일을 올리세요
                   </div>
@@ -684,7 +690,13 @@ export default function Home() {
             {/* 완료 */}
             {pptxResult && (
               <div style={{ background: "linear-gradient(135deg, #FEF3C7, #FFF7ED)", borderRadius: 14, padding: "20px 18px", border: "1px solid #FDE68A", textAlign: "center" }}>
-                <div style={{ fontSize: 38, marginBottom: 8 }}>✅</div>
+                <img
+                  src="/interpreter/success.png"
+                  alt=""
+                  aria-hidden="true"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).outerHTML = '<div style="font-size:38px;margin-bottom:8px">✅</div>'; }}
+                  style={{ width: 72, height: 72, objectFit: "contain", margin: "0 auto 8px", display: "block" }}
+                />
                 <div style={{ fontWeight: 800, fontSize: 15, color: "#B45309", marginBottom: 6 }}>번역 완료</div>
                 <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 4 }}>
                   {LANGUAGES[pptxFrom]?.flag} {LANGUAGES[pptxFrom]?.label} → {LANGUAGES[pptxTo]?.flag} {LANGUAGES[pptxTo]?.label}

@@ -62,7 +62,7 @@ export function stageLabel(stage: Stage): string {
   }
 }
 
-// Image path for stage
+// Image path for stage (classic skin = 기본 노란색)
 export function stageImage(stage: Stage): string {
   switch (stage) {
     case "egg":   return "/stickers/stage-1-egg.png";
@@ -71,6 +71,41 @@ export function stageImage(stage: Stage): string {
     case "bee":   return "/stickers/stage-4-bee.png";
     case "queen": return "/stickers/stage-5-queen.png";
   }
+}
+
+function stageKey(stage: Stage): string {
+  switch (stage) {
+    case "egg":   return "stage-1-egg";
+    case "larva": return "stage-2-larva";
+    case "pupa":  return "stage-3-pupa";
+    case "bee":   return "stage-4-bee";
+    case "queen": return "stage-5-queen";
+  }
+}
+
+// Skin 은 "같은 단계 캐릭터의 색 변형" 이다. classic 이 아니면 해당 skin 의
+// 재채색 버전(/stickers/skins/stage-{n}-{name}-{skin}.png) 을 반환.
+// 스킨 파일이 없다면 호출부에서 onError 로 기본 stageImage 로 폴백.
+export function stageImageWithSkin(stage: Stage, skin: SkinId): string {
+  if (skin === "classic") return stageImage(stage);
+  return `/stickers/skins/${stageKey(stage)}-${skin}.png`;
+}
+
+// 모자 합성본 경로. Gemini edit 으로 미리 합성된 이미지(더 자연스러움).
+// classic + hat 조합에만 합성본이 존재. 스킨 + 모자 조합은 호출부에서 별도 처리.
+export function stageImageWithHat(stage: Stage, hat: NonNullable<HatId>): string {
+  return `/stickers/stage-hats/${stageKey(stage)}-${hat}.png`;
+}
+
+// Skin + Hat 합성본. skin_hats 배치로 5색 × 5스테이지 × 4모자 = 100장 생성.
+// classic 스킨은 기존 stage-hats 폴더 사용.
+export function stageImageWithSkinAndHat(
+  stage: Stage,
+  skin: SkinId,
+  hat: NonNullable<HatId>,
+): string {
+  if (skin === "classic") return stageImageWithHat(stage, hat);
+  return `/stickers/skin-hats/${stageKey(stage)}-${skin}-${hat}.png`;
 }
 
 // Helper: numeric rank of a stage (egg=0 ... queen=4)
@@ -94,7 +129,7 @@ export function unlockedHats(stage: Stage): NonNullable<HatId>[] {
   const r = rank(stage);
   const out: NonNullable<HatId>[] = [];
   if (r >= rank("pupa"))  out.push("top");
-  if (r >= rank("bee"))   out.push("cap", "ribbon");
+  if (r >= rank("bee"))   out.push("cap", "party");
   if (r >= rank("queen")) out.push("crown");
   return out;
 }

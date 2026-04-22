@@ -13,10 +13,22 @@ import NumberTap from "./games/NumberTap";
 import EmotionQuiz from "./games/EmotionQuiz";
 import MarketRolePlay from "./games/MarketRolePlay";
 import WordTower from "./games/WordTower";
+import TwentyQuestions from "./games/TwentyQuestions";
+import HoneyTaboo from "./games/HoneyTaboo";
+import WouldYouRather from "./games/WouldYouRather";
+import SpotIt from "./games/SpotIt";
+import HalliGalli from "./games/HalliGalli";
+import BeeWorldMarble from "./games/BeeWorldMarble";
+import StoryCubes from "./games/StoryCubes";
+import BeeTreasureHunt from "./games/BeeTreasureHunt";
+import HoneyYut from "./games/HoneyYut";
+import BeeCafe from "./games/BeeCafe";
 
 type GameMeta = {
   id: string;
   icon: string;
+  /** Optional PNG that, if present at /public/game-icons/<id>.png, replaces the emoji. */
+  iconImg?: string;
   name: string;
   sub: string;
   color: string;
@@ -25,17 +37,44 @@ type GameMeta = {
 };
 
 const GAMES: GameMeta[] = [
-  { id: "country",   icon: "🌏", name: "이 나라는 어디?",   sub: "국기 맞추기",       color: "#F59E0B", bg: "#FEF3C7", cmp: CountryGuess },
-  { id: "emotion",   icon: "💗", name: "이 마음은?",         sub: "감정 알아채기",     color: "#FB7185", bg: "#FFE4E6", cmp: EmotionQuiz },
-  { id: "memory",    icon: "🎴", name: "기억 카드",          sub: "짝 맞추기",         color: "#A78BFA", bg: "#EDE9FE", cmp: WordMemory },
-  { id: "greeting",  icon: "👋", name: "인사말 배우기",      sub: "들은 인사 찾기",    color: "#10B981", bg: "#D1FAE5", cmp: GreetingRelay },
-  { id: "market",    icon: "🍜", name: "시장 역할극",        sub: "대화 연습",         color: "#EF4444", bg: "#FEE2E2", cmp: MarketRolePlay },
-  { id: "draw",      icon: "🎨", name: "그림 맞히기",        sub: "꿀벌 낙서",         color: "#3B82F6", bg: "#DBEAFE", cmp: DrawGuess },
-  { id: "spot",      icon: "🔍", name: "틀린 그림 찾기",     sub: "다른 곳 찾기",      color: "#6366F1", bg: "#E0E7FF", cmp: SpotDifference },
-  { id: "puzzle",    icon: "🧩", name: "문화 퍼즐",          sub: "조각 맞추기",       color: "#F472B6", bg: "#FCE7F3", cmp: CulturePuzzle },
-  { id: "number",    icon: "🔢", name: "숫자 빨리 누르기",   sub: "듣고 터치",         color: "#FACC15", bg: "#FEF9C3", cmp: NumberTap },
-  { id: "tower",     icon: "🏗️", name: "단어 탑 쌓기",       sub: "번역 맞히기",       color: "#14B8A6", bg: "#CCFBF1", cmp: WordTower },
+  { id: "country",   icon: "🌏", iconImg: "/game-icons/country.png",  name: "이 나라는 어디?",   sub: "국기 맞추기",       color: "#F59E0B", bg: "#FEF3C7", cmp: CountryGuess },
+  { id: "emotion",   icon: "💗", iconImg: "/game-icons/emotion.png",  name: "이 마음은?",         sub: "감정 알아채기",     color: "#FB7185", bg: "#FFE4E6", cmp: EmotionQuiz },
+  { id: "memory",    icon: "🎴", iconImg: "/game-icons/memory.png",   name: "기억 카드",          sub: "짝 맞추기",         color: "#A78BFA", bg: "#EDE9FE", cmp: WordMemory },
+  { id: "greeting",  icon: "👋", iconImg: "/game-icons/greeting.png", name: "인사말 배우기",      sub: "들은 인사 찾기",    color: "#10B981", bg: "#D1FAE5", cmp: GreetingRelay },
+  { id: "market",    icon: "🍜", iconImg: "/game-icons/market.png",   name: "시장 역할극",        sub: "대화 연습",         color: "#EF4444", bg: "#FEE2E2", cmp: MarketRolePlay },
+  { id: "draw",      icon: "🎨", iconImg: "/game-icons/draw.png",     name: "그림 맞히기",        sub: "꿀벌 낙서",         color: "#3B82F6", bg: "#DBEAFE", cmp: DrawGuess },
+  { id: "spot",      icon: "🔍", iconImg: "/game-icons/spot.png",     name: "틀린 그림 찾기",     sub: "다른 곳 찾기",      color: "#6366F1", bg: "#E0E7FF", cmp: SpotDifference },
+  { id: "puzzle",    icon: "🧩", iconImg: "/game-icons/puzzle.png",   name: "문화 퍼즐",          sub: "조각 맞추기",       color: "#F472B6", bg: "#FCE7F3", cmp: CulturePuzzle },
+  { id: "number",    icon: "🔢", iconImg: "/game-icons/number.png",   name: "숫자 빨리 누르기",   sub: "듣고 터치",         color: "#FACC15", bg: "#FEF9C3", cmp: NumberTap },
+  { id: "tower",     icon: "🏗️", iconImg: "/game-icons/tower.png",    name: "단어 탑 쌓기",       sub: "번역 맞히기",       color: "#14B8A6", bg: "#CCFBF1", cmp: WordTower },
+  { id: "twentyq",   icon: "🔎", iconImg: "/game-icons/twentyq.png",  name: "스무고개",           sub: "예/아니오로 맞히기", color: "#8B5CF6", bg: "#EDE9FE", cmp: TwentyQuestions },
+  { id: "taboo",     icon: "🚫", iconImg: "/game-icons/taboo.png",    name: "꿀벌 금칙어",         sub: "단어 설명 놀이",    color: "#E11D48", bg: "#FFE4E6", cmp: HoneyTaboo },
+  { id: "wyr",       icon: "🎲", iconImg: "/game-icons/wyr.png",      name: "이거 저거 고르기",   sub: "둘 중 뭐가 좋아?",  color: "#F97316", bg: "#FFEDD5", cmp: WouldYouRather },
+  { id: "spotit",    icon: "🕵️", iconImg: "/game-icons/spotit.png",   name: "꿀벌 스팟잇",         sub: "같은 그림 먼저!",   color: "#F59E0B", bg: "#FEF3C7", cmp: SpotIt },
+  { id: "halligalli", icon: "🔔", iconImg: "/game-icons/halligalli.png", name: "할리갈리",           sub: "과일 5개 종 울려!", color: "#DC2626", bg: "#FEE2E2", cmp: HalliGalli },
+  { id: "marble",    icon: "🎲", iconImg: "/marble/tiles/start.png", name: "꿀벌 월드 마블",     sub: "세계 여행 보드게임", color: "#D97706", bg: "#FEF3C7", cmp: BeeWorldMarble },
+  { id: "story", icon: "📖", iconImg: "/game-icons/story.png", name: "이야기 주사위", sub: "한 문장씩 이어가기", color: "#A78BFA", bg: "#EDE9FE", cmp: StoryCubes },
+  { id: "treasure", icon: "🗺", iconImg: "/game-icons/treasure.png", name: "꿀벌 보물사냥", sub: "힌트로 찾아내기", color: "#14B8A6", bg: "#CCFBF1", cmp: BeeTreasureHunt },
+  { id: "yut",      icon: "🪵", iconImg: "/game-icons/yut.png",      name: "꿀벌 윷놀이",   sub: "우리 전통 놀이",    color: "#B45309", bg: "#FEF3C7", cmp: HoneyYut },
+  { id: "cafe",     icon: "🍳", iconImg: "/game-icons/cafe.png",     name: "꿀벌 카페",     sub: "함께 요리해요",     color: "#F97316", bg: "#FFEDD5", cmp: BeeCafe },
 ];
+
+/** Graceful <img> that falls back to an emoji span when the PNG is missing. */
+function GameIcon({ icon, iconImg, size }: { icon: string; iconImg?: string; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (!iconImg || failed) {
+    return <div style={{ fontSize: size, lineHeight: 1 }}>{icon}</div>;
+  }
+  return (
+    <img
+      src={iconImg}
+      alt=""
+      aria-hidden="true"
+      onError={() => setFailed(true)}
+      style={{ width: size + 10, height: size + 10, objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.15))" }}
+    />
+  );
+}
 
 const FRIEND_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
 
@@ -48,7 +87,8 @@ export default function GameRoom({ myLang, onClose }: { myLang: string; onClose:
   const viewerLang = myLang || "ko";
   const ActiveGame = GAMES.find((g) => g.id === gameId);
 
-  const availableFriendLangs = FRIEND_LANG_CODES.filter((c) => c !== viewerLang);
+  // 한국 학생끼리도 플레이 가능하도록 같은 언어 중복 선택 허용 (filter 제거)
+  const availableFriendLangs = FRIEND_LANG_CODES;
 
   return (
     <div style={{
@@ -205,7 +245,7 @@ export default function GameRoom({ myLang, onClose }: { myLang: string; onClose:
                   onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                   onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                 >
-                  <div style={{ fontSize: 42, lineHeight: 1 }}>{g.icon}</div>
+                  <GameIcon icon={g.icon} iconImg={g.iconImg} size={42} />
                   <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937", marginTop: 6 }}>{g.name}</div>
                   <div style={{ fontSize: 12, color: g.color, fontWeight: 800 }}>{g.sub}</div>
                   <div style={{

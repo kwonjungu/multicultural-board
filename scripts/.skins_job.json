@@ -1,0 +1,30 @@
+{
+  "name": "batches/au5hitfyc71v1n2ohb7kp1vivqupztlzvudb",
+  "ids": [
+    "stage-1-egg-orange",
+    "stage-1-egg-green",
+    "stage-1-egg-sky",
+    "stage-1-egg-pink",
+    "stage-1-egg-purple",
+    "stage-2-larva-orange",
+    "stage-2-larva-green",
+    "stage-2-larva-sky",
+    "stage-2-larva-pink",
+    "stage-2-larva-purple",
+    "stage-3-pupa-orange",
+    "stage-3-pupa-green",
+    "stage-3-pupa-sky",
+    "stage-3-pupa-pink",
+    "stage-3-pupa-purple",
+    "stage-4-bee-orange",
+    "stage-4-bee-green",
+    "stage-4-bee-sky",
+    "stage-4-bee-pink",
+    "stage-4-bee-purple",
+    "stage-5-queen-orange",
+    "stage-5-queen-green",
+    "stage-5-queen-sky",
+    "stage-5-queen-pink",
+    "stage-5-queen-purple"
+  ]
+}
