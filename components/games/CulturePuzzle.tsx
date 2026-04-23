@@ -193,7 +193,8 @@ export default function CulturePuzzle({ langA, langB }: { langA: string; langB: 
                 onClick={() => handleClick(i)}
                 aria-label={`조각 ${i + 1}`}
                 style={{
-                  background: `url(${topic!.src})`,
+                  backgroundColor: "#f3f4f6",
+                  backgroundImage: `url(${topic!.src})`,
                   backgroundSize: `${GRID_SIZE * 100}% ${GRID_SIZE * 100}%`,
                   backgroundPosition: `${(col / (GRID_SIZE - 1)) * 100}% ${(row / (GRID_SIZE - 1)) * 100}%`,
                   backgroundRepeat: "no-repeat",
