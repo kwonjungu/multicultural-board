@@ -24,6 +24,11 @@ export function makeGroqClient(apiKey?: string): OpenAI {
   return new OpenAI({
     apiKey: apiKey || "placeholder",
     baseURL: "https://api.groq.com/openai/v1",
+    // SDK 기본값(재시도 2회)은 429 때 Retry-After(수십 초 가능)를 그대로 기다린다.
+    // 우리는 withGroqKeyFallback 으로 즉시 예비 키/모델로 넘어가는 게 훨씬 빠르므로
+    // SDK 자체 재시도는 끈다. 챗봇 체감 지연의 최대 원인이었음.
+    maxRetries: 0,
+    timeout: 30_000,
   });
 }
 

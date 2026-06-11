@@ -2,6 +2,146 @@
 
 이 프로젝트에서 반복되면 안 되는 실수들. 같은 함정에 다시 빠지지 말 것.
 
+---
+
+## 📌 현재 작업 컨텍스트 (2026-06-01 기준)
+
+> **📋 자기 정리 규칙 — 이 섹션을 깔끔하게 유지하는 법**
+>
+> 1. **세션 시작 시점에 먼저 정리한다.** 아래 "이번 라운드 산출물" 의 ✅ 항목
+>    중에서, 영구 가드레일·데이터 모델로 흡수해야 할 내용은 해당 섹션으로 옮기고
+>    여기서는 삭제한다. 단순 결과 보고에 불과한 줄(예: "X 컴포넌트 만듦") 은
+>    바로 삭제. 남기는 줄은 **다음 세션이 알아야 하는 의도/제약** 뿐.
+> 2. **"다음 작업 큐" 의 항목이 시작되면** ⏳ 로 표시. **완료되면** 즉시
+>    이 큐에서 제거하고 산출물에서 영구 가드레일 후보를 발굴 → 적절한 섹션으로 이동.
+> 3. **이 컨텍스트 섹션은 누적되지 않아야 한다.** 라운드가 끝나도 남는 정보는
+>    "🛡 새 가드레일" 또는 "🧠 핵심 데이터 모델" 같은 영구 섹션에만 둔다.
+> 4. **프로젝트 배경 / 마감 / 4키워드** 는 보고서가 제출(2026-07-31)될 때까지 유지.
+>    이후엔 통째로 삭제.
+
+### 프로젝트 배경 (보고서 제출 시까지 유지)
+- **백암초** 황의순 + 권준구 교사 **연구대회** 프로그램. 다문화 학생 지원 SPA.
+- 배포: `a-iroom.vercel.app` (별도 AIroom 저장소) — 이 저장소(multicultural-board)는
+  통합 LMS / 그림책 / 게임화 모듈을 같은 Vercel 프로젝트에서 호스팅.
+- **황의순 보고서 초안 마감 2026-06-15**, 최종 제출 2026-07-31.
+- 보고서 4키워드: **포용성 · 깊이 있는 학습 · 학생주도 · 디지털소양**.
+  모든 신규 모듈은 이 4개에 매핑 가능해야 의미가 있다.
+
+### 다음 작업 큐 (사용자 지정 순서)
+완료되면 줄 자체를 지운다. ⏳ 는 현재 진행 중.
+
+- ⏳ **#2 유튜브 자막 자동 번역** — 1.5일.
+  `youtube-transcript` 패키지 + `/api/youtube-transcript` + PadletCard 토글.
+- **#3 그림책 PPT 출력 점검** — 1일. StorybookCreator 결과를 PPTX 로.
+- **#5 분야별 보상 확장** — 1.5일. 소통/그림책/감정/게임/표현 5분야 트로피.
+  *#1 표현 복습 완료로 5번째 분야의 호출 지점 확보됨.*
+- **#15 게임 오류 잡기** — 분산 2~3일. 20개 게임 회귀 QA.
+- **#7 약점 단어 자동 복습 레슨** — 1일. attempts 로그 기반 약점 선정.
+- **#8 교사용 EmotionFeed** — 반나절. `subscribeEmotionsRecent` 활용.
+- **#9 PraiseHive ↔ LMS Level 연동** — 반나절. 벌 진화를 Lv 에 매핑.
+
+### 이번 라운드 산출물 (다음 세션 시작 시 정리할 줄)
+> 이 블록은 **임시 메모**다. ✅ 항목은 영구 섹션(🛡 가드레일 / 🧠 데이터 모델)
+> 으로 흡수되면 즉시 삭제. 줄 끝에 ⤴ 표시는 "흡수 완료" → 다음 차례에 정리 대상.
+>
+> - ✅ 챗 API SSE 스트리밍 전환 (storybook-chat + 신규 tutor-chat) ⤴
+> - ✅ 앱 전역 AI 튜터 "꿀비" 위젯 (`components/TutorChat.tsx`, 모든 허브 화면 우하단)
+> - ✅ 게임 효과음 AudioContext 누수 수정 → `lib/gameSfx.ts` 싱글턴 ⤴
+> - #15 게임 QA 일부 진행: 할리갈리 더블탭 flip 가드 추가. 나머지 게임 회귀 QA 는 계속.
+
+---
+
+## 🛡 가드레일 (반복하지 말아야 할 함정)
+
+- **Web Audio 효과음은 `lib/gameSfx.ts` 의 공유 싱글턴 컨텍스트만 사용.**
+  "톤마다 `new AudioContext()`" 패턴은 컨텍스트를 닫지 않아 누적되고,
+  브라우저가 탭당 개수를 제한해 장시간 플레이 시 소리가 통째로 멈춘다.
+  오실레이터는 한 컨텍스트 안에서 얼마든지 겹쳐 재생된다.
+
+- **챗 LLM 응답은 SSE 스트리밍이 기본.** 서버는 `lib/groq-stream.ts`
+  (`streamChatResponse` — 키/모델 폴백 + 증분 안전검사 + finalize 후처리),
+  클라이언트는 `lib/chatStreamClient.ts` (`readChatStream`). Groq 클라이언트는
+  `maxRetries: 0` — SDK 자체 재시도가 429 Retry-After(수십 초)를 기다리는 게
+  챗봇 체감 지연의 최대 원인이었다. 폴백은 `withGroqKeyFallback` 으로만.
+
+- **Firebase 로컬 쓰기는 즉시 onValue 로 에코된다.** 챗처럼 "쓰고 나서 다음
+  작업" 흐름에서 `await appendChatTurn(...)` 으로 서버 ack 를 기다리면 그만큼
+  다음 단계(LLM fetch)가 늦어진다. 표시용이면 await 없이 fire-and-forget.
+
+- **매칭 퀴즈 셔플은 단일 `useState + useEffect` 로 통일한다.**
+  `useState` 초기화 1회 + `useRef` 갱신 병용 패턴은 채점이 stale 값을 보게 됨.
+  표시되는 순서와 채점 비교에 쓰이는 순서가 같아야 한다 (`components/VocabTest.tsx`).
+
+- **핫시팅 응답은 반드시 질문으로 끝나야 한다.** 시스템 프롬프트만으로는 불충분.
+  `enforceQuestionEnding(reply, lang)` 후처리가 답이 `?` 로 끝나는지 검사하고
+  아니면 학생 언어에 맞는 fallback 후속 질문을 부착한다 (15개 언어 매핑).
+  새 캐릭터/책 추가해도 이 가드는 유지.
+
+- **일일 1회 보상은 `runTransaction` 으로 원자화.** `get` + `set` 분리하면
+  동시 탭 시 중복 지급된다. 참고: `awardEmotionStickerOncePerDay()`.
+
+- **XP / 하트 / 스트릭 갱신은 모두 `runTransaction`.** 동시 요청 안전.
+  단, 트랜잭션 콜백 내부에서 외부 변수에 캡처(`let leveledUp = ...`)할 때는
+  React StrictMode double-invoke 로 두 번 실행될 수 있음 — 결과는 항상
+  `result.snapshot.val()` 로 다시 읽어 사용.
+
+- **세션 종료 시 XP 일괄 적립.** 매 정답마다 Firebase 쓰기 금지.
+  `VocabTest` 와 `ExpressionReview` 둘 다 세션 끝에 `awardXp(total)` 1회만 호출.
+
+- **데일리골 자동 조정은 VocabHub 마운트당 1회.** `useRef(goalAdjustedRef)` 로
+  중복 호출 가드. 하향 조정은 한 번에 1단계만 (200→100→50). 급락 금지.
+
+- **표현 추출은 `writeLang !== user.myLang` 일 때만.** 학생이 모국어로 쓴 카드는
+  학습 대상이 아님 (대부분 한국어 카드만 추출됨). 텍스트 길이 ≥ 5 도 강제.
+
+- **PadletBoard 학생 액션 직후의 백그라운드 작업은 try/catch 로 격리.**
+  카드 작성 성공이 표현 추출/감정 카운트 실패로 인해 미끄러지면 안 됨.
+
+---
+
+## 🧠 핵심 데이터 모델 (자주 참조)
+
+### Firebase 노드 스키마
+```
+rooms/{roomCode}/
+  ├─ cards/{cardId}                        — PadletBoard 카드 (기존)
+  ├─ stickers/individual/{clientId}/{id}   — 칭찬 스티커 (기존)
+  ├─ stickers/cosmetics/{clientId}         — 코스메틱 (기존)
+  ├─ storybook/...                         — 그림책 세션/응답/챗/알림 (기존)
+  ├─ vocab/
+  │  ├─ progress/{clientId}/{wordId}       — WordProgress (기존)
+  │  ├─ recordings/{clientId}/{id}         — 음성 녹음 (기존, 30일 TTL)
+  │  ├─ rewards/{clientId}/{ruleId}        — 지급 기록 (기존)
+  │  └─ attempts/{clientId}/{attemptId}    — VocabAttempt raw log
+  ├─ lms/{clientId}                        — LearnerState
+  ├─ emotions/{clientId}/{pushId}          — EmotionEntry
+  │  └─ _lastAward/{clientId} = "YYYY-MM-DD"
+  └─ expressions/{clientId}/{exprId}       — ExpressionEntry (SRS)
+```
+**모두 클라이언트 쓰기.** README 는 옛 정보. Firebase 콘솔 규칙이 `rooms/{}` 전체에
+클라이언트 쓰기를 허용해야 함 (배포 시 점검 필수).
+
+### `LearnerState` (`lib/lms.ts`)
+```
+{ xp, hearts, heartsLastLost, streak, streakLastDate,
+  dailyXp, dailyXpDate, dailyGoal,
+  lessons: { [lessonId]: { stars, bestAccuracy, completedAt, attempts } } }
+```
+- 레벨 공식: `xpForLevel(n) = 50·n·(n+1)/2`. 누적 트라이앵글.
+- 하트 회복: 30분 = 1개. `effectiveHearts(state, now)` 가 회복 시각을 자동 적용해
+  계산. 상태에 박힌 `hearts` 만 보고 판단 금지.
+
+### `VocabAttempt` (`lib/vocabAttempts.ts`)
+한 문제 = 한 로그. `format`, `wordId`, `correct`, `attempts`, `durationMs`,
+`pickedWordId` (선택지 클릭 시 어떤 distractor 골랐는지) 저장. 교사 대시보드의
+모든 통계가 여기서 나옴.
+
+### `ExpressionEntry` (`lib/expressionLog.ts`)
+Leitner 박스 1~5 + `nextDueAt`. `filterDue(list)` 가 지금 복습 대상 추출.
+**중복 방지**: `pushExpressionDedup()` 가 같은 텍스트는 한 번만 저장.
+
+---
+
 ## 에셋 / 좌표
 
 - **PNG 좌표를 눈으로 측정할 때는 반드시 트림된 이미지에서 측정한다.**

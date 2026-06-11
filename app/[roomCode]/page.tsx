@@ -16,6 +16,7 @@ import StorybookRoom from "@/components/StorybookRoom";
 import StickerGiveModal from "@/components/StickerGiveModal";
 import CosmeticPicker from "@/components/CosmeticPicker";
 import Toast from "@/components/Toast";
+import TutorChat from "@/components/TutorChat";
 import { TutorialProvider } from "@/components/tutorial/TutorialProvider";
 import HubTutorialBootstrap from "@/components/tutorial/HubTutorialBootstrap";
 import SectionCaption from "@/components/tutorial/SectionCaption";
@@ -192,6 +193,8 @@ export default function RoomPage() {
         tone={toast?.tone}
         onDismiss={() => setToast(null)}
       />
+      {/* 앱 전역 AI 튜터 — 모든 허브 화면에서 우하단 플로팅 버튼 */}
+      <TutorChat roomCode={roomCode} myClientId={myClientId} user={user} />
     </>
   );
 

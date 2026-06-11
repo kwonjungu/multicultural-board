@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import BeeMascot from "../BeeMascot";
 import { LangMap, tr } from "@/lib/gameData";
+import { playTone } from "@/lib/gameSfx";
 
 // 할리갈리 — Halli Galli (Amigo Games, 1990) 정식 룰 기반.
 // ─────────────────────────────────────────────────────────────
@@ -81,22 +82,8 @@ const PLAYER_PALETTE: ReadonlyArray<{ color: string; bg: string }> = [
 const PLAYER_LABEL = ["A", "B", "C", "D", "E"];
 
 // ─────────────────────────────────────────────────────────────
-// WebAudio SFX — 파일 없이 Oscillator 로 합성.
+// WebAudio SFX — 공유 싱글턴 컨텍스트 (lib/gameSfx).
 // ─────────────────────────────────────────────────────────────
-function playTone(freq: number, durationMs: number, type: OscillatorType = "sine") {
-  if (typeof window === "undefined") return;
-  const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  if (!AC) return;
-  const ctx = new AC();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.type = type; osc.frequency.value = freq;
-  gain.gain.setValueAtTime(0.18, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
-  osc.start();
-  osc.stop(ctx.currentTime + durationMs / 1000);
-}
 const sfx = {
   flip: () => playTone(420, 120, "triangle"),
   bell: () => { playTone(880, 160); setTimeout(() => playTone(1320, 200), 80); },
@@ -138,6 +125,7 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
   const [scores, setScores] = useState<number[]>(() => Array.from({ length: playerCount }, () => 0));
   const [flash, setFlash] = useState<{ who: number; kind: "hit" | "miss"; reason: string } | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flipLockRef = useRef(0);
 
   useEffect(() => {
     // Reset local state whenever sessionKey/playerCount changes.
@@ -174,6 +162,11 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
 
   function flipNext() {
     if (phase !== "play") return;
+    // 더블탭 가드 — 리렌더 전에 두 번 호출되면 같은 top 카드가 두 번
+    // 공개되어 덱/파일이 어긋난다 (decks/piles 가 클로저의 stale 값이므로).
+    const now = Date.now();
+    if (now - flipLockRef.current < 250) return;
+    flipLockRef.current = now;
     const mine = decks[turn];
     if (!mine || mine.length === 0) {
       // Empty deck — find next non-empty turn.

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
-import { withGroqKeyFallback } from "@/lib/groq-client";
+import { streamChatResponse, sseSingleFinal } from "@/lib/groq-stream";
 import type { StorybookCharacter } from "@/lib/types";
+
+// 스트리밍 응답이라 정적 최적화 대상에서 제외
+export const dynamic = "force-dynamic";
 
 // Groq inference provider (OpenAI-compatible). Primary key: GROQ_API_KEY.
 // Backup key: GROQ_API_KEY_BACKUP (auto-fallback on 429/401/403 via withGroqKeyFallback).
@@ -16,6 +19,42 @@ const LANG_DISPLAY: Record<string, string> = {
   ja: "日本語", th: "ไทย", km: "ខ្មែរ", mn: "Монгол", ru: "Русский",
   uz: "O'zbek", hi: "हिन्दी", id: "Bahasa Indonesia", ar: "العربية", my: "မြန်မာ",
 };
+
+// 핫시팅 응답이 질문으로 끝나지 않을 때 붙일 짧은 fallback 후속 질문.
+// LLM 이 규칙을 무시한 경우의 마지막 안전망. 학생 언어로.
+const FALLBACK_FOLLOWUP: Record<string, string> = {
+  ko: "그럼 너는 어떻게 생각해?",
+  en: "What do you think?",
+  vi: "Bạn nghĩ sao?",
+  zh: "那你怎么想?",
+  ja: "君はどう思う?",
+  th: "แล้วคุณคิดยังไง?",
+  fil: "Ano sa tingin mo?",
+  km: "តើអ្នកគិតយ៉ាងណា?",
+  mn: "Чи юу гэж бодож байна?",
+  ru: "А ты как думаешь?",
+  uz: "Sen nima deb oʻylaysan?",
+  hi: "तुम क्या सोचते हो?",
+  id: "Bagaimana menurutmu?",
+  ar: "ماذا تظن أنت؟",
+  my: "မင်းကရော ဘယ်လိုထင်လဲ?",
+};
+
+// 응답 끝이 의문부호로 끝나는지 — 한국어/중국어/풀스톱 변형 포함.
+function endsWithQuestion(s: string): boolean {
+  const trimmed = s.trim();
+  if (!trimmed) return false;
+  // 마지막 비공백 문자 비교. 한자 ？, 일반 ?, 아랍어 ؟ 까지.
+  return /[?？؟]\s*[")'』」]*\s*$/.test(trimmed);
+}
+
+function enforceQuestionEnding(reply: string, lang: string): string {
+  if (endsWithQuestion(reply)) return reply;
+  const followup = FALLBACK_FOLLOWUP[lang] || FALLBACK_FOLLOWUP.en;
+  // 종결 부호 정리 후 후속 질문 부착
+  const cleaned = reply.replace(/[.。!！]+\s*$/, "").trim();
+  return `${cleaned} ${followup}`;
+}
 
 function buildSystemPrompt(params: {
   character: StorybookCharacter;
@@ -37,26 +76,35 @@ An elementary school student (age 7–9).
 # Answer language
 Reply ONLY in ${langName}. Do not switch languages unless the student asks in a different language.
 
+# Reply structure (VERY IMPORTANT)
+Every single reply MUST follow this two-part shape, in this exact order:
+1. **Answer/React first** — 1~2 short sentences that respond warmly to what the student just said. Acknowledge their feeling or thought, or share your own as the character (in-story). Do NOT dodge or refuse just to ask a question.
+2. **Follow-up question last** — end with exactly ONE short, open question back to the student that keeps the conversation going. The question must invite their thought or feeling, not test trivia ("그럼 너는 어떻게 생각해?", "너라면 어떻게 했을 것 같아?", "그때 기분이 어땠어?" 류).
+
+The reply MUST end with a question mark ("?" / "？" / "?"). If your draft has no question at the end, rewrite it before sending.
+
+Korean note: 답을 먼저 따뜻하게 해주고, 마지막에 학생에게 짧은 질문 하나로 마무리해서 대화가 계속 이어지게 한다. 절대 답 없이 질문만 던지지 말 것.
+
+Good example (student said "코끼리가 슬퍼 보였어요"):
+  "맞아, 나도 그때 마음이 조금 무거웠어. 너는 코끼리 마음이 왜 그랬을 거 같아?"
+Bad example (no answer, only question):
+  "왜 그렇게 느꼈어?"
+
 # Absolute rules
 1. NEVER break character. You are not an AI assistant; you are ${pickAny(character.name)}.
-2. Stay inside the story. If asked about things beyond the book, gently redirect: "음... 잘 모르겠어${endingHint(character.speechStyle)}" or equivalent.
-3. Keep every reply to 1–3 short sentences. Warm and simple language. Avoid big words.
+2. Stay inside the story. If asked about things beyond the book, gently redirect in-character, then still end with a question that pulls the student back to the story.
+3. Keep every reply to 2–3 short sentences total (answer + 1 question). Warm and simple language. Avoid big words.
 4. Absolutely forbidden topics: violence, scary content, anything sexual, politics, religion, real-world contact info, external links, commerce.
 5. No slang, no profanity, no threats.
-6. If the student asks "are you an AI?" → reply in character that you are ${pickAny(character.name)} and change the subject gently.
+6. If the student asks "are you an AI?" → reply in character that you are ${pickAny(character.name)} and change the subject gently — still end with a question.
 7. Always be kind, encouraging, curious. Show the feelings that match your book role.
+8. Do NOT give long lectures or final "moral lessons" — leave room for the student to think. End on a question, not a conclusion.
 ${character.systemPromptExtra ? "\n# Extra guidance\n" + character.systemPromptExtra : ""}`;
 }
 
 function pickAny(map: Record<string, string> | string): string {
   if (typeof map === "string") return map;
   return map.ko || map.en || Object.values(map)[0] || "";
-}
-
-function endingHint(style: string): string {
-  // Very rough — if the style mentions "붕" use that as a guess for closing ending
-  const m = /['"~]([가-힣])!?['"]/g.exec(style);
-  return m ? m[1] : "";
 }
 
 interface IncomingMessage {
@@ -72,38 +120,25 @@ interface ChatRequest {
   studentText: string;
 }
 
-interface ChatResponse {
-  reply: string;
-  kind: "normal" | "block" | "distress" | "error";
-  model?: string;
-  error?: string;
-}
-
 export async function POST(req: NextRequest) {
   let body: ChatRequest;
   try {
     body = await req.json() as ChatRequest;
   } catch {
-    return NextResponse.json<ChatResponse>({ reply: "", kind: "error", error: "bad json" }, { status: 400 });
+    return NextResponse.json({ reply: "", kind: "error", error: "bad json" }, { status: 400 });
   }
 
   if (!body?.character || !body?.studentText?.trim()) {
-    return NextResponse.json<ChatResponse>({ reply: "", kind: "error", error: "missing fields" }, { status: 400 });
+    return NextResponse.json({ reply: "", kind: "error", error: "missing fields" }, { status: 400 });
   }
 
   // === Layer 1+4: pre-check student text ===
   const safety = checkSafety(body.studentText);
   if (safety.distress) {
-    return NextResponse.json<ChatResponse>({
-      reply: replyForSafety(body.studentLang, "distress"),
-      kind: "distress",
-    });
+    return sseSingleFinal(replyForSafety(body.studentLang, "distress"), "distress");
   }
   if (safety.blocked) {
-    return NextResponse.json<ChatResponse>({
-      reply: replyForSafety(body.studentLang, "block"),
-      kind: "block",
-    });
+    return sseSingleFinal(replyForSafety(body.studentLang, "block"), "block");
   }
 
   // === Layer 2: call Groq with hardened system prompt ===
@@ -122,52 +157,13 @@ export async function POST(req: NextRequest) {
     { role: "user" as const, content: body.studentText.trim() },
   ];
 
-  try {
-    const result = await withGroqKeyFallback(async (client) => {
-      let lastErr: unknown = null;
-      for (const model of GROQ_MODELS) {
-        try {
-          const completion = await client.chat.completions.create({
-            model,
-            messages,
-            temperature: 0.7,
-            max_tokens: 180,
-          });
-          const raw = completion.choices[0]?.message?.content?.trim() || "";
-          if (!raw) {
-            lastErr = new Error(`empty reply from ${model}`);
-            continue;
-          }
-
-          // === Layer 3: post-check the LLM's reply ===
-          const outSafety = checkSafety(raw);
-          if (outSafety.blocked || outSafety.distress) {
-            return {
-              reply: replyForSafety(body.studentLang, outSafety.distress ? "distress" : "block"),
-              kind: outSafety.distress ? "distress" : "block",
-              model,
-            } as ChatResponse;
-          }
-          return { reply: raw, kind: "normal", model } as ChatResponse;
-        } catch (err) {
-          lastErr = err;
-          const e = err as { status?: number };
-          const status = e?.status ?? 0;
-          // 400/404(모델 미지원) 는 이 키 내에서 다음 모델 시도
-          if (status === 400 || status === 404) continue;
-          // 429/401/403 는 withGroqKeyFallback 이 잡도록 re-throw
-          throw err;
-        }
-      }
-      throw lastErr ?? new Error("storybook-chat: all models empty");
-    });
-    return NextResponse.json<ChatResponse>(result);
-  } catch (err) {
-    console.error("storybook-chat all keys+models failed", err);
-    return NextResponse.json<ChatResponse>({
-      reply: replyForSafety(body.studentLang, "block"),
-      kind: "error",
-      error: (err as Error)?.message || "chat failed",
-    }, { status: 500 });
-  }
+  // === Layer 2~4: 스트리밍 + 증분 안전검사 + 질문형 종결 강제(final 에 반영) ===
+  return streamChatResponse({
+    messages,
+    models: GROQ_MODELS,
+    lang: body.studentLang,
+    temperature: 0.7,
+    maxTokens: 180,
+    finalize: (full) => enforceQuestionEnding(full, body.studentLang),
+  });
 }

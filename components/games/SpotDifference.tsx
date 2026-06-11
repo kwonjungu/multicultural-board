@@ -2,6 +2,7 @@
 
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { LangMap, SPOT_DIFF_SCENES, SpotDiffScene, pickN, tr } from "@/lib/gameData";
+import { playTone } from "@/lib/gameSfx";
 import BeeMascot from "../BeeMascot";
 
 // ============================================================
@@ -37,37 +38,8 @@ function lab(map: LangMap, a: string, b: string): string {
 }
 
 // ============================================================
-// Tiny Web Audio sfx — pattern from BeeWorldMarble/HalliGalli.
+// Tiny Web Audio sfx — 공유 싱글턴 컨텍스트 (lib/gameSfx).
 // ============================================================
-
-interface WindowWithAudio {
-  AudioContext?: typeof AudioContext;
-  webkitAudioContext?: typeof AudioContext;
-}
-
-function playTone(
-  freq: number,
-  durationMs: number,
-  type: OscillatorType = "sine",
-  volume = 0.18,
-): void {
-  if (typeof window === "undefined") return;
-  const w = window as unknown as WindowWithAudio;
-  const AC = w.AudioContext ?? w.webkitAudioContext;
-  if (!AC) return;
-  const ctx = new AC();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.type = type;
-  osc.frequency.value = freq;
-  const t0 = ctx.currentTime;
-  gain.gain.setValueAtTime(volume, t0);
-  gain.gain.exponentialRampToValueAtTime(0.001, t0 + durationMs / 1000);
-  osc.start(t0);
-  osc.stop(t0 + durationMs / 1000);
-}
 
 const sfx = {
   tick: (): void => playTone(880, 90, "triangle", 0.16),

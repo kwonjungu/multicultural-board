@@ -35,8 +35,11 @@ import {
   type BookListEntry,
 } from "@/lib/storybook";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
+import { readChatStream } from "@/lib/chatStreamClient";
 import { speak as speakText } from "@/lib/ttsMulti";
 import StorybookCreator from "./StorybookCreator";
+import EmotionCardDeck from "./EmotionCardDeck";
+import { pushEmotion, emotionById, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
 import { t, tFmt } from "@/lib/i18n";
 
 interface Props {
@@ -1004,7 +1007,7 @@ function BilingualText({
 // ============================================================
 // v3: Character wobble + TTS auto-play + post-it + fruit-tree result + 3 input modes
 
-type QInputMode = "text" | "voice" | "draw";
+type QInputMode = "text" | "voice" | "draw" | "emotion";
 
 const POSTIT_COLORS = [
   "#FEF3C7", "#DBEAFE", "#FCE7F3", "#D1FAE5", "#EDE9FE",
@@ -1419,6 +1422,7 @@ function QuestionCard({
               { id: "text" as QInputMode, icon: "✏️", label: "글자" },
               { id: "voice" as QInputMode, icon: "🎤", label: "말" },
               { id: "draw" as QInputMode, icon: "🖌️", label: "그리기" },
+              { id: "emotion" as QInputMode, icon: "💗", label: "감정" },
             ]).map((tab) => (
               <button key={tab.id} onClick={() => setInputMode(tab.id)} style={{
                 flex: 1, padding: "9px 6px", borderRadius: 10,
@@ -1471,22 +1475,64 @@ function QuestionCard({
             </div>
           )}
 
-          {draft && inputMode !== "text" && (
+          {inputMode === "emotion" && (
+            <div>
+              <EmotionCardDeck
+                lang={lang}
+                quick
+                busy={busy}
+                onPick={async (emotionId) => {
+                  if (busy) return;
+                  setBusy(true);
+                  try {
+                    const e = emotionById(emotionId);
+                    const label = e.label[lang] ?? e.label.ko ?? e.id;
+                    const text = `${e.emoji} ${label}`;
+                    await pushEmotion({
+                      roomCode,
+                      emotionId: emotionId as EmotionId,
+                      intensity: 2,
+                      clientId: myClientId,
+                      authorName: user.myName,
+                      context: "storybook",
+                      bookId: book?.id,
+                    });
+                    await submitResponse(roomCode, q.id, myClientId, user.myName, user.myLang, text);
+                    awardEmotionStickerOncePerDay({
+                      roomCode,
+                      clientId: myClientId,
+                      studentName: user.myName,
+                    }).catch(() => undefined);
+                    setDraft(text);
+                    setSaved(true);
+                  } catch (err) {
+                    console.error("emotion submit failed", err);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+            </div>
+          )}
+
+          {draft && inputMode !== "text" && inputMode !== "emotion" && (
             <div style={{ marginTop: 10, padding: "8px 12px", background: "#F0F9FF", borderRadius: 10, fontSize: 13, color: "#1E40AF", fontWeight: 600 }}>
               입력: &ldquo;{draft}&rdquo;
             </div>
           )}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-            <button onClick={handleSubmit} disabled={busy || !draft.trim()} style={{
-              minHeight: 44, padding: "10px 24px",
-              background: !draft.trim() ? "#E5E7EB" : "linear-gradient(135deg, #3B82F6, #2563EB)",
-              color: !draft.trim() ? "#9CA3AF" : "#fff",
-              fontSize: 15, fontWeight: 900, border: "none", borderRadius: 14,
-              cursor: !draft.trim() || busy ? "not-allowed" : "pointer",
-              boxShadow: !draft.trim() ? "none" : "0 6px 16px rgba(59,130,246,0.3)",
-              transition: "all 0.2s",
-            }}>{busy ? "제출 중..." : "📨 포스트잇 붙이기"}</button>
-          </div>
+          {inputMode !== "emotion" && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+              <button onClick={handleSubmit} disabled={busy || !draft.trim()} style={{
+                minHeight: 44, padding: "10px 24px",
+                background: !draft.trim() ? "#E5E7EB" : "linear-gradient(135deg, #3B82F6, #2563EB)",
+                color: !draft.trim() ? "#9CA3AF" : "#fff",
+                fontSize: 15, fontWeight: 900, border: "none", borderRadius: 14,
+                cursor: !draft.trim() || busy ? "not-allowed" : "pointer",
+                boxShadow: !draft.trim() ? "none" : "0 6px 16px rgba(59,130,246,0.3)",
+                transition: "all 0.2s",
+              }}>{busy ? "제출 중..." : "📨 포스트잇 붙이기"}</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -2041,6 +2087,7 @@ function CharacterChat({
   const [turns, setTurns] = useState<StorybookChatTurn[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [streamText, setStreamText] = useState<string | null>(null);
   const [showLangExpand, setShowLangExpand] = useState(false);
 
   useEffect(() => {
@@ -2115,12 +2162,14 @@ function CharacterChat({
       return;
     }
 
-    // Record the student turn first so the UI feels responsive
-    await appendChatTurn(roomCode, myClientId, {
+    // Record the student turn — await 하지 않는다. Firebase 는 로컬 쓰기를
+    // 즉시 onValue 로 에코하므로 화면엔 바로 뜨고, 서버 ack 를 기다리느라
+    // LLM 요청 시작이 늦어지는 게 기존 체감 지연의 한 축이었음.
+    appendChatTurn(roomCode, myClientId, {
       from: "student", text, timestamp: Date.now(),
-    });
+    }).catch((err) => console.error("student turn write failed", err));
 
-    // Send to server API (Layer 2+3 happen there)
+    // Send to server API (Layer 2+3 happen there) — SSE 스트리밍 수신
     try {
       const history = turns.map((t) => ({
         role: t.from === "student" ? ("user" as const) : ("assistant" as const),
@@ -2137,9 +2186,9 @@ function CharacterChat({
           studentText: text,
         }),
       });
-      const data = await res.json() as {
-        reply: string; kind: "normal" | "block" | "distress" | "error";
-      };
+      const data = await readChatStream(res, (accumulated) => {
+        setStreamText(accumulated);
+      });
       if (data.kind === "distress") {
         await raiseAlert(roomCode, {
           clientId: myClientId,
@@ -2148,18 +2197,21 @@ function CharacterChat({
           kind: "distress",
         });
       }
-      await appendChatTurn(roomCode, myClientId, {
+      // 로컬 에코가 즉시 발화하므로 await 없이 기록 → streamText 정리 순서로
+      // 깜빡임 없이 확정 버블로 전환된다.
+      appendChatTurn(roomCode, myClientId, {
         from: "character", text: data.reply || replyForSafety(lang, "block"),
         timestamp: Date.now(),
         flagged: data.kind !== "normal",
-      });
+      }).catch((err) => console.error("character turn write failed", err));
     } catch (err) {
       console.error("chat request failed", err);
-      await appendChatTurn(roomCode, myClientId, {
+      appendChatTurn(roomCode, myClientId, {
         from: "character", text: replyForSafety(lang, "block"),
         timestamp: Date.now(), flagged: true,
-      });
+      }).catch(() => {});
     }
+    setStreamText(null);
     setBusy(false);
   }
 
@@ -2236,12 +2288,16 @@ function CharacterChat({
         {busy && (
           <div style={{
             alignSelf: "flex-start",
-            padding: "8px 14px",
-            background: "#fff", borderRadius: 16,
+            maxWidth: "85%",
+            padding: streamText ? "10px 14px" : "8px 14px",
+            background: "#fff",
+            borderRadius: streamText ? "18px 18px 18px 4px" : 16,
             border: "2px solid #FDE68A",
-            fontSize: 14, fontWeight: 700, color: "#92400E",
+            fontSize: 14, fontWeight: streamText ? 600 : 700,
+            color: streamText ? "#1F2937" : "#92400E",
+            lineHeight: 1.4, wordBreak: "break-word",
           }}>
-            ···
+            {streamText || "···"}
           </div>
         )}
       </div>

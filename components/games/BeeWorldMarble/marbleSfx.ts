@@ -1,68 +1,8 @@
 // BeeWorldMarble — Web Audio synth sfx (no audio files).
-// Pattern mirrors HalliGalli.tsx `playTone`: one AudioContext per tone so
-// overlapping calls don't fight over a single context. SSR-safe.
-//
-// IMPORTANT: browsers require a user gesture before the first AudioContext
-// can play audio, so every sfx here is expected to be triggered from a
-// dispatch that happens after the user's click/tap.
+// 공유 싱글턴 컨텍스트(lib/gameSfx) 사용 — 톤마다 new AudioContext() 하던
+// 옛 패턴은 컨텍스트 누수로 장시간 플레이 시 소리가 멈췄다.
 
-interface WindowWithAudio {
-  AudioContext?: typeof AudioContext;
-  webkitAudioContext?: typeof AudioContext;
-}
-
-function getAC(): typeof AudioContext | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as WindowWithAudio;
-  return w.AudioContext ?? w.webkitAudioContext ?? null;
-}
-
-/**
- * Play a single oscillator tone. New AudioContext per call so overlapping
- * invocations don't cut each other off.
- */
-function playTone(
-  freq: number,
-  durationMs: number,
-  type: OscillatorType = "sine",
-  volume = 0.18,
-): void {
-  const AC = getAC();
-  if (!AC) return;
-  const ctx = new AC();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.type = type;
-  osc.frequency.value = freq;
-  const t0 = ctx.currentTime;
-  gain.gain.setValueAtTime(volume, t0);
-  gain.gain.exponentialRampToValueAtTime(0.001, t0 + durationMs / 1000);
-  osc.start(t0);
-  osc.stop(t0 + durationMs / 1000);
-}
-
-/**
- * Sequence of tones with relative delays (ms from the first call).
- */
-function playSequence(
-  notes: Array<{
-    freq: number;
-    durationMs: number;
-    delayMs: number;
-    type?: OscillatorType;
-    volume?: number;
-  }>,
-): void {
-  if (typeof window === "undefined") return;
-  for (const n of notes) {
-    window.setTimeout(
-      () => playTone(n.freq, n.durationMs, n.type ?? "sine", n.volume),
-      n.delayMs,
-    );
-  }
-}
+import { playTone, playSequence } from "@/lib/gameSfx";
 
 export const sfx = {
   // Dice rattle — 4 quick clicks at varied pitch.
