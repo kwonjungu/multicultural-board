@@ -12,12 +12,22 @@ import {
 import { extractVocabLocal, MatchedWord, wordById } from "@/lib/vocabUtils";
 import { checkAndAward, RewardRule, getAwardedIds } from "@/lib/vocabRewards";
 import { cleanupExpiredRecordings } from "@/lib/vocabRecordings";
-import { buildQuiz, QuizQuestion } from "@/lib/vocabTest";
+import { buildMixedQuiz, buildLessonQuiz, type QuizItem } from "@/lib/quizFormats";
+import { getUnits, type Unit, type Lesson } from "@/lib/lessons";
+import {
+  subscribeLearner, setDailyGoal, effectiveHearts, msUntilNextHeart, xpToNextLevel, levelFromXp,
+  MAX_HEARTS, type LearnerState,
+} from "@/lib/lms";
+import { fetchStudentAttempts } from "@/lib/vocabAttempts";
+import { suggestGoal } from "@/lib/dailyGoal";
+import { subscribeExpressions, filterDue, type ExpressionEntry } from "@/lib/expressionLog";
+import ExpressionReview from "./ExpressionReview";
 import { UserConfig, CardData } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import VocabCard from "./VocabCard";
 import VocabNotebook from "./VocabNotebook";
 import VocabTest from "./VocabTest";
+import TeacherVocabDashboard from "./TeacherVocabDashboard";
 
 const PURPLE = "#8B5CF6";
 const PURPLE_DARK = "#6D28D9";
@@ -59,11 +69,58 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   const [awardQueue, setAwardQueue] = useState<RewardRule[]>([]);
   const [stickersEarned, setStickersEarned] = useState(0);
 
-  // 뷰 모드 (그리드 / 단어장)
-  const [viewMode, setViewMode] = useState<"grid" | "notebook">("grid");
+  // 뷰 모드 (트리 / 그리드 / 단어장) — 듀오링고 스타일 트리가 기본
+  const [viewMode, setViewMode] = useState<"tree" | "grid" | "notebook">("tree");
 
   // 시험
-  const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
+  const [quiz, setQuiz] = useState<QuizItem[] | null>(null);
+  const [lessonContext, setLessonContext] = useState<{ id: string; title: string } | null>(null);
+  const [teacherView, setTeacherView] = useState(false);
+  const [learner, setLearner] = useState<LearnerState | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const [goalToast, setGoalToast] = useState<string | null>(null);
+  const goalAdjustedRef = useRef(false);
+  const [expressions, setExpressions] = useState<ExpressionEntry[]>([]);
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeLearner(roomCode, user.myName, setLearner);
+    return unsub;
+  }, [roomCode, user.myName]);
+
+  useEffect(() => {
+    const unsub = subscribeExpressions(roomCode, user.myName, setExpressions);
+    return unsub;
+  }, [roomCode, user.myName]);
+
+  // 하트 회복 카운트다운 1초마다
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // 단어카드 진입 시 1회 — 최근 학습 데이터로 데일리 골 자동 조정
+  useEffect(() => {
+    if (!learner) return;
+    if (goalAdjustedRef.current) return;
+    goalAdjustedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const attempts = await fetchStudentAttempts(roomCode, user.myName);
+        if (cancelled) return;
+        const sug = suggestGoal(attempts, learner.dailyGoal, learner.streak);
+        if (sug.changed) {
+          await setDailyGoal(roomCode, user.myName, sug.goal);
+          setGoalToast(`🎯 ${sug.reason}`);
+          setTimeout(() => setGoalToast(null), 4500);
+        }
+      } catch (err) {
+        console.warn("[VocabHub] 자동 골 조정 실패", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [learner, roomCode, user.myName]);
 
   useEffect(() => {
     setProgress(loadProgress(roomCode, user.myName));
@@ -182,6 +239,21 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   }, [activeSub]);
 
   const masteredTotal = masteredCount(progress);
+  const isTeacher = user.isTeacher ?? false;
+
+  // 교사가 대시보드 토글 켜면 다른 화면 전체 가리고 대시보드만 렌더
+  if (isTeacher && teacherView) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(180deg, #FAF5FF 0%, #EDE9FE 50%, #DDD6FE 100%)",
+        fontFamily: "'Noto Sans KR', sans-serif",
+        padding: "16px 14px 40px",
+      }}>
+        <TeacherVocabDashboard roomCode={roomCode} onBack={() => setTeacherView(false)} />
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -219,6 +291,56 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           </div>
         </div>
 
+        {isTeacher && (
+          <button
+            onClick={() => setTeacherView(true)}
+            style={{
+              background: "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")",
+              color: "#fff", border: "none", borderRadius: 14,
+              padding: "8px 14px", fontSize: 13, fontWeight: 900,
+              cursor: "pointer", fontFamily: "inherit",
+              boxShadow: "0 4px 10px " + PURPLE + "55",
+            }}
+          >👨‍🏫 반 전체 보기</button>
+        )}
+
+        {!isTeacher && (() => {
+          const dueCount = filterDue(expressions).length;
+          const hasAny = expressions.length > 0;
+          if (!hasAny) return null;
+          return (
+            <button
+              onClick={() => setReviewOpen(true)}
+              aria-label="표현 복습"
+              style={{
+                position: "relative",
+                background: dueCount > 0
+                  ? "linear-gradient(135deg, #FB923C, #EA580C)"
+                  : PURPLE_LIGHT,
+                color: dueCount > 0 ? "#fff" : PURPLE_DARK,
+                border: "none", borderRadius: 14,
+                padding: "8px 12px", fontSize: 13, fontWeight: 900,
+                cursor: "pointer", fontFamily: "inherit",
+                boxShadow: dueCount > 0 ? "0 4px 12px rgba(234,88,12,0.45)" : "none",
+              }}
+            >
+              📝 표현
+              {dueCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -6, right: -6,
+                  background: "#fff", color: "#EA580C",
+                  fontSize: 11, fontWeight: 900,
+                  minWidth: 20, height: 20, borderRadius: 999,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  padding: "0 5px",
+                  border: "2px solid #EA580C",
+                  lineHeight: 1,
+                }}>{dueCount}</span>
+              )}
+            </button>
+          );
+        })()}
+
         <div style={{
           background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
           color: "#78350F", fontSize: 14, fontWeight: 900,
@@ -229,6 +351,23 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
         </div>
       </div>
 
+      {/* HUD: 하트 / 스트릭 / XP */}
+      <LearnerHUD learner={learner} now={now} />
+
+      {viewMode === "tree" ? (
+        <SkillTreeView
+          learner={learner}
+          onStartLesson={(lesson, unit) => {
+            const q = buildLessonQuiz(lesson.id);
+            if (q.length > 0) {
+              setLessonContext({ id: lesson.id, title: `${unit.emoji} ${unit.title} · ${lesson.title}` });
+              setQuiz(q);
+            }
+          }}
+        />
+      ) : (
+      <>
+
       {/* Test CTA banner */}
       {(() => {
         const studied = Object.values(progress).filter((p) => (p.doneSentences?.length ?? 0) > 0).length;
@@ -238,7 +377,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
             onClick={() => {
               if (!canTest) return;
               const fallback = matched.map((m) => m.wordId);
-              const q = buildQuiz(progress, Math.min(5, Math.max(3, studied)), fallback);
+              const q = buildMixedQuiz(progress, Math.min(5, Math.max(3, studied)), fallback);
               if (q.length > 0) setQuiz(q);
             }}
             style={{
@@ -289,6 +428,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
         border: "2px solid " + PURPLE + "22",
       }}>
         {([
+          { k: "tree" as const, label: "🌳 단원" },
           { k: "grid" as const, label: t("vocabViewGrid", lang) },
           { k: "notebook" as const, label: t("vocabViewNotebook", lang) },
         ]).map((v) => (
@@ -521,6 +661,8 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       </div>
       </>
       )}
+      </>
+      )}
 
       {/* Study modal */}
       {openWord && (
@@ -542,17 +684,33 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
         />
       )}
 
+      {/* Expression review modal */}
+      {reviewOpen && (
+        <ExpressionReview
+          roomCode={roomCode}
+          clientId={user.myName}
+          studentName={user.myName}
+          studentLang={user.myLang}
+          onClose={() => setReviewOpen(false)}
+        />
+      )}
+
       {/* Test modal */}
       {quiz && (
         <VocabTest
           questions={quiz}
+          roomCode={roomCode}
+          clientId={user.myName}
+          studentName={user.myName}
+          lessonId={lessonContext?.id}
+          lessonTitle={lessonContext?.title}
           onWordResult={(wordId, passed) => {
             persist(markTestResult(progress, wordId, passed), {
               touchedWordId: wordId,
-              checkRewards: passed,   // 통과 시 보상 체크 (단어 수 증가는 이미 done 인 기준)
+              checkRewards: passed,
             });
           }}
-          onClose={() => setQuiz(null)}
+          onClose={() => { setQuiz(null); setLessonContext(null); }}
         />
       )}
 
@@ -582,13 +740,233 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
         </div>
       )}
 
+      {/* 데일리 골 자동 조정 토스트 */}
+      {goalToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: "fixed", top: 20, left: "50%",
+            transform: "translateX(-50%)",
+            background: "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")",
+            color: "#fff",
+            padding: "12px 20px", borderRadius: 999,
+            fontSize: 14, fontWeight: 900,
+            boxShadow: "0 10px 28px rgba(109,40,217,0.45)",
+            zIndex: 1500,
+            animation: "goalToastIn 0.35s ease",
+            maxWidth: "90vw",
+            textAlign: "center",
+          }}
+        >
+          {goalToast}
+        </div>
+      )}
+
       <style>{`
         @keyframes rewardPop {
           0% { transform: translate(-50%, -80px) scale(0.6); opacity: 0; }
           60% { transform: translate(-50%, 0) scale(1.05); opacity: 1; }
           100% { transform: translate(-50%, 0) scale(1); }
         }
+        @keyframes goalToastIn {
+          0% { transform: translate(-50%, -40px); opacity: 0; }
+          60% { transform: translate(-50%, 4px); opacity: 1; }
+          100% { transform: translate(-50%, 0); opacity: 1; }
+        }
       `}</style>
+    </div>
+  );
+}
+
+function LearnerHUD({ learner, now }: { learner: LearnerState | null; now: number }) {
+  const xp = learner?.xp ?? 0;
+  const level = levelFromXp(xp);
+  const next = xpToNextLevel(xp);
+  const hearts = learner ? effectiveHearts(learner, now) : MAX_HEARTS;
+  const streak = learner?.streak ?? 0;
+  const today = (() => {
+    if (!learner) return 0;
+    const d = new Date();
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return learner.dailyXpDate === k ? learner.dailyXp : 0;
+  })();
+  const goal = learner?.dailyGoal ?? 50;
+  const heartMs = learner ? msUntilNextHeart(learner, now) : 0;
+  const heartMin = Math.floor(heartMs / 60000);
+  const heartSec = Math.floor((heartMs % 60000) / 1000);
+
+  return (
+    <div style={{
+      maxWidth: 760, margin: "0 auto 14px",
+      display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8,
+    }}>
+      {/* 하트 */}
+      <div style={{
+        background: "#fff", borderRadius: 14, padding: "10px 12px",
+        border: "2px solid #FCA5A5",
+        display: "flex", flexDirection: "column", gap: 2,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 18 }}>❤️</span>
+          <span style={{ fontSize: 18, fontWeight: 900, color: "#B91C1C" }}>{hearts}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#9CA3AF" }}>/ {MAX_HEARTS}</span>
+        </div>
+        {hearts < MAX_HEARTS && heartMs > 0 && (
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280" }}>
+            다음 +1: {heartMin}:{String(heartSec).padStart(2, "0")}
+          </div>
+        )}
+      </div>
+
+      {/* 스트릭 */}
+      <div style={{
+        background: streak > 0
+          ? "linear-gradient(135deg, #FB923C, #EA580C)"
+          : "#fff",
+        color: streak > 0 ? "#fff" : "#374151",
+        borderRadius: 14, padding: "10px 12px",
+        border: streak > 0 ? "none" : "2px solid #FED7AA",
+        display: "flex", flexDirection: "column", gap: 2,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 18 }}>🔥</span>
+          <span style={{ fontSize: 18, fontWeight: 900 }}>{streak}</span>
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.85 }}>연속 학습</div>
+      </div>
+
+      {/* XP + 데일리 골 */}
+      <div style={{
+        background: "#fff", borderRadius: 14, padding: "10px 12px",
+        border: "2px solid " + PURPLE + "55",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+          <span style={{ fontSize: 13 }}>⚡</span>
+          <span style={{ fontSize: 13, fontWeight: 900, color: PURPLE_DARK }}>Lv.{level}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", marginLeft: "auto" }}>
+            {next.current}/{next.needed}
+          </span>
+        </div>
+        <div style={{ height: 6, background: PURPLE_LIGHT, borderRadius: 999, overflow: "hidden" }}>
+          <div style={{
+            height: "100%",
+            width: `${Math.round(next.ratio * 100)}%`,
+            background: "linear-gradient(90deg, " + PURPLE + ", " + PURPLE_DARK + ")",
+          }} />
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", marginTop: 4 }}>
+          🎯 오늘 {today}/{goal} XP
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkillTreeView({
+  learner, onStartLesson,
+}: {
+  learner: LearnerState | null;
+  onStartLesson: (lesson: Lesson, unit: Unit) => void;
+}) {
+  const units = getUnits();
+  return (
+    <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 4px 30px" }}>
+      {units.map((unit, ui) => {
+        const completedStars = unit.lessons.reduce((acc, l) => acc + (learner?.lessons?.[l.id]?.stars ?? 0), 0);
+        const maxStars = unit.lessons.length * 3;
+        const completedLessons = unit.lessons.filter((l) => learner?.lessons?.[l.id]).length;
+        // 다음 미해결 레슨이 unlocked. 이전 단원의 마지막 레슨이 done 이어야 다음 단원 unlock
+        const prevUnitDone = ui === 0 ? true : units[ui - 1].lessons.every((l) => learner?.lessons?.[l.id]);
+        return (
+          <div key={unit.id} style={{
+            marginBottom: 24, position: "relative",
+            opacity: prevUnitDone ? 1 : 0.55,
+          }}>
+            {/* 단원 헤더 배너 */}
+            <div style={{
+              background: `linear-gradient(135deg, ${unit.color}, ${unit.color}dd)`,
+              color: "#fff", borderRadius: 18, padding: "14px 18px",
+              display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
+              boxShadow: `0 8px 20px ${unit.color}55`,
+            }}>
+              <div style={{ fontSize: 32 }}>{unit.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.9 }}>단원 {ui + 1}</div>
+                <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: -0.3 }}>{unit.title}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.9, marginTop: 2 }}>
+                  {completedLessons} / {unit.lessons.length} 레슨 · ⭐ {completedStars}/{maxStars}
+                </div>
+              </div>
+            </div>
+
+            {/* 레슨 노드 — 지그재그 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              {unit.lessons.map((lesson, li) => {
+                const res = learner?.lessons?.[lesson.id];
+                const done = !!res;
+                const stars = res?.stars ?? 0;
+                // 이전 레슨이 done 이거나 첫 레슨이거나 단원 첫 노드 → unlocked
+                const prevLessonDone = li === 0 ? prevUnitDone : !!learner?.lessons?.[unit.lessons[li - 1].id];
+                const unlocked = prevLessonDone;
+                const offset = li % 2 === 0 ? -40 : 40;
+                return (
+                  <div key={lesson.id} style={{
+                    display: "flex", justifyContent: "center",
+                    transform: `translateX(${offset}px)`,
+                  }}>
+                    <button
+                      onClick={() => unlocked && onStartLesson(lesson, unit)}
+                      disabled={!unlocked}
+                      title={lesson.title}
+                      style={{
+                        width: 92, height: 92, borderRadius: "50%",
+                        border: done ? `4px solid ${unit.color}` : unlocked ? `4px solid ${unit.color}88` : "4px solid #D1D5DB",
+                        background: !unlocked
+                          ? "#F3F4F6"
+                          : done
+                            ? `radial-gradient(circle at 35% 30%, ${unit.color}ee, ${unit.color}88)`
+                            : `radial-gradient(circle at 35% 30%, #fff, ${unit.color}33)`,
+                        color: done ? "#fff" : unlocked ? unit.color : "#9CA3AF",
+                        cursor: unlocked ? "pointer" : "not-allowed",
+                        fontFamily: "inherit",
+                        boxShadow: unlocked ? `0 8px 16px ${unit.color}44, inset 0 -4px 0 rgba(0,0,0,0.12)` : "none",
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                        transition: "transform 0.12s",
+                        position: "relative",
+                      }}
+                      onMouseDown={(e) => { if (unlocked) e.currentTarget.style.transform = "scale(0.94)"; }}
+                      onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                    >
+                      <div style={{ fontSize: 28, lineHeight: 1 }}>
+                        {!unlocked ? "🔒" : done ? "✓" : lesson.index}
+                      </div>
+                      <div style={{ fontSize: 10, fontWeight: 900, marginTop: 2 }}>레슨 {lesson.index}</div>
+
+                      {/* 별 표시 */}
+                      {unlocked && (
+                        <div style={{
+                          position: "absolute", bottom: -14, left: "50%", transform: "translateX(-50%)",
+                          display: "flex", gap: 1,
+                        }}>
+                          {[1, 2, 3].map((s) => (
+                            <span key={s} style={{
+                              fontSize: 14,
+                              opacity: s <= stars ? 1 : 0.25,
+                              filter: s <= stars ? "drop-shadow(0 2px 3px rgba(245,158,11,0.5))" : "none",
+                            }}>⭐</span>
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

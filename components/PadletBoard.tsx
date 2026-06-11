@@ -14,6 +14,9 @@ import DiscussionSession from "./DiscussionSession";
 import GameRoom from "./GameRoom";
 import InterpreterDrawer from "./InterpreterDrawer";
 import SentencePracticeModal from "./SentencePracticeModal";
+import EmotionCardDeck from "./EmotionCardDeck";
+import { pushEmotion, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
+import { pushExpressionDedup } from "@/lib/expressionLog";
 import { filterTodayCards } from "@/lib/sentencePractice";
 import { columnIconFor } from "@/lib/assets";
 import { QRCodeSVG } from "qrcode.react";
@@ -52,6 +55,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   );
   const [modal, setModal] = useState<{ colId: string; colTitle: string; colColor: string } | null>(null);
   const [interpreterOpen, setInterpreterOpen] = useState(false);
+  const [emotionOpen, setEmotionOpen] = useState(false);
+  const [emotionToast, setEmotionToast] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
   const lang = user.myLang;
 
@@ -559,13 +564,49 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       });
       if (!res.ok) throw new Error("API 오류");
       setCards((prev) => prev.filter((c) => c.id !== tempId));
+
+      // ── 학생 표현 자동 추출 (백그라운드) ──
+      // 학생이 모국어 외 언어(주로 한국어)로 쓴 텍스트만 학습 가치가 있다고 보고 추출.
+      if (
+        !isTeacher &&
+        cardType === "text" &&
+        text.trim().length >= 5 &&
+        writeLang !== user.myLang
+      ) {
+        (async () => {
+          try {
+            const ex = await fetch("/api/expression-extract", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text, fromLang: writeLang, targetLang: user.myLang }),
+            });
+            if (!ex.ok) return;
+            const j = (await ex.json()) as { expressions?: Array<{ text: string; translation: string }> };
+            const list = j?.expressions || [];
+            for (const e of list) {
+              if (!e?.text) continue;
+              await pushExpressionDedup({
+                roomCode,
+                clientId: myClientId,
+                text: e.text,
+                lang: writeLang,
+                translation: e.translation,
+                translationLang: user.myLang,
+                source: tempId,
+              });
+            }
+          } catch (err) {
+            console.warn("[expression-extract] 실패", err);
+          }
+        })();
+      }
     } catch {
       setCards((prev) =>
         prev.map((c) => c.id === tempId ? { ...c, loading: false, translateError: true } : c)
       );
     }
     setPosting(false);
-  }, [posting, modal, user, isTeacher, teacherLangs, roomCode]);
+  }, [posting, modal, user, isTeacher, teacherLangs, roomCode, myClientId]);
 
   // ── Edit post handler ──
   const handleEditPost = useCallback(async (data: PostData) => {
@@ -1759,6 +1800,112 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         >
           ✏️
         </button>
+      )}
+
+      {/* ── 💗 FAB: 내 감정 표현하기 (학생 전용) ── */}
+      {!isTeacher && !modal && !editModal && !showPptx && !showGameRoom && !showDiscussionCreate && !activeSessionId && (
+        <button
+          onClick={() => setEmotionOpen(true)}
+          aria-label="내 감정 표현하기"
+          title="내 감정 표현하기"
+          style={{
+            position: "fixed",
+            right: "clamp(16px, 3vw, 28px)",
+            bottom: "calc(clamp(16px, 3vw, 28px) + 80px)",
+            width: 56, height: 56, borderRadius: "50%", border: "none",
+            background: "linear-gradient(135deg, #F472B6, #DB2777)",
+            color: "#fff", fontSize: 24, fontWeight: 900,
+            boxShadow: "0 10px 24px rgba(219,39,119,0.45), inset 0 -3px 0 rgba(0,0,0,0.15)",
+            cursor: "pointer", zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "transform 0.12s",
+          }}
+          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}
+          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          💗
+        </button>
+      )}
+
+      {/* ── 감정 카드 데크 모달 ── */}
+      {emotionOpen && (
+        <div
+          onClick={() => setEmotionOpen(false)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)",
+            zIndex: 250, display: "flex", alignItems: "flex-end", justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 420, background: "#fff", borderRadius: 22,
+              padding: "18px 18px 20px", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 22 }}>💗</span>
+                <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937" }}>내 감정 표현하기</div>
+              </div>
+              <button
+                onClick={() => setEmotionOpen(false)}
+                aria-label="닫기"
+                style={{
+                  width: 32, height: 32, borderRadius: "50%", border: "none",
+                  background: "#F3F4F6", color: "#6B7280", fontSize: 16, fontWeight: 900, cursor: "pointer",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <EmotionCardDeck
+              lang={lang}
+              onPick={async (emotionId) => {
+                try {
+                  await pushEmotion({
+                    roomCode,
+                    emotionId: emotionId as EmotionId,
+                    intensity: 2,
+                    clientId: myClientId,
+                    authorName: user.myName,
+                    context: "padlet",
+                  });
+                  const awarded = await awardEmotionStickerOncePerDay({
+                    roomCode,
+                    clientId: myClientId,
+                    studentName: user.myName,
+                  });
+                  setEmotionToast(
+                    awarded
+                      ? "감정을 보냈어요 💗 오늘의 호기심 스티커 +1"
+                      : "감정을 친구들에게 보냈어요 💗"
+                  );
+                  setTimeout(() => setEmotionToast(null), 2400);
+                  setEmotionOpen(false);
+                } catch (err) {
+                  console.error("pushEmotion failed", err);
+                  setEmotionToast("문제가 생겼어요. 다시 눌러주세요.");
+                  setTimeout(() => setEmotionToast(null), 2400);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {emotionToast && (
+        <div
+          style={{
+            position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)",
+            background: "rgba(31,41,55,0.95)", color: "#fff",
+            padding: "10px 18px", borderRadius: 999, fontSize: 13, fontWeight: 800,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.25)", zIndex: 300,
+          }}
+        >
+          {emotionToast}
+        </div>
       )}
     </div>
   );
