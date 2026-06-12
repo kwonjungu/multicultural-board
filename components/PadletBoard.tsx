@@ -20,6 +20,10 @@ import { pushExpressionDedup } from "@/lib/expressionLog";
 import { filterTodayCards } from "@/lib/sentencePractice";
 import { columnIconFor } from "@/lib/assets";
 import { QRCodeSVG } from "qrcode.react";
+import dynamic from "next/dynamic";
+
+// three.js(~600KB)는 지구본을 열 때만 로드
+const MulticulturalGlobe = dynamic(() => import("./MulticulturalGlobe"), { ssr: false });
 
 type PendingItem =
   | { kind: "card"; data: CardData }
@@ -55,6 +59,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   );
   const [modal, setModal] = useState<{ colId: string; colTitle: string; colColor: string } | null>(null);
   const [interpreterOpen, setInterpreterOpen] = useState(false);
+  const [globeOpen, setGlobeOpen] = useState(false);
   const [emotionOpen, setEmotionOpen] = useState(false);
   const [emotionToast, setEmotionToast] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
@@ -716,6 +721,26 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               </span>
             )}
           </div>
+
+          {/* 🌍 다문화 지구본 — available to everyone */}
+          <button
+            onClick={() => setGlobeOpen(true)}
+            aria-label="다문화 지구본 열기"
+            style={{
+              background: "linear-gradient(135deg, #1e1b4b, #3730A3)",
+              border: "none", color: "#fff",
+              borderRadius: 16, padding: "10px 16px",
+              fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 44,
+              boxShadow: "0 6px 18px rgba(55,48,163,0.4)",
+              display: "inline-flex", alignItems: "center", gap: 6,
+              transition: "transform 0.12s",
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            🌍 지구본
+          </button>
 
           {/* 🎙️ 통역 도우미 — available to everyone */}
           <button
@@ -1488,6 +1513,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         viewerLang={lang}
         availableLangs={teacherLangs.length > 0 ? teacherLangs : Object.keys(LANGUAGES)}
       />
+
+      {/* ── 🌍 다문화 지구본 (미니 구글어스) ── */}
+      {globeOpen && (
+        <MulticulturalGlobe
+          open={globeOpen}
+          onClose={() => setGlobeOpen(false)}
+          viewerLang={lang}
+          roomLangs={roomLangs}
+        />
+      )}
 
       {/* ── 📖 오늘의 문장 연습 (학생) ── */}
       {practiceOpen && !isTeacher && (

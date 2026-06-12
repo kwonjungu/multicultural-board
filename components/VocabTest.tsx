@@ -76,11 +76,15 @@ export default function VocabTest({
   // ── Duolingo 상태 ──
   const [learner, setLearner] = useState<LearnerState | null>(null);
   const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
   const [sessionXp, setSessionXp] = useState(0);
   const [outOfHearts, setOutOfHearts] = useState(false);
   const [awardResult, setAwardResult] = useState<Awaited<ReturnType<typeof awardXp>> | null>(null);
   const [lessonStars, setLessonStars] = useState<1 | 2 | 3 | null>(null);
   const [finalizing, setFinalizing] = useState(false);
+  // StrictMode double-invoke 가드 — state(finalizing)는 같은 틱에 두 번
+  // 통과시킬 수 있어 awardXp 가 이중 적립될 수 있다. ref 로 즉시 차단.
+  const finalizedRef = useRef(false);
 
   useEffect(() => {
     const unsub = subscribeLearner(roomCode, clientId, setLearner);
@@ -192,6 +196,7 @@ export default function VocabTest({
         const nextCombo = combo + 1;
         const earned = XP_PER_CORRECT + comboBonus(nextCombo);
         setCombo(nextCombo);
+        setMaxCombo((m) => Math.max(m, nextCombo));
         setSessionXp((x) => x + earned);
       } else {
         setCombo(0);
@@ -222,7 +227,8 @@ export default function VocabTest({
 
   // 세션 완료 시 XP 일괄 적립 + 레슨 결과 기록
   async function finalizeSession() {
-    if (finalizing) return;
+    if (finalizedRef.current) return;
+    finalizedRef.current = true;
     setFinalizing(true);
     try {
       if (sessionXp > 0) {
@@ -352,7 +358,7 @@ export default function VocabTest({
           correct={correctCount}
           total={total}
           sessionXp={sessionXp}
-          combo={combo}
+          combo={maxCombo}
           award={awardResult}
           stars={lessonStars}
           lessonTitle={lessonTitle}
@@ -362,9 +368,11 @@ export default function VocabTest({
             setCorrectCount(0);
             setFinishedCount(0);
             setCombo(0);
+            setMaxCombo(0);
             setSessionXp(0);
             setAwardResult(null);
             setLessonStars(null);
+            finalizedRef.current = false; // 새 세션은 다시 적립 가능
           }}
           onClose={onClose}
         />
@@ -396,7 +404,7 @@ export default function VocabTest({
             fontSize: 11, fontWeight: 900, padding: "3px 8px", borderRadius: 999,
             whiteSpace: "nowrap",
           }}>
-            {FORMAT_ICON[currentQ.format]} {finishedCount + 1}/{total}
+            {FORMAT_ICON[currentQ.format]} {Math.min(finishedCount + 1, total)}/{total}
           </div>
           {combo >= 3 && (
             <div style={{
@@ -621,6 +629,14 @@ function ChoiceBody({
   const maxedOut = attempts >= 3 && !lastCorrect;
   const showAnswer = phase === "feedback";
   const sentenceIdx = "sentenceIdx" in q ? q.sentenceIdx : 0;
+
+  // 듣기 문제 진입 시 자동 1회 재생 — 버튼은 "다시 듣기" 용도
+  useEffect(() => {
+    if (!isListening) return;
+    const tts = (q as ListeningItem).ttsText;
+    const id = window.setTimeout(() => speakKorean(tts), 350);
+    return () => window.clearTimeout(id);
+  }, [isListening, q]);
 
   return (
     <>
