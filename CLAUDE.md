@@ -35,7 +35,6 @@
 - **#3 그림책 PPT 출력 점검** — 1일. StorybookCreator 결과를 PPTX 로.
 - **#5 분야별 보상 확장** — 1.5일. 소통/그림책/감정/게임/표현 5분야 트로피.
   *#1 표현 복습 완료로 5번째 분야의 호출 지점 확보됨.*
-- **#15 게임 오류 잡기** — 분산 2~3일. 20개 게임 회귀 QA.
 - **#7 약점 단어 자동 복습 레슨** — 1일. attempts 로그 기반 약점 선정.
 - **#8 교사용 EmotionFeed** — 반나절. `subscribeEmotionsRecent` 활용.
 - **#9 PraiseHive ↔ LMS Level 연동** — 반나절. 벌 진화를 Lv 에 매핑.
@@ -47,7 +46,13 @@
 > - ✅ 챗 API SSE 스트리밍 전환 (storybook-chat + 신규 tutor-chat) ⤴
 > - ✅ 앱 전역 AI 튜터 "꿀비" 위젯 (`components/TutorChat.tsx`, 모든 허브 화면 우하단)
 > - ✅ 게임 효과음 AudioContext 누수 수정 → `lib/gameSfx.ts` 싱글턴 ⤴
-> - #15 게임 QA 일부 진행: 할리갈리 더블탭 flip 가드 추가. 나머지 게임 회귀 QA 는 계속.
+> - ✅ #15 게임 20개 전수 QA 완료 — 버그 15건 수정 (윷 소프트락·마블 턴스킵·
+>   스팟잇 판정 등). 미수정 보고 항목: 마블 승리조건이 파산뿐이라 실전에서
+>   게임이 안 끝날 수 있음(시뮬 200판 전부 120라운드 캡), 윷 골인 정확도착제,
+>   GREETINGS 5개뿐(6라운드 의도면 1개 추가 필요), 이야기주사위 그림 3개 누락
+>   (이모지 폴백 동작). 디자인 판단 필요 시 이 목록부터.
+> - ✅ 다문화 지구본 `components/MulticulturalGlobe.tsx` — 소통창 헤더 🌍.
+>   three.js 는 next/dynamic 지연 로드 유지할 것 (~600KB).
 
 ---
 
