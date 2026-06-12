@@ -13,7 +13,8 @@ import { extractVocabLocal, MatchedWord, wordById } from "@/lib/vocabUtils";
 import { checkAndAward, RewardRule, getAwardedIds } from "@/lib/vocabRewards";
 import { cleanupExpiredRecordings } from "@/lib/vocabRecordings";
 import { buildMixedQuiz, buildLessonQuiz, type QuizItem } from "@/lib/quizFormats";
-import { getUnits, type Unit, type Lesson } from "@/lib/lessons";
+import { getUnits, wordsForLesson, type Unit, type Lesson } from "@/lib/lessons";
+import BeeMascot from "./BeeMascot";
 import {
   subscribeLearner, setDailyGoal, effectiveHearts, msUntilNextHeart, xpToNextLevel, levelFromXp,
   MAX_HEARTS, type LearnerState,
@@ -75,6 +76,10 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   // 시험
   const [quiz, setQuiz] = useState<QuizItem[] | null>(null);
   const [lessonContext, setLessonContext] = useState<{ id: string; title: string } | null>(null);
+  // 레슨 시작 시트 — 단어 카드 공부(상황 카드) ↔ 시험 선택
+  const [lessonSheet, setLessonSheet] = useState<{ lesson: Lesson; unit: Unit } | null>(null);
+  const [studyQueue, setStudyQueue] = useState<VocabWord[] | null>(null);
+  const [studyIdx, setStudyIdx] = useState(0);
   const [teacherView, setTeacherView] = useState(false);
   const [learner, setLearner] = useState<LearnerState | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -357,13 +362,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       {viewMode === "tree" ? (
         <SkillTreeView
           learner={learner}
-          onStartLesson={(lesson, unit) => {
-            const q = buildLessonQuiz(lesson.id);
-            if (q.length > 0) {
-              setLessonContext({ id: lesson.id, title: `${unit.emoji} ${unit.title} · ${lesson.title}` });
-              setQuiz(q);
-            }
-          }}
+          onStartLesson={(lesson, unit) => setLessonSheet({ lesson, unit })}
         />
       ) : (
       <>
@@ -662,6 +661,136 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       </>
       )}
       </>
+      )}
+
+      {/* 레슨 시작 시트 — 단어 카드 공부 / 시험 선택 */}
+      {lessonSheet && !studyQueue && !quiz && (
+        <div
+          onClick={() => setLessonSheet(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 600,
+            background: "rgba(15,10,40,0.55)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 18,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(420px, 100%)",
+              background: "#fff", borderRadius: 24,
+              border: `4px solid ${lessonSheet.unit.color}`,
+              boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
+              padding: "20px 18px", textAlign: "center",
+            }}
+          >
+            <BeeMascot size={84} mood="welcome" />
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", margin: "8px 0 2px" }}>
+              {lessonSheet.unit.emoji} {lessonSheet.unit.title} · {lessonSheet.lesson.title}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 12 }}>
+              이번 레슨에서 배우는 단어
+            </div>
+            {/* 단어 미리보기 */}
+            <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
+              {wordsForLesson(lessonSheet.lesson.id).map((w) => (
+                <div key={w.id} style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                  background: PURPLE_LIGHT, borderRadius: 12, padding: "8px 6px", width: 64,
+                }}>
+                  <img
+                    src={`/vocab-images/icons/${w.id}.png`}
+                    alt=""
+                    aria-hidden="true"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                    style={{ width: 36, height: 36, objectFit: "contain" }}
+                  />
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#374151" }}>{w.ko}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                onClick={() => {
+                  const words = wordsForLesson(lessonSheet.lesson.id);
+                  if (words.length > 0) { setStudyQueue(words); setStudyIdx(0); }
+                }}
+                style={{
+                  background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
+                  color: "#fff", border: "none", borderRadius: 16,
+                  padding: "14px", fontSize: 16, fontWeight: 900, cursor: "pointer",
+                  boxShadow: "0 6px 16px rgba(245,158,11,0.4)",
+                }}
+              >📖 단어 카드 공부 (그림·상황 카드)</button>
+              <button
+                onClick={() => {
+                  const q = buildLessonQuiz(lessonSheet.lesson.id);
+                  if (q.length > 0) {
+                    setLessonContext({
+                      id: lessonSheet.lesson.id,
+                      title: `${lessonSheet.unit.emoji} ${lessonSheet.unit.title} · ${lessonSheet.lesson.title}`,
+                    });
+                    setQuiz(q);
+                    setLessonSheet(null);
+                  }
+                }}
+                style={{
+                  background: `linear-gradient(135deg, ${PURPLE}, ${PURPLE_DARK})`,
+                  color: "#fff", border: "none", borderRadius: 16,
+                  padding: "14px", fontSize: 16, fontWeight: 900, cursor: "pointer",
+                  boxShadow: `0 6px 16px ${PURPLE}55`,
+                }}
+              >⚡ 시험 보기 (XP 도전!)</button>
+              <button
+                onClick={() => setLessonSheet(null)}
+                style={{
+                  background: "#F3F4F6", color: "#6B7280", border: "none",
+                  borderRadius: 14, padding: "10px", fontSize: 13, fontWeight: 800, cursor: "pointer",
+                }}
+              >닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 레슨 단어 카드 순차 학습 (상황 카드 3장씩) */}
+      {studyQueue && studyQueue[studyIdx] && (
+        <>
+          <VocabCard
+            key={studyQueue[studyIdx].id}
+            word={studyQueue[studyIdx]}
+            lang={lang}
+            doneSentences={progress[studyQueue[studyIdx].id]?.doneSentences ?? []}
+            onSentenceDone={(idx) => persist(
+              markSentenceDone(progress, studyQueue[studyIdx].id, idx),
+              { checkRewards: true, touchedWordId: studyQueue[studyIdx].id },
+            )}
+            onListenBump={() => persist(
+              bumpListen(progress, studyQueue[studyIdx].id),
+              { touchedWordId: studyQueue[studyIdx].id },
+            )}
+            onClose={() => {
+              if (studyIdx + 1 < studyQueue.length) setStudyIdx((i) => i + 1);
+              else setStudyQueue(null); // 끝 — 레슨 시트로 복귀 (시험 보기 유도)
+            }}
+            roomCode={roomCode}
+            clientId={user.myName}
+          />
+          {/* 진행 배지 — 닫기(✕)가 "다음 단어"로 동작함을 안내 */}
+          <div style={{
+            position: "fixed", top: 14, left: "50%", transform: "translateX(-50%)",
+            zIndex: 1300, pointerEvents: "none",
+            background: "#1F2937", color: "#fff",
+            borderRadius: 999, padding: "7px 16px",
+            fontSize: 13, fontWeight: 900,
+            boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            🐝 {studyIdx + 1} / {studyQueue.length}
+            <span style={{ fontWeight: 700, color: "#FDE68A" }}>
+              {studyIdx + 1 < studyQueue.length ? "✕ 누르면 다음 단어" : "마지막 단어!"}
+            </span>
+          </div>
+        </>
       )}
 
       {/* Study modal */}

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { AwardResult } from "@/lib/lms";
+import BeeMascot from "./BeeMascot";
 
 const PURPLE = "#8B5CF6";
 const PURPLE_DARK = "#6D28D9";
@@ -39,7 +40,8 @@ export default function SessionResultScreen({
   if (outOfHearts) {
     return (
       <div style={{ textAlign: "center", padding: "32px 18px" }}>
-        <div style={{ fontSize: 64, marginBottom: 6 }}>💔</div>
+        <BeeMascot size={96} mood="oops" />
+        <div style={{ fontSize: 40, marginBottom: 6 }}>💔</div>
         <div style={{ fontSize: 22, fontWeight: 900, color: "#B91C1C", marginBottom: 6 }}>
           하트가 다 떨어졌어요
         </div>
@@ -74,7 +76,8 @@ export default function SessionResultScreen({
 
   return (
     <div style={{ textAlign: "center", padding: "24px 16px 8px" }}>
-      <div style={{ fontSize: 64, marginBottom: 4 }}>{headlineEmoji}</div>
+      <BeeMascot size={104} mood={stars !== null && stars >= 2 ? "cheer" : pct >= 60 ? "celebrate" : "think"} />
+      <div style={{ fontSize: 40, marginBottom: 4 }}>{headlineEmoji}</div>
       <div style={{ fontSize: 24, fontWeight: 900, color: PURPLE_DARK, marginBottom: 4 }}>
         {headlineText}
       </div>

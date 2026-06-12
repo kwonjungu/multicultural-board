@@ -59,11 +59,14 @@ function pickL(table: Record<string, string>, lang: string): string {
 const MAX_STORED = 40;
 
 export default function TutorChat({
-  roomCode, myClientId, user,
+  roomCode, myClientId, user, hidden,
 }: {
   roomCode: string;
   myClientId: string;
   user: UserConfig;
+  /** 전체화면 인터랙티브 뷰(게임룸 등)에서는 숨김 — 플로팅 버튼(zIndex 900)이
+   *  게임의 우하단 버튼을 가려 탭을 가로채는 사고 방지 */
+  hidden?: boolean;
 }) {
   const lang = user.myLang;
   const storageKey = `tutorChat:${roomCode}:${myClientId}`;
@@ -154,6 +157,8 @@ export default function TutorChat({
     setBusy(false);
   }
 
+  if (hidden) return null;
+
   return (
     <>
       {/* 플로팅 버튼 — HubTutorialBootstrap(bottom 20/right 20) 위에 쌓는다 */}
@@ -162,7 +167,9 @@ export default function TutorChat({
           onClick={() => setOpen(true)}
           aria-label={pickL(L_TITLE, lang)}
           style={{
-            position: "fixed", bottom: 84, right: 18, zIndex: 900,
+            // zIndex 는 전체화면 뷰(게임룸 460·토론 450·모달 400)보다 낮게 —
+            // 그 위에 떠서 게임 버튼 탭을 가로채던 버그의 재발 방지
+            position: "fixed", bottom: 84, right: 18, zIndex: 300,
             width: 60, height: 60, borderRadius: "50%",
             border: "3px solid #FDE68A",
             background: "linear-gradient(135deg, #F59E0B, #D97706)",
@@ -178,7 +185,7 @@ export default function TutorChat({
       {/* 챗 패널 */}
       {open && (
         <div style={{
-          position: "fixed", bottom: 16, right: 12, zIndex: 950,
+          position: "fixed", bottom: 16, right: 12, zIndex: 320,
           width: "min(380px, calc(100vw - 24px))",
           height: "min(540px, calc(100vh - 90px))",
           background: "#fff",

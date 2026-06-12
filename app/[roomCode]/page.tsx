@@ -193,8 +193,13 @@ export default function RoomPage() {
         tone={toast?.tone}
         onDismiss={() => setToast(null)}
       />
-      {/* 앱 전역 AI 튜터 — 모든 허브 화면에서 우하단 플로팅 버튼 */}
-      <TutorChat roomCode={roomCode} myClientId={myClientId} user={user} />
+      {/* 앱 전역 AI 튜터 — 게임룸에서는 숨김 (게임 우하단 버튼 가림 방지) */}
+      <TutorChat
+        roomCode={roomCode}
+        myClientId={myClientId}
+        user={user}
+        hidden={hubView === "games"}
+      />
     </>
   );
 
