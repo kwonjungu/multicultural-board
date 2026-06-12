@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { LANGUAGES } from "@/lib/constants";
 import BeeMascot from "./BeeMascot";
 import CountryGuess from "./games/CountryGuess";
@@ -23,6 +24,9 @@ import StoryCubes from "./games/StoryCubes";
 import BeeTreasureHunt from "./games/BeeTreasureHunt";
 import HoneyYut from "./games/HoneyYut";
 import BeeCafe from "./games/BeeCafe";
+
+// three.js(~600KB)가 들어 있어 지구본을 열 때만 로드
+const GlobeQuest = dynamic(() => import("./games/GlobeQuest"), { ssr: false });
 
 type GameMeta = {
   id: string;
@@ -57,6 +61,7 @@ const GAMES: GameMeta[] = [
   { id: "treasure", icon: "🗺", iconImg: "/game-icons/treasure.png", name: "꿀벌 보물사냥", sub: "힌트로 찾아내기", color: "#14B8A6", bg: "#CCFBF1", cmp: BeeTreasureHunt },
   { id: "yut",      icon: "🪵", iconImg: "/game-icons/yut.png",      name: "꿀벌 윷놀이",   sub: "우리 전통 놀이",    color: "#B45309", bg: "#FEF3C7", cmp: HoneyYut },
   { id: "cafe",     icon: "🍳", iconImg: "/game-icons/cafe.png",     name: "꿀벌 카페",     sub: "함께 요리해요",     color: "#F97316", bg: "#FFEDD5", cmp: BeeCafe },
+  { id: "globe",    icon: "🌍",                                       name: "다문화 지구본", sub: "공부하기·나라 찾기", color: "#3730A3", bg: "#E0E7FF", cmp: GlobeQuest },
 ];
 
 /** Graceful <img> that falls back to an emoji span when the PNG is missing. */
