@@ -1,155 +1,119 @@
 "use client";
 
-import { CSSProperties, useEffect, useRef, useState } from "react";
+// 윷가락 4개 + 던지기 버튼. 결과는 먼저 계산하고 애니메이션이 끝난 뒤
+// 부모에 전달한다 (더블탭은 로컬 가드 + disabled 로 차단).
+
+import React, { useEffect, useRef, useState } from "react";
+import { throwSticks, type StickThrow } from "@/lib/yutLogic";
 import type { Throw } from "@/lib/yutTypes";
-import { throwLabel } from "@/lib/yutData";
+import { sfx } from "./yutSfx";
 
-interface Props {
+const THROW_LABEL: Record<string, string> = {
+  "-1": "백도", "1": "도", "2": "개", "3": "걸", "4": "윷", "5": "모",
+};
+
+export default function YutSticks({
+  enabled, accent, onResult,
+}: {
+  enabled: boolean;
+  accent: string;            // 현재 팀 색
   onResult: (value: Throw) => void;
-  disabled: boolean;
-  // When the parent wants us to play the throw animation with a specific
-  // predetermined value (so probabilities stay in the reducer), pass it in.
-  // We animate ~600ms then call onResult.
-  pendingValue: Throw | null;
-  onAnimationDone: () => void;
-}
+}) {
+  const [spinning, setSpinning] = useState(false);
+  const [shown, setShown] = useState<StickThrow | null>(null);
+  const [flicker, setFlicker] = useState<boolean[]>([true, false, true, false]);
+  const busyRef = useRef(false);
+  const timersRef = useRef<number[]>([]);
 
-// Four sticks shown as horizontal capsules. Each stick has a "flat" or
-// "round" side. We randomise a display during spin and snap to the final
-// sides once the parent signals a pendingValue.
-//
-// Final-side derivation: count flats (F) where
-//   value=-1 (백도)  → 1 flat (special, visually identical to 도)
-//   value=1  (도)    → 1 flat
-//   value=2  (개)    → 2 flats
-//   value=3  (걸)    → 3 flats
-//   value=4  (윷)    → 4 flats
-//   value=5  (모)    → 0 flats
-function flatsForThrow(v: Throw): number {
-  switch (v) {
-    case -1: return 1;
-    case 1:  return 1;
-    case 2:  return 2;
-    case 3:  return 3;
-    case 4:  return 4;
-    case 5:  return 0;
-    default: return 2;
-  }
-}
+  useEffect(() => () => { timersRef.current.forEach((t) => window.clearTimeout(t)); }, []);
 
-// Pick which 4-bit pattern shows N flats. Just take the first 2^0..2^4 mask
-// with popcount(N).
-function maskWithFlats(n: number): boolean[] {
-  const out = [false, false, false, false];
-  for (let i = 0; i < n && i < 4; i += 1) out[i] = true;
-  return out;
-}
-
-export function YutSticks({ onResult, disabled, pendingValue, onAnimationDone }: Props): JSX.Element {
-  const [spin, setSpin] = useState(false);
-  const [faces, setFaces] = useState<boolean[]>([true, false, true, false]);
-  const raf = useRef<number | null>(null);
-  const deadline = useRef<number>(0);
-
-  // Animate until deadline, then snap to pendingValue.
-  useEffect(() => {
-    if (!spin || pendingValue === null) return;
-    const tick = () => {
-      setFaces([
-        Math.random() < 0.5,
-        Math.random() < 0.5,
-        Math.random() < 0.5,
-        Math.random() < 0.5,
-      ]);
-      if (performance.now() < deadline.current) {
-        raf.current = window.requestAnimationFrame(tick);
-      } else {
-        // snap
-        setFaces(maskWithFlats(flatsForThrow(pendingValue)));
-        setSpin(false);
-        onResult(pendingValue);
-        onAnimationDone();
-      }
-    };
-    raf.current = window.requestAnimationFrame(tick);
-    return () => {
-      if (raf.current) window.cancelAnimationFrame(raf.current);
-    };
-  }, [spin, pendingValue, onResult, onAnimationDone]);
-
-  // Public: parent calls startSpin by setting pendingValue + we kick off.
-  useEffect(() => {
-    if (pendingValue !== null && !spin) {
-      deadline.current = performance.now() + 600;
-      setSpin(true);
+  function handleThrow() {
+    if (!enabled || busyRef.current) return;
+    busyRef.current = true;
+    const result = throwSticks();
+    setShown(null);
+    setSpinning(true);
+    sfx.throwSticks();
+    // 굴러가는 동안 깜빡임
+    for (let i = 1; i <= 5; i++) {
+      timersRef.current.push(window.setTimeout(() => {
+        setFlicker([0, 0, 0, 0].map(() => Math.random() < 0.5));
+      }, i * 130));
     }
-  }, [pendingValue, spin]);
+    timersRef.current.push(window.setTimeout(() => {
+      setSpinning(false);
+      setShown(result);
+      onResult(result.value);
+      busyRef.current = false;
+    }, 780));
+  }
+
+  const sticks = spinning ? flicker : (shown?.sticks ?? [true, true, false, false]);
 
   return (
-    <div style={wrap} aria-label="윷가락">
-      <div style={sticksRow}>
-        {faces.map((flat, i) => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", gap: 10 }}>
+        {sticks.map((up, i) => (
           <div
             key={i}
             style={{
-              ...stick,
-              background: flat ? "#FBBF24" : "#92400E",
-              transform: spin ? `rotate(${(i % 2 === 0 ? 1 : -1) * 20}deg)` : "rotate(0deg)",
-              transition: spin ? "transform 80ms linear" : "transform 200ms ease-out",
+              width: 26, height: 84, borderRadius: 13,
+              background: up
+                ? "linear-gradient(180deg, #FDE68A, #D4A95C)"   // 배(평평한 면)
+                : "linear-gradient(180deg, #92400E, #6B3410)",  // 등(둥근 면)
+              border: "2.5px solid #78350F",
+              boxShadow: spinning ? "0 8px 18px rgba(0,0,0,0.3)" : "0 3px 8px rgba(0,0,0,0.2)",
+              transform: spinning ? `translateY(-${6 + (i % 2) * 6}px) rotate(${(i - 1.5) * 8}deg)` : "none",
+              transition: "transform 0.13s, background 0.13s",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 13, fontWeight: 900, color: up ? "#92400E" : "#FDE68A",
             }}
           >
-            <span style={stickText}>{flat ? "🟡" : "🪵"}</span>
+            {/* 백도 표시 가락 (첫 번째) */}
+            {i === 0 && up && !spinning ? "✕" : ""}
           </div>
         ))}
       </div>
-      {pendingValue !== null && !spin && (
-        <div style={resultBadge}>{throwLabel(pendingValue)}</div>
-      )}
-      {disabled && !spin && <div style={hint}>대기중…</div>}
+
+      <div style={{ minHeight: 30, display: "flex", alignItems: "center" }}>
+        {shown && !spinning && (
+          <div style={{
+            fontSize: 20, fontWeight: 900, color: accent,
+            animation: "yutPop 0.35s ease",
+          }}>
+            {THROW_LABEL[String(shown.value)]}!
+            {(shown.value === 4 || shown.value === 5) && (
+              <span style={{ fontSize: 13, marginLeft: 6, color: "#92400E" }}>한 번 더 🎉</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={handleThrow}
+        disabled={!enabled || spinning}
+        style={{
+          background: enabled && !spinning
+            ? `linear-gradient(135deg, ${accent}, ${accent}CC)`
+            : "#E5E7EB",
+          color: enabled && !spinning ? "#fff" : "#9CA3AF",
+          border: "none", borderRadius: 99,
+          padding: "14px 40px", fontSize: 17, fontWeight: 900,
+          cursor: enabled && !spinning ? "pointer" : "default",
+          boxShadow: enabled && !spinning ? `0 8px 20px ${accent}66` : "none",
+          fontFamily: "inherit",
+        }}
+      >
+        🪵 윷 던지기
+      </button>
+
+      <style>{`
+        @keyframes yutPop {
+          0% { transform: scale(0.4); opacity: 0; }
+          70% { transform: scale(1.2); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
-
-const wrap: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 10,
-  padding: "10px 0",
-};
-
-const sticksRow: CSSProperties = {
-  display: "flex",
-  gap: 8,
-  alignItems: "center",
-};
-
-const stick: CSSProperties = {
-  width: 34,
-  height: 90,
-  borderRadius: 18,
-  border: "2px solid #92400E",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-};
-
-const stickText: CSSProperties = {
-  fontSize: 18,
-};
-
-const resultBadge: CSSProperties = {
-  fontSize: 20,
-  fontWeight: 900,
-  color: "#B45309",
-  background: "#FEF3C7",
-  padding: "4px 14px",
-  borderRadius: 999,
-  border: "2px solid #F59E0B",
-};
-
-const hint: CSSProperties = {
-  fontSize: 13,
-  color: "#92400E",
-};

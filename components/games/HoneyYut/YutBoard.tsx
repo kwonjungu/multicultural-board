@@ -1,192 +1,192 @@
 "use client";
 
-import { CSSProperties, useMemo } from "react";
-import { TILE_GRAPH } from "@/lib/yutData";
-import type { GameState, PieceId } from "@/lib/yutTypes";
-import { YutPiece } from "./YutPiece";
+// 윷놀이 보드 (SVG). 보드 + 말 + 홈 트레이 + 골 카운터를 모두 그린다.
+// 말은 "같은 노드의 같은 팀"을 한 묶음으로 그리고 개수 배지를 붙인다.
 
-interface Props {
+import React from "react";
+import { YUT_NODES, YUT_EDGES } from "@/lib/yutData";
+import { movablePieceIds } from "@/lib/yutLogic";
+import type { GameState, PieceId, TeamId, Throw } from "@/lib/yutTypes";
+
+export const TEAM_COLOR: Record<TeamId, string> = { A: "#F59E0B", B: "#3B82F6" };
+export const TEAM_IMG: Record<TeamId, string> = {
+  A: "/stickers/skins/stage-4-bee-orange.png",
+  B: "/stickers/skins/stage-4-bee-sky.png",
+};
+
+interface BoardGroup {
+  team: TeamId;
+  node: number;
+  ids: PieceId[];
+}
+
+export default function YutBoard({
+  state, selectedValue, onPickPiece,
+}: {
   state: GameState;
-  // When in chooseBranch, highlight the option tiles so players can tap them.
-  highlightOptions: number[] | null;
-  onNodeClick: ((node: number) => void) | null;
-  // When in choosePiece for the current team, highlight the pieces that
-  // could be moved with `currentThrow`.
-  movableIds: PieceId[];
-  onPieceClick: ((id: PieceId) => void) | null;
-}
+  selectedValue: Throw | null;
+  onPickPiece: (id: PieceId) => void;
+}) {
+  const canPick = state.phase === "move" && selectedValue !== null;
+  const movable = new Set(canPick ? movablePieceIds(state, selectedValue!) : []);
 
-// Edges drawn under the nodes for visual guidance.
-function makeEdges(): Array<{ a: number; b: number; dashed: boolean }> {
-  const edges: Array<{ a: number; b: number; dashed: boolean }> = [];
-  // Outer ring
-  for (let i = 0; i < 20; i += 1) edges.push({ a: i, b: (i + 1) % 20, dashed: false });
-  // Shortcuts (marked dashed)
-  const shortcutPairs: Array<[number, number]> = [
-    [5, 21], [21, 22], [22, 23],
-    [10, 24], [24, 23],
-    [23, 25], [25, 26], [26, 17],
-    [23, 27], [27, 28], [28, 17],
-  ];
-  for (const [a, b] of shortcutPairs) edges.push({ a, b, dashed: true });
-  return edges;
-}
-
-export function YutBoard({
-  state,
-  highlightOptions,
-  onNodeClick,
-  movableIds,
-  onPieceClick,
-}: Props): JSX.Element {
-  const edges = useMemo(makeEdges, []);
-  const nodes = TILE_GRAPH;
-
-  // Group pieces by node for stacking render.
-  const byNode = new Map<number, PieceId[]>();
+  // 보드 위 말 묶음
+  const groups = new Map<string, BoardGroup>();
   for (const p of Object.values(state.pieces)) {
-    if (typeof p.node === "number") {
-      const arr = byNode.get(p.node) ?? [];
-      arr.push(p.id);
-      byNode.set(p.node, arr);
-    }
+    if (p.pos.kind !== "board") continue;
+    const key = `${p.team}-${p.pos.node}`;
+    const g = groups.get(key) ?? { team: p.team, node: p.pos.node, ids: [] };
+    g.ids.push(p.id);
+    groups.set(key, g);
   }
 
+  const homePieces = (team: TeamId) =>
+    Object.values(state.pieces).filter((p) => p.team === team && p.pos.kind === "home");
+  const goalCount = (team: TeamId) =>
+    Object.values(state.pieces).filter((p) => p.team === team && p.pos.kind === "goal").length;
+
   return (
-    <div style={wrap}>
-      <svg viewBox="0 0 1000 1000" style={svg} aria-label="윷놀이 판">
-        <defs>
-          <radialGradient id="hy-bg" cx="50%" cy="50%" r="70%">
-            <stop offset="0%" stopColor="#FFFBEB" />
-            <stop offset="100%" stopColor="#FDE68A" />
-          </radialGradient>
-        </defs>
-        <rect x={0} y={0} width={1000} height={1000} fill="url(#hy-bg)" rx={36} ry={36} />
-        {/* Edges */}
-        {edges.map((e, i) => {
-          const a = nodes[e.a];
-          const b = nodes[e.b];
-          if (!a || !b) return null;
-          return (
-            <line
-              key={`e-${i}`}
-              x1={a.x} y1={a.y}
-              x2={b.x} y2={b.y}
-              stroke={e.dashed ? "#F59E0B" : "#B45309"}
-              strokeWidth={e.dashed ? 5 : 7}
-              strokeDasharray={e.dashed ? "14 10" : undefined}
-              strokeLinecap="round"
-              opacity={0.55}
+    <svg
+      viewBox="0 0 1000 1000"
+      style={{ width: "min(94vw, 560px)", height: "auto", display: "block", touchAction: "manipulation" }}
+      role="img"
+      aria-label="윷놀이 판"
+    >
+      {/* 바탕 */}
+      <rect x={30} y={30} width={940} height={940} rx={48}
+        fill="#FFF7E0" stroke="#D4A95C" strokeWidth={7} />
+
+      {/* 연결선 */}
+      {YUT_EDGES.map(([a, b], i) => {
+        const na = YUT_NODES[a], nb = YUT_NODES[b];
+        return (
+          <line key={i} x1={na.x} y1={na.y} x2={nb.x} y2={nb.y}
+            stroke="#E2C58A" strokeWidth={9} strokeLinecap="round" />
+        );
+      })}
+
+      {/* 노드 */}
+      {YUT_NODES.map((n) => {
+        const big = n.kind === "start" || n.kind === "corner" || n.kind === "center";
+        return (
+          <g key={n.idx}>
+            <circle cx={n.x} cy={n.y} r={big ? 34 : 22}
+              fill={n.kind === "start" ? "#FDE68A" : n.kind === "center" ? "#FECACA" : "#fff"}
+              stroke={big ? "#B45309" : "#D4A95C"}
+              strokeWidth={big ? 6 : 4} />
+            {n.kind === "start" && (
+              <text x={n.x} y={n.y + 7} textAnchor="middle" fontSize={22} fontWeight={900} fill="#92400E">출발</text>
+            )}
+            {n.kind === "center" && (
+              <text x={n.x} y={n.y + 8} textAnchor="middle" fontSize={24}>🌸</text>
+            )}
+            {n.kind === "corner" && (
+              <text x={n.x} y={n.y + 8} textAnchor="middle" fontSize={24}>🍯</text>
+            )}
+          </g>
+        );
+      })}
+
+      {/* 홈 트레이 — B 는 위 삼각 영역, A 는 아래 삼각 영역 */}
+      <HomeTray
+        team="B"
+        pieces={homePieces("B").map((p) => p.id)}
+        movable={movable}
+        cx={500} cy={235}
+        goal={goalCount("B")}
+        isTurn={state.turn === "B"}
+        onPick={onPickPiece}
+      />
+      <HomeTray
+        team="A"
+        pieces={homePieces("A").map((p) => p.id)}
+        movable={movable}
+        cx={500} cy={765}
+        goal={goalCount("A")}
+        isTurn={state.turn === "A"}
+        onPick={onPickPiece}
+      />
+
+      {/* 보드 위 말 묶음 — 두 팀이 같은 노드를 공유할 일은 없음(잡힘) */}
+      {Array.from(groups.values()).map((g) => {
+        const n = YUT_NODES[g.node];
+        const isMovable = g.ids.some((id) => movable.has(id));
+        return (
+          <g
+            key={`${g.team}-${g.node}`}
+            onClick={() => { if (isMovable) onPickPiece(g.ids[0]); }}
+            style={{ cursor: isMovable ? "pointer" : "default" }}
+          >
+            {isMovable && (
+              <circle cx={n.x} cy={n.y} r={46} fill="none"
+                stroke={TEAM_COLOR[g.team]} strokeWidth={6} strokeDasharray="10 7">
+                <animateTransform attributeName="transform" type="rotate"
+                  from={`0 ${n.x} ${n.y}`} to={`360 ${n.x} ${n.y}`} dur="6s" repeatCount="indefinite" />
+              </circle>
+            )}
+            <image
+              href={TEAM_IMG[g.team]}
+              x={n.x - 38} y={n.y - 44} width={76} height={76}
+              style={{ filter: `drop-shadow(0 4px 8px ${TEAM_COLOR[g.team]}88)` }}
             />
-          );
-        })}
-        {/* Nodes */}
-        {nodes.map((n) => {
-          if (n.idx === 20) return null; // placeholder slot
-          const isCorner = n.kind === "corner" || n.kind === "start";
-          const isCenter = n.kind === "center";
-          const isHighlighted = highlightOptions?.includes(n.idx) ?? false;
-          const r = isCenter ? 64 : isCorner ? 56 : 42;
-          const fill = n.kind === "start"
-            ? "#FEF3C7"
-            : isCorner
-              ? "#FCD34D"
-              : isCenter
-                ? "#FBBF24"
-                : n.kind === "shortcut"
-                  ? "#FEF3C7"
-                  : "#FFFBEB";
-          const stroke = isHighlighted ? "#16A34A" : isCorner || isCenter ? "#B45309" : "#D97706";
-          const sw = isHighlighted ? 7 : 3;
-          return (
-            <g
-              key={`n-${n.idx}`}
-              onClick={onNodeClick ? () => onNodeClick(n.idx) : undefined}
-              style={{ cursor: onNodeClick && isHighlighted ? "pointer" : "default" }}
-            >
-              <circle
-                cx={n.x} cy={n.y} r={r}
-                fill={fill}
-                stroke={stroke}
-                strokeWidth={sw}
-              />
-              {n.kind === "start" && (
-                <text x={n.x} y={n.y + 8} textAnchor="middle" fontSize={36} fontWeight={800} fill="#B45309">
-                  출발
+            {g.ids.length > 1 && (
+              <g>
+                <circle cx={n.x + 28} cy={n.y - 30} r={17} fill={TEAM_COLOR[g.team]} stroke="#fff" strokeWidth={3.5} />
+                <text x={n.x + 28} y={n.y - 23} textAnchor="middle" fontSize={20} fontWeight={900} fill="#fff">
+                  {g.ids.length}
                 </text>
-              )}
-              {n.kind === "corner" && (
-                <text x={n.x} y={n.y + 10} textAnchor="middle" fontSize={36} fontWeight={800} fill="#B45309">
-                  {n.cornerRegion === "south" ? "남" : n.cornerRegion === "west" ? "서" : "북"}
-                </text>
-              )}
-              {n.kind === "center" && (
-                <text x={n.x} y={n.y + 12} textAnchor="middle" fontSize={40} fontWeight={900} fill="#7C2D12">
-                  🐝
-                </text>
-              )}
-            </g>
-          );
-        })}
-        {/* 홈(대기) 말 — 출발 전/잡힌 말. 보드에 안 그리면 말을 꺼낼 방법이
-            없어 첫 턴부터 진행 불가가 되므로 링 안쪽 빈 공간에 팀별로 표시. */}
-        {(["A", "B"] as const).map((team) =>
-          Object.values(state.pieces)
-            .filter((p) => p.team === team && p.node === "home")
-            .map((p, i) => (
-              <YutPiece
-                key={p.id}
-                piece={p}
-                x={team === "A" ? 400 + i * 64 : 180 + i * 64}
-                y={team === "A" ? 790 : 210}
-                size={50}
-                isMovable={movableIds.includes(p.id)}
-                onClick={onPieceClick ? () => onPieceClick(p.id) : undefined}
-              />
-            )),
-        )}
-        {/* Pieces */}
-        {Array.from(byNode.entries()).map(([nodeIdx, ids]) => {
-          const n = nodes[nodeIdx];
-          if (!n) return null;
-          return ids.map((id, i) => {
-            const p = state.pieces[id];
-            // Offset stacked pieces in a small cluster around the tile center.
-            const angle = (i / Math.max(ids.length, 1)) * Math.PI * 2;
-            const radius = ids.length === 1 ? 0 : 20;
-            const cx = n.x + Math.cos(angle) * radius;
-            const cy = n.y + Math.sin(angle) * radius;
-            return (
-              <YutPiece
-                key={id}
-                piece={p}
-                x={cx}
-                y={cy}
-                size={50}
-                isMovable={movableIds.includes(id)}
-                onClick={onPieceClick ? () => onPieceClick(id) : undefined}
-              />
-            );
-          });
-        })}
-      </svg>
-    </div>
+              </g>
+            )}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
-const wrap: CSSProperties = {
-  width: "100%",
-  maxWidth: 560,
-  margin: "0 auto",
-  aspectRatio: "1 / 1",
-  minWidth: 280,
-};
-
-const svg: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  display: "block",
-  borderRadius: 24,
-  boxShadow: "0 6px 22px rgba(180, 83, 9, 0.15)",
-};
-
+function HomeTray({
+  team, pieces, movable, cx, cy, goal, isTurn, onPick,
+}: {
+  team: TeamId;
+  pieces: PieceId[];
+  movable: Set<PieceId>;
+  cx: number; cy: number;
+  goal: number;
+  isTurn: boolean;
+  onPick: (id: PieceId) => void;
+}) {
+  const color = TEAM_COLOR[team];
+  const W = 320, H = 120;
+  return (
+    <g>
+      <rect x={cx - W / 2} y={cy - H / 2} width={W} height={H} rx={24}
+        fill={isTurn ? `${color}22` : "#FFFFFFAA"}
+        stroke={color} strokeWidth={isTurn ? 6 : 3.5}
+        strokeDasharray={isTurn ? "none" : "12 8"} />
+      <text x={cx - W / 2 + 18} y={cy - H / 2 + 32} fontSize={22} fontWeight={900} fill={color}>
+        {team}팀
+      </text>
+      <text x={cx + W / 2 - 18} y={cy - H / 2 + 32} textAnchor="end" fontSize={20} fontWeight={900} fill="#92400E">
+        🏁 {goal}/4
+      </text>
+      {pieces.map((id, i) => {
+        const px = cx - W / 2 + 56 + i * 62;
+        const py = cy + 16;
+        const isMov = movable.has(id);
+        return (
+          <g key={id} onClick={() => { if (isMov) onPick(id); }}
+            style={{ cursor: isMov ? "pointer" : "default" }}>
+            {isMov && (
+              <circle cx={px} cy={py} r={32} fill="none" stroke={color} strokeWidth={5} strokeDasharray="8 6">
+                <animateTransform attributeName="transform" type="rotate"
+                  from={`0 ${px} ${py}`} to={`360 ${px} ${py}`} dur="6s" repeatCount="indefinite" />
+              </circle>
+            )}
+            <image href={TEAM_IMG[team]} x={px - 27} y={py - 30} width={54} height={54}
+              opacity={isMov ? 1 : 0.75} />
+          </g>
+        );
+      })}
+    </g>
+  );
+}

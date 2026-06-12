@@ -1,157 +1,96 @@
 "use client";
 
-import { CSSProperties } from "react";
-import type { CultureCardData } from "@/lib/yutTypes";
-import { REGION_EMOJI, REGION_NAME } from "@/lib/yutData";
+// 문화카드 — 모서리/중앙 칸에 멈추면 세계 인사말 카드가 뜬다.
+// 나라 데이터는 다문화 지구본과 공유 (lib/globeData).
+// 닫기는 cultureNode 만 지우며 턴 흐름과 무관 (더블탭 무해).
 
-interface Props {
-  data: CultureCardData;
+import React from "react";
+import { flagUrlFor, globeCountryName, type GlobeCountry } from "@/lib/globeData";
+import { LANGUAGES } from "@/lib/constants";
+import { speak } from "@/lib/ttsMulti";
+
+export default function CultureCard({
+  country, viewerLang, onClose,
+}: {
+  country: GlobeCountry;
   viewerLang: string;
   onClose: () => void;
-}
-
-// Pronounce helper: use SpeechSynthesis if available.
-function speak(text: string, lang: string): void {
-  if (typeof window === "undefined") return;
-  const synth = window.speechSynthesis;
-  if (!synth) return;
-  try {
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang;
-    synth.cancel();
-    synth.speak(u);
-  } catch {
-    /* noop */
-  }
-}
-
-export function CultureCard({ data, viewerLang, onClose }: Props): JSX.Element {
-  const regionName = REGION_NAME[data.region][viewerLang] ?? REGION_NAME[data.region].ko;
-
+}) {
   return (
-    <div style={backdrop} role="dialog" aria-modal="true" aria-label="문화 카드">
-      <div style={card}>
-        <div style={header}>
-          <span style={flag}>{REGION_EMOJI[data.region]}</span>
-          <strong style={title}>{regionName}</strong>
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 500,
+        background: "rgba(15,10,40,0.6)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(380px, 100%)",
+          background: "#fff", borderRadius: 24,
+          border: "4px solid #FDE68A",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.45)",
+          padding: "22px 20px", textAlign: "center",
+          animation: "cultureUp 0.3s ease-out",
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 900, color: "#B45309", letterSpacing: 1, marginBottom: 10 }}>
+          🌍 세계 인사 카드
         </div>
-        <div style={list}>
-          {data.greetings.map((g, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => speak(g.greet, g.lang)}
-              style={row}
-              aria-label={`${g.lang} 인사말 듣기`}
-            >
-              <span style={langChip}>{g.lang.toUpperCase()}</span>
-              <span style={greetText}>{g.greet}</span>
-              {g.roman && <span style={romanText}>{g.roman}</span>}
-              <span style={speakerIcon} aria-hidden>
-                🔊
-              </span>
-            </button>
-          ))}
+        <img
+          src={country.landmark}
+          alt=""
+          aria-hidden="true"
+          style={{ width: 110, height: 110, objectFit: "contain", filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.2))" }}
+        />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 }}>
+          <img
+            src={flagUrlFor(country.code, "w80")}
+            alt=""
+            aria-hidden="true"
+            style={{ width: 32, height: "auto", borderRadius: 4, boxShadow: "0 1px 4px rgba(0,0,0,0.25)" }}
+          />
+          <div style={{ fontSize: 19, fontWeight: 900, color: "#1F2937" }}>
+            {globeCountryName(country, viewerLang)}
+          </div>
         </div>
-        <button type="button" onClick={onClose} style={closeBtn}>
-          계속 →
+        <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280", marginTop: 2 }}>
+          {LANGUAGES[country.lang]?.label}
+        </div>
+        <button
+          onClick={() => speak(country.hello, country.lang)}
+          style={{
+            marginTop: 12,
+            background: "linear-gradient(135deg, #F59E0B, #D97706)",
+            border: "none", color: "#fff", borderRadius: 99,
+            padding: "12px 26px", fontSize: 18, fontWeight: 900, cursor: "pointer",
+            boxShadow: "0 6px 16px rgba(245,158,11,0.45)",
+          }}
+        >
+          🔊 {country.hello}
         </button>
+        <div>
+          <button
+            onClick={onClose}
+            style={{
+              marginTop: 14, background: "#F3F4F6", border: "none",
+              color: "#374151", borderRadius: 14, padding: "10px 28px",
+              fontSize: 14, fontWeight: 900, cursor: "pointer",
+            }}
+          >
+            계속 하기 →
+          </button>
+        </div>
+        <style>{`
+          @keyframes cultureUp {
+            from { transform: translateY(26px) scale(0.95); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+          }
+        `}</style>
       </div>
     </div>
   );
 }
-
-const backdrop: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background: "rgba(120, 53, 15, 0.45)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 50,
-  borderRadius: 24,
-};
-
-const card: CSSProperties = {
-  background: "#FFFBEB",
-  border: "3px solid #F59E0B",
-  borderRadius: 20,
-  padding: "18px 18px 14px",
-  width: "min(92%, 360px)",
-  boxShadow: "0 8px 28px rgba(120,53,15,0.35)",
-};
-
-const header: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  marginBottom: 12,
-};
-
-const flag: CSSProperties = {
-  fontSize: 36,
-};
-
-const title: CSSProperties = {
-  fontSize: 20,
-  color: "#7C2D12",
-};
-
-const list: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  marginBottom: 14,
-};
-
-const row: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  width: "100%",
-  padding: "10px 12px",
-  background: "#FEF3C7",
-  border: "2px solid #FDE68A",
-  borderRadius: 12,
-  cursor: "pointer",
-  color: "#7C2D12",
-  fontWeight: 700,
-  textAlign: "left",
-};
-
-const langChip: CSSProperties = {
-  fontSize: 11,
-  background: "#B45309",
-  color: "#FFFBEB",
-  borderRadius: 999,
-  padding: "2px 8px",
-  fontWeight: 900,
-  letterSpacing: 0.5,
-};
-
-const greetText: CSSProperties = {
-  fontSize: 18,
-  flex: 1,
-};
-
-const romanText: CSSProperties = {
-  fontSize: 12,
-  color: "#92400E",
-  fontWeight: 500,
-};
-
-const speakerIcon: CSSProperties = {
-  fontSize: 18,
-};
-
-const closeBtn: CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  background: "#B45309",
-  color: "#FFFBEB",
-  border: "none",
-  borderRadius: 12,
-  fontSize: 16,
-  fontWeight: 900,
-  cursor: "pointer",
-};

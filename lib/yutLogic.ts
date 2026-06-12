@@ -1,494 +1,312 @@
-// HoneyYut — pure logic. No React, no side-effects.
-// Every helper returns a new snapshot. Collision, goal and stacking rules
-// all live here.
+// HoneyYut v2 — 순수 로직 + 리듀서.
+//
+// 핵심 설계: "멈춘 칸이 경로를 결정한다" (전통 룰).
+//   - 5(첫 모서리)에 멈춤  → 다음 이동은 대각선 diagA (5→20→21→22→23→24→15)
+//   - 10(둘째 모서리)에 멈춤 → 대각선 diagB (10→25→26→22→27→28→골)
+//   - 22(중앙)에 멈춤      → 최단 출구 cut (22→27→28→골)
+//   - 골은 "출발점을 밟거나 지나치면" 인정 (pass-over).
+// 정규화(normalize) 덕분에 멈춘 말의 node 가 route 를 유일하게 결정하므로,
+// "같은 노드에 멈춘 같은 팀 말 = 같은 pos = 자동 업기"가 성립한다.
 
 import {
-  TILE_GRAPH,
-  STICK_PROB,
-  forwardOptions,
-  backwardStep,
-  cornerRegion,
-  CORNER_GREETINGS,
-  throwLabel,
-} from "./yutData";
-import type {
-  Throw,
-  TeamId,
-  Piece,
-  PieceId,
-  GameState,
-  CultureCardData,
-  Action,
+  CULTURE_NODES,
+  PIECES_PER_TEAM,
+  type Action,
+  type GameState,
+  type Piece,
+  type PieceId,
+  type PiecePos,
+  type Route,
+  type TeamId,
+  type Throw,
 } from "./yutTypes";
-import { PIECES_PER_TEAM } from "./yutTypes";
 
-// --- Initial state --------------------------------------------------------
+export type BoardPos = { node: number; route: Route };
 
-export function createInitialState(): GameState {
+// ── 한 걸음 전진. "goal" = 골 경계를 넘음 ──────────────────────────
+export function stepForward(p: BoardPos): BoardPos | "goal" {
+  const { node, route } = p;
+  if (route === "outer") {
+    // 0(출발칸)에 서 있는 말 = 백도로 돌아온 말. 한 걸음이라도 가면 골인.
+    if (node === 0 || node === 19) return "goal";
+    return { node: node + 1, route: "outer" };
+  }
+  if (route === "diagA") {
+    // 5→20→21→22→23→24→15(이후 outer 합류)
+    if (node === 5) return { node: 20, route };
+    if (node === 24) return { node: 15, route: "outer" };
+    return { node: node + 1, route }; // 20→21→22→23→24
+  }
+  if (route === "diagB") {
+    // 10→25→26→22→27→28→골
+    if (node === 10) return { node: 25, route };
+    if (node === 26) return { node: 22, route };
+    if (node === 22) return { node: 27, route };
+    if (node === 28) return "goal";
+    return { node: node + 1, route }; // 25→26, 27→28
+  }
+  // cut: 22→27→28→골
+  if (node === 28) return "goal";
+  if (node === 22) return { node: 27, route };
+  return { node: 28, route }; // 27→28
+}
+
+// ── 멈춘 칸 정규화 — 지름길 진입 + 합류 구간 route 통일 ──────────────
+export function normalize(p: BoardPos): BoardPos {
+  if (p.node === 5) return { node: 5, route: "diagA" };
+  if (p.node === 10) return { node: 10, route: "diagB" };
+  if (p.node === 22) return { node: 22, route: "cut" };
+  if (p.route === "diagA" && p.node >= 15 && p.node <= 19) {
+    return { node: p.node, route: "outer" };
+  }
+  return p;
+}
+
+// ── 전진 이동 (steps ≥ 1). 골 경계를 넘으면 즉시 골 ──────────────────
+export function walkForward(start: BoardPos, steps: number): BoardPos | "goal" {
+  let cur: BoardPos = start;
+  for (let i = 0; i < steps; i++) {
+    const next = stepForward(cur);
+    if (next === "goal") return "goal";
+    cur = next;
+  }
+  return normalize(cur);
+}
+
+// ── 백도 한 걸음. 출발칸(0)에서 또 백도면 집으로 ─────────────────────
+export function stepBackward(p: BoardPos): BoardPos | "home" {
+  const { node, route } = p;
+  if (route === "outer") {
+    if (node === 0) return "home";
+    return normalize({ node: node - 1, route: "outer" });
+  }
+  if (route === "diagA") {
+    // 멈춘 diagA 노드: 5, 20, 21, 23, 24
+    if (node === 5) return normalize({ node: 4, route: "outer" });
+    if (node === 20) return { node: 5, route: "diagA" };
+    if (node === 23) return { node: 22, route: "cut" };
+    return normalize({ node: node - 1, route }); // 21→20, 24→23
+  }
+  if (route === "diagB") {
+    // 멈춘 diagB 노드: 10, 25, 26, 27, 28
+    if (node === 10) return normalize({ node: 9, route: "outer" });
+    if (node === 25) return { node: 10, route: "diagB" };
+    if (node === 27) return { node: 22, route: "cut" };
+    return normalize({ node: node - 1, route }); // 26→25, 28→27
+  }
+  // cut 멈춘 노드: 22, 27, 28
+  if (node === 22) return { node: 21, route: "diagA" }; // 가장 흔한 진입 경로로 복귀
+  if (node === 27) return { node: 22, route: "cut" };
+  return { node: 27, route: "cut" }; // 28
+}
+
+// ── 초기 상태 ──────────────────────────────────────────────────────
+export function makeInitialState(): GameState {
   const pieces: Record<PieceId, Piece> = {};
-  (["A", "B"] as const).forEach((team) => {
-    for (let i = 0; i < PIECES_PER_TEAM; i += 1) {
-      const id: PieceId = `${team}-${i}`;
-      pieces[id] = { id, team, node: "home", stackedWith: [] };
+  (["A", "B"] as TeamId[]).forEach((team) => {
+    for (let i = 0; i < PIECES_PER_TEAM; i++) {
+      const id = `${team}-${i}`;
+      pieces[id] = { id, team, pos: { kind: "home" } };
     }
   });
   return {
     turn: "A",
     pieces,
-    throws: [],
-    phase: { kind: "idle" },
-    pendingBranch: null,
-    cultureCard: null,
-    log: ["🐝 꿀벌 윷놀이 시작! A팀부터"],
+    queue: [],
+    phase: "needThrow",
     winner: null,
-    extraThrowStreak: 0,
+    cultureNode: null,
+    log: ["🐝 윷놀이 시작! A팀부터 던져요."],
   };
 }
 
-// --- Throw ----------------------------------------------------------------
+const TEAM_LABEL: Record<TeamId, string> = { A: "A팀", B: "B팀" };
+const THROW_LABEL: Record<string, string> = {
+  "-1": "백도", "1": "도", "2": "개", "3": "걸", "4": "윷", "5": "모",
+};
 
-/**
- * Roll the sticks. Uses cumulative-weight sampling over STICK_PROB.
- */
-export function throwSticks(): Throw {
-  const r = Math.random();
-  let acc = 0;
-  for (const o of STICK_PROB) {
-    acc += o.weight;
-    if (r < acc) return o.value;
-  }
-  return 3; // fallback (걸)
+function pushLog(s: GameState, text: string): GameState {
+  return { ...s, log: [...s.log.slice(-29), text] };
 }
 
-export function isExtraThrow(v: Throw): boolean {
-  return v === 4 || v === 5;
+// ── 이동 가능 판정 ─────────────────────────────────────────────────
+export function canMove(piece: Piece, value: Throw): boolean {
+  if (piece.pos.kind === "goal") return false;
+  if (piece.pos.kind === "home") return value > 0; // 백도로는 출발 불가
+  return true;
 }
 
-// --- Piece selection / movement ------------------------------------------
-
-function ownedPieces(state: GameState, team: TeamId): Piece[] {
-  return Object.values(state.pieces).filter(p => p.team === team);
+function teamPieces(s: GameState, team: TeamId): Piece[] {
+  return Object.values(s.pieces).filter((p) => p.team === team);
 }
 
-/**
- * Return pieces that CAN use this throw. A piece can move if:
- *   - throw > 0 and piece is on home OR on a real node,
- *   - throw === -1 (백도) and piece is already on the board
- *     (if no on-board pieces, 백도 is auto-spent with no effect).
- */
-export function movablePieces(state: GameState, throwValue: Throw): Piece[] {
-  const team = state.turn;
-  const mine = ownedPieces(state, team).filter(p => p.node !== "goal");
-  if (throwValue === -1) {
-    // Only on-board pieces can back up; home/goal pieces skip.
-    return mine.filter(p => p.node !== "home");
-  }
-  return mine;
+function anyUsable(s: GameState): boolean {
+  const mine = teamPieces(s, s.turn);
+  return s.queue.some((v) => mine.some((p) => canMove(p, v)));
 }
 
-// --- Path resolution ------------------------------------------------------
-
-// Walk forward `steps` from `start`. Returns `landed` (single path), `goal`
-// (reached 0 from 19), or `branch` when the first step (or a mid-walk arrival
-// at node 23) offers multiple forward options.
-export type WalkResult =
-  | { kind: "landed"; node: number }
-  | { kind: "goal" }
-  | { kind: "branch"; from: number; options: number[]; remainingSteps: number };
-
-export function walkForward(start: number, steps: number): WalkResult {
-  if (steps <= 0) return { kind: "landed", node: start };
-
-  let node = start;
-  let left = steps;
-  let firstStep = true;
-
-  while (left > 0) {
-    const opts = forwardOptions(node);
-    if (opts.length > 1 && (firstStep || node === 23)) {
-      return { kind: "branch", from: node, options: opts, remainingSteps: left };
-    }
-    const next = opts[0];
-    // Goal = 19에서 0(출발점)을 밟거나 지나치면 골인 — 전통 윷놀이 룰.
-    // (예전 "정확히 도착"제는 남은 걸음이 많으면 한 바퀴를 더 돌아야 해서
-    // 학생들이 혼란스러워했다.) Inner paths rejoin at idx 17 and then walk
-    // 17->18->19->0 normally, so the same check covers both routes.
-    if (node === 19 && next === 0) {
-      return { kind: "goal" };
-    }
-    node = next;
-    left -= 1;
-    firstStep = false;
-  }
-  return { kind: "landed", node };
+/** 현재 선택한 던지기 값으로 움직일 수 있는 말 id 목록 (UI 하이라이트용) */
+export function movablePieceIds(s: GameState, value: Throw): PieceId[] {
+  return teamPieces(s, s.turn).filter((p) => canMove(p, value)).map((p) => p.id);
 }
 
-export function walkBackward(start: number): { kind: "landed"; node: number } | { kind: "home" } {
-  if (start === 0) {
-    // Can't backdo off the start — send the piece home for a do-over.
-    return { kind: "home" };
-  }
-  return { kind: "landed", node: backwardStep(start) };
+// 같은 칸에 멈춰 있는 같은 팀 말들 (업힌 묶음). home/goal 은 단독.
+function groupOf(s: GameState, pieceId: PieceId): PieceId[] {
+  const p = s.pieces[pieceId];
+  if (p.pos.kind !== "board") return [pieceId];
+  const node = p.pos.node;
+  return Object.values(s.pieces)
+    .filter((q) => q.team === p.team && q.pos.kind === "board" && q.pos.node === node)
+    .map((q) => q.id);
 }
 
-// --- Collision & stacking ------------------------------------------------
-
-// Land the moving piece (with its carry-on group) at `node`:
-//   - enemy occupant → entire enemy group goes home, returns captured:true
-//   - friendly occupant → groups merge (stacking)
-export interface LandingEffect {
-  state: GameState;
-  captured: boolean;
+function endTurn(s: GameState): GameState {
+  const next: TeamId = s.turn === "A" ? "B" : "A";
+  return { ...s, turn: next, queue: [], phase: "needThrow" };
 }
 
-export function applyLanding(
-  state: GameState,
-  movingId: PieceId,
-  node: number,
-): LandingEffect {
-  const next = { ...state, pieces: { ...state.pieces } };
-  const movers = collectGroup(next.pieces, movingId);
-  const team = next.pieces[movingId].team;
-
-  // Find any existing occupant group (pick leader: any piece whose node===node
-  // AND is not itself part of the moving group).
-  const occupant = Object.values(next.pieces).find(
-    p => p.node === node && !movers.includes(p.id),
-  );
-
-  if (!occupant) {
-    // Plain landing.
-    for (const id of movers) {
-      next.pieces[id] = { ...next.pieces[id], node };
-    }
-    return { state: next, captured: false };
+// move phase 진입 — 쓸 수 있는 던지기가 하나도 없으면 자동으로 턴 넘김
+function enterMove(s: GameState): GameState {
+  if (!anyUsable(s)) {
+    return endTurn(pushLog(s, `${TEAM_LABEL[s.turn]} 움직일 말이 없어요 — 턴 넘김`));
   }
-
-  const occGroup = collectGroup(next.pieces, occupant.id);
-
-  if (occupant.team === team) {
-    // Stack: merge movers onto occupant leader.
-    const leaderId = occupant.id;
-    const combined = Array.from(new Set([...occGroup.filter(i => i !== leaderId), ...movers.filter(i => i !== leaderId)]));
-    next.pieces[leaderId] = {
-      ...next.pieces[leaderId],
-      node,
-      stackedWith: combined,
-    };
-    for (const id of movers) {
-      if (id === leaderId) continue;
-      next.pieces[id] = { ...next.pieces[id], node, stackedWith: [] };
-    }
-    // Also blank followers-of-leader's stackedWith to avoid duplication — the
-    // leader owns the canonical list.
-    for (const id of occGroup) {
-      if (id === leaderId) continue;
-      next.pieces[id] = { ...next.pieces[id], node, stackedWith: [] };
-    }
-    return { state: next, captured: false };
-  }
-
-  // Capture: whole enemy group sent home.
-  for (const id of occGroup) {
-    next.pieces[id] = { ...next.pieces[id], node: "home", stackedWith: [] };
-  }
-  for (const id of movers) {
-    next.pieces[id] = { ...next.pieces[id], node };
-  }
-  // Make moving piece the leader, with its followers re-attached.
-  next.pieces[movingId] = {
-    ...next.pieces[movingId],
-    node,
-    stackedWith: movers.filter(id => id !== movingId),
-  };
-  for (const id of movers) {
-    if (id === movingId) continue;
-    next.pieces[id] = { ...next.pieces[id], node, stackedWith: [] };
-  }
-  return { state: next, captured: true };
+  return { ...s, phase: "move" };
 }
 
-function collectGroup(pieces: Record<PieceId, Piece>, id: PieceId): PieceId[] {
-  const p = pieces[id];
-  if (!p) return [];
-  // Canonical group = all same-team pieces on the same node (leader-agnostic).
-  if (p.node === "home" || p.node === "goal") return [id];
-  const group: PieceId[] = [];
-  for (const other of Object.values(pieces)) {
-    if (other.team === p.team && other.node === p.node) group.push(other.id);
-  }
-  return group;
-}
-
-// --- Goal & win -----------------------------------------------------------
-
-export function sendToGoal(state: GameState, movingId: PieceId): GameState {
-  const next = { ...state, pieces: { ...state.pieces } };
-  const movers = collectGroup(next.pieces, movingId);
-  for (const id of movers) {
-    next.pieces[id] = { ...next.pieces[id], node: "goal", stackedWith: [] };
-  }
-  return next;
-}
-
-export function checkWin(state: GameState): TeamId | null {
-  for (const team of ["A", "B"] as const) {
-    const mine = Object.values(state.pieces).filter(p => p.team === team);
-    if (mine.every(p => p.node === "goal")) return team;
-  }
-  return null;
-}
-
-// --- Reducer --------------------------------------------------------------
-
+// ── 리듀서 ─────────────────────────────────────────────────────────
 export function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
+    case "restart":
+      return makeInitialState();
+
+    case "closeCulture":
+      // 턴 흐름과 완전히 분리 — 두 번 닫혀도 무해 (v1 더블탭 버그 방지)
+      return state.cultureNode === null ? state : { ...state, cultureNode: null };
+
     case "throwResult": {
-      if (state.winner) return state;
-      // idle 외 phase 에서 들어온 중복 dispatch(더블탭 등)는 무시 — 공짜 던지기 방지.
-      if (state.phase.kind !== "idle") return state;
-      const throws = [...state.throws, action.value];
-      const extra = isExtraThrow(action.value);
-      const nextLog = [
-        ...state.log,
-        `${turnEmoji(state.turn)} ${throwLabel(action.value)}${extra ? " — 한 번 더!" : ""}`,
-      ];
-      // Extra-throw (윷/모) → stay idle so the player throws again.
-      // Otherwise move on to choosePiece — queued throws persist across that.
-      return {
+      if (state.phase !== "needThrow" || state.winner) return state;
+      const v = action.value;
+      let s = { ...state, queue: [...state.queue, v] };
+      s = pushLog(s, `${TEAM_LABEL[s.turn]} ${THROW_LABEL[String(v)]}!`);
+      if (v === 4 || v === 5) {
+        return pushLog(s, "✨ 한 번 더 던져요!");
+      }
+      return enterMove(s);
+    }
+
+    case "move": {
+      if (state.phase !== "move" || state.winner) return state;
+      const { pieceId, queueIndex } = action;
+      const value = state.queue[queueIndex];
+      if (value === undefined) return state;
+      const piece = state.pieces[pieceId];
+      if (!piece || piece.team !== state.turn || !canMove(piece, value)) return state;
+
+      // 목적지 계산
+      let dest: PiecePos;
+      if (piece.pos.kind === "home") {
+        // 집에서 출발: 첫 걸음이 1번 칸 (출발칸 0 은 밟지 않고 지나침)
+        const r = value === 1
+          ? normalize({ node: 1, route: "outer" })
+          : walkForward({ node: 1, route: "outer" }, value - 1);
+        dest = r === "goal" ? { kind: "goal" } : { kind: "board", ...r };
+      } else if (piece.pos.kind === "board") {
+        const from: BoardPos = { node: piece.pos.node, route: piece.pos.route };
+        if (value === -1) {
+          const r = stepBackward(from);
+          dest = r === "home" ? { kind: "home" } : { kind: "board", ...r };
+        } else {
+          const r = walkForward(from, value);
+          dest = r === "goal" ? { kind: "goal" } : { kind: "board", ...r };
+        }
+      } else {
+        return state;
+      }
+
+      // 묶음(업힌 말들) 함께 이동
+      const movers = groupOf(state, pieceId);
+      const newPieces: Record<PieceId, Piece> = { ...state.pieces };
+      for (const id of movers) {
+        newPieces[id] = { ...newPieces[id], pos: dest };
+      }
+
+      let s: GameState = {
         ...state,
-        throws,
-        log: nextLog,
-        extraThrowStreak: extra ? state.extraThrowStreak + 1 : state.extraThrowStreak,
-        phase: extra ? { kind: "idle" } : { kind: "choosePiece" },
+        pieces: newPieces,
+        queue: state.queue.filter((_, i) => i !== queueIndex),
       };
-    }
 
-    case "selectPiece": {
-      const { pieceId, throwValue } = action;
-      const piece = state.pieces[pieceId];
-      if (!piece || piece.team !== state.turn) return state;
-      if (!state.throws.includes(throwValue)) return state;
+      const stackNote = movers.length > 1 ? ` (${movers.length}개 업고)` : "";
 
-      // Remove this throw from the queue now.
-      const throws = removeOnce(state.throws, throwValue);
-
-      // Resolve movement.
-      if (throwValue === -1) {
-        if (piece.node === "home" || piece.node === "goal") {
-          // No effect; throw consumed.
-          return finishThrow(state, throws, `⤵️ ${pieceId} 백도 — 제자리`);
+      // 잡기 — 도착 노드의 상대 말 전부 집으로 + 한 번 더
+      let captured = false;
+      if (dest.kind === "board") {
+        const node = dest.node;
+        const enemies = Object.values(s.pieces).filter(
+          (q) => q.team !== piece.team && q.pos.kind === "board" && q.pos.node === node,
+        );
+        if (enemies.length > 0) {
+          captured = true;
+          const np = { ...s.pieces };
+          for (const e of enemies) np[e.id] = { ...e, pos: { kind: "home" } };
+          s = { ...s, pieces: np };
+          s = pushLog(s, `💥 ${TEAM_LABEL[piece.team]}이 상대 말 ${enemies.length}개를 잡았어요${stackNote} — 한 번 더!`);
         }
-        const res = walkBackward(piece.node as number);
-        if (res.kind === "home") {
-          // Sent back to start tile 0 (not home).
-          const { state: post } = applyLanding(state, pieceId, 0);
-          return finishThrow({ ...post, throws }, throws, `⤵️ ${pieceId} 백도 → 시작으로`);
+        // 같은 팀 말 위에 멈추면 자동 업기 (pos 동일화로 이미 묶임)
+        const friends = Object.values(s.pieces).filter(
+          (q) => q.team === piece.team && q.pos.kind === "board" && q.pos.node === node && !movers.includes(q.id),
+        );
+        if (friends.length > 0) {
+          s = pushLog(s, `🤝 ${TEAM_LABEL[piece.team]} 말이 업혔어요! (${friends.length + movers.length}개)`);
         }
-        const landing = applyLanding(state, pieceId, res.node);
-        const afterLog = [
-          ...state.log,
-          `⤵️ ${pieceId} 백도 → ${res.node}${landing.captured ? " (잡음!)" : ""}`,
-        ];
-        return postLanding(landing.state, throws, afterLog, res.node, landing.captured, false);
+        // 문화카드 칸
+        if ((CULTURE_NODES as readonly number[]).includes(node)) {
+          s = { ...s, cultureNode: node };
+        }
       }
 
-      // Forward walk. Home-pieces enter at node 0 by consuming 1 pip.
-      const walkStart = piece.node === "home" ? 0 : (piece.node as number);
-      const steps = piece.node === "home" ? (throwValue as number) - 1 : (throwValue as number);
-      const res = walkForward(walkStart, steps);
-      return resolveWalk(state, pieceId, throwValue, throws, res, "➡️");
-    }
-
-    case "selectBranch": {
-      if (!state.pendingBranch) return state;
-      const { pieceId, throwValue, options, remainingSteps } = state.pendingBranch;
-      if (!options.includes(action.nextNode)) return state;
-      const piece = state.pieces[pieceId];
-      if (!piece) return state;
-      // 분기 시점에 남아 있던 걸음 수에서 선택한 칸으로 1걸음 소비.
-      // throwValue 로 복원하면 중앙(23) 중간 도착 분기에서 오버슈트한다.
-      const remaining = remainingSteps - 1;
-      const chosenStart = action.nextNode;
-      const cleared: GameState = { ...state, pendingBranch: null };
-      const res: WalkResult = remaining <= 0
-        ? { kind: "landed", node: chosenStart }
-        : walkForward(chosenStart, remaining);
-      return resolveWalk(cleared, pieceId, throwValue, cleared.throws, res, "↪️");
-    }
-
-    case "closeCulture": {
-      // Culture card dismissed: if throws remain, go back to choosePiece;
-      // otherwise end turn.
-      // culture phase 가 아닐 때의 중복 dispatch(더블탭)는 무시 —
-      // 안 막으면 endTurnCore 가 두 번 돌아 상대 턴을 통째로 건너뛴다.
-      if (state.phase.kind !== "culture") return state;
-      if (state.throws.length > 0) {
-        return { ...state, cultureCard: null, phase: { kind: "choosePiece" } };
+      if (dest.kind === "goal") {
+        s = pushLog(s, `🏁 ${TEAM_LABEL[piece.team]} 말 골인!${stackNote}`);
+        const allGoal = teamPieces(s, piece.team).every((p) => p.pos.kind === "goal");
+        if (allGoal) {
+          return {
+            ...pushLog(s, `🏆 ${TEAM_LABEL[piece.team]} 승리!`),
+            phase: "win",
+            winner: piece.team,
+          };
+        }
       }
-      return endTurnCore({ ...state, cultureCard: null });
+      if (dest.kind === "home") {
+        s = pushLog(s, `↩️ 백도로 출발점을 지나 집으로 돌아갔어요`);
+      }
+
+      if (captured) {
+        // 잡기 보너스 — 즉시 한 번 더 던진다 (남은 큐는 유지)
+        return { ...s, phase: "needThrow" };
+      }
+      if (s.queue.length === 0) {
+        return endTurn(s);
+      }
+      return enterMove(s);
     }
-
-    case "endTurn": {
-      return endTurnCore(state);
-    }
-
-    case "restart": {
-      return createInitialState();
-    }
-
-    default:
-      return state;
   }
 }
 
-// --- Reducer helpers ------------------------------------------------------
-
-// Unified dispatcher for a WalkResult. Used by both selectPiece and
-// selectBranch so the branch / goal / landed cases live in one place.
-function resolveWalk(
-  state: GameState,
-  pieceId: PieceId,
-  throwValue: Throw,
-  throws: Throw[],
-  res: WalkResult,
-  prefix: string,
-): GameState {
-  if (res.kind === "branch") {
-    return {
-      ...state,
-      throws,
-      pendingBranch: {
-        pieceId,
-        throwValue,
-        from: res.from,
-        options: res.options,
-        remainingSteps: res.remainingSteps,
-      },
-      phase: { kind: "chooseBranch" },
-    };
-  }
-  if (res.kind === "goal") {
-    const reached = sendToGoal(state, pieceId);
-    return checkAndFinish(
-      { ...reached, throws, log: [...state.log, `🏁 ${pieceId} 도착!`] },
-      throws,
-      false,
-    );
-  }
-  const landing = applyLanding(state, pieceId, res.node);
-  const afterLog = [
-    ...state.log,
-    `${prefix} ${pieceId} → ${res.node}${landing.captured ? " (잡음! 🎯)" : ""}`,
-  ];
-  return postLanding(landing.state, throws, afterLog, res.node, landing.captured, false);
+// ── 윷가락 던지기 (4개 시뮬레이션) ──────────────────────────────────
+// 평평한 면이 위로 올 확률 0.55 (살짝 등이 무거운 실제 윷 느낌).
+// 1개 위 = 도 (단, 표시된 가락[idx 0] 혼자 위면 백도), 2=개, 3=걸, 4=윷, 0=모.
+export interface StickThrow {
+  sticks: boolean[]; // true = 평평한 면(배)이 위
+  value: Throw;
 }
 
-function removeOnce<T>(arr: T[], v: T): T[] {
-  const i = arr.indexOf(v);
-  if (i < 0) return arr;
-  const out = arr.slice();
-  out.splice(i, 1);
-  return out;
+export function throwSticks(rand: () => number = Math.random): StickThrow {
+  const sticks = [0, 1, 2, 3].map(() => rand() < 0.55);
+  const up = sticks.filter(Boolean).length;
+  let value: Throw;
+  if (up === 0) value = 5;        // 모
+  else if (up === 4) value = 4;   // 윷
+  else if (up === 1) value = sticks[0] ? -1 : 1; // 백도 가락 혼자면 백도
+  else value = up as Throw;       // 개(2) / 걸(3)
+  return { sticks, value };
 }
-
-function turnEmoji(team: TeamId): string {
-  return team === "A" ? "🟡" : "🔵";
-}
-
-// After a landing: maybe fire a CultureCard (corner), grant a capture bonus
-// throw, or advance phase / turn.
-function postLanding(
-  state: GameState,
-  throws: Throw[],
-  log: string[],
-  node: number,
-  captured: boolean,
-  _fromHome: boolean,
-): GameState {
-  const winner = checkWin(state);
-  if (winner) {
-    return {
-      ...state,
-      throws,
-      log: [...log, `🏆 ${winner}팀 승리!`],
-      phase: { kind: "win" },
-      winner,
-    };
-  }
-
-  // Culture card trigger — only when a player actually lands on a corner.
-  const region = cornerRegion(node);
-  const cultureCard: CultureCardData | null = region
-    ? { region, greetings: CORNER_GREETINGS[region] }
-    : null;
-
-  // Capture grants an extra throw (classic yut rule).
-  if (captured) {
-    log = [...log, "➕ 잡았으니 한 번 더!"];
-  }
-
-  // Culture card pauses the flow; closeCulture resumes.
-  // v1 trade-off: we don't thread capture-extra through the culture pause
-  // because capture + corner co-landing is rare.
-  if (cultureCard) {
-    return {
-      ...state,
-      throws,
-      log,
-      phase: { kind: "culture" },
-      cultureCard,
-    };
-  }
-
-  if (captured) {
-    // Extra throw: go idle so player throws again.
-    return { ...state, throws, log, phase: { kind: "idle" } };
-  }
-
-  if (throws.length > 0) {
-    return { ...state, throws, log, phase: { kind: "choosePiece" } };
-  }
-  // No throws left and no bonus — end turn.
-  return endTurnCore({ ...state, throws, log });
-}
-
-function checkAndFinish(state: GameState, throws: Throw[], captured: boolean): GameState {
-  const winner = checkWin(state);
-  if (winner) {
-    return {
-      ...state,
-      throws,
-      log: [...state.log, `🏆 ${winner}팀 승리!`],
-      phase: { kind: "win" },
-      winner,
-    };
-  }
-  if (throws.length > 0 || captured) {
-    return { ...state, throws, phase: throws.length > 0 ? { kind: "choosePiece" } : { kind: "idle" } };
-  }
-  return endTurnCore({ ...state, throws });
-}
-
-function finishThrow(state: GameState, throws: Throw[], logLine: string): GameState {
-  const log = [...state.log, logLine];
-  if (throws.length > 0) return { ...state, throws, log, phase: { kind: "choosePiece" } };
-  return endTurnCore({ ...state, throws, log });
-}
-
-function endTurnCore(state: GameState): GameState {
-  const nextTurn: TeamId = state.turn === "A" ? "B" : "A";
-  return {
-    ...state,
-    turn: nextTurn,
-    phase: { kind: "idle" },
-    throws: [],
-    pendingBranch: null,
-    cultureCard: null,
-    extraThrowStreak: 0,
-    log: [...state.log, `— ${nextTurn}팀 차례 —`],
-  };
-}
-
-// Convenience re-exports for consumers.
-export { throwLabel, TILE_GRAPH };

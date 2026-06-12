@@ -1,340 +1,197 @@
 "use client";
 
-import { CSSProperties, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { createInitialState, reducer, throwSticks, movablePieces } from "@/lib/yutLogic";
-import type { PieceId, Throw, TeamId } from "@/lib/yutTypes";
-import { throwLabel } from "@/lib/yutData";
-import { YutBoard } from "./YutBoard";
-import { YutSticks } from "./YutSticks";
-import { CultureCard } from "./CultureCard";
+// 꿀벌 윷놀이 v2 — 전통 룰 (멈춘 칸이 지름길을 결정).
+// 2팀 로컬 대전. 던지기 → (윷/모면 또 던지기) → 말 고르기 → 자동 이동.
+
+import React, { useEffect, useReducer, useRef, useState } from "react";
+import { makeInitialState, reducer } from "@/lib/yutLogic";
+import { GLOBE_COUNTRIES, type GlobeCountry } from "@/lib/globeData";
+import { pickN } from "@/lib/gameData";
+import type { PieceId, Throw } from "@/lib/yutTypes";
+import BeeMascot from "../../BeeMascot";
+import YutBoard, { TEAM_COLOR } from "./YutBoard";
+import YutSticks from "./YutSticks";
+import CultureCard from "./CultureCard";
 import { sfx } from "./yutSfx";
 
-interface Props {
-  langA: string;
-  langB: string;
-}
+const THROW_LABEL: Record<string, string> = {
+  "-1": "백도", "1": "도", "2": "개", "3": "걸", "4": "윷", "5": "모",
+};
 
-export default function HoneyYut({ langA, langB }: Props): JSX.Element {
-  const [state, dispatch] = useReducer(reducer, undefined, createInitialState);
-  const [pendingThrow, setPendingThrow] = useState<Throw | null>(null);
-  // Which throw is currently selected as "in play" (if multiple throws queued).
-  const [activeThrow, setActiveThrow] = useState<Throw | null>(null);
+export default function HoneyYut({ langA }: { langA: string; langB: string }) {
+  const [state, dispatch] = useReducer(reducer, undefined, makeInitialState);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [cultureCountry, setCultureCountry] = useState<GlobeCountry | null>(null);
+  const prevHomeCount = useRef<number>(8);
 
-  // Sync activeThrow to the newest queued throw whenever throws change.
+  // 큐가 줄거나 phase 가 바뀌면 선택 인덱스를 안전하게 보정
   useEffect(() => {
-    if (state.throws.length === 0) {
-      setActiveThrow(null);
-      return;
-    }
-    // Default to the largest positive throw (most rewarding first).
-    const sorted = [...state.throws].sort((a, b) => (b as number) - (a as number));
-    setActiveThrow(sorted[0]);
-  }, [state.throws]);
+    if (selectedIdx >= state.queue.length) setSelectedIdx(0);
+  }, [state.queue.length, selectedIdx]);
 
-  // Sfx on significant phase transitions.
-  const prevPhase = useRef(state.phase.kind);
+  // 문화카드 칸 도착 → 무작위 나라 선택
   useEffect(() => {
-    const prev = prevPhase.current;
-    const curr = state.phase.kind;
-    if (prev !== curr) {
-      if (curr === "win") sfx.win();
-      else if (curr === "culture") sfx.landing();
-      else if (curr === "choosePiece" && prev === "throwing") sfx.landing();
+    if (state.cultureNode !== null) {
+      setCultureCountry(pickN(GLOBE_COUNTRIES, 1)[0] ?? null);
+    } else {
+      setCultureCountry(null);
     }
-    prevPhase.current = curr;
+  }, [state.cultureNode]);
+
+  // 잡기 효과음 — home 으로 돌아간 말 수 증가 감지
+  useEffect(() => {
+    const homeNow = Object.values(state.pieces).filter((p) => p.pos.kind === "home").length;
+    if (homeNow > prevHomeCount.current && state.phase !== "win") sfx.capture();
+    prevHomeCount.current = homeNow;
+  }, [state.pieces, state.phase]);
+
+  // 승리 효과음
+  const winPlayed = useRef(false);
+  useEffect(() => {
+    if (state.phase === "win" && !winPlayed.current) {
+      winPlayed.current = true;
+      sfx.win();
+    }
+    if (state.phase !== "win") winPlayed.current = false;
   }, [state.phase]);
 
-  const handleThrow = (): void => {
-    // pendingThrow 가드: 애니메이션 중 더블탭하면 이미 굴린 결과가 교체된다.
-    if (state.phase.kind !== "idle" || state.winner || pendingThrow !== null) return;
-    sfx.throwSticks();
-    const v = throwSticks();
-    // Animation takes ~600ms; the YutSticks component dispatches "throwResult"
-    // on snap via the onResult callback we pass.
-    setPendingThrow(v);
-  };
+  const accent = TEAM_COLOR[state.turn];
+  const selectedValue: Throw | null =
+    state.phase === "move" ? (state.queue[selectedIdx] ?? state.queue[0] ?? null) : null;
 
-  const onAnimationDone = (): void => {
-    setPendingThrow(null);
-  };
-
-  const onSticksResult = (value: Throw): void => {
-    dispatch({ type: "throwResult", value });
-  };
-
-  // Piece click in choosePiece.
-  const onPieceClick = (id: PieceId): void => {
-    if (state.phase.kind !== "choosePiece") return;
-    if (activeThrow === null) return;
-    const piece = state.pieces[id];
-    if (!piece || piece.team !== state.turn) return;
+  function handlePick(id: PieceId) {
+    if (selectedValue === null) return;
+    const qIdx = state.queue[selectedIdx] !== undefined ? selectedIdx : 0;
     sfx.pickPiece();
-    dispatch({ type: "selectPiece", pieceId: id, throwValue: activeThrow });
-  };
+    dispatch({ type: "move", pieceId: id, queueIndex: qIdx });
+    sfx.landing();
+    setSelectedIdx(0);
+  }
 
-  // Branch option click.
-  const onNodeClick = (node: number): void => {
-    if (state.phase.kind !== "chooseBranch") return;
-    if (!state.pendingBranch?.options.includes(node)) return;
-    sfx.pickPiece();
-    dispatch({ type: "selectBranch", nextNode: node });
-  };
-
-  const movable = useMemo(() => {
-    if (state.phase.kind !== "choosePiece" || activeThrow === null) return [] as PieceId[];
-    return movablePieces(state, activeThrow).map(p => p.id);
-  }, [state, activeThrow]);
-
-  const highlightOptions = state.phase.kind === "chooseBranch" && state.pendingBranch
-    ? state.pendingBranch.options
-    : null;
-
-  const viewerLang = state.turn === "A" ? langA : langB;
-
-  const goalCount = (team: TeamId): number =>
-    Object.values(state.pieces).filter(p => p.team === team && p.node === "goal").length;
+  const lastLog = state.log[state.log.length - 1] ?? "";
 
   return (
-    <div style={root}>
-      <header style={header}>
-        <TeamBadge team="A" active={state.turn === "A"} goals={goalCount("A")} lang={langA} />
-        <div style={title}>🐝 꿀벌 윷놀이</div>
-        <TeamBadge team="B" active={state.turn === "B"} goals={goalCount("B")} lang={langB} />
-      </header>
-
-      <div style={boardWrap}>
-        <YutBoard
-          state={state}
-          highlightOptions={highlightOptions}
-          onNodeClick={state.phase.kind === "chooseBranch" ? onNodeClick : null}
-          movableIds={movable}
-          onPieceClick={state.phase.kind === "choosePiece" ? onPieceClick : null}
-        />
-        {state.phase.kind === "culture" && state.cultureCard && (
-          <CultureCard
-            data={state.cultureCard}
-            viewerLang={viewerLang}
-            onClose={() => dispatch({ type: "closeCulture" })}
-          />
-        )}
+    <div style={{
+      maxWidth: 620, margin: "0 auto", padding: "12px 10px 36px",
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+    }}>
+      {/* 턴 표시 */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        background: "#fff", borderRadius: 999,
+        border: `3px solid ${accent}`,
+        padding: "8px 22px",
+        boxShadow: `0 6px 16px ${accent}33`,
+      }}>
+        <span style={{
+          width: 14, height: 14, borderRadius: "50%", background: accent,
+          display: "inline-block",
+        }} />
+        <span style={{ fontSize: 16, fontWeight: 900, color: "#1F2937" }}>
+          {state.turn}팀 차례
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: "#92400E" }}>
+          {state.phase === "needThrow" ? "윷을 던져요" : state.phase === "move" ? "말을 고르세요" : ""}
+        </span>
       </div>
 
-      <section style={controls}>
+      {/* 보드 */}
+      <YutBoard state={state} selectedValue={selectedValue} onPickPiece={handlePick} />
+
+      {/* 로그 한 줄 */}
+      <div style={{
+        minHeight: 24, fontSize: 13, fontWeight: 800, color: "#78350F",
+        textAlign: "center",
+      }}>
+        {lastLog}
+      </div>
+
+      {/* 하단 패널 */}
+      {state.phase === "needThrow" && (
         <YutSticks
-          onResult={onSticksResult}
-          disabled={state.phase.kind !== "idle" || !!state.winner || pendingThrow !== null}
-          pendingValue={pendingThrow}
-          onAnimationDone={onAnimationDone}
+          enabled
+          accent={accent}
+          onResult={(v) => dispatch({ type: "throwResult", value: v })}
         />
-        <div style={controlsRight}>
-          {state.throws.length > 0 && (
-            <div style={throwChips}>
-              {state.throws.map((t, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setActiveThrow(t)}
-                  style={{
-                    ...chip,
-                    background: activeThrow === t ? "#F59E0B" : "#FEF3C7",
-                    color: activeThrow === t ? "#FFFBEB" : "#92400E",
-                  }}
-                >
-                  {throwLabel(t)}
-                </button>
-              ))}
+      )}
+
+      {state.phase === "move" && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          {state.queue.length > 1 && (
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280" }}>
+              사용할 윷을 고르고 말을 누르세요
             </div>
           )}
-          {state.phase.kind === "idle" && !state.winner && (
-            <button type="button" onClick={handleThrow} style={throwBtn}>
-              🎋 윷 던지기
-            </button>
-          )}
-          {state.phase.kind === "choosePiece" && (
-            <div style={help}>말을 탭해 이동하세요 ({throwLabel(activeThrow ?? 2)})</div>
-          )}
-          {state.phase.kind === "chooseBranch" && (
-            <div style={help}>지름길로 갈 타일을 선택하세요</div>
-          )}
-          {state.winner && (
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "restart" })}
-              style={restartBtn}
-            >
-              🔁 다시 시작
-            </button>
-          )}
-        </div>
-      </section>
-
-      <footer style={logBox} aria-label="게임 로그">
-        {state.log.slice(-4).map((l, i) => (
-          <div key={i} style={logLine}>
-            {l}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            {state.queue.map((v, i) => {
+              const active = i === selectedIdx;
+              return (
+                <button
+                  key={`${i}-${v}`}
+                  onClick={() => setSelectedIdx(i)}
+                  style={{
+                    minWidth: 64, padding: "10px 16px", borderRadius: 14,
+                    border: `3px solid ${active ? accent : "#E5E7EB"}`,
+                    background: active ? `${accent}22` : "#fff",
+                    color: active ? "#1F2937" : "#6B7280",
+                    fontSize: 16, fontWeight: 900, cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {THROW_LABEL[String(v)]}
+                  <span style={{ fontSize: 11, marginLeft: 4, color: "#92400E" }}>
+                    {v === -1 ? "←1" : `→${v}`}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        ))}
-      </footer>
+        </div>
+      )}
+
+      {/* 승리 오버레이 */}
+      {state.phase === "win" && state.winner && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 510,
+          background: "rgba(15,10,40,0.65)", backdropFilter: "blur(5px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 26,
+            border: `4px solid ${TEAM_COLOR[state.winner]}`,
+            padding: "30px 34px", textAlign: "center",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
+          }}>
+            <BeeMascot size={120} mood="cheer" />
+            <div style={{ fontSize: 28, fontWeight: 900, color: TEAM_COLOR[state.winner], margin: "12px 0 4px" }}>
+              🏆 {state.winner}팀 승리!
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#6B7280", marginBottom: 18 }}>
+              네 마리 꿀벌이 모두 집에 돌아왔어요
+            </div>
+            <button
+              onClick={() => dispatch({ type: "restart" })}
+              style={{
+                background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
+                color: "#fff", border: "none", borderRadius: 99,
+                padding: "13px 32px", fontSize: 16, fontWeight: 900, cursor: "pointer",
+                boxShadow: "0 8px 20px rgba(245,158,11,0.45)",
+              }}
+            >
+              🔁 다시 하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 문화카드 */}
+      {state.cultureNode !== null && cultureCountry && (
+        <CultureCard
+          country={cultureCountry}
+          viewerLang={langA}
+          onClose={() => dispatch({ type: "closeCulture" })}
+        />
+      )}
     </div>
   );
 }
-
-function TeamBadge({
-  team,
-  active,
-  goals,
-  lang,
-}: {
-  team: TeamId;
-  active: boolean;
-  goals: number;
-  lang: string;
-}): JSX.Element {
-  const color = team === "A" ? "#F59E0B" : "#2563EB";
-  return (
-    <div
-      style={{
-        ...badge,
-        borderColor: color,
-        background: active ? color : "#FFFBEB",
-        color: active ? "#FFFBEB" : color,
-      }}
-      aria-label={`${team}팀 ${lang}`}
-    >
-      <div style={badgeTop}>
-        {team === "A" ? "🟡 A팀" : "🔵 B팀"}
-      </div>
-      <div style={badgeSub}>도착 {goals}/4 · {lang}</div>
-    </div>
-  );
-}
-
-const root: CSSProperties = {
-  width: "100%",
-  maxWidth: 640,
-  margin: "0 auto",
-  padding: "10px 8px 16px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 10,
-  boxSizing: "border-box",
-  fontFamily: "system-ui, -apple-system, 'Noto Sans KR', sans-serif",
-};
-
-const header: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr auto 1fr",
-  alignItems: "center",
-  gap: 8,
-};
-
-const title: CSSProperties = {
-  fontSize: 20,
-  fontWeight: 900,
-  color: "#7C2D12",
-  textAlign: "center",
-};
-
-const badge: CSSProperties = {
-  border: "2px solid",
-  borderRadius: 14,
-  padding: "6px 10px",
-  textAlign: "center",
-  fontWeight: 800,
-  fontSize: 13,
-  minWidth: 0,
-};
-
-const badgeTop: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 900,
-};
-
-const badgeSub: CSSProperties = {
-  fontSize: 11,
-  opacity: 0.85,
-};
-
-const boardWrap: CSSProperties = {
-  position: "relative",
-  width: "100%",
-};
-
-const controls: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "auto 1fr",
-  gap: 12,
-  alignItems: "center",
-  padding: "8px 6px",
-  background: "#FFFBEB",
-  border: "2px solid #FDE68A",
-  borderRadius: 14,
-};
-
-const controlsRight: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-  alignItems: "stretch",
-};
-
-const throwBtn: CSSProperties = {
-  padding: "10px 14px",
-  background: "#B45309",
-  color: "#FFFBEB",
-  border: "none",
-  borderRadius: 12,
-  fontSize: 15,
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const restartBtn: CSSProperties = {
-  padding: "10px 14px",
-  background: "#16A34A",
-  color: "#FFFBEB",
-  border: "none",
-  borderRadius: 12,
-  fontSize: 15,
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const throwChips: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 6,
-};
-
-const chip: CSSProperties = {
-  padding: "4px 10px",
-  borderRadius: 999,
-  border: "2px solid #F59E0B",
-  fontWeight: 800,
-  fontSize: 13,
-  cursor: "pointer",
-};
-
-const help: CSSProperties = {
-  fontSize: 12,
-  color: "#92400E",
-  fontWeight: 700,
-};
-
-const logBox: CSSProperties = {
-  background: "#FFFBEB",
-  border: "2px solid #FDE68A",
-  borderRadius: 12,
-  padding: "8px 10px",
-  maxHeight: 90,
-  overflowY: "auto",
-  display: "flex",
-  flexDirection: "column",
-  gap: 2,
-};
-
-const logLine: CSSProperties = {
-  fontSize: 12,
-  color: "#7C2D12",
-  lineHeight: 1.3,
-};
