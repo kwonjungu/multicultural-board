@@ -17,6 +17,7 @@ import {
 } from "./marbleEffects";
 import {
   JAIL_RELEASE_FEE,
+  MAX_ROUNDS,
   PASS_START_BONUS,
   START_CASH,
   type Action,
@@ -39,11 +40,17 @@ export type {
 } from "./marbleTypes";
 export {
   JAIL_RELEASE_FEE,
+  MAX_ROUNDS,
   PASS_START_BONUS,
   START_CASH,
   TAX_AMOUNT,
   KEY_BONUS,
 } from "./marbleTypes";
+
+/** 총자산 = 현금 + 보유 도시 가격 합 (라운드 캡 승부 판정용) */
+export function totalAssets(p: PlayerState): number {
+  return p.cash + p.owned.reduce((acc, t) => acc + (TILES[t]?.price ?? 0), 0);
+}
 export { findOwner, tollFor };
 
 export function freshPlayer(sp: SetupPlayer): PlayerState {
@@ -346,6 +353,20 @@ export function reducer(state: GameState, action: Action): GameState {
         next = nextActivePlayer(cur, next);
       }
       const round = cur.playerIds.indexOf(next) === 0 ? cur.round + 1 : cur.round;
+      // 라운드 캡 — 마지막 라운드가 끝나면 총자산이 가장 많은 사람이 승리.
+      if (round > MAX_ROUNDS) {
+        const ranked = alive
+          .map((id) => ({ id, total: totalAssets(cur.players[id]) }))
+          .sort((a, b) => b.total - a.total);
+        const winner =
+          ranked.length > 1 && ranked[1].total === ranked[0].total
+            ? null // 공동 1위 → 무승부
+            : ranked[0].id;
+        return {
+          ...pushLog(cur, `⏰ ${MAX_ROUNDS}라운드 종료 — 총자산 승부!`),
+          phase: { kind: "gameover", winner, byAssets: true },
+        };
+      }
       return {
         ...cur,
         turn: next,

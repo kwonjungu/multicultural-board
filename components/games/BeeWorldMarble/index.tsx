@@ -3,6 +3,7 @@
 import { CSSProperties, useEffect, useReducer, useRef, useState } from "react";
 import {
   initialState,
+  MAX_ROUNDS,
   reducer,
   type SetupPlayer,
 } from "@/lib/marbleReducer";
@@ -141,6 +142,13 @@ export default function BeeWorldMarble({
 
   const footerNode = (
     <div style={footerBar}>
+      <div style={{
+        fontSize: 11, fontWeight: 900, color: "#92400E",
+        background: "#FEF3C7", border: "1.5px solid #FDE68A",
+        borderRadius: 999, padding: "4px 10px", whiteSpace: "nowrap", flexShrink: 0,
+      }}>
+        ⏰ {Math.min(state.round, MAX_ROUNDS)}/{MAX_ROUNDS}
+      </div>
       <LogTicker log={state.log} variant="footer" />
       <button
         type="button"

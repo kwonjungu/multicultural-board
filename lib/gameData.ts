@@ -183,6 +183,7 @@ export const GREETINGS: LangMap[] = [
   { ko: "미안해요", en: "Sorry", vi: "Xin lỗi", zh: "对不起", ja: "ごめんなさい", th: "ขอโทษ", id: "Maaf", hi: "माफ़ करें", ru: "Извините", ar: "آسف", fil: "Pasensya", km: "សុំទោស", mn: "Уучлаарай", uz: "Kechirasiz", my: "တောင်းပန်ပါတယ်" },
   { ko: "잘 자요", en: "Good night", vi: "Chúc ngủ ngon", zh: "晚安", ja: "おやすみ", th: "ราตรีสวัสดิ์", id: "Selamat tidur", hi: "शुभ रात्रि", ru: "Спокойной ночи", ar: "تصبح على خير", fil: "Magandang gabi", km: "រាត្រីសួស្ដី", mn: "Сайхан амраарай", uz: "Hayrli tun", my: "ညချမ်းသာပါစေ" },
   { ko: "만나서 반가워요", en: "Nice to meet you", vi: "Rất vui được gặp bạn", zh: "很高兴见到你", ja: "はじめまして", th: "ยินดีที่ได้รู้จัก", id: "Senang bertemu", hi: "मिलकर खुशी हुई", ru: "Приятно познакомиться", ar: "تشرفت بلقائك", fil: "Ikinagagalak kita", km: "រីករាយដែលបានជួប", mn: "Танилцсандаа баяртай байна", uz: "Tanishganimdan xursandman", my: "တွေ့ရတာ ဝမ်းသာပါတယ်" },
+  { ko: "또 만나요", en: "See you again", vi: "Hẹn gặp lại", zh: "再见", ja: "また会いましょう", th: "แล้วเจอกันใหม่", id: "Sampai jumpa lagi", hi: "फिर मिलेंगे", ru: "До встречи", ar: "إلى اللقاء", fil: "Kita tayo ulit", km: "ជួបគ្នាម្ដងទៀត", mn: "Дахин уулзацгаая", uz: "Yana ko'rishguncha", my: "နောက်မှ ပြန်တွေ့မယ်" },
 ];
 
 export function pickN<T>(arr: T[], n: number): T[] {
@@ -840,11 +841,12 @@ export const STORY_SYMBOLS: StorySymbol[] = [
     label: { ko: "꿀벌",   en: "bee",      vi: "con ong",    zh: "蜜蜂",   ja: "ミツバチ",th: "ผึ้ง",      id: "lebah",    hi: "मधुमक्खी",ru: "пчела",   ar: "نحلة",    fil: "bubuyog",  km: "ឃ្មុំ",       mn: "зөгий",   uz: "asalari", my: "ပျားကောင်" } },
 
   // ---- VOCAB 재활용 (13~15) ----
-  { id: 13, key: "friend", emoji: "🤝", image: "/story/friend.png", group: "people",
+  // friend/family/thanks 는 /story 에 전용 PNG 가 없어 DrawGuess 에셋 재사용
+  { id: 13, key: "friend", emoji: "🤝", image: "/game-assets/draw/friend.png", group: "people",
     label: { ko: "친구",   en: "friend",   vi: "bạn",        zh: "朋友",   ja: "友達",    th: "เพื่อน",    id: "teman",    hi: "दोस्त",   ru: "друг",     ar: "صديق",    fil: "kaibigan", km: "មិត្ត",        mn: "найз",    uz: "doʻst",   my: "သူငယ်ချင်း" } },
-  { id: 14, key: "family", emoji: "👨‍👩‍👧", image: "/story/family.png", group: "people",
+  { id: 14, key: "family", emoji: "👨‍👩‍👧", image: "/game-assets/draw/family.png", group: "people",
     label: { ko: "가족",   en: "family",   vi: "gia đình",   zh: "家人",   ja: "家族",    th: "ครอบครัว",  id: "keluarga", hi: "परिवार",  ru: "семья",    ar: "عائلة",   fil: "pamilya",  km: "គ្រួសារ",     mn: "гэр бүл", uz: "oila",    my: "မိသားစု" } },
-  { id: 15, key: "thanks", emoji: "🙏", image: "/story/thanks.png", group: "action",
+  { id: 15, key: "thanks", emoji: "🙏", image: "/game-assets/draw/thanks.png", group: "action",
     label: { ko: "고마워", en: "thanks",   vi: "cảm ơn",     zh: "谢谢",   ja: "ありがとう", th: "ขอบคุณ",  id: "terima kasih", hi: "धन्यवाद", ru: "спасибо", ar: "شكرا", fil: "salamat", km: "អរគុណ",     mn: "баярлалаа",uz: "rahmat",my: "ကျေးဇူးတင်ပါတယ်" } },
 
   // ---- 신규 추상/자연 (16~27) ----

@@ -109,9 +109,11 @@ export function walkForward(start: number, steps: number): WalkResult {
       return { kind: "branch", from: node, options: opts, remainingSteps: left };
     }
     const next = opts[0];
-    // Goal = landing exactly on 0 from 19. Inner paths rejoin at idx 17 and
-    // then walk 17->18->19->0 normally, so the same check covers both.
-    if (node === 19 && next === 0 && left === 1) {
+    // Goal = 19에서 0(출발점)을 밟거나 지나치면 골인 — 전통 윷놀이 룰.
+    // (예전 "정확히 도착"제는 남은 걸음이 많으면 한 바퀴를 더 돌아야 해서
+    // 학생들이 혼란스러워했다.) Inner paths rejoin at idx 17 and then walk
+    // 17->18->19->0 normally, so the same check covers both routes.
+    if (node === 19 && next === 0) {
       return { kind: "goal" };
     }
     node = next;

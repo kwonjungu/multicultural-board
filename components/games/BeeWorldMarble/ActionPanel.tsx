@@ -3,7 +3,7 @@
 import { CSSProperties, Dispatch, ReactNode } from "react";
 import { tr } from "@/lib/gameData";
 import { CHANCES, TILES } from "@/lib/marbleData";
-import type { Action, GameState } from "@/lib/marbleReducer";
+import { MAX_ROUNDS, totalAssets, type Action, type GameState } from "@/lib/marbleReducer";
 import { ChanceCard } from "./ChanceCard";
 import { DicePanel } from "./DicePanel";
 import { LogTicker } from "./LogTicker";
@@ -80,6 +80,13 @@ export function ActionPanel({
   if (isOverlayPhase) return null; // the overlay handles it
 
   if (phase.kind === "gameover") {
+    // 라운드 캡 종료(총자산 승부)면 순위표를 함께 보여준다.
+    const ranking = phase.byAssets
+      ? state.playerIds
+          .filter((id) => !state.players[id].bankrupt)
+          .map((id) => ({ p: state.players[id], total: totalAssets(state.players[id]) }))
+          .sort((a, b) => b.total - a.total)
+      : null;
     return (
       <CenterCard>
         <div style={iconRow}>🏆</div>
@@ -88,6 +95,26 @@ export function ActionPanel({
             ? `${state.players[phase.winner].name || phase.winner} 승리!`
             : "무승부!"}
         </div>
+        {ranking && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, margin: "6px 0 2px" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#92400E" }}>
+              ⏰ {MAX_ROUNDS}라운드 종료 · 총자산 순위
+            </div>
+            {ranking.map(({ p, total }, i) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "flex", justifyContent: "space-between", gap: 10,
+                  fontSize: 12, fontWeight: 800,
+                  color: PLAYER_COLOR[p.id] ?? "#1F2937",
+                }}
+              >
+                <span>{i + 1}위 {p.name || p.id}</span>
+                <span>💰 {total}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           aria-label="다시 시작"
