@@ -56,6 +56,20 @@ function enforceQuestionEnding(reply: string, lang: string): string {
   return `${cleaned} ${followup}`;
 }
 
+// 한국어 답변 정리 — LLM 이 가끔 섞는 외국어 토큰("çok 좋아해")과
+// 어색한 명사절 의문형("~무엇인지?")을 마지막 안전망으로 교정한다.
+function sanitizeKorean(reply: string): string {
+  let out = reply;
+  // 분음 라틴 문자(ç, ğ, ü, à …)가 든 토큰은 한국어 문장에 정상적으로
+  // 등장할 일이 없다 — 통째로 제거
+  out = out.replace(/[A-Za-z]*[À-ÿĀ-žơưƠƯ]+[A-Za-z À-ÿĀ-ž]*/g, "").replace(/\s{2,}/g, " ");
+  // "~무엇인지?" / "~어떤지?" / "~는지?" 류 명사절 의문형 → 구어체로
+  out = out.replace(/무엇인지\s*\?/g, "뭐야?");
+  out = out.replace(/인지\s*\?/g, "이야?");
+  out = out.replace(/([가-힣])는지\s*\?/g, "$1?");
+  return out.trim();
+}
+
 function buildSystemPrompt(params: {
   character: StorybookCharacter;
   bookTitle: string;
@@ -73,8 +87,18 @@ function buildSystemPrompt(params: {
 # Who you are talking to
 An elementary school student (age 7–9).
 
-# Answer language
-Reply ONLY in ${langName}. Do not switch languages unless the student asks in a different language.
+# Answer language (STRICT)
+Reply ONLY in ${langName}. EVERY single word must be ${langName} — never mix in words from English, Turkish, Vietnamese or any other language (e.g. writing "çok" or "very" inside a Korean sentence is forbidden). Do not switch languages unless the student writes in a different language.
+${studentLang === "ko" ? `
+# Korean speech register (반말 규칙)
+어린이 친구에게 말하듯 자연스러운 반말(해체)로만 말한다. "~예요/~에요/~습니다" 같은 존댓말 금지.
+의문문은 완전한 구어체로 끝낸다: "~이야?", "~어때?", "~할 것 같아?", "~좋아해?".
+"~인지?", "~한지?" 처럼 명사절로 끝나는 어색한 의문형은 절대 금지.
+  - 나쁜 예: "가장 좋아하는 음식이 무엇인지?" → 좋은 예: "제일 좋아하는 음식이 뭐야?"
+  - 나쁜 예: "어떤 감정을 주는지?" → 좋은 예: "이 이야기 들으니까 기분이 어때?"` : ""}
+
+# Never repeat yourself
+If the student asks the same or a similar question again, do NOT repeat your previous answer. They probably wanted MORE detail — give a NEW concrete detail from the story (a specific scene, what a character did, how it felt) in different words.
 
 # Reply structure (VERY IMPORTANT)
 Every single reply MUST follow this two-part shape, in this exact order:
@@ -157,13 +181,16 @@ export async function POST(req: NextRequest) {
     { role: "user" as const, content: body.studentText.trim() },
   ];
 
-  // === Layer 2~4: 스트리밍 + 증분 안전검사 + 질문형 종결 강제(final 에 반영) ===
+  // === Layer 2~4: 스트리밍 + 증분 안전검사 + 정리/질문형 종결 강제(final 에 반영) ===
   return streamChatResponse({
     messages,
     models: GROQ_MODELS,
     lang: body.studentLang,
-    temperature: 0.7,
+    temperature: 0.6,
     maxTokens: 180,
-    finalize: (full) => enforceQuestionEnding(full, body.studentLang),
+    finalize: (full) => {
+      const cleaned = body.studentLang === "ko" ? sanitizeKorean(full) : full;
+      return enforceQuestionEnding(cleaned, body.studentLang);
+    },
   });
 }

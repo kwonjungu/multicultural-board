@@ -36,6 +36,7 @@ import {
 } from "@/lib/storybook";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { readChatStream } from "@/lib/chatStreamClient";
+import MicButton from "./MicButton";
 import { speak as speakText } from "@/lib/ttsMulti";
 import StorybookCreator from "./StorybookCreator";
 import EmotionCardDeck from "./EmotionCardDeck";
@@ -2308,8 +2309,13 @@ function CharacterChat({
           padding: "10px 12px 12px",
           background: "#fff",
           borderTop: "2px solid #FDE68A",
-          display: "flex", gap: 8,
+          display: "flex", gap: 8, alignItems: "center",
         }}>
+          <MicButton
+            lang={lang}
+            disabled={busy}
+            onText={(text) => setDraft((d) => (d ? `${d} ${text}` : text))}
+          />
           <input
             type="text"
             value={draft}

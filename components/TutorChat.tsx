@@ -10,6 +10,7 @@ import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { readChatStream } from "@/lib/chatStreamClient";
 import { raiseAlert } from "@/lib/storybook";
 import type { UserConfig } from "@/lib/types";
+import MicButton from "./MicButton";
 
 interface TutorMsg {
   role: "user" | "assistant";
@@ -226,8 +227,14 @@ export default function TutorChat({
           {/* 입력 */}
           <div style={{
             padding: "8px 10px 10px", background: "#fff",
-            borderTop: "2px solid #FDE68A", display: "flex", gap: 8,
+            borderTop: "2px solid #FDE68A", display: "flex", gap: 8, alignItems: "center",
           }}>
+            <MicButton
+              lang={lang}
+              disabled={busy}
+              size={42}
+              onText={(text) => setDraft((d) => (d ? `${d} ${text}` : text))}
+            />
             <input
               type="text"
               value={draft}
