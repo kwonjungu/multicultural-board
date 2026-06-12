@@ -151,12 +151,27 @@ async function submitBatch() {
 
 async function poll(name) {
   const start = Date.now();
+  let netFails = 0;
   for (;;) {
-    const op = await api(name);
-    const state = op.metadata?.state || (op.done ? "done" : "running");
-    const mins = Math.round((Date.now() - start) / 60000);
-    console.log(`  …${state} (${mins}분 경과)`);
-    if (op.done) return op;
+    let op = null;
+    try {
+      op = await api(name);
+      netFails = 0;
+    } catch (err) {
+      // 일시적 네트워크 끊김(ECONNRESET 등)은 재시도 — 배치는 서버에서 계속 돈다
+      netFails++;
+      console.warn(`  ⚠ 폴링 실패 ${netFails}회: ${String(err?.message ?? err).slice(0, 120)}`);
+      if (netFails >= 10) {
+        console.error(`연속 실패 — 나중에 재개: node scripts/gen-images-batch.mjs ${name}`);
+        process.exit(1);
+      }
+    }
+    if (op) {
+      const state = op.metadata?.state || (op.done ? "done" : "running");
+      const mins = Math.round((Date.now() - start) / 60000);
+      console.log(`  …${state} (${mins}분 경과)`);
+      if (op.done) return op;
+    }
     if (Date.now() - start > 60 * 60 * 1000) {
       console.log(`1시간 초과 — 나중에 재개: node scripts/gen-images-batch.mjs ${name}`);
       process.exit(0);

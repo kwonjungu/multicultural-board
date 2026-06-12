@@ -841,12 +841,11 @@ export const STORY_SYMBOLS: StorySymbol[] = [
     label: { ko: "꿀벌",   en: "bee",      vi: "con ong",    zh: "蜜蜂",   ja: "ミツバチ",th: "ผึ้ง",      id: "lebah",    hi: "मधुमक्खी",ru: "пчела",   ar: "نحلة",    fil: "bubuyog",  km: "ឃ្មុំ",       mn: "зөгий",   uz: "asalari", my: "ပျားကောင်" } },
 
   // ---- VOCAB 재활용 (13~15) ----
-  // friend/family/thanks 는 /story 에 전용 PNG 가 없어 DrawGuess 에셋 재사용
-  { id: 13, key: "friend", emoji: "🤝", image: "/game-assets/draw/friend.png", group: "people",
+  { id: 13, key: "friend", emoji: "🤝", image: "/story/friend.png", group: "people",
     label: { ko: "친구",   en: "friend",   vi: "bạn",        zh: "朋友",   ja: "友達",    th: "เพื่อน",    id: "teman",    hi: "दोस्त",   ru: "друг",     ar: "صديق",    fil: "kaibigan", km: "មិត្ត",        mn: "найз",    uz: "doʻst",   my: "သူငယ်ချင်း" } },
-  { id: 14, key: "family", emoji: "👨‍👩‍👧", image: "/game-assets/draw/family.png", group: "people",
+  { id: 14, key: "family", emoji: "👨‍👩‍👧", image: "/story/family.png", group: "people",
     label: { ko: "가족",   en: "family",   vi: "gia đình",   zh: "家人",   ja: "家族",    th: "ครอบครัว",  id: "keluarga", hi: "परिवार",  ru: "семья",    ar: "عائلة",   fil: "pamilya",  km: "គ្រួសារ",     mn: "гэр бүл", uz: "oila",    my: "မိသားစု" } },
-  { id: 15, key: "thanks", emoji: "🙏", image: "/game-assets/draw/thanks.png", group: "action",
+  { id: 15, key: "thanks", emoji: "🙏", image: "/story/thanks.png", group: "action",
     label: { ko: "고마워", en: "thanks",   vi: "cảm ơn",     zh: "谢谢",   ja: "ありがとう", th: "ขอบคุณ",  id: "terima kasih", hi: "धन्यवाद", ru: "спасибо", ar: "شكرا", fil: "salamat", km: "អរគុណ",     mn: "баярлалаа",uz: "rahmat",my: "ကျေးဇူးတင်ပါတယ်" } },
 
   // ---- 신규 추상/자연 (16~27) ----

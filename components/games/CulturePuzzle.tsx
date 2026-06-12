@@ -33,34 +33,34 @@ const TOPICS: Topic[] = [
     caption: { ko: "친구야, 같이 놀자!", en: "Hey friend, let’s play together!", vi: "Bạn ơi, cùng chơi nào!" },
   },
   {
-    key: "intro",
-    src: "/icons/intro.png",
-    caption: { ko: "반가워, 내 소개를 할게!", en: "Nice to meet you — let me introduce myself!", vi: "Rất vui được gặp bạn — mình tự giới thiệu nhé!" },
+    key: "aodai",
+    src: "/game-assets/puzzle/aodai.png",
+    caption: { ko: "아오자이 (베트남의 전통 옷)", en: "Ao dai — traditional Vietnamese dress", vi: "Áo dài — trang phục truyền thống Việt Nam" },
   },
   {
-    key: "angry",
-    src: "/vocab-images/sentences/angry_2.png",
-    caption: { ko: "속상할 땐 마음을 말로 표현해요", en: "When upset, use your words to express feelings", vi: "Khi buồn bực, hãy nói ra cảm xúc" },
+    key: "songkran",
+    src: "/game-assets/puzzle/songkran.png",
+    caption: { ko: "송끄란 (태국의 물 축제)", en: "Songkran — Thai water festival", vi: "Songkran — lễ hội té nước Thái Lan" },
   },
   {
-    key: "know",
-    src: "/vocab-images/sentences/know_2.png",
-    caption: { ko: "비밀 이야기 — 친구와 소곤소곤", en: "A little secret — whisper to your friend", vi: "Chuyện nhỏ — thì thầm cùng bạn" },
+    key: "naadam",
+    src: "/game-assets/puzzle/naadam.png",
+    caption: { ko: "나담 축제 (몽골의 말타기)", en: "Naadam — Mongolian horse riding festival", vi: "Naadam — lễ hội cưỡi ngựa Mông Cổ" },
   },
   {
-    key: "bee",
-    src: "/mascot/bee-loading.png",
-    caption: { ko: "꿀벌이가 응원해요!", en: "Little bee cheers you on!", vi: "Chú ong nhỏ cổ vũ bạn!" },
+    key: "jeepney",
+    src: "/game-assets/puzzle/jeepney.png",
+    caption: { ko: "지프니 (필리핀의 알록달록 버스)", en: "Jeepney — colorful Filipino bus", vi: "Jeepney — xe buýt sặc sỡ của Philippines" },
+  },
+  {
+    key: "taekwondo",
+    src: "/game-assets/puzzle/taekwondo.png",
+    caption: { ko: "태권도 (한국의 전통 무예)", en: "Taekwondo — Korean martial art", vi: "Taekwondo — võ thuật truyền thống Hàn Quốc" },
   },
   {
     key: "korea",
     src: "/landmarks/korea.png",
     caption: { ko: "경복궁 — 한국의 옛 궁궐", en: "Gyeongbokgung — ancient Korean palace", vi: "Gyeongbokgung — cung điện cổ của Hàn Quốc" },
-  },
-  {
-    key: "school",
-    src: "/game-assets/draw/school.png",
-    caption: { ko: "학교 — 친구들을 만나는 곳", en: "School — where we meet friends", vi: "Trường học — nơi gặp bạn bè" },
   },
 ];
 

@@ -176,9 +176,16 @@ export default function TutorChat({
             boxShadow: "0 8px 20px rgba(180,83,9,0.4)",
             fontSize: 28, cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 4,
           }}
         >
-          🐝
+          <img
+            src="/mascot/bee-tutor.png"
+            alt=""
+            aria-hidden="true"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).outerHTML = "🐝"; }}
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          />
         </button>
       )}
 
@@ -201,7 +208,12 @@ export default function TutorChat({
             display: "flex", alignItems: "center", gap: 10,
             borderBottom: "2px solid #F59E0B33",
           }}>
-            <div style={{ fontSize: 30, lineHeight: 1 }}>🐝</div>
+            <img
+              src="/mascot/bee-tutor.png"
+              alt=""
+              aria-hidden="true"
+              style={{ width: 40, height: 40, objectFit: "contain", flexShrink: 0 }}
+            />
             <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 900, color: "#1F2937" }}>
               {pickL(L_TITLE, lang)}
             </div>
