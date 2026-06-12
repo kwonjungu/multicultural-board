@@ -205,12 +205,17 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
     if (!myCard || myCard.length === 0) return;
 
     // easy(order 3) 는 commonSymbol (정확히 1개 보장),
-    // 타협 모드는 anyCommon (0 또는 여러 개 가능)
+    // 타협 모드는 공통 심볼이 여러 개일 수 있으므로
+    // "양쪽 카드에 모두 있는 심볼" 은 모두 정답으로 수용
     const common = difficulty === "easy"
       ? commonSymbol(myCard, centerCard)
       : anyCommon(myCard, centerCard);
 
-    const isCorrect = common !== -1 && symbolId === common;
+    const isCorrect =
+      common !== -1 &&
+      (difficulty === "easy"
+        ? symbolId === common
+        : centerCard.includes(symbolId));
 
     if (!isCorrect) {
       // 오답 → 0.8초 락

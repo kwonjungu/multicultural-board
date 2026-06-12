@@ -128,6 +128,23 @@ export function YutBoard({
             </g>
           );
         })}
+        {/* 홈(대기) 말 — 출발 전/잡힌 말. 보드에 안 그리면 말을 꺼낼 방법이
+            없어 첫 턴부터 진행 불가가 되므로 링 안쪽 빈 공간에 팀별로 표시. */}
+        {(["A", "B"] as const).map((team) =>
+          Object.values(state.pieces)
+            .filter((p) => p.team === team && p.node === "home")
+            .map((p, i) => (
+              <YutPiece
+                key={p.id}
+                piece={p}
+                x={team === "A" ? 400 + i * 64 : 180 + i * 64}
+                y={team === "A" ? 790 : 210}
+                size={50}
+                isMovable={movableIds.includes(p.id)}
+                onClick={onPieceClick ? () => onPieceClick(p.id) : undefined}
+              />
+            )),
+        )}
         {/* Pieces */}
         {Array.from(byNode.entries()).map(([nodeIdx, ids]) => {
           const n = nodes[nodeIdx];

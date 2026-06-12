@@ -35,6 +35,9 @@ export interface BranchChoice {
   throwValue: Throw;
   from: number;
   options: number[]; // next-node candidates, >=2 entries when branch applies
+  // 분기 시점에 남아 있던 걸음 수 (walkForward 의 remainingSteps).
+  // 중간에 중앙(23)에서 분기가 생기면 throwValue 로는 복원할 수 없다.
+  remainingSteps: number;
 }
 
 export type LangMap = Record<string, string>;

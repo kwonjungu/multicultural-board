@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, useMemo, useState, useEffect } from "react";
+import { CSSProperties, useMemo, useRef, useState, useEffect } from "react";
 import {
   COUNTRIES,
   EMOTIONS,
@@ -141,6 +141,10 @@ function shuffleLangs(): string[] {
 export function QuizCard({ tileIdx, langA, langB, onAnswer }: QuizCardProps) {
   const [picked, setPicked] = useState<number | null>(null);
   const [remaining, setRemaining] = useState(20);
+  // 답을 이미 골랐는지 — 타이머 콜백은 picked 의 stale 값을 보므로 ref 로 추적.
+  // 마지막 1초에 정답을 골라도 타임아웃의 onAnswer(false) 가 먼저 dispatch 되어
+  // 오답 처리(우주 타일이면 한 턴 쉬기 페널티)되는 레이스를 막는다.
+  const answeredRef = useRef(false);
 
   const q = useMemo(
     () => buildQuiz(tileIdx, langA),
@@ -154,8 +158,8 @@ export function QuizCard({ tileIdx, langA, langB, onAnswer }: QuizCardProps) {
       setRemaining((r) => {
         if (r <= 1) {
           clearInterval(id);
-          // Timeout → wrong.
-          setTimeout(() => onAnswer(false), 0);
+          // Timeout → wrong (이미 답을 골랐다면 무시).
+          if (!answeredRef.current) setTimeout(() => onAnswer(false), 0);
           return 0;
         }
         return r - 1;
@@ -166,6 +170,7 @@ export function QuizCard({ tileIdx, langA, langB, onAnswer }: QuizCardProps) {
 
   function handlePick(i: number) {
     if (picked !== null) return;
+    answeredRef.current = true;
     setPicked(i);
     const correct = i === q.answerIdx;
     setTimeout(() => onAnswer(correct), 800);

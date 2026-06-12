@@ -45,7 +45,8 @@ export default function HoneyYut({ langA, langB }: Props): JSX.Element {
   }, [state.phase]);
 
   const handleThrow = (): void => {
-    if (state.phase.kind !== "idle" || state.winner) return;
+    // pendingThrow 가드: 애니메이션 중 더블탭하면 이미 굴린 결과가 교체된다.
+    if (state.phase.kind !== "idle" || state.winner || pendingThrow !== null) return;
     sfx.throwSticks();
     const v = throwSticks();
     // Animation takes ~600ms; the YutSticks component dispatches "throwResult"

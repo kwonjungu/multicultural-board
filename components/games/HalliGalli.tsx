@@ -583,8 +583,9 @@ function CenterCard({ card, flipped, highlight, compact }: { card: Card | undefi
           placeItems: "center",
         }}
       >
+        {/* key 에 fruit 포함 — 카드가 바뀔 때 리마운트되어 failed(onError) 상태가 새 과일로 새어가지 않게 */}
         {Array.from({ length: card.count }).map((_, i) => (
-          <FruitGlyph key={i} fruit={card.fruit} />
+          <FruitGlyph key={`${card.fruit}-${i}`} fruit={card.fruit} />
         ))}
       </div>
       {/* Corner count for tactile confirmation, very subtle */}
@@ -596,8 +597,8 @@ function CenterCard({ card, flipped, highlight, compact }: { card: Card | undefi
       }}>{meta.emoji} ×{card.count}</div>
       <style jsx>{`
         @keyframes halliGlow {
-          from { box-shadow: 0 0 0 4px rgba(220,38,38,0.25), 0 12px 28px rgba(0,0,0,0.18); }
-          to   { box-shadow: 0 0 0 10px rgba(220,38,38,0.55), 0 12px 32px rgba(0,0,0,0.25); }
+          from { box-shadow: 0 0 0 4px rgba(16,185,129,0.25), 0 12px 28px rgba(0,0,0,0.18); }
+          to   { box-shadow: 0 0 0 10px rgba(16,185,129,0.55), 0 12px 32px rgba(0,0,0,0.25); }
         }
       `}</style>
     </div>

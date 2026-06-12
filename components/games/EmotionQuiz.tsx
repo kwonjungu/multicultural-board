@@ -71,7 +71,8 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
           💭 상황
         </div>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
-          <EmotionImage item={cur.answer} />
+          {/* key 로 라운드마다 리마운트 — imgOk(onError) 상태가 다음 문제로 새어가지 않게 */}
+          <EmotionImage key={cur.answer.imageKey} item={cur.answer} />
         </div>
         <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.5 }}>
           {tr(cur.answer.situation, langA)}

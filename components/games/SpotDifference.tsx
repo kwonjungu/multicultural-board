@@ -211,8 +211,9 @@ export default function SpotDifference({ langA, langB }: Props) {
 
       {/* A/B images */}
       <div style={imagesGrid}>
-        <SceneImage src={scene.imageA} badge="A" label={lab(L.left, langA, langB)} />
-        <SceneImage src={scene.imageB} badge="B" label={lab(L.right, langA, langB)} />
+        {/* key 로 장면마다 리마운트 — errored(onError) 상태가 다음 장면으로 새어가지 않게 */}
+        <SceneImage key={scene.imageA} src={scene.imageA} badge="A" label={lab(L.left, langA, langB)} />
+        <SceneImage key={scene.imageB} src={scene.imageB} badge="B" label={lab(L.right, langA, langB)} />
       </div>
 
       {/* Checklist */}

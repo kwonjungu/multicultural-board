@@ -272,9 +272,11 @@ export function reducer(state: GameState, action: Action): GameState {
       // If the effect did not change phase (e.g. gain/lose), stamp landed so
       // the UI can offer the "next turn" button.
       if (applied.phase.kind === "chance") {
+        // toJail/toFestival 은 pos 를 옮기므로 이동 *후* 위치를 찍어야
+        // 보드 하이라이트와 무인도 sfx 판정이 맞는다 (state.players 는 이동 전).
         return {
           ...applied,
-          phase: { kind: "landed", who, tile: state.players[who].pos },
+          phase: { kind: "landed", who, tile: applied.players[who].pos },
         };
       }
       return applied;
@@ -311,6 +313,15 @@ export function reducer(state: GameState, action: Action): GameState {
     }
 
     case "endTurn": {
+      // 턴 종료가 가능한 phase 에서만 처리 — 버튼 더블클릭으로 중복 dispatch
+      // 되면 두 번째 endTurn 이 다음 플레이어의 턴(rolling)을 건너뛴다.
+      if (
+        state.phase.kind !== "landed" &&
+        state.phase.kind !== "tollPaid" &&
+        state.phase.kind !== "festival"
+      ) {
+        return state;
+      }
       const alive = state.playerIds.filter((id) => !state.players[id].bankrupt);
       if (alive.length <= 1) {
         return {

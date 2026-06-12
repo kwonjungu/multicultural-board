@@ -204,6 +204,10 @@ export function reducer(state: GameState, action: Action): GameState {
     }
 
     case "SERVE": {
+      // 더블탭/타이머 경쟁으로 result 에서 중복 SERVE 되면 별점이 이중 적립됨 → phase 가드
+      if (state.phase !== "cook-ingr" && state.phase !== "cook-steps") {
+        return state;
+      }
       if (!state.chosenMenu) return state;
       const presetTimer = initialTimerFor(state.difficulty).timer;
       const elapsed = state.unlimited

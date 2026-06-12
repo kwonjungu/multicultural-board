@@ -73,7 +73,9 @@ export default function HoneyTaboo({ langA, langB }: { langA: string; langB: str
 
   function startGame() {
     if (selected.length === 0) return;
-    setDeckCats(selected);
+    // 새 배열로 복사해야 같은 카테고리로 재시작해도 deck useMemo가
+    // 재계산되어 카드가 다시 섞인다 (같은 참조면 React가 갱신을 건너뜀).
+    setDeckCats([...selected]);
     setIdx(0); setScore(0); setPasses(MAX_PASSES); setTimer(ROUND_SECONDS);
     setOutcomes([]); finishedRef.current = false;
     setPhase("play");

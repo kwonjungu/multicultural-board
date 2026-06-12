@@ -243,6 +243,8 @@ export function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case "throwResult": {
       if (state.winner) return state;
+      // idle 외 phase 에서 들어온 중복 dispatch(더블탭 등)는 무시 — 공짜 던지기 방지.
+      if (state.phase.kind !== "idle") return state;
       const throws = [...state.throws, action.value];
       const extra = isExtraThrow(action.value);
       const nextLog = [
@@ -298,12 +300,13 @@ export function reducer(state: GameState, action: Action): GameState {
 
     case "selectBranch": {
       if (!state.pendingBranch) return state;
-      const { pieceId, throwValue, options } = state.pendingBranch;
+      const { pieceId, throwValue, options, remainingSteps } = state.pendingBranch;
       if (!options.includes(action.nextNode)) return state;
       const piece = state.pieces[pieceId];
       if (!piece) return state;
-      const homeBase = piece.node === "home" ? 1 : 0;
-      const remaining = (throwValue as number) - homeBase - 1;
+      // 분기 시점에 남아 있던 걸음 수에서 선택한 칸으로 1걸음 소비.
+      // throwValue 로 복원하면 중앙(23) 중간 도착 분기에서 오버슈트한다.
+      const remaining = remainingSteps - 1;
       const chosenStart = action.nextNode;
       const cleared: GameState = { ...state, pendingBranch: null };
       const res: WalkResult = remaining <= 0
@@ -315,6 +318,9 @@ export function reducer(state: GameState, action: Action): GameState {
     case "closeCulture": {
       // Culture card dismissed: if throws remain, go back to choosePiece;
       // otherwise end turn.
+      // culture phase 가 아닐 때의 중복 dispatch(더블탭)는 무시 —
+      // 안 막으면 endTurnCore 가 두 번 돌아 상대 턴을 통째로 건너뛴다.
+      if (state.phase.kind !== "culture") return state;
       if (state.throws.length > 0) {
         return { ...state, cultureCard: null, phase: { kind: "choosePiece" } };
       }
@@ -350,7 +356,13 @@ function resolveWalk(
     return {
       ...state,
       throws,
-      pendingBranch: { pieceId, throwValue, from: res.from, options: res.options },
+      pendingBranch: {
+        pieceId,
+        throwValue,
+        from: res.from,
+        options: res.options,
+        remainingSteps: res.remainingSteps,
+      },
       phase: { kind: "chooseBranch" },
     };
   }

@@ -59,19 +59,19 @@ export default function StepSequencer({
 
   const handlePointerUp = useCallback(
     (e: PointerEvent) => {
-      setDrag((d) => {
-        if (!d || e.pointerId !== d.pointerId) return d;
-        const delta = d.currentY - d.startY;
-        const slots = Math.round(delta / Math.max(1, d.itemHeight));
-        const to = Math.max(
-          0,
-          Math.min(stepOrder.length - 1, d.from + slots),
-        );
-        if (to !== d.from) onReorder(d.from, to);
-        return null;
-      });
+      // setDrag updater 내부에서 onReorder 를 호출하면 StrictMode 의
+      // updater 이중 호출 시 재정렬이 두 번 적용됨 → updater 밖에서 계산
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      const delta = drag.currentY - drag.startY;
+      const slots = Math.round(delta / Math.max(1, drag.itemHeight));
+      const to = Math.max(
+        0,
+        Math.min(stepOrder.length - 1, drag.from + slots),
+      );
+      if (to !== drag.from) onReorder(drag.from, to);
+      setDrag(null);
     },
-    [onReorder, stepOrder.length],
+    [drag, onReorder, stepOrder.length],
   );
 
   useEffect(() => {
