@@ -42,10 +42,20 @@ function solidFromGradient(bgGradient: string | undefined): string {
   return "FEF3C7";
 }
 
+// 외부(파이어베이스 스토리지 등) 절대 URL 은 CORS 에 막히므로 서버 프록시를 경유한다.
+// 같은-오리진 상대경로(/storybooks/...)와 data: URL 은 그대로 fetch.
+function fetchableUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) {
+    const sameOrigin = typeof window !== "undefined" && url.startsWith(window.location.origin);
+    if (!sameOrigin) return `/api/img-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 // 이미지 URL → dataURL. 실패 시 null (이모지 폴백).
 async function toDataUrl(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url);
+    const res = await fetch(fetchableUrl(url));
     if (!res.ok) return null;
     const blob = await res.blob();
     return await new Promise((resolve) => {

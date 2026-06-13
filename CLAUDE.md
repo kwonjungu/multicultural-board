@@ -128,6 +128,10 @@
   `node:fs`/`node:https` 를 참조해 클라이언트 빌드가 `UnhandledSchemeError` 로 깨지므로
   `next.config.js` 에 `!isServer` 분기로 (1) `node:` prefix 제거 플러그인 +
   (2) `resolve.fallback { fs/https/http: false }` 를 넣어둠. 이 webpack 블록 건드리지 말 것.
+  또한 그림책 이미지는 **Firebase Storage URL**(`firebasestorage.googleapis.com`)이라
+  브라우저에서 직접 fetch 하면 버킷 CORS 미설정 시 막혀 PPT 에 사진이 빠진다 →
+  `lib/storybookPptx.ts` 의 `toDataUrl` 은 외부 절대 URL 을 `/api/img-proxy` (서버
+  프록시, 호스트 화이트리스트)로 우회해 dataURL 로 변환한다. 같은-오리진/상대경로는 직접.
 
 ---
 
