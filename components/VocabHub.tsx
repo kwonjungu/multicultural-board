@@ -12,7 +12,7 @@ import {
 import { extractVocabLocal, MatchedWord, wordById } from "@/lib/vocabUtils";
 import { checkAndAward, RewardRule, getAwardedIds } from "@/lib/vocabRewards";
 import { cleanupExpiredRecordings } from "@/lib/vocabRecordings";
-import { buildMixedQuiz, buildLessonQuiz, type QuizItem } from "@/lib/quizFormats";
+import { buildMixedQuiz, buildLessonQuiz, buildDailyChallenge, type QuizItem } from "@/lib/quizFormats";
 import { getUnits, wordsForLesson, type Unit, type Lesson } from "@/lib/lessons";
 import BeeMascot from "./BeeMascot";
 import {
@@ -358,6 +358,54 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
 
       {/* HUD: 하트 / 스트릭 / XP */}
       <LearnerHUD learner={learner} now={now} />
+
+      {/* 🔥 나의 단어 일일 챌린지 — 소통판 단어 + 약점 단어 듀오링고식 릴레이 */}
+      {(() => {
+        const boardCount = matched.length;
+        const studiedCount = Object.values(progress).filter(
+          (p) => (p.doneSentences?.length ?? 0) > 0,
+        ).length;
+        const startDailyChallenge = () => {
+          const boardIds = matched.map((m) => m.wordId);
+          const q = buildDailyChallenge(progress, boardIds, 10);
+          if (q.length > 0) {
+            setLessonContext({ id: "daily-challenge", title: "🔥 나의 단어 일일 챌린지" });
+            setQuiz(q);
+          }
+        };
+        return (
+          <button
+            onClick={startDailyChallenge}
+            style={{
+              maxWidth: 760, width: "100%", margin: "0 auto 14px",
+              display: "flex", alignItems: "center", gap: 14, textAlign: "left",
+              background: "linear-gradient(135deg, #F97316, #DB2777)",
+              border: "none", borderRadius: 20, padding: "14px 18px",
+              cursor: "pointer", fontFamily: "inherit",
+              boxShadow: "0 10px 26px rgba(219, 39, 119, 0.35)",
+              transition: "transform 0.15s",
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            <div style={{ fontSize: 40, flexShrink: 0 }}>🔥</div>
+            <div style={{ flex: 1, minWidth: 0, color: "#fff" }}>
+              <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: -0.3 }}>
+                나의 단어 일일 챌린지
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2, opacity: 0.95 }}>
+                🎧 듣고 찾기 · 소통판 단어 {boardCount}개 + 약점 단어 {studiedCount}개 섞어서 출제
+              </div>
+            </div>
+            <div style={{
+              background: "rgba(255,255,255,0.25)", color: "#fff",
+              fontSize: 14, fontWeight: 900, padding: "8px 14px", borderRadius: 12,
+              flexShrink: 0,
+            }}>시작 →</div>
+          </button>
+        );
+      })()}
 
       {viewMode === "tree" ? (
         <SkillTreeView
