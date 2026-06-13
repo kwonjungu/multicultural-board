@@ -30,7 +30,6 @@
 ### 다음 작업 큐 (사용자 지정 순서)
 완료되면 줄 자체를 지운다. ⏳ 는 현재 진행 중.
 
-- **#3 그림책 PPT 출력 점검** — 1일. StorybookCreator 결과를 PPTX 로.
 - **#5 분야별 보상 확장** — 1.5일. 소통/그림책/감정/게임/표현 5분야 트로피.
   *#1 표현 복습 완료로 5번째 분야의 호출 지점 확보됨.*
 - **#7 약점 단어 자동 복습 레슨** — 1일. attempts 로그 기반 약점 선정.
@@ -57,6 +56,9 @@
 >   PoToken 을 강제해 서버측 자동 추출이 거의 항상 빈 응답(200 len=0) → 자동은
 >   best-effort 로만 두고, **교사 붙여넣기 폴백**(manualText)을 메인 경로로 추가함.
 >   교사가 스크립트 붙여넣으면 방 언어 전체로 번역해 모든 학생에게 공유. 가드레일 참조.
+> - ✅ #3 그림책 PPT 출력 — `lib/storybookPptx.ts`(`exportStorybookToPptx`) +
+>   TeacherSetup 책 목록에 "📊 PPT" 버튼. 표지 1장 + 페이지 N장(상단 일러스트/
+>   하단 주언어+한국어). pptxgenjs 는 동적 import(메인 번들 보호). 가드레일 참조.
 
 ---
 
@@ -114,6 +116,13 @@
   API 를 붙이지 않는 한 자동 추출은 안 된다. 그래서 `/api/youtube-transcript` 는 실패를
   구조화된 `available:false` 로 반환(24h 네거티브 캐시)하고, **교사 붙여넣기(manualText)**가
   실질적 데이터 소스다. 다음에 "자동이 왜 안 되냐"로 다시 파헤치지 말 것.
+
+- **pptxgenjs(그림책 PPT 출력)는 반드시 동적 import + 클라이언트 전용.** 정적
+  import 하면 ~수백 KB 가 메인 `/[roomCode]` 번들에 박힌다 → `lib/storybookPptx.ts`
+  안에서 `(await import("pptxgenjs")).default` 로만 로드. 또한 pptxgenjs 는
+  `node:fs`/`node:https` 를 참조해 클라이언트 빌드가 `UnhandledSchemeError` 로 깨지므로
+  `next.config.js` 에 `!isServer` 분기로 (1) `node:` prefix 제거 플러그인 +
+  (2) `resolve.fallback { fs/https/http: false }` 를 넣어둠. 이 webpack 블록 건드리지 말 것.
 
 ---
 

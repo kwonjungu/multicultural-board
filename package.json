@@ -18,6 +18,7 @@
     "next": "14.2.5",
     "openai": "^4.52.0",
     "pdf-parse": "^2.4.5",
+    "pptxgenjs": "^4.0.1",
     "qrcode.react": "^4.2.0",
     "react": "^18",
     "react-dom": "^18",

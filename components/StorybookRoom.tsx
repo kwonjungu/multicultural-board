@@ -34,6 +34,7 @@ import {
   deleteGeneratedBook,
   type BookListEntry,
 } from "@/lib/storybook";
+import { exportStorybookToPptx } from "@/lib/storybookPptx";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { readChatStream } from "@/lib/chatStreamClient";
 import MicButton from "./MicButton";
@@ -304,6 +305,22 @@ function TeacherSetup({
   const [generated, setGenerated] = useState<BookListEntry[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [exportingId, setExportingId] = useState<string | null>(null);
+
+  async function handleExportPptx(id: string) {
+    if (exportingId) return;
+    setExportingId(id);
+    try {
+      const book = await loadBook(id);
+      if (book) await exportStorybookToPptx(book, lang);
+      else window.alert("그림책을 불러오지 못했어요.");
+    } catch (err) {
+      console.error("PPTX export failed", err);
+      window.alert("PPT 만들기에 실패했어요.");
+    } finally {
+      setExportingId(null);
+    }
+  }
 
   useEffect(() => {
     let cancel = false;
@@ -476,6 +493,21 @@ function TeacherSetup({
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => handleExportPptx(b.id)}
+                    disabled={exportingId === b.id}
+                    aria-label="PPT로 내보내기"
+                    title="PPT로 내보내기"
+                    style={{
+                      minHeight: 40, padding: "6px 10px",
+                      background: exportingId === b.id ? "#E5E7EB" : "#fff",
+                      border: "1.5px solid #FCD34D",
+                      color: exportingId === b.id ? "#9CA3AF" : "#B45309",
+                      fontSize: 12, fontWeight: 900,
+                      borderRadius: 10, cursor: exportingId === b.id ? "wait" : "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >{exportingId === b.id ? "…" : "📊 PPT"}</button>
                   {b.source === "generated" && (
                     <button
                       onClick={() => handleDelete(b.id)}
