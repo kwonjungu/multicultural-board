@@ -32,7 +32,6 @@
 
 - ⏳ **#2 유튜브 자막 자동 번역** — 1.5일.
   `youtube-transcript` 패키지 + `/api/youtube-transcript` + PadletCard 토글.
-- **#3 그림책 PPT 출력 점검** — 1일. StorybookCreator 결과를 PPTX 로.
 - **#5 분야별 보상 확장** — 1.5일. 소통/그림책/감정/게임/표현 5분야 트로피.
   *#1 표현 복습 완료로 5번째 분야의 호출 지점 확보됨.*
 - **#7 약점 단어 자동 복습 레슨** — 1일. attempts 로그 기반 약점 선정.
@@ -53,6 +52,9 @@
 >   (이모지 폴백 동작). 디자인 판단 필요 시 이 목록부터.
 > - ✅ 다문화 지구본 `components/MulticulturalGlobe.tsx` — 소통창 헤더 🌍.
 >   three.js 는 next/dynamic 지연 로드 유지할 것 (~600KB).
+> - ✅ #3 그림책 PPT 출력 — `lib/storybookPptx.ts`(`exportStorybookToPptx`) +
+>   TeacherSetup 책 목록에 "📊 PPT" 버튼. 표지 1장 + 페이지 N장(상단 일러스트/
+>   하단 주언어+한국어). pptxgenjs 는 동적 import(메인 번들 보호). 가드레일 참조.
 
 ---
 
@@ -101,6 +103,13 @@
 
 - **PadletBoard 학생 액션 직후의 백그라운드 작업은 try/catch 로 격리.**
   카드 작성 성공이 표현 추출/감정 카운트 실패로 인해 미끄러지면 안 됨.
+
+- **pptxgenjs(그림책 PPT 출력)는 반드시 동적 import + 클라이언트 전용.** 정적
+  import 하면 ~수백 KB 가 메인 `/[roomCode]` 번들에 박힌다 → `lib/storybookPptx.ts`
+  안에서 `(await import("pptxgenjs")).default` 로만 로드. 또한 pptxgenjs 는
+  `node:fs`/`node:https` 를 참조해 클라이언트 빌드가 `UnhandledSchemeError` 로 깨지므로
+  `next.config.js` 에 `!isServer` 분기로 (1) `node:` prefix 제거 플러그인 +
+  (2) `resolve.fallback { fs/https/http: false }` 를 넣어둠. 이 webpack 블록 건드리지 말 것.
 
 ---
 
