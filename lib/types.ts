@@ -30,6 +30,19 @@ export interface CardData {
   status?: CardStatus;
   authorClientId?: string;
   editedAt?: number;
+  transcript?: TranscriptData;
+}
+
+// YouTube 카드의 자막 + 번역 캐시. /api/youtube-transcript 가 채워
+// rooms/{roomCode}/cards/{cardId}/transcript 에 저장한다.
+export interface TranscriptData {
+  available: boolean;
+  reason?: string;                       // available=false 일 때 한국어 사유
+  sourceLang: string;                    // 자막 트랙 언어 ("" 이면 미상)
+  original: string;                      // 원어 전문
+  translations: Record<string, string>;  // lang -> 번역 전문
+  fetchedAt: number;
+  truncated?: boolean;                   // 길이 상한으로 잘렸는지
 }
 
 export interface ColumnData {

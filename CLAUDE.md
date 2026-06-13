@@ -30,8 +30,6 @@
 ### 다음 작업 큐 (사용자 지정 순서)
 완료되면 줄 자체를 지운다. ⏳ 는 현재 진행 중.
 
-- ⏳ **#2 유튜브 자막 자동 번역** — 1.5일.
-  `youtube-transcript` 패키지 + `/api/youtube-transcript` + PadletCard 토글.
 - **#3 그림책 PPT 출력 점검** — 1일. StorybookCreator 결과를 PPTX 로.
 - **#5 분야별 보상 확장** — 1.5일. 소통/그림책/감정/게임/표현 5분야 트로피.
   *#1 표현 복습 완료로 5번째 분야의 호출 지점 확보됨.*
@@ -53,6 +51,12 @@
 >   (이모지 폴백 동작). 디자인 판단 필요 시 이 목록부터.
 > - ✅ 다문화 지구본 `components/MulticulturalGlobe.tsx` — 소통창 헤더 🌍.
 >   three.js 는 next/dynamic 지연 로드 유지할 것 (~600KB).
+> - ✅ #2 유튜브 자막 자동 번역 — `/api/youtube-transcript` + `lib/youtubeTranscript.ts`
+>   + PadletCard 토글 UI(원어/뷰어언어/다른언어 더보기 + 읽어주기) + 결과는
+>   `rooms/{}/cards/{}/transcript` 에 캐시. **핵심 제약**: YouTube 가 timedtext 에
+>   PoToken 을 강제해 서버측 자동 추출이 거의 항상 빈 응답(200 len=0) → 자동은
+>   best-effort 로만 두고, **교사 붙여넣기 폴백**(manualText)을 메인 경로로 추가함.
+>   교사가 스크립트 붙여넣으면 방 언어 전체로 번역해 모든 학생에게 공유. 가드레일 참조.
 
 ---
 
@@ -101,6 +105,15 @@
 
 - **PadletBoard 학생 액션 직후의 백그라운드 작업은 try/catch 로 격리.**
   카드 작성 성공이 표현 추출/감정 카운트 실패로 인해 미끄러지면 안 됨.
+
+- **YouTube 자막 서버측 자동 추출은 신뢰하지 말 것 (PoToken 차단).** watch 페이지에서
+  captionTracks 목록(`languageCode`/`baseUrl`)은 잘 나오지만, 그 baseUrl 의 timedtext
+  (`&fmt=json3/srv3/srv1`, as-is 전부)는 현재 **200 + 본문 0바이트**로 돌아온다. InnerTube
+  ANDROID(키 만료 400)·`get_transcript`(failedPrecondition)·CONSENT 쿠키 모두 우회 실패 —
+  교육용/음악 영상 무관하게 동일. 헤드리스 브라우저로 PoToken 을 만들거나 외부 transcript
+  API 를 붙이지 않는 한 자동 추출은 안 된다. 그래서 `/api/youtube-transcript` 는 실패를
+  구조화된 `available:false` 로 반환(24h 네거티브 캐시)하고, **교사 붙여넣기(manualText)**가
+  실질적 데이터 소스다. 다음에 "자동이 왜 안 되냐"로 다시 파헤치지 말 것.
 
 ---
 
