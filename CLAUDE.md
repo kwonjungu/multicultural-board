@@ -59,6 +59,11 @@
 > - ✅ #3 그림책 PPT 출력 — `lib/storybookPptx.ts`(`exportStorybookToPptx`) +
 >   TeacherSetup 책 목록에 "📊 PPT" 버튼. 표지 1장 + 페이지 N장(상단 일러스트/
 >   하단 주언어+한국어). pptxgenjs 는 동적 import(메인 번들 보호). 가드레일 참조.
+> - ✅ 나의 단어 일일 챌린지 — `buildDailyChallenge()`(quizFormats.ts) + VocabHub 상단
+>   카드. **약점 단어(priority) + 소통판 단어(matched) 블렌드**, 듣고 찾기/그림 중심
+>   (listening·mc4-image·mc4) 듀오링고식 릴레이. 단어카드 학습은 그대로 유지하고 그 옆에
+>   추가. VocabTest 재사용(lessonId="daily-challenge"로 결과 stars 기록, 스킬트리 무영향).
+>   #7(약점 단어 자동 복습)의 핵심 선정 로직을 챌린지 형태로 선반영함.
 
 ---
 

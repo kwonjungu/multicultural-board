@@ -262,6 +262,79 @@ export function buildLessonQuiz(lessonId: string, formatCycle: QuizFormat[] = DE
   return out;
 }
 
+// 일일 챌린지용 — "단순/듣고 찾기" 중심의 탭형 포맷 (타이핑 cloze 제외).
+export const CHALLENGE_FORMAT_CYCLE: QuizFormat[] = ["listening", "mc4-image", "mc4"];
+
+function pickSentenceIdx(progress: ProgressMap, wordId: string): 0 | 1 | 2 {
+  const done = progress[wordId]?.doneSentences ?? [];
+  if (done.length > 0) {
+    return done[Math.floor(Math.random() * done.length)] as 0 | 1 | 2;
+  }
+  return 0;
+}
+
+/**
+ * 나의 단어 일일 챌린지 — **약점 단어 + 소통판 단어**를 섞어 듀오링고식 릴레이로.
+ * 약점 우선(buildQuiz 의 priority), 소통판 단어 교차 삽입, 부족하면 기초(level≤2) 단어로
+ * 채워 항상 target 문항을 보장한다. 포맷은 듣고 찾기/그림 중심(단순).
+ *
+ * @param progress 학습 이력
+ * @param boardWordIds 소통판에서 추출된 단어 id (matched)
+ * @param target 문항 수 (기본 10)
+ */
+export function buildDailyChallenge(
+  progress: ProgressMap,
+  boardWordIds: string[] = [],
+  target = 10,
+  formatCycle: QuizFormat[] = CHALLENGE_FORMAT_CYCLE,
+): QuizItem[] {
+  // 1) 약점/학습이력 단어 (priority>0, 정렬됨)
+  const weakWords = buildQuiz(progress, Math.max(target, 8)).map((q) => q.word);
+  // 2) 소통판 단어
+  const boardWords = boardWordIds
+    .map((id) => VOCAB_WORDS.find((w) => w.id === id))
+    .filter((w): w is VocabWord => !!w);
+
+  const seen = new Set<string>();
+  const ordered: VocabWord[] = [];
+  const push = (w?: VocabWord) => {
+    if (w && !seen.has(w.id)) { seen.add(w.id); ordered.push(w); }
+  };
+
+  // 약점·소통판 교차 삽입 (둘 다 골고루)
+  const maxLen = Math.max(weakWords.length, boardWords.length);
+  for (let i = 0; i < maxLen && ordered.length < target; i++) {
+    push(weakWords[i]);
+    push(boardWords[i]);
+  }
+  // 부족하면 기초 단어로 채움
+  if (ordered.length < target) {
+    for (const w of shuffle(VOCAB_WORDS.filter((w) => w.level <= 2))) {
+      push(w);
+      if (ordered.length >= target) break;
+    }
+  }
+
+  const finalWords = ordered.slice(0, target);
+
+  // 포맷 라운드로빈 배정 (실패 시 다른 포맷으로 폴백)
+  const out: QuizItem[] = [];
+  finalWords.forEach((w, i) => {
+    const sIdx = pickSentenceIdx(progress, w.id);
+    const primary = formatCycle[i % formatCycle.length];
+    const order: QuizFormat[] = [
+      primary,
+      ...formatCycle.filter((f) => f !== primary),
+      ...DEFAULT_FORMAT_CYCLE.filter((f) => !formatCycle.includes(f)),
+    ];
+    for (const fmt of order) {
+      const item = makeItem(fmt, w, sIdx);
+      if (item) { out.push(item); return; }
+    }
+  });
+  return out;
+}
+
 export const FORMAT_LABEL: Record<QuizFormat, string> = {
   cloze: "빈칸 채우기",
   mc4: "4지선다",
