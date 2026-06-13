@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { ref, onValue, off, push, set, remove } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
-import { CardData, CommentData } from "@/lib/types";
+import { CardData, CommentData, TranscriptData } from "@/lib/types";
 import { LANGUAGES, CARD_PALETTES } from "@/lib/constants";
 import { t } from "@/lib/i18n";
 
@@ -90,6 +90,48 @@ function TranslationRow({ lang, text, accent }: { lang: string; text: string; ac
   );
 }
 
+// 자막 전문 블록 — 줄바꿈 보존(whiteSpace: pre-wrap) + 스크롤 + 읽어주기.
+function TranscriptBlock({ lang, text, accent }: { lang: string; text: string; accent: string }) {
+  return (
+    <div style={{
+      position: "relative",
+      background: accent + "0F",
+      borderLeft: "4px solid " + accent,
+      padding: "10px 40px 10px 14px",
+      borderRadius: "0 10px 10px 0",
+      marginTop: 8,
+    }}>
+      <span style={{ fontSize: 12, display: "block", marginBottom: 4, color: accent, fontWeight: 800 }}>
+        {LANGUAGES[lang]?.flag} {LANGUAGES[lang]?.label}
+      </span>
+      <div style={{
+        fontSize: 14, color: "#374151", lineHeight: 1.7, fontWeight: 500,
+        whiteSpace: "pre-wrap", maxHeight: 220, overflowY: "auto",
+      }}>{text}</div>
+      <button
+        onClick={() => speakText(text, lang)}
+        title="읽어주기"
+        aria-label={`${LANGUAGES[lang]?.label} 읽어주기`}
+        style={{
+          position: "absolute", top: 8, right: 8,
+          background: "rgba(255,255,255,0.85)", border: `1.5px solid ${accent}44`, cursor: "pointer",
+          fontSize: 13, color: accent, padding: "4px 8px",
+          lineHeight: 1, borderRadius: 10, fontWeight: 700,
+        }}
+      >🔊</button>
+    </div>
+  );
+}
+
+function transcriptSubBtnStyle(accent: string): CSSProperties {
+  return {
+    background: "rgba(255,255,255,0.7)", border: `1.5px dashed ${accent}44`, cursor: "pointer",
+    fontSize: 12, color: accent, fontWeight: 700,
+    padding: "6px 12px", marginTop: 8, borderRadius: 999,
+    display: "inline-flex", alignItems: "center", gap: 4,
+  };
+}
+
 interface Props {
   card: CardData;
   viewerLang: string;
@@ -126,6 +168,17 @@ export default function PadletCard({
   const [imgError, setImgError] = useState(false);
   const [now, setNow] = useState(Date.now());
   const cardType = card.cardType || "text";
+
+  // YouTube 자막 번역 상태
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [transcriptErr, setTranscriptErr] = useState<string | null>(null);
+  const [transcriptOtherOpen, setTranscriptOtherOpen] = useState(false);
+  const [transcriptOrigOpen, setTranscriptOrigOpen] = useState(false);
+  const [localTranscript, setLocalTranscript] = useState<TranscriptData | null>(null);
+  // 교사 수동 붙여넣기 폴백
+  const [pasteText, setPasteText] = useState("");
+  const [pasteSubmitting, setPasteSubmitting] = useState(false);
 
   // Comment state
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -290,6 +343,62 @@ export default function PadletCard({
   function approveComment(commentId: string) {
     const db = getClientDb();
     set(ref(db, `rooms/${roomCode}/cards/${card.id}/comments/${commentId}/status`), "approved");
+  }
+
+  // YouTube 자막: 토글 + 최초 1회 서버 호출(이후엔 Firebase 캐시가 card.transcript 로 들어옴)
+  const transcript = card.transcript || localTranscript;
+  async function toggleTranscript() {
+    const next = !transcriptOpen;
+    setTranscriptOpen(next);
+    if (!next || transcript || transcriptLoading || !card.youtubeId) return;
+    setTranscriptLoading(true);
+    setTranscriptErr(null);
+    try {
+      const res = await fetch("/api/youtube-transcript", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          youtubeId: card.youtubeId,
+          roomCode,
+          cardId: card.id,
+          targetLangs: roomLangs,
+        }),
+      });
+      if (!res.ok) throw new Error("fetch failed");
+      const data = await res.json();
+      setLocalTranscript(data.transcript as TranscriptData);
+    } catch {
+      setTranscriptErr(t("captionNone", viewerLang));
+    }
+    setTranscriptLoading(false);
+  }
+
+  // 교사가 직접 붙여넣은 자막을 번역해 올린다(모든 학생 언어로).
+  async function submitManualTranscript() {
+    if (!pasteText.trim() || pasteSubmitting || !card.youtubeId) return;
+    setPasteSubmitting(true);
+    setTranscriptErr(null);
+    try {
+      const res = await fetch("/api/youtube-transcript", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          youtubeId: card.youtubeId,
+          roomCode,
+          cardId: card.id,
+          targetLangs: roomLangs,
+          manualText: pasteText,
+          sourceLang: viewerLang,
+        }),
+      });
+      if (!res.ok) throw new Error("fetch failed");
+      const data = await res.json();
+      setLocalTranscript(data.transcript as TranscriptData);
+      setPasteText("");
+    } catch {
+      setTranscriptErr(t("captionNone", viewerLang));
+    }
+    setPasteSubmitting(false);
   }
 
   return (
@@ -486,15 +595,151 @@ export default function PadletCard({
 
         {/* ── YouTube ── */}
         {cardType === "youtube" && card.youtubeId && (
-          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 10, overflow: "hidden" }}>
-            <iframe
-              src={`https://www.youtube.com/embed/${card.youtubeId}`}
-              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title="YouTube video"
-            />
-          </div>
+          <>
+            <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 10, overflow: "hidden" }}>
+              <iframe
+                src={`https://www.youtube.com/embed/${card.youtubeId}`}
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title="YouTube video"
+              />
+            </div>
+
+            {/* 자막 번역 토글 */}
+            <button
+              onClick={toggleTranscript}
+              style={{
+                background: transcriptOpen ? p.accent + "14" : "rgba(255,255,255,0.7)",
+                border: `1.5px dashed ${p.accent}55`, cursor: "pointer",
+                fontSize: 13, color: p.accent, fontWeight: 800,
+                padding: "8px 14px", marginTop: 8, borderRadius: 999,
+                display: "inline-flex", alignItems: "center", gap: 4, transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = p.accent + "14")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = transcriptOpen ? p.accent + "14" : "rgba(255,255,255,0.7)")}
+            >
+              {transcriptOpen ? t("captionHide", viewerLang) : t("captionShow", viewerLang)}
+            </button>
+
+            {transcriptOpen && (
+              <div style={{ marginTop: 8 }}>
+                {transcriptLoading && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6B7280", padding: "10px 14px", background: "#F9FAFB", borderRadius: 10 }}>
+                    <span style={{ display: "inline-block", animation: "pulse 1.2s ease-in-out infinite" }}>● ● ●</span>
+                    {t("captionLoading", viewerLang)}
+                  </div>
+                )}
+
+                {!transcriptLoading && transcriptErr && (
+                  <div style={{ fontSize: 13, color: "#6B7280", padding: "10px 14px", background: "#F9FAFB", borderRadius: 10 }}>
+                    {transcriptErr}
+                  </div>
+                )}
+
+                {!transcriptLoading && transcript && !transcript.available && (
+                  <div style={{ fontSize: 13, color: "#6B7280", padding: "10px 14px", background: "#F9FAFB", borderRadius: 10 }}>
+                    📝 {transcript.reason || t("captionNone", viewerLang)}
+                  </div>
+                )}
+
+                {!transcriptLoading && transcript && transcript.available && (() => {
+                  const src = transcript.sourceLang;
+                  const viewerText = viewerLang === src
+                    ? transcript.original
+                    : (transcript.translations?.[viewerLang] || transcript.original);
+                  const otherLangs = roomLangs.filter(
+                    (l) => l !== viewerLang && l !== src && transcript.translations?.[l],
+                  );
+                  return (
+                    <>
+                      <TranscriptBlock
+                        lang={viewerLang}
+                        text={viewerText}
+                        accent={colColor}
+                      />
+
+                      {src && src !== viewerLang && (
+                        <div>
+                          <button
+                            onClick={() => setTranscriptOrigOpen((v) => !v)}
+                            style={transcriptSubBtnStyle(p.accent)}
+                          >
+                            {transcriptOrigOpen ? "▲ " : "▼ "}{LANGUAGES[src]?.flag} {t("captionOriginal", viewerLang)}
+                          </button>
+                          {transcriptOrigOpen && (
+                            <TranscriptBlock lang={src} text={transcript.original} accent={p.accent} />
+                          )}
+                        </div>
+                      )}
+
+                      {otherLangs.length > 0 && (
+                        <div>
+                          <button
+                            onClick={() => setTranscriptOtherOpen((v) => !v)}
+                            style={transcriptSubBtnStyle(p.accent)}
+                          >
+                            {transcriptOtherOpen ? "▲ 접기" : `▼ +${otherLangs.length}개 언어 더보기`}
+                          </button>
+                          {transcriptOtherOpen && otherLangs.map((l) => (
+                            <TranscriptBlock key={l} lang={l} text={transcript.translations[l]} accent={p.accent} />
+                          ))}
+                        </div>
+                      )}
+
+                      {transcript.truncated && (
+                        <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 6, paddingLeft: 4 }}>
+                          ⓘ 긴 영상이라 앞부분만 번역했어요
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* 교사용 붙여넣기 폴백 — 자동 추출이 막혔거나 자막이 없을 때 */}
+                {isTeacher && !transcriptLoading && (!transcript || !transcript.available) && (
+                  <div style={{
+                    marginTop: 10, padding: "12px 14px", background: "#F0F9FF",
+                    border: "1px dashed #7DD3FC", borderRadius: 12,
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#0369A1", marginBottom: 6 }}>
+                      👩‍🏫 교사용 · 자막 직접 붙여넣기
+                    </div>
+                    <div style={{ fontSize: 11, color: "#0C4A6E", marginBottom: 8, lineHeight: 1.5 }}>
+                      YouTube 자동 자막을 가져올 수 없을 때, 영상 설명/자막 스크립트를 붙여넣으면
+                      모든 학생 언어로 자동 번역돼요. ({LANGUAGES[viewerLang]?.label} 기준으로 인식)
+                    </div>
+                    <textarea
+                      value={pasteText}
+                      onChange={(e) => setPasteText(e.target.value)}
+                      placeholder="여기에 자막/스크립트를 붙여넣으세요"
+                      disabled={pasteSubmitting}
+                      rows={4}
+                      style={{
+                        width: "100%", borderRadius: 10, padding: "10px 12px",
+                        border: "1.5px solid #BAE6FD", fontSize: 14, outline: "none",
+                        resize: "vertical", boxSizing: "border-box", lineHeight: 1.6,
+                        background: pasteSubmitting ? "#F3F4F6" : "#fff", color: "#1F2937",
+                      }}
+                    />
+                    <button
+                      onClick={submitManualTranscript}
+                      disabled={!pasteText.trim() || pasteSubmitting}
+                      style={{
+                        marginTop: 8, padding: "9px 18px", borderRadius: 10, border: "none",
+                        background: pasteText.trim() && !pasteSubmitting ? "linear-gradient(135deg, #0EA5E9, #0284C7)" : "#E5E7EB",
+                        color: pasteText.trim() && !pasteSubmitting ? "#fff" : "#9CA3AF",
+                        fontWeight: 800, fontSize: 14,
+                        cursor: pasteText.trim() && !pasteSubmitting ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      {pasteSubmitting ? "번역 중…" : "🌐 번역해서 올리기"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         {/* ── Text ── */}
