@@ -5,6 +5,7 @@ import { UserConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import RoomManagePanel from "./RoomManagePanel";
 import FontSizeButton from "./FontSizeButton";
+import LangSwitchButton from "./LangSwitchButton";
 
 export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab" | "storybook";
 
@@ -89,9 +90,11 @@ interface Props {
   roomCode: string;
   onSelect: (view: HubView) => void;
   onLogout: () => void;
+  onChangeLang: (lang: string) => void;
+  availableLangs: string[];
 }
 
-export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
+export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLang, availableLangs }: Props) {
   const lang = user.myLang;
   // 교사는 로그인 직후 시작화면에서 관리 패널을 바로 본다 (기본 펼침).
   const [manageOpen, setManageOpen] = useState(true);
@@ -145,6 +148,13 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
               )}
             </div>
           </div>
+          {/* 언어 설정 — 교사·학생 공통, 입장 후에도 변경 가능 */}
+          <LangSwitchButton
+            currentLang={user.myLang}
+            availableLangs={availableLangs}
+            onChange={onChangeLang}
+          />
+
           {/* 글자 크기 설정 — 교사·학생 공통 */}
           <FontSizeButton />
 

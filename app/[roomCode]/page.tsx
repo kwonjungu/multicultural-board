@@ -215,6 +215,8 @@ export default function RoomPage() {
             else setHubView(v);
           }}
           onLogout={() => setUser(null)}
+          onChangeLang={(l) => setUser({ ...user, myLang: l })}
+          availableLangs={roomLangs}
         />
         <HubTutorialBootstrap isTeacher={user.isTeacher} />
         {/* Interpreter은 drawer 오버레이, hub 위에서 직접 열림 */}
