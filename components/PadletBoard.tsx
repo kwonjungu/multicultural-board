@@ -11,7 +11,6 @@ import PostModal from "./PostModal";
 import PptxTranslateModal from "./PptxTranslateModal";
 import DiscussionCreateModal from "./DiscussionCreateModal";
 import DiscussionSession from "./DiscussionSession";
-import GameRoom from "./GameRoom";
 import InterpreterDrawer from "./InterpreterDrawer";
 import SentencePracticeModal from "./SentencePracticeModal";
 import EmotionCardDeck from "./EmotionCardDeck";
@@ -80,10 +79,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   // Feature modals
   const [showQR, setShowQR] = useState(false);
   const [showApproval, setShowApproval] = useState(false);
-  const [showExport, setShowExport] = useState(false);
   const [showPptx, setShowPptx] = useState(false);
   const [showDiscussionCreate, setShowDiscussionCreate] = useState(false);
-  const [showGameRoom, setShowGameRoom] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionMinimized, setSessionMinimized] = useState(false);
   const [editModal, setEditModal] = useState<{ card: CardData; colTitle: string; colColor: string } | null>(null);
@@ -305,192 +302,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     });
     setNewColTitle("");
     setNewColColor(COL_COLORS[0]);
-  }
-
-  // ── PDF Export (text-based with comment summaries) ──
-  async function exportPDF() {
-    setShowExport(false);
-    const { default: jsPDFLib } = await import("jspdf");
-    const pdf = new jsPDFLib({ orientation: "portrait", unit: "mm", format: "a4" });
-    const W = pdf.internal.pageSize.getWidth();
-    const margin = 14;
-    let y = margin;
-    const lineH = 6;
-    const maxW = W - margin * 2;
-
-    function ensurePage(need = 10) {
-      if (y + need > 285) { pdf.addPage(); y = margin; }
-    }
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(14);
-    pdf.text(`Room ${roomCode}`, margin, y);
-    y += lineH + 2;
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(9);
-    pdf.setTextColor(130, 130, 130);
-    pdf.text(new Date().toLocaleString("ko-KR"), margin, y);
-    pdf.setTextColor(0, 0, 0);
-    y += lineH + 4;
-
-    for (const col of columns) {
-      const colCards = visibleCards.filter((c) => c.colId === col.id);
-      if (!colCards.length) continue;
-      ensurePage(14);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.text(col.title, margin, y);
-      y += lineH;
-
-      for (const card of colCards) {
-        ensurePage(20);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(9);
-        pdf.text(`${card.authorName} (${LANGUAGES[card.authorLang]?.flag || ""} ${card.authorLang})`, margin + 4, y);
-        y += lineH - 1;
-
-        pdf.setFont("helvetica", "normal");
-        const body =
-          card.cardType === "image" ? "[이미지 첨부]"
-          : card.cardType === "youtube" ? `[YouTube: ${card.youtubeId}]`
-          : card.cardType === "drawing" ? "[그림]"
-          : card.originalText || "";
-        const lines = pdf.splitTextToSize(body, maxW - 4);
-        lines.slice(0, 4).forEach((line: string) => {
-          ensurePage();
-          pdf.text(line, margin + 4, y);
-          y += lineH - 1;
-        });
-        if (lines.length > 4) {
-          pdf.setTextColor(130, 130, 130);
-          pdf.text(`... (${lines.length - 4} more lines)`, margin + 4, y);
-          pdf.setTextColor(0, 0, 0);
-          y += lineH - 1;
-        }
-
-        // Comment summaries from pendingItems (approved comments)
-        const cardComments = pendingItems
-          .filter((p) => p.kind === "comment" && p.parentCard.id === card.id && p.data.status !== "pending")
-          .map((p) => (p as { kind: "comment"; data: CommentData; parentCard: CardData }).data);
-        if (cardComments.length) {
-          const shown = cardComments.slice(0, 3);
-          const more = cardComments.length - 3;
-          shown.forEach((c) => {
-            ensurePage();
-            pdf.setTextColor(80, 80, 180);
-            pdf.setFontSize(8);
-            const cLine = `  💬 ${c.authorName}: ${c.text.slice(0, 60)}${c.text.length > 60 ? "…" : ""}`;
-            pdf.text(cLine, margin + 4, y);
-            y += lineH - 2;
-          });
-          if (more > 0) {
-            pdf.text(`  ... +${more}개`, margin + 4, y);
-            y += lineH - 2;
-          }
-          pdf.setTextColor(0, 0, 0);
-          pdf.setFontSize(9);
-        }
-        y += 2;
-      }
-      y += 4;
-    }
-
-    const now = new Date();
-    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-    pdf.save(`${roomCode}_${stamp}.pdf`);
-  }
-
-  // ── CSV Export (includes comment rows) ──
-  async function exportCSV() {
-    setShowExport(false);
-    const { get, ref: dbRef } = await import("firebase/database");
-    const db = getClientDb();
-
-    // Fetch full card data (with comments) for export
-    type RawCard = CardData & { comments?: Record<string, CommentData> };
-    const snap = await get(dbRef(db, `rooms/${roomCode}/cards`)).catch(() => null);
-    const rawData: Record<string, RawCard> = snap?.val() || {};
-
-    const bom = "\uFEFF";
-    const header = "종류,작성자,컬럼,타입,원문,언어,시각\n";
-    const rows: string[] = [];
-
-    for (const card of visibleCards) {
-      const col = columns.find((c) => c.id === card.colId);
-      const colTitle = (col?.title || card.colId).replace(/"/g, '""');
-      let content = (card.originalText || "").replace(/"/g, '""');
-      if (card.cardType === "image") content = `[사진] ${card.imageUrl || ""}`;
-      if (card.cardType === "youtube") content = `[YouTube] https://youtu.be/${card.youtubeId || ""}`;
-      if (card.cardType === "drawing") content = "[그림]";
-      const time = new Date(card.timestamp).toLocaleString("ko-KR");
-      rows.push(`"card","${card.authorName}","${colTitle}","${card.cardType}","${content}","${card.authorLang}","${time}"`);
-
-      // Append approved comments
-      const rawCard = rawData[card.id];
-      if (rawCard?.comments) {
-        for (const comment of Object.values(rawCard.comments)) {
-          if (comment.status === "pending") continue; // skip unapproved
-          const commentText = comment.text.replace(/"/g, '""');
-          const commentTime = new Date(comment.timestamp).toLocaleString("ko-KR");
-          rows.push(`"comment","${comment.authorName}","${colTitle}","comment","${commentText}","${comment.authorLang}","${commentTime}"`);
-        }
-      }
-    }
-
-    const blob = new Blob([bom + header + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const now = new Date();
-    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-    a.href = url;
-    a.download = `${roomCode}_${stamp}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  // ── Image Export (single PNG capture of whole board) ──
-  async function exportImage() {
-    setShowExport(false);
-    const el = boardRef.current;
-    if (!el) return;
-    const { default: html2canvas } = await import("html2canvas");
-    const prevOverflowX = el.style.overflowX;
-    const prevOverflowY = el.style.overflowY;
-    const prevHeight = el.style.height;
-    el.style.overflowX = "visible";
-    el.style.overflowY = "visible";
-    el.style.height = "auto";
-    try {
-      const canvas = await html2canvas(el, {
-        backgroundColor: "#F8F9FE",
-        scale: window.devicePixelRatio > 1 ? 2 : 1.5,
-        useCORS: true,
-        logging: false,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
-      });
-      const now = new Date();
-      const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `bee-board-${roomCode}-${stamp}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, "image/png");
-    } finally {
-      el.style.overflowX = prevOverflowX;
-      el.style.overflowY = prevOverflowY;
-      el.style.height = prevHeight;
-    }
   }
 
   // ── Approval actions ──
@@ -806,68 +617,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 </button>
               )}
 
-              {/* Export dropdown */}
-              <div style={{ position: "relative" }}>
-                <button
-                  onClick={() => setShowExport((v) => !v)}
-                  style={{
-                    background: "#EFF6FF", border: "2px solid #BFDBFE",
-                    color: "#1D4ED8", borderRadius: 16, padding: "10px 16px",
-                    fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
-                    transition: "transform 0.12s",
-                  }}
-                  onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                  onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  📤 {t("exportBtn", lang)} ▾
-                </button>
-                {showExport && (
-                  <div style={{
-                    position: "absolute", top: "calc(100% + 8px)", right: 0,
-                    background: "#fff", borderRadius: 18, boxShadow: "0 12px 36px rgba(0,0,0,0.18)",
-                    border: "2px solid #FDE68A", zIndex: 100, minWidth: 200, overflow: "hidden",
-                  }}>
-                    <button
-                      onClick={exportPDF}
-                      style={{
-                        width: "100%", padding: "14px 18px", textAlign: "left", border: "none",
-                        background: "transparent", cursor: "pointer", fontSize: 15, fontWeight: 700,
-                        color: "#374151", display: "block",
-                      }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#FEF9E7")}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
-                    >
-                      📄 {t("exportPdf", lang)}
-                    </button>
-                    <button
-                      onClick={exportCSV}
-                      style={{
-                        width: "100%", padding: "14px 18px", textAlign: "left", border: "none",
-                        background: "transparent", cursor: "pointer", fontSize: 15, fontWeight: 700,
-                        color: "#374151", borderTop: "1px solid #FEF3C7", display: "block",
-                      }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#FEF9E7")}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
-                    >
-                      📊 {t("exportCsv", lang)}
-                    </button>
-                    <button
-                      onClick={exportImage}
-                      style={{
-                        width: "100%", padding: "14px 18px", textAlign: "left", border: "none",
-                        background: "transparent", cursor: "pointer", fontSize: 15, fontWeight: 700,
-                        color: "#374151", borderTop: "1px solid #FEF3C7", display: "block",
-                      }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "#FEF9E7")}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
-                    >
-                      🖼️ {t("exportImage", lang)}
-                    </button>
-                  </div>
-                )}
-              </div>
-
               {/* 의견 나누기 button */}
               <button
                 onClick={() => {
@@ -887,24 +636,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
                 {activeSessionId ? "🔴 진행 중" : "💭 의견 나누기"}
-              </button>
-
-              {/* 🎮 소통의 방 button */}
-              <button
-                onClick={() => setShowGameRoom(true)}
-                style={{
-                  background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
-                  border: "none",
-                  color: "#fff", borderRadius: 16, padding: "10px 18px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 44,
-                  boxShadow: "0 6px 18px rgba(245,158,11,0.4)",
-                  transition: "transform 0.12s",
-                }}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                🎮 소통의 방
               </button>
 
               {/* PPTX 번역 button */}
@@ -1476,11 +1207,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         />
       )}
 
-      {/* ── 🎮 소통의 방 ── */}
-      {showGameRoom && (
-        <GameRoom myLang={lang} onClose={() => setShowGameRoom(false)} />
-      )}
-
       {/* ── 🎙️ 통역 도우미 Drawer ── */}
       <InterpreterDrawer
         open={interpreterOpen}
@@ -1778,7 +1504,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       )}
 
       {/* ── ✏️ FAB: 아무 칼럼에 글쓰기 ── */}
-      {!modal && !editModal && !showPptx && !showGameRoom && !showDiscussionCreate && !activeSessionId && columns.length > 0 && (
+      {!modal && !editModal && !showPptx && !showDiscussionCreate && !activeSessionId && columns.length > 0 && (
         <button
           onClick={() => {
             const first = columns[0];
@@ -1803,7 +1529,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       )}
 
       {/* ── 💗 FAB: 내 감정 표현하기 (학생 전용) ── */}
-      {!isTeacher && !modal && !editModal && !showPptx && !showGameRoom && !showDiscussionCreate && !activeSessionId && (
+      {!isTeacher && !modal && !editModal && !showPptx && !showDiscussionCreate && !activeSessionId && (
         <button
           onClick={() => setEmotionOpen(true)}
           aria-label="내 감정 표현하기"
