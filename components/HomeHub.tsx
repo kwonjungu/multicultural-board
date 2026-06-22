@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import RoomManagePanel from "./RoomManagePanel";
+import FontSizeButton from "./FontSizeButton";
 
 export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab" | "storybook";
 
@@ -144,15 +145,23 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
               )}
             </div>
           </div>
-          <button
-            onClick={onLogout}
-            aria-label="나가기"
-            style={{
-              width: 40, height: 40, borderRadius: 12, border: "2px solid #FDE68A",
-              background: "#fff", fontSize: 14, fontWeight: 900, color: "#92400E", cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >⏻</button>
+          {/* 글자 크기 설정 — 교사·학생 공통 */}
+          <FontSizeButton />
+
+          {/* 전원(로그아웃) — 학생에게는 아래에 "로그아웃" 글자 표시 */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
+            <button
+              onClick={onLogout}
+              aria-label="로그아웃"
+              style={{
+                width: 40, height: 40, borderRadius: 12, border: "2px solid #FDE68A",
+                background: "#fff", fontSize: 14, fontWeight: 900, color: "#92400E", cursor: "pointer",
+              }}
+            >⏻</button>
+            {!user.isTeacher && (
+              <span style={{ fontSize: 10, fontWeight: 800, color: "#92400E", lineHeight: 1 }}>로그아웃</span>
+            )}
+          </div>
         </div>
 
         {/* 교사 전용 관리 패널 — 로그인 직후 시작화면에서 바로 보임 */}
