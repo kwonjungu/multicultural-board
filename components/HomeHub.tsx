@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { UserConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
+import RoomManagePanel from "./RoomManagePanel";
 
 export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab" | "storybook";
 
@@ -90,6 +92,8 @@ interface Props {
 
 export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
   const lang = user.myLang;
+  // 교사는 로그인 직후 시작화면에서 관리 패널을 바로 본다 (기본 펼침).
+  const [manageOpen, setManageOpen] = useState(true);
   return (
     <div style={{
       minHeight: "100vh",
@@ -150,6 +154,45 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
             }}
           >⏻</button>
         </div>
+
+        {/* 교사 전용 관리 패널 — 로그인 직후 시작화면에서 바로 보임 */}
+        {user.isTeacher && (
+          <div style={{
+            background: "#fff", borderRadius: 24, marginBottom: 22,
+            border: "2px solid #FDE68A",
+            boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
+            overflow: "hidden",
+          }}>
+            <button
+              onClick={() => setManageOpen((v) => !v)}
+              aria-expanded={manageOpen}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "16px 20px", background: "transparent", border: "none",
+                cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+              }}
+            >
+              <span style={{ fontSize: 22 }}>🛠</span>
+              <span style={{ flex: 1 }}>
+                <span style={{ display: "block", fontSize: 17, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
+                  {t("manage", lang)}
+                </span>
+                <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#92400E", marginTop: 2 }}>
+                  방 설정 · 컬럼 · 언어 · 명렬표
+                </span>
+              </span>
+              <span style={{
+                fontSize: 14, fontWeight: 900, color: "#B45309",
+                transform: manageOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s",
+              }}>▾</span>
+            </button>
+            {manageOpen && (
+              <div style={{ padding: "4px 20px 22px", borderTop: "1px solid #FEF3C7" }}>
+                <RoomManagePanel roomCode={roomCode} lang={lang} />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Greeting */}
         <div style={{ textAlign: "center", marginBottom: 22 }}>
