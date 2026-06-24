@@ -263,7 +263,9 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(180deg, #FAF5FF 0%, #EDE9FE 50%, #DDD6FE 100%)",
+      // 🐝 꽃밭 풍경 배경 (흰 반투명 오버레이로 단어카드 가독성 유지)
+      background: "linear-gradient(rgba(250,245,255,0.85), rgba(237,233,254,0.85)), url('/landing/board-meadow.webp') center / cover no-repeat",
+      backgroundAttachment: "fixed",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       padding: "16px 14px 40px",
       position: "relative",

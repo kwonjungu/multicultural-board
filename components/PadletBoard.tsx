@@ -477,7 +477,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     <div style={{
       height: "100vh", display: "flex", flexDirection: "column",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
-      background: "linear-gradient(180deg, #FEF9E7 0%, #FFFDF3 40%, #FFFAE8 100%)",
+      // 🐝 꽃밭 풍경 배경을 흰 반투명(82%) 오버레이 아래 은은하게 깔아 카드 가독성 유지
+      background: "linear-gradient(rgba(255,253,243,0.82), rgba(255,251,232,0.82)), url('/landing/board-meadow.webp') center / cover no-repeat",
+      backgroundAttachment: "fixed",
       overflow: "hidden",
     }}>
       {/* ── Header ── */}

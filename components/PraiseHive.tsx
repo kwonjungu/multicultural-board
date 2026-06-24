@@ -222,16 +222,13 @@ export default function PraiseHive({
         overflow: "hidden",
       }}
     >
-      {/* Honeycomb bg */}
+      {/* 🐝 농장 풍경 배경 (흰 반투명 오버레이로 카드 가독성 유지) */}
       <div
         aria-hidden="true"
         style={{
           position: "fixed",
           inset: 0,
-          backgroundImage: "url('/patterns/honeycomb.png')",
-          backgroundSize: "300px auto",
-          backgroundRepeat: "repeat",
-          opacity: 0.18,
+          background: "linear-gradient(rgba(255,251,235,0.82), rgba(254,243,199,0.82)), url('/landing/praise-farm.webp') center / cover no-repeat",
           pointerEvents: "none",
           zIndex: 0,
         }}

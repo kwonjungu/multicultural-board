@@ -102,17 +102,11 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
     <div style={{
       position: "fixed", inset: 0, zIndex: 460,
       display: "flex", flexDirection: "column",
-      background: "linear-gradient(180deg, #FFFBEB 0%, #FDE68A 60%, #FCD34D 100%)",
+      // 🐝 협곡 꽃밭 풍경 배경을 흰 반투명(80%) 오버레이 아래 은은하게 (카드 가독성 유지)
+      background: "linear-gradient(rgba(255,251,235,0.80), rgba(252,239,176,0.80)), url('/landing/game-canyon.webp') center / cover no-repeat",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       overflow: "hidden",
     }}>
-      {/* Honeycomb pattern background */}
-      <div aria-hidden="true" style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: 320,
-        backgroundImage: "url('/patterns/honeycomb.png')",
-        backgroundSize: "260px auto", backgroundRepeat: "repeat",
-        opacity: 0.35, pointerEvents: "none",
-      }} />
 
       {!ActiveGame ? (
         <>
