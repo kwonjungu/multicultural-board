@@ -251,6 +251,8 @@ export interface Storybook {
   characters: StorybookCharacter[];
   questions: StorybookQuestion[];
   vocab?: StorybookVocabWord[];           // [신규] 단어 퀴즈용 어휘 세트
+  visible?: boolean;                      // [신규] 학생 자유 읽기 공개 여부 (기본=숨김)
+  wordQuizEnabled?: boolean;              // [신규] 책별 단어 퀴즈 기본 사용 여부
 }
 
 export interface StorybookSession {

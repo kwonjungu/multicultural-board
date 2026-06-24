@@ -32,6 +32,7 @@ import {
   clearAlert,
   listGeneratedBooks,
   deleteGeneratedBook,
+  setBookFlags,
   type BookListEntry,
 } from "@/lib/storybook";
 import { exportStorybookToPptx } from "@/lib/storybookPptx";
@@ -144,7 +145,7 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
     await endSession(roomCode);
   }, [roomCode]);
 
-  // ── Teacher Setup screen: no session yet ─────────────────
+  // ── No active session ────────────────────────────────────
   if (!session) {
     if (isTeacher) {
       return (
@@ -156,7 +157,8 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
         />
       );
     }
-    return <StudentWaiting lang={lang} onBack={onBack} />;
+    // [신규] 학생: 수업이 없으면 교사가 공개한 책을 자유롭게 읽을 수 있다.
+    return <StudentFreeLibrary lang={lang} viewerLang={lang} onBack={onBack} />;
   }
 
   // ── Loading book ─────────────────────────────────────────
@@ -345,6 +347,21 @@ function TeacherSetup({
     }
   }
 
+  // [신규] 책별 공개/퀴즈 토글 — 낙관적 갱신 후 Firebase 저장.
+  async function toggleFlag(id: string, key: "visible" | "wordQuizEnabled") {
+    const cur = generated.find((b) => b.id === id);
+    if (!cur) return;
+    const nextVal = !cur[key];
+    setGenerated((prev) => prev.map((b) => (b.id === id ? { ...b, [key]: nextVal } : b)));
+    try {
+      await setBookFlags(id, { [key]: nextVal });
+    } catch (err) {
+      console.error("setBookFlags failed", err);
+      // 롤백
+      setGenerated((prev) => prev.map((b) => (b.id === id ? { ...b, [key]: !nextVal } : b)));
+    }
+  }
+
   if (creating) {
     return (
       <StorybookCreator
@@ -353,7 +370,7 @@ function TeacherSetup({
           setCreating(false);
           if (busy) return;
           setBusy(true);
-          try { await onStart(id, { wordQuizEnabled }); } finally { setBusy(false); }
+          try { await onStart(id, wordQuizEnabled ? { wordQuizEnabled: true } : undefined); } finally { setBusy(false); }
         }}
         onCancel={() => setCreating(false)}
       />
@@ -432,10 +449,10 @@ function TeacherSetup({
           <span style={{ fontSize: 24 }}>📝</span>
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: "block", fontSize: 14, fontWeight: 900, color: "#1F2937" }}>
-              단어 퀴즈로 시작
+              이번 수업은 단어 퀴즈로 시작
             </span>
             <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 1 }}>
-              수업 전 그림책 핵심 낱말 4지선다 (어휘 4개 이상일 때)
+              켜면 책 설정과 무관하게 강제 적용 · 끄면 책별 📝 설정을 따름
             </span>
           </span>
           <span style={{
@@ -468,7 +485,7 @@ function TeacherSetup({
                   if ((e.target as HTMLElement).closest("button")) return;
                   if (busy) return;
                   setBusy(true);
-                  try { await onStart(b.id, { wordQuizEnabled }); } finally { setBusy(false); }
+                  try { await onStart(b.id, wordQuizEnabled ? { wordQuizEnabled: true } : undefined); } finally { setBusy(false); }
                 }}
                 role="button"
                 tabIndex={0}
@@ -530,6 +547,26 @@ function TeacherSetup({
                   <div style={{ fontSize: 10, fontWeight: 800, color: b.source === "generated" ? "#6D28D9" : "#B45309", marginTop: 2 }}>
                     {b.source === "generated" ? `🤖 AI · ${b.authorName || ""}` : "📖 샘플"}
                   </div>
+                  {/* [신규] 책별 공개/퀴즈 토글 (AI 생성 책만) */}
+                  {b.source === "generated" && (
+                    <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                      <FlagChip
+                        active={!!b.visible}
+                        onClick={() => toggleFlag(b.id, "visible")}
+                        onLabel="👁 공개됨"
+                        offLabel="🙈 숨김"
+                        title="학생 자유 읽기 공개 여부"
+                      />
+                      <FlagChip
+                        active={!!b.wordQuizEnabled}
+                        disabled={!b.hasVocab}
+                        onClick={() => toggleFlag(b.id, "wordQuizEnabled")}
+                        onLabel="📝 퀴즈 ON"
+                        offLabel={b.hasVocab ? "📝 퀴즈 OFF" : "📝 어휘없음"}
+                        title="단어 퀴즈를 켜면 읽기 전 4지선다를 먼저 풀어요"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
@@ -563,7 +600,7 @@ function TeacherSetup({
                     onClick={async () => {
                       if (busy) return;
                       setBusy(true);
-                      try { await onStart(b.id, { wordQuizEnabled }); } finally { setBusy(false); }
+                      try { await onStart(b.id, wordQuizEnabled ? { wordQuizEnabled: true } : undefined); } finally { setBusy(false); }
                     }}
                     disabled={busy}
                     style={{
@@ -617,6 +654,273 @@ function StudentWaiting({ lang, onBack }: { lang: string; onBack: () => void }) 
       />
       <div style={{ marginTop: 16, fontSize: 18, fontWeight: 900, color: "#92400E", letterSpacing: -0.2 }}>
         {t("sbWaitingForTeacher", lang)}
+      </div>
+    </div>
+  );
+}
+
+// [신규] 교사용 토글 칩 — 책 카드의 공개/퀴즈 on·off.
+function FlagChip({
+  active, onClick, onLabel, offLabel, title, disabled,
+}: {
+  active: boolean;
+  onClick: () => void;
+  onLabel: string;
+  offLabel: string;
+  title?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={active}
+      aria-label={title}
+      title={title}
+      disabled={disabled}
+      onClick={(e) => { e.stopPropagation(); if (!disabled) onClick(); }}
+      style={{
+        fontSize: 10, fontWeight: 900, letterSpacing: -0.2,
+        padding: "4px 9px", borderRadius: 999, cursor: disabled ? "not-allowed" : "pointer",
+        border: `1.5px solid ${active ? "#10B981" : "#D1D5DB"}`,
+        background: disabled ? "#F3F4F6" : active ? "#ECFDF5" : "#fff",
+        color: disabled ? "#9CA3AF" : active ? "#047857" : "#6B7280",
+        fontFamily: "inherit", whiteSpace: "nowrap",
+      }}
+    >
+      {active ? onLabel : offLabel}
+    </button>
+  );
+}
+
+// ============================================================
+// [신규] 학생 자유 도서관 — 교사가 공개한 책을 수업 외에 스스로 읽기
+// ============================================================
+
+function StudentFreeLibrary({
+  lang, viewerLang, onBack,
+}: { lang: string; viewerLang: string; onBack: () => void }) {
+  const [books, setBooks] = useState<BookListEntry[] | null>(null);
+  const [openBook, setOpenBook] = useState<Storybook | null>(null);
+  const [loadingBook, setLoadingBook] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    listGeneratedBooks()
+      .then((list) => { if (!cancel) setBooks(list.filter((b) => b.visible)); })
+      .catch(() => { if (!cancel) setBooks([]); });
+    return () => { cancel = true; };
+  }, []);
+
+  async function open(id: string) {
+    if (loadingBook) return;
+    setLoadingBook(true);
+    try {
+      const b = await loadBook(id);
+      setOpenBook(b);
+    } catch (err) {
+      console.error("free reader loadBook failed", err);
+      window.alert("그림책을 불러오지 못했어요.");
+    } finally {
+      setLoadingBook(false);
+    }
+  }
+
+  if (openBook) {
+    return (
+      <StorybookFreeReader
+        book={openBook}
+        viewerLang={viewerLang}
+        onBack={() => setOpenBook(null)}
+      />
+    );
+  }
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 40%, #FDE68A 100%)",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
+      padding: "20px 16px 40px",
+    }}>
+      <div style={{ maxWidth: 620, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <button
+            onClick={onBack}
+            aria-label="back"
+            style={{
+              width: 44, height: 44, borderRadius: 14,
+              background: "#fff", border: "2px solid #FDE68A",
+              fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
+            }}
+          >←</button>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
+            📚 그림책 읽기
+          </h1>
+        </div>
+
+        {books === null ? (
+          <div style={{ textAlign: "center", padding: 30, color: "#92400E", fontWeight: 700 }}>
+            📚 그림책 불러오는 중…
+          </div>
+        ) : books.length === 0 ? (
+          <div style={{
+            marginTop: 24, textAlign: "center", padding: "30px 20px",
+            background: "#fff", borderRadius: 16, border: "2px dashed #FDE68A",
+            color: "#92400E", fontSize: 14, fontWeight: 700, lineHeight: 1.6,
+          }}>
+            <div style={{ fontSize: 40, marginBottom: 8 }}>🐝</div>
+            아직 읽을 수 있는 그림책이 없어요.<br/>선생님이 책을 열어주면 여기에 보여요!
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {books.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => open(b.id)}
+                disabled={loadingBook}
+                style={{
+                  display: "grid", gridTemplateColumns: "72px 1fr auto",
+                  alignItems: "center", gap: 14, textAlign: "left",
+                  padding: "12px 14px",
+                  background: "linear-gradient(135deg, #FAF5FF, #EDE9FE)",
+                  border: "3px solid #8B5CF655", borderRadius: 18,
+                  boxShadow: "0 6px 20px rgba(180,83,9,0.12)",
+                  cursor: loadingBook ? "wait" : "pointer", fontFamily: "inherit",
+                }}
+              >
+                {b.coverImageUrl ? (
+                  <div style={{ width: 72, height: 72, borderRadius: 12, overflow: "hidden", background: "#fff", border: "2px solid #fff" }}>
+                    <img src={b.coverImageUrl} alt="" aria-hidden="true" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                ) : (
+                  <div style={{ width: 72, height: 72, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.6)", fontSize: 38 }}>
+                    {b.coverEmoji}
+                  </div>
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {b.titleKo}
+                  </div>
+                  {b.wordQuizEnabled && b.hasVocab && (
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#6D28D9", marginTop: 2 }}>
+                      📝 단어 퀴즈 먼저 풀어요
+                    </div>
+                  )}
+                </div>
+                <span style={{
+                  fontSize: 12, fontWeight: 900, color: "#fff",
+                  background: "#8B5CF6", padding: "6px 12px", borderRadius: 999, whiteSpace: "nowrap",
+                }}>읽기 ▶</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// [신규] 자유 리더 — 학생이 스스로 페이지를 넘기며 읽고 듣는다 (질문/핫시팅 없음).
+// 책에 단어 퀴즈가 켜져 있고 어휘가 4개 이상이면 읽기 전에 퀴즈를 먼저 푼다(규칙).
+function StorybookFreeReader({
+  book, viewerLang, onBack,
+}: { book: Storybook; viewerLang: string; onBack: () => void }) {
+  const quizFirst = !!book.wordQuizEnabled && (book.vocab?.length ?? 0) >= 4;
+  const [quizDone, setQuizDone] = useState(false);
+  // 0 = 표지, 1..N = 페이지
+  const [page, setPage] = useState(0);
+  const [speaking, setSpeaking] = useState(false);
+
+  if (quizFirst && !quizDone) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 40%, #FDE68A 100%)",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
+        padding: "16px 12px 32px",
+      }}>
+        <div style={{ maxWidth: 560, margin: "0 auto" }}>
+          <StorybookWordQuiz book={book} viewerLang={viewerLang} onDone={() => setQuizDone(true)} />
+        </div>
+      </div>
+    );
+  }
+
+  const total = book.pages.length;
+  const onCover = page === 0;
+  const curPage = onCover ? null : book.pages.find((p) => p.idx === page) ?? null;
+
+  function speakCurrent() {
+    const text = onCover
+      ? (book.title?.[viewerLang] || book.title?.ko || "")
+      : (curPage?.text?.[viewerLang] || curPage?.text?.ko || "");
+    if (!text) return;
+    setSpeaking(true);
+    speakText(text, viewerLang).finally(() => setSpeaking(false));
+  }
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 40%, #FDE68A 100%)",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
+      padding: "16px 12px 32px",
+    }}>
+      <div style={{ maxWidth: 640, margin: "0 auto" }}>
+        {/* header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <button
+            onClick={onBack}
+            aria-label="back"
+            style={{
+              width: 44, height: 44, borderRadius: 14,
+              background: "#fff", border: "2px solid #FDE68A",
+              fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
+            }}
+          >←</button>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 900, color: "#1F2937", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {book.title?.[viewerLang] || book.title?.ko}
+          </div>
+          <button
+            onClick={speakCurrent}
+            aria-label="들어보기"
+            style={{
+              minHeight: 44, padding: "8px 14px", borderRadius: 12,
+              background: "#fff", border: "2px solid #FDE68A",
+              fontSize: 14, fontWeight: 900, color: "#B45309", cursor: "pointer",
+            }}
+          >🔊 {speaking ? "재생 중…" : "들어보기"}</button>
+        </div>
+
+        {/* content */}
+        {onCover
+          ? <CoverCard lang={viewerLang} book={book} />
+          : curPage && <PageCard lang={viewerLang} page={curPage} total={total} />}
+
+        {/* nav */}
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={onCover}
+            style={{
+              flex: 1, padding: "14px 16px", borderRadius: 14,
+              background: onCover ? "#F3F4F6" : "#fff", border: "2px solid #FDE68A",
+              color: onCover ? "#9CA3AF" : "#92400E", fontWeight: 900, fontSize: 15,
+              cursor: onCover ? "default" : "pointer",
+            }}
+          >◀ 이전</button>
+          <button
+            onClick={() => setPage((p) => Math.min(total, p + 1))}
+            disabled={page >= total}
+            style={{
+              flex: 2, padding: "14px 16px", borderRadius: 14,
+              background: page >= total ? "#F3F4F6" : "linear-gradient(135deg, #F59E0B, #D97706)",
+              border: "none", color: page >= total ? "#9CA3AF" : "#fff", fontWeight: 900, fontSize: 15,
+              cursor: page >= total ? "default" : "pointer",
+            }}
+          >{page >= total ? "끝!" : onCover ? "읽기 시작 ▶" : "다음 ▶"}</button>
+        </div>
       </div>
     </div>
   );

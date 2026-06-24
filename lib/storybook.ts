@@ -83,6 +83,9 @@ export interface BookListEntry {
   source: "static" | "generated";
   createdAt?: number;
   authorName?: string;
+  visible?: boolean;           // [신규] 학생 자유 읽기 공개 여부 (기본=숨김)
+  wordQuizEnabled?: boolean;   // [신규] 책별 단어 퀴즈 기본 사용 여부
+  hasVocab?: boolean;          // [신규] 단어 퀴즈 가능 여부(어휘 4개 이상)
 }
 
 export async function listGeneratedBooks(): Promise<BookListEntry[]> {
@@ -100,8 +103,24 @@ export async function listGeneratedBooks(): Promise<BookListEntry[]> {
       source: "generated" as const,
       createdAt: b.createdAt,
       authorName: b.authorName,
+      visible: b.visible ?? false,
+      wordQuizEnabled: b.wordQuizEnabled ?? false,
+      hasVocab: (b.vocab?.length ?? 0) >= 4,
     }))
     .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+}
+
+/** [신규] 책의 공개 여부 / 단어 퀴즈 토글을 즉시 갱신. */
+export async function setBookFlags(
+  bookId: string,
+  flags: { visible?: boolean; wordQuizEnabled?: boolean },
+): Promise<void> {
+  const db = getClientDb();
+  const updates: Record<string, boolean> = {};
+  if (typeof flags.visible === "boolean") updates.visible = flags.visible;
+  if (typeof flags.wordQuizEnabled === "boolean") updates.wordQuizEnabled = flags.wordQuizEnabled;
+  if (Object.keys(updates).length === 0) return;
+  await update(ref(db, `generated_books/${bookId}`), updates);
 }
 
 export async function deleteGeneratedBook(bookId: string): Promise<void> {
@@ -165,6 +184,14 @@ export async function startSession(
   opts?: { wordQuizEnabled?: boolean },
 ): Promise<void> {
   const db = getClientDb();
+  // 명시값이 없으면 책의 기본 단어 퀴즈 설정을 따른다.
+  let wordQuizEnabled = opts?.wordQuizEnabled;
+  if (wordQuizEnabled === undefined) {
+    try {
+      const snap = await get(ref(db, `generated_books/${bookId}/wordQuizEnabled`));
+      wordQuizEnabled = !!snap.val();
+    } catch { wordQuizEnabled = false; }
+  }
   const initial: StorybookSession = {
     bookId,
     phase: "before",
@@ -173,7 +200,7 @@ export async function startSession(
     activeCharacterId: null,
     teacherClientId,
     startedAt: Date.now(),
-    wordQuizEnabled: !!opts?.wordQuizEnabled,
+    wordQuizEnabled: !!wordQuizEnabled,
   };
   await set(ref(db, sessionPath(roomCode)), stripUndefined(initial));
 }

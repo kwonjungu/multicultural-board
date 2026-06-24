@@ -136,17 +136,8 @@ function shortId(id: string): string {
   return (clean || id).slice(0, 6);
 }
 
-function timeAgo(ts: number, lang: string): string {
-  const diff = Math.max(0, Date.now() - ts);
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return t("phAgoSec", lang);
-  const m = Math.floor(s / 60);
-  if (m < 60) return tFmt("phAgoMin", lang, { n: m });
-  const h = Math.floor(m / 60);
-  if (h < 24) return tFmt("phAgoHour", lang, { n: h });
-  const d = Math.floor(h / 24);
-  return tFmt("phAgoDay", lang, { n: d });
-}
+// 칭찬을 "언제 받았는지" 시각 표시는 제거됨 (학생·교사 모두). 칭찬은 누가
+// 주었는지만 남기고 시점은 노출하지 않는다.
 
 function daysSince(ts: number): number {
   return Math.max(0, Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24)));
@@ -1262,9 +1253,6 @@ function TeamTab({ lang, roomCode }: { lang: string; roomCode: string }) {
                 <div style={{ fontSize: 11, color: HONEY.h700, fontWeight: 700 }}>
                   #{shortId(s.contributorClientId)}
                 </div>
-                <div style={{ fontSize: 11, color: HONEY.h700, fontWeight: 700 }}>
-                  {timeAgo(s.timestamp, lang)}
-                </div>
               </div>
             ))}
           </div>
@@ -1855,7 +1843,7 @@ function RecentPraiseFeed({
                     marginTop: 3,
                   }}
                 >
-                  {fromLabel} · {timeAgo(s.timestamp, lang)}
+                  {fromLabel}
                 </div>
               </div>
               <div style={{ fontSize: 20 }}>✨</div>
@@ -2119,7 +2107,7 @@ function StickerDetailPopover({
             letterSpacing: -0.1,
           }}
         >
-          {fromLabel} · {timeAgo(sticker.timestamp, lang)}
+          {fromLabel}
         </div>
       </div>
       <style jsx global>{`
