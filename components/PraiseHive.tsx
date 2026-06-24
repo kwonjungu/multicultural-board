@@ -608,7 +608,7 @@ function MyHiveTab({
           onClick={onOpenCosmetics}
           style={{
             marginTop: 14,
-            minHeight: 44,
+            minHeight: 56,
             padding: "10px 22px",
             background: `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`,
             color: "#fff",
@@ -1424,7 +1424,7 @@ function ManageTab({
           onClick={handleReset}
           style={{
             marginTop: 14,
-            minHeight: 44,
+            minHeight: 56,
             padding: "10px 18px",
             background: pendingReset ? "#DC2626" : "#fff",
             color: pendingReset ? "#fff" : "#B91C1C",
@@ -1469,7 +1469,7 @@ function ManageTab({
             onChange={(e) => setGoalDraft(e.target.value)}
             style={{
               flex: 1,
-              minHeight: 44,
+              minHeight: 56,
               padding: "10px 14px",
               border: `2px solid ${HONEY.h200}`,
               borderRadius: 14,
@@ -1483,7 +1483,7 @@ function ManageTab({
           <button
             onClick={handleSaveGoal}
             style={{
-              minHeight: 44,
+              minHeight: 56,
               padding: "10px 22px",
               background: `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`,
               color: "#fff",

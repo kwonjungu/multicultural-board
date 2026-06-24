@@ -536,7 +536,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               background: "linear-gradient(135deg, #1F2937, #374151)",
               border: "none", color: "#fff",
               borderRadius: 16, padding: "10px 16px",
-              fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 44,
+              fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 56,
               boxShadow: "0 6px 18px rgba(31,41,55,0.35)",
               display: "inline-flex", alignItems: "center", gap: 6,
               transition: "transform 0.12s",
@@ -566,7 +566,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   background: "linear-gradient(135deg, #8B5CF6, #6D28D9)",
                   border: "none", color: "#fff",
                   borderRadius: 16, padding: "10px 16px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 44,
+                  fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 56,
                   boxShadow: "0 6px 18px rgba(139,92,246,0.4)",
                   display: "inline-flex", alignItems: "center", gap: 6,
                   transition: "transform 0.12s",
@@ -593,7 +593,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 style={{
                   background: "#ECFDF5", border: "2px solid #A7F3D0",
                   color: "#047857", borderRadius: 16, padding: "10px 16px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
                   transition: "transform 0.12s",
                 }}
                 onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
@@ -610,7 +610,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   style={{
                     background: "#FEF3C7", border: "2px solid #FBBF24",
                     color: "#92400E", borderRadius: 16, padding: "10px 16px",
-                    fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                    fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
                   }}
                 >
                   🔔 {t("approvalPending", lang)} {pendingCount}
@@ -628,7 +628,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   border: `2px solid ${activeSessionId ? "#FCA5A5" : "#DDD6FE"}`,
                   color: activeSessionId ? "#B91C1C" : "#6D28D9",
                   borderRadius: 16, padding: "10px 16px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
                   transition: "transform 0.12s",
                 }}
                 onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
@@ -644,7 +644,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 style={{
                   background: "#FDF2F8", border: "2px solid #FBCFE8",
                   color: "#BE185D", borderRadius: 16, padding: "10px 16px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
                   transition: "transform 0.12s",
                 }}
                 onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
@@ -663,7 +663,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 style={{
                   background: "#FEF3C7", border: "2px solid #FDE68A",
                   color: "#B45309", borderRadius: 16, padding: "10px 18px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 44,
+                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
                   transition: "transform 0.12s",
                 }}
                 onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
@@ -680,7 +680,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             style={{
               background: "#F9FAFB", border: "2px solid #E5E7EB",
               color: "#6B7280", borderRadius: 16, padding: "10px 16px",
-              fontSize: 15, cursor: "pointer", fontWeight: 700, minHeight: 44,
+              fontSize: 15, cursor: "pointer", fontWeight: 700, minHeight: 56,
               transition: "transform 0.12s",
             }}
             onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}

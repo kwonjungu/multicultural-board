@@ -266,6 +266,7 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
                   aria-label={`${n}명`}
                   aria-pressed={active}
                   style={{
+                    // 친화규격 예외: 할리갈리는 빠른탭 게임 — 의도적 컴팩트 타깃 유지(56 하한 면제)
                     minHeight: 44, padding: "8px 4px", borderRadius: 12,
                     background: active ? "#F59E0B" : "#fff",
                     color: active ? "#fff" : "#92400E",

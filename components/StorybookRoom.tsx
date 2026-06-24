@@ -1613,7 +1613,7 @@ function QuestionCard({
           {inputMode !== "emotion" && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
               <button onClick={handleSubmit} disabled={busy || !draft.trim()} style={{
-                minHeight: 44, padding: "10px 24px",
+                minHeight: 56, padding: "10px 24px",
                 background: !draft.trim() ? "#E5E7EB" : "linear-gradient(135deg, #3B82F6, #2563EB)",
                 color: !draft.trim() ? "#9CA3AF" : "#fff",
                 fontSize: 15, fontWeight: 900, border: "none", borderRadius: 14,
@@ -2414,7 +2414,7 @@ function CharacterChat({
             disabled={busy}
             maxLength={200}
             style={{
-              flex: 1, minHeight: 44,
+              flex: 1, minHeight: 56,
               padding: "10px 14px",
               border: "2px solid #FDE68A",
               borderRadius: 14,

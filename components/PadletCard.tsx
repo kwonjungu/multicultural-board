@@ -826,7 +826,7 @@ export default function PadletCard({
           )}
           aria-label="원문 읽어주기"
           style={{
-            flex: 1, minHeight: 44, borderRadius: 12,
+            flex: 1, minHeight: 56, borderRadius: 12,
             background: "#fff", border: `2px solid ${p.accent}44`,
             color: p.accent, fontSize: 14, fontWeight: 900,
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
@@ -843,7 +843,7 @@ export default function PadletCard({
           aria-pressed={likedByMe}
           aria-label={likedByMe ? "좋아요 취소" : "좋아요"}
           style={{
-            flex: 1, minHeight: 44, borderRadius: 12,
+            flex: 1, minHeight: 56, borderRadius: 12,
             background: likedByMe ? "#FEE2E2" : "#fff",
             border: `2px solid ${likedByMe ? "#FB7185" : "#FECDD3"}`,
             color: likedByMe ? "#BE123C" : "#FB7185", fontSize: 14, fontWeight: 900,
@@ -862,7 +862,7 @@ export default function PadletCard({
           aria-expanded={commentsOpen}
           aria-label="댓글"
           style={{
-            flex: 1, minHeight: 44, borderRadius: 12,
+            flex: 1, minHeight: 56, borderRadius: 12,
             background: commentsOpen ? "#EDE9FE" : "#fff",
             border: `2px solid ${commentsOpen ? "#A78BFA" : "#DDD6FE"}`,
             color: commentsOpen ? "#6D28D9" : "#8B5CF6", fontSize: 14, fontWeight: 900,

@@ -472,7 +472,7 @@ function InputForm({
     letterSpacing: -0.1, marginBottom: 6,
   } as const;
   const inputStyle = {
-    width: "100%", minHeight: 44, padding: "10px 14px",
+    width: "100%", minHeight: 56, padding: "10px 14px",
     border: "2px solid #FDE68A", borderRadius: 14,
     fontSize: 15, fontWeight: 600, color: "#1F2937",
     background: "#fff", fontFamily: "inherit", outline: "none",
@@ -529,7 +529,7 @@ function InputForm({
                 key={n}
                 onClick={() => onChange({ ...input, pageCount: n })}
                 style={{
-                  flex: 1, minHeight: 44,
+                  flex: 1, minHeight: 56,
                   background: input.pageCount === n
                     ? "linear-gradient(135deg, #F59E0B, #D97706)"
                     : "#fff",
@@ -1211,7 +1211,7 @@ function PreviewPanel({
               onKeyDown={(e) => { if (e.key === "Enter") saveTitle(); }}
               maxLength={80}
               style={{
-                flex: 1, minHeight: 44, padding: "8px 12px",
+                flex: 1, minHeight: 56, padding: "8px 12px",
                 border: "2px solid #F59E0B", borderRadius: 12,
                 fontSize: 18, fontWeight: 900, color: "#1F2937",
                 fontFamily: "inherit", outline: "none",
