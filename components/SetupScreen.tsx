@@ -4,7 +4,8 @@ import { useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
-import { landmarkFor, PATTERN } from "@/lib/assets";
+import { landmarkFor } from "@/lib/assets";
+import FlyingBees from "./ui/FlyingBees";
 
 interface Props {
   onDone: (config: UserConfig) => void;
@@ -66,20 +67,18 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 50%, #FDE68A 100%)",
+      background: "#FCEFB0",
       display: "flex", alignItems: "center", justifyContent: "center",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", padding: "20px",
       position: "relative", overflow: "hidden",
     }}>
-      {/* Honeycomb pattern background */}
-      <div style={{
+      {/* 🐝 꿀벌 일러스트 배경 (시작화면·허브와 통일) */}
+      <div aria-hidden="true" style={{
         position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
-        backgroundImage: `url(${PATTERN.honeycomb})`,
-        backgroundSize: "280px auto",
-        backgroundRepeat: "repeat",
-        opacity: 0.12,
-      }} aria-hidden="true" />
-      <div style={{ position: "fixed", bottom: "-15%", left: "-10%", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.45) 0%, transparent 65%)", pointerEvents: "none", zIndex: 0 }} />
+        backgroundImage: "url('/landing/landing-bees.webp')",
+        backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+      }} />
+      <FlyingBees />
 
       <div style={{
         background: "#fff", borderRadius: 32, padding: "clamp(22px, 4vw, 32px) clamp(20px, 4vw, 30px)",
