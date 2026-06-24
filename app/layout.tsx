@@ -76,6 +76,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             0%, 100% { transform: translateY(0) rotate(-2deg); }
             50%      { transform: translateY(-8px) rotate(3deg); }
           }
+          /* 랜딩 배경: 꿀벌이 화면을 가로질러 날아다님 (왼→오 / 오→왼) */
+          @keyframes beeFlyR {
+            0%   { transform: translate(-16vw, 0)     rotate(-4deg); }
+            25%  { transform: translate(22vw, -26px)  rotate(5deg); }
+            50%  { transform: translate(52vw, 10px)   rotate(-4deg); }
+            75%  { transform: translate(84vw, -20px)  rotate(6deg); }
+            100% { transform: translate(120vw, 0)     rotate(-4deg); }
+          }
+          @keyframes beeFlyL {
+            0%   { transform: translate(120vw, 0)    scaleX(-1) rotate(4deg); }
+            30%  { transform: translate(70vw, -22px) scaleX(-1) rotate(-5deg); }
+            60%  { transform: translate(34vw, 12px)  scaleX(-1) rotate(4deg); }
+            100% { transform: translate(-16vw, 0)    scaleX(-1) rotate(-4deg); }
+          }
           @keyframes likeBump {
             0%, 100% { transform: scale(1); }
             30%      { transform: scale(1.18); }

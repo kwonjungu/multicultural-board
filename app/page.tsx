@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LANGUAGES } from "@/lib/constants";
 import BeeMascot from "@/components/BeeMascot";
+import FlyingBees from "@/components/ui/FlyingBees";
 import { PATTERN } from "@/lib/assets";
 
 const DEFAULT_LANGS = ["ko", "en", "vi", "zh", "fil"];
@@ -251,19 +252,20 @@ export default function Home() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 60%, #FDE68A 100%)",
+      background: "#FCEFB0",
       display: "flex", alignItems: "center", justifyContent: "center",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", padding: 20,
       position: "relative", overflow: "hidden",
     }}>
-      <div style={{
+      {/* 🐝 꿀벌·꽃·허니컴 일러스트 배경 (전체 화면 고정) */}
+      <div aria-hidden="true" style={{
         position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
-        backgroundImage: `url(${PATTERN.honeycomb})`,
-        backgroundSize: "280px auto",
-        backgroundRepeat: "repeat",
-        opacity: 0.12,
+        backgroundImage: "url('/landing/landing-bees.webp')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
       }} />
-      <div style={{ position: "fixed", bottom: "-20%", left: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.35) 0%, transparent 65%)", pointerEvents: "none", zIndex: 0 }} />
+      <FlyingBees />
 
       <div style={{
         background: "#fff", borderRadius: 28, padding: view === "hero" ? "40px 28px 28px" : "22px 28px 28px",

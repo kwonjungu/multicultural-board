@@ -6,6 +6,7 @@ import { t, tFmt } from "@/lib/i18n";
 import RoomManagePanel from "./RoomManagePanel";
 import FontSizeButton from "./FontSizeButton";
 import LangSwitchButton from "./LangSwitchButton";
+import FlyingBees from "./ui/FlyingBees";
 
 export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab" | "storybook";
 
@@ -101,18 +102,19 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 50%, #FDE68A 100%)",
+      background: "#FCEFB0",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       position: "relative", overflow: "hidden",
       padding: "24px 16px 40px",
     }}>
-      {/* Honeycomb texture */}
+      {/* 🐝 입장 화면 꿀벌 일러스트 배경 (전체 화면 고정) */}
       <div aria-hidden="true" style={{
         position: "fixed", inset: 0,
-        backgroundImage: "url('/patterns/honeycomb.png')",
-        backgroundSize: "300px auto", backgroundRepeat: "repeat",
-        opacity: 0.22, pointerEvents: "none", zIndex: 0,
+        backgroundImage: "url('/landing/landing-bees-hub.webp')",
+        backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+        pointerEvents: "none", zIndex: 0,
       }} />
+      <FlyingBees />
 
       <div style={{
         maxWidth: 760, margin: "0 auto",
