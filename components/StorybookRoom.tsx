@@ -185,7 +185,7 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
       style={{
         minHeight: "100vh",
         background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 40%, #FDE68A 100%)",
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         padding: "16px 12px 32px",
       }}
     >
@@ -374,7 +374,7 @@ function TeacherSetup({
       style={{
         minHeight: "100vh",
         background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 40%, #FDE68A 100%)",
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         padding: "20px 16px 40px",
       }}
     >
@@ -594,7 +594,7 @@ function StudentWaiting({ lang, onBack }: { lang: string; onBack: () => void }) 
       style={{
         minHeight: "100vh",
         background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 100%)",
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         padding: 20, textAlign: "center",
       }}
@@ -895,7 +895,7 @@ function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
         >
           <div
             style={{
-              fontFamily: "'Jua', 'Noto Sans KR', sans-serif",
+              fontFamily: "'Jua', 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
               fontSize: "clamp(28px, 6vw, 44px)",
               fontWeight: 400, // Jua is a single-weight display font
               color: "#fff",
@@ -911,7 +911,7 @@ function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
           </div>
           <div style={{
             marginTop: 8,
-            fontFamily: "'Jua', 'Noto Sans KR', sans-serif",
+            fontFamily: "'Jua', 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
             fontSize: 13,
             color: "#FEF3C7",
             textShadow: "0 1px 2px rgba(0,0,0,0.5)",
@@ -1081,7 +1081,7 @@ function BilingualText({
           borderTop: "1px dashed #FDE68A",
           fontSize: secondarySize, fontWeight: 600, color: "#B45309",
           letterSpacing: -0.1, lineHeight: 1.5,
-          fontFamily: "'Noto Sans KR', sans-serif",
+          fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         }}>
           🇰🇷 {secondary}
         </div>
@@ -1356,7 +1356,7 @@ function QuestionCard({
               padding: "22px 26px 24px",
               boxShadow: "0 20px 50px rgba(180,83,9,0.4)",
               position: "relative",
-              fontFamily: "'Noto Sans KR', sans-serif",
+              fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
               animation: "bubblePop 0.35s cubic-bezier(0.17,0.89,0.32,1.28) 0.2s both",
               cursor: "pointer",
             }}

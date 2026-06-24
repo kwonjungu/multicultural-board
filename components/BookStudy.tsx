@@ -252,7 +252,7 @@ export default function BookStudy({
     <div style={{
       minHeight: "100vh",
       background: "linear-gradient(180deg, #FFF7ED 0%, #FEF3C7 50%, #FFEDD5 100%)",
-      fontFamily: "'Noto Sans KR', sans-serif",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       position: "relative", overflow: "hidden",
     }}>
       {/* Background pattern */}

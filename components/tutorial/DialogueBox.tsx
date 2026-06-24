@@ -164,7 +164,7 @@ export default function DialogueBox({ lines, speakerName, onLineChange, onDone, 
         zIndex: 10000,
         cursor: "pointer",
         animation: "tutorialDialogueIn 360ms cubic-bezier(0.22, 0.61, 0.36, 1) both",
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         color: "#1F2937",
       }}
     >

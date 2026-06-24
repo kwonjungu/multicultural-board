@@ -55,7 +55,7 @@ export default function WorksheetAnalyzeModal({
         background: "rgba(17, 24, 39, 0.55)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 16,
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         animation: "fadeSlideIn 240ms ease-out both",
       }}
     >
@@ -364,7 +364,7 @@ function ResultStage({
         background: "#fff", border: "1.5px solid #FDE68A",
         borderRadius: 12, color: "#1F2937",
         fontSize: 13, lineHeight: 1.6,
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         whiteSpace: "pre-wrap", wordBreak: "break-word",
         maxHeight: "40vh", overflow: "auto",
       }}>{content}</pre>
@@ -422,7 +422,7 @@ function ErrorStage({ message, onRetry }: { message: string; onRetry: () => void
           background: "#F59E0B", color: "#fff",
           border: "none", borderRadius: 12,
           fontWeight: 900, fontSize: 14, cursor: "pointer",
-          fontFamily: "'Noto Sans KR', sans-serif",
+          fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         }}
       >🔄 다시 시도</button>
     </div>

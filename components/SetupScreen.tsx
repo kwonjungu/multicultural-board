@@ -68,7 +68,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
       minHeight: "100vh",
       background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 50%, #FDE68A 100%)",
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontFamily: "'Noto Sans KR', sans-serif", padding: "20px",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", padding: "20px",
       position: "relative", overflow: "hidden",
     }}>
       {/* Honeycomb pattern background */}

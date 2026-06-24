@@ -269,7 +269,7 @@ export default function SectionCaption({
         alignItems: "flex-start",
         gap: 12,
         zIndex: 100,
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         transform: leaving ? "translateX(calc(100% + 40px))" : "translateX(0)",
         opacity: leaving ? 0 : 1,
         transition: "transform 260ms cubic-bezier(0.4, 0, 0.2, 1), opacity 260ms ease",

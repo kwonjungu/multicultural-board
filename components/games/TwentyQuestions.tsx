@@ -478,7 +478,7 @@ function AskModal({
 // ---- shared styles ----
 const wrapStyle: React.CSSProperties = {
   padding: "20px 16px 40px", maxWidth: 640, margin: "0 auto",
-  fontFamily: "'Noto Sans KR', sans-serif",
+  fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
 };
 const titleStyle: React.CSSProperties = {
   fontSize: 24, fontWeight: 900, color: "#111827", margin: "4px 0 6px",

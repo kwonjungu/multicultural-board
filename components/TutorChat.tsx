@@ -199,7 +199,7 @@ export default function TutorChat({
           borderRadius: 20, border: "3px solid #FDE68A",
           boxShadow: "0 16px 40px rgba(0,0,0,0.28)",
           display: "flex", flexDirection: "column", overflow: "hidden",
-          fontFamily: "'Noto Sans KR', sans-serif",
+          fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         }}>
           {/* 헤더 */}
           <div style={{

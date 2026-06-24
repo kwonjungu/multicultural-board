@@ -671,7 +671,7 @@ function Rules({ langA, langB }: { langA: string; langB: string }) {
 
 const wrap: React.CSSProperties = {
   padding: "20px 16px 32px", maxWidth: 560, margin: "0 auto",
-  fontFamily: "'Noto Sans KR', sans-serif",
+  fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
 };
 const primaryBtn: React.CSSProperties = {
   width: "100%", padding: "16px 18px", borderRadius: 16,

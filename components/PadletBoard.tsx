@@ -476,7 +476,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   return (
     <div style={{
       height: "100vh", display: "flex", flexDirection: "column",
-      fontFamily: "'Noto Sans KR', sans-serif",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       background: "linear-gradient(180deg, #FEF9E7 0%, #FFFDF3 40%, #FFFAE8 100%)",
       overflow: "hidden",
     }}>

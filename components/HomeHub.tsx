@@ -102,7 +102,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
     <div style={{
       minHeight: "100vh",
       background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 50%, #FDE68A 100%)",
-      fontFamily: "'Noto Sans KR', sans-serif",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       position: "relative", overflow: "hidden",
       padding: "24px 16px 40px",
     }}>

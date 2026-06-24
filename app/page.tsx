@@ -13,7 +13,7 @@ const selectStyle: React.CSSProperties = {
   border: "1.5px solid #E5E7EB", fontSize: 13,
   background: "#F9FAFB", color: "#111827",
   outline: "none", cursor: "pointer", fontWeight: 600,
-  fontFamily: "'Noto Sans KR', sans-serif", flex: 1,
+  fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", flex: 1,
 };
 
 export default function Home() {
@@ -253,7 +253,7 @@ export default function Home() {
       minHeight: "100vh",
       background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 60%, #FDE68A 100%)",
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontFamily: "'Noto Sans KR', sans-serif", padding: 20,
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", padding: 20,
       position: "relative", overflow: "hidden",
     }}>
       <div style={{

@@ -109,7 +109,7 @@ function Shell({ children, onBack }: { children: React.ReactNode; onBack: () => 
   return (
     <div style={{
       maxWidth: 980, margin: "0 auto", padding: "16px",
-      fontFamily: "'Noto Sans KR', sans-serif",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <button

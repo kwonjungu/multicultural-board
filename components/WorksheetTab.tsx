@@ -124,7 +124,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
     border: "1.5px solid #E5E7EB", fontSize: 13,
     background: "#F9FAFB", color: "#111827",
     outline: "none", cursor: "pointer", fontWeight: 600,
-    fontFamily: "'Noto Sans KR', sans-serif",
+    fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
   };
 
   return (
@@ -355,7 +355,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
                           wordBreak: "break-word",
                           whiteSpace: "pre-wrap",
                           fontWeight: 600,
-                          fontFamily: "'Noto Sans KR', sans-serif",
+                          fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
                           transition: "background 0.15s, border-color 0.15s",
                           boxShadow: active ? "0 2px 10px rgba(245,158,11,0.35)" : "none",
                         }}

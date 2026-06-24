@@ -190,7 +190,10 @@ function buildListeningItem(word: VocabWord, sentenceIdx: 0 | 1 | 2): ListeningI
   };
 }
 
-const DEFAULT_FORMAT_CYCLE: QuizFormat[] = ["cloze", "mc4", "mc4-image", "listening", "matching"];
+// 단어 시험은 4지선다 계열만 출제한다. cloze(빈칸 타이핑=주관식)는 정답 후보가
+// 여러 개라 "정답이 너무 많은" 문제가 있었고, matching(짝짓기)도 4지선다가 아니어서
+// 제외 — mc4 / mc4-image / listening 은 모두 보기 4개 중 하나 고르기다.
+const DEFAULT_FORMAT_CYCLE: QuizFormat[] = ["mc4", "mc4-image", "listening"];
 
 /**
  * 혼합 포맷 퀴즈 — 기존 buildQuiz 로 단어를 뽑고, 각 단어에 라운드로빈으로 포맷을 배정.

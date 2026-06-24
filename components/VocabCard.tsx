@@ -99,7 +99,7 @@ export default function VocabCard({
         position: "fixed", inset: 0, zIndex: 1000,
         background: "rgba(15, 10, 40, 0.72)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         animation: "fadeIn 0.2s ease",
       }}
       onClick={onClose}

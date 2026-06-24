@@ -252,7 +252,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       <div style={{
         minHeight: "100vh",
         background: "linear-gradient(180deg, #FAF5FF 0%, #EDE9FE 50%, #DDD6FE 100%)",
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         padding: "16px 14px 40px",
       }}>
         <TeacherVocabDashboard roomCode={roomCode} onBack={() => setTeacherView(false)} />
@@ -264,7 +264,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
     <div style={{
       minHeight: "100vh",
       background: "linear-gradient(180deg, #FAF5FF 0%, #EDE9FE 50%, #DDD6FE 100%)",
-      fontFamily: "'Noto Sans KR', sans-serif",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       padding: "16px 14px 40px",
       position: "relative",
     }}>

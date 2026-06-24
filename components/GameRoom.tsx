@@ -103,7 +103,7 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
       position: "fixed", inset: 0, zIndex: 460,
       display: "flex", flexDirection: "column",
       background: "linear-gradient(180deg, #FFFBEB 0%, #FDE68A 60%, #FCD34D 100%)",
-      fontFamily: "'Noto Sans KR', sans-serif",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       overflow: "hidden",
     }}>
       {/* Honeycomb pattern background */}

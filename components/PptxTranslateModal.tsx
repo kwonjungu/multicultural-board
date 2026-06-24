@@ -162,7 +162,7 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
     border: "1.5px solid #E5E7EB", fontSize: 13,
     background: "#F9FAFB", color: "#111827",
     outline: "none", cursor: "pointer", fontWeight: 600,
-    fontFamily: "'Noto Sans KR', sans-serif",
+    fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
   };
 
   return (

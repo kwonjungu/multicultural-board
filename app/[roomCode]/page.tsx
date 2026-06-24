@@ -172,7 +172,7 @@ export default function RoomPage() {
         minHeight: "100vh",
         background: "linear-gradient(135deg, #0d0b26, #1e1b4b)",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        fontFamily: "'Noto Sans KR', sans-serif", color: "#fff", gap: 16,
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", color: "#fff", gap: 16,
       }}>
         <div style={{ fontSize: 48 }}>⚠️</div>
         <p style={{ fontSize: 18, fontWeight: 700 }}>잘못된 방 번호입니다</p>

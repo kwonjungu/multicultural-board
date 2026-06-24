@@ -356,7 +356,7 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
       style={{
         minHeight: "100vh",
         background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 40%, #FDE68A 100%)",
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         padding: "20px 16px 40px",
       }}
     >
@@ -1190,7 +1190,7 @@ function PreviewPanel({
               padding: "16px 20px 20px",
               textAlign: "center",
               pointerEvents: "none",
-              fontFamily: "'Jua', 'Noto Sans KR', sans-serif",
+              fontFamily: "'Jua', 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
               fontSize: "clamp(24px, 5vw, 38px)",
               color: "#fff",
               lineHeight: 1.15,

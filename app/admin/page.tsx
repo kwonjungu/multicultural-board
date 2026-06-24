@@ -149,7 +149,7 @@ export default function AdminPage() {
         minHeight: "100vh",
         background: "linear-gradient(135deg, #0d0b26, #1e1b4b)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontFamily: "'Noto Sans KR', sans-serif", padding: 20,
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", padding: 20,
       }}>
         <div style={{
           background: "#fff", borderRadius: 24, padding: "40px 32px",
@@ -197,7 +197,7 @@ export default function AdminPage() {
   return (
     <div style={{
       minHeight: "100vh", background: "#F0F2FA",
-      fontFamily: "'Noto Sans KR', sans-serif",
+      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
     }}>
       {/* Header */}
       <header style={{

@@ -225,7 +225,7 @@ export default function PraiseHive({
       style={{
         minHeight: "100vh",
         background: `linear-gradient(180deg, ${HONEY.h50} 0%, ${HONEY.h100} 60%, ${HONEY.h200} 100%)`,
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         padding: "18px 14px 32px",
         position: "relative",
         overflow: "hidden",
