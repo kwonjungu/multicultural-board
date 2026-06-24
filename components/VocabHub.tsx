@@ -386,21 +386,42 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           }
         };
         return (
+          <>
+          <style>{`
+            @keyframes dailyChallengePulse {
+              0%, 100% { box-shadow: 0 10px 26px rgba(219,39,119,0.35); }
+              50% { box-shadow: 0 12px 34px rgba(219,39,119,0.65), 0 0 0 4px rgba(249,115,22,0.30); }
+            }
+            @keyframes dailyChallengeSparkle {
+              0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+              50% { transform: scale(1.18) rotate(8deg); opacity: 0.85; }
+            }
+          `}</style>
           <button
             onClick={startDailyChallenge}
             style={{
+              position: "relative",
               maxWidth: 760, width: "100%", margin: "0 auto 14px",
               display: "flex", alignItems: "center", gap: 14, textAlign: "left",
               background: "linear-gradient(135deg, #F97316, #DB2777)",
               border: "none", borderRadius: 20, padding: "14px 18px",
               cursor: "pointer", fontFamily: "inherit",
-              boxShadow: "0 10px 26px rgba(219, 39, 119, 0.35)",
+              animation: "dailyChallengePulse 2.2s ease-in-out infinite",
               transition: "transform 0.15s",
             }}
             onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
             onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
+            {/* NEW 반짝 뱃지 — 시선 유도 */}
+            <span style={{
+              position: "absolute", top: -8, right: 14,
+              background: "#FACC15", color: "#7C2D12",
+              fontSize: 11, fontWeight: 900, letterSpacing: 0.5,
+              padding: "3px 9px", borderRadius: 999,
+              boxShadow: "0 3px 8px rgba(0,0,0,0.25)",
+              animation: "dailyChallengeSparkle 1.4s ease-in-out infinite",
+            }}>✨ 도전!</span>
             <div style={{ fontSize: 46, flexShrink: 0 }}>🔥</div>
             <div style={{ flex: 1, minWidth: 0, color: "#fff" }}>
               <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: -0.3 }}>
@@ -423,6 +444,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
               flexShrink: 0,
             }}>도전 →</div>
           </button>
+          </>
         );
       })()}
 

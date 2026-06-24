@@ -698,6 +698,13 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "Улей похвалы", uz: "Maqtov uyasi", hi: "प्रशंसा का छत्ता",
     id: "Sarang Pujian", ar: "خلية المديح", my: "ချီးကျူးပျားရည်အိမ်",
   },
+  praiseHiveTitle: {
+    ko: "우리반 칭찬 꿀벌집", en: "Our Class Praise Hive", vi: "Tổ ong khen thưởng của lớp",
+    zh: "我们班的表扬蜂巢", fil: "Pugad ng Papuri ng Klase", ja: "わたしたちのクラスのほめほめハチの巣",
+    th: "รังผึ้งชมเชยของห้องเรา", km: "សំបុកឃ្មុំសរសើររបស់ថ្នាក់យើង", mn: "Манай ангийн магтаалын үүр",
+    ru: "Улей похвалы нашего класса", uz: "Sinfimiz maqtov uyasi", hi: "हमारी कक्षा का प्रशंसा छत्ता",
+    id: "Sarang Pujian Kelas Kami", ar: "خلية المديح لصفنا", my: "ကျွန်တို့အတန်း၏ချီးကျူးပျားရည်အိမ်",
+  },
   hubSectionStickersDesc: {
     ko: "선생님의 칭찬을 모아요", en: "Collect teacher's praise",
     vi: "Thu thập lời khen", zh: "收集老师的表扬",
