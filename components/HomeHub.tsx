@@ -110,7 +110,7 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
       {/* 🐝 입장 화면 꿀벌 일러스트 배경 (전체 화면 고정) */}
       <div aria-hidden="true" style={{
         position: "fixed", inset: 0,
-        backgroundImage: "url('/landing/landing-bees-hub.webp')",
+        backgroundImage: "url('/landing/landing-bees.webp')",
         backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
         pointerEvents: "none", zIndex: 0,
       }} />
