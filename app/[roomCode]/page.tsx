@@ -23,6 +23,7 @@ import SectionCaption from "@/components/tutorial/SectionCaption";
 import { subscribeStudentStickers } from "@/lib/stickers";
 import { subscribeSession } from "@/lib/storybook";
 import { UserConfig, RoomConfig } from "@/lib/types";
+import { useBackLayer } from "@/lib/backStack";
 import { t } from "@/lib/i18n";
 
 const ALL_LANGS = Object.keys(LANGUAGES);
@@ -103,42 +104,15 @@ export default function RoomPage() {
   });
 
   // #1 브라우저/기기 뒤로 가기 → 홈 허브 복귀 (사이트 이탈 방지)
-  // 서브뷰에 있는 동안 히스토리 가드 항목 1개를 유지한다. 어느 서브뷰든
-  // 뒤로 가기 한 번이면 허브로 돌아오고, 허브에서의 뒤로 가기만 사이트를 이탈한다.
-  const subviewGuardRef = useRef(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onPop = () => {
-      // 그림책 수업이 진행 중인 학생은 허브로 빠지면 강제 동기화 의도가 깨진다 →
-      // 가드를 다시 쌓아 그림책 화면을 유지한다.
-      if (storybookActiveRef.current && isStudentRef.current) {
-        window.history.pushState({ hubGuard: true }, "");
-        subviewGuardRef.current = true;
-        setHubView("storybook");
-        return;
-      }
-      // 가드 항목이 소비됨 → 허브로 복귀시키고 이탈을 막는다.
-      subviewGuardRef.current = false;
-      setHubView("hub");
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (hubView !== "hub") {
-      // 서브뷰 진입: 가드가 없으면 히스토리 항목을 1개 쌓는다.
-      if (!subviewGuardRef.current) {
-        window.history.pushState({ hubGuard: true }, "");
-        subviewGuardRef.current = true;
-      }
-    } else if (subviewGuardRef.current) {
-      // 인앱 버튼으로 허브 복귀: 남아 있는 가드 항목을 소비해
-      // 허브에서의 뒤로 가기가 곧장 사이트를 이탈하도록 정합성을 맞춘다.
-      subviewGuardRef.current = false;
-      window.history.back();
-    }
-  }, [hubView]);
+  // 서브뷰에 있는 동안 백스택 레이어 1개를 유지한다. 어느 서브뷰든 뒤로 가기
+  // 한 번이면 허브로 돌아오고, 허브에서의 뒤로 가기만 사이트를 이탈한다.
+  // (각 섹션 내부의 더 깊은 단계는 그 컴포넌트가 자체 useBackLayer 로 쌓아,
+  //  중앙 백스택이 가장 안쪽 레이어부터 차례로 닫는다.)
+  useBackLayer(hubView !== "hub", () => {
+    // 그림책 수업 중인 학생은 허브로 빠지면 강제 동기화 의도가 깨진다 → 머무른다.
+    if (storybookActiveRef.current && isStudentRef.current) return false;
+    setHubView("hub");
+  });
 
   const validCode = /^\d{4}$/.test(roomCode);
 

@@ -42,6 +42,7 @@ import MicButton from "./MicButton";
 import { speak as speakText } from "@/lib/ttsMulti";
 import StorybookCreator from "./StorybookCreator";
 import StorybookWordQuiz from "./StorybookWordQuiz";
+import { useBackLayer } from "@/lib/backStack";
 import EmotionCardDeck from "./EmotionCardDeck";
 import { pushEmotion, emotionById, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
 import { t, tFmt } from "@/lib/i18n";
@@ -634,7 +635,9 @@ function StudentWaiting({ lang, onBack }: { lang: string; onBack: () => void }) 
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 100%)",
+        // 🐝 협곡 풍경 배경 (그림책 일러스트 보호 위해 흰 오버레이 88%로 은은하게)
+        background: "linear-gradient(rgba(255,251,235,0.88), rgba(253,230,138,0.88)), url('/landing/game-canyon.webp') center / cover no-repeat",
+        backgroundAttachment: "fixed",
         fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         padding: 20, textAlign: "center",
@@ -716,6 +719,9 @@ function StudentFreeLibrary({
     return () => { cancel = true; };
   }, []);
 
+  // 뒤로 가기: 책을 읽는 중이면 도서관 목록으로 (그림책 교실에서 바로 나가지 않음).
+  useBackLayer(openBook !== null, () => setOpenBook(null));
+
   async function open(id: string) {
     if (loadingBook) return;
     setLoadingBook(true);
@@ -743,7 +749,9 @@ function StudentFreeLibrary({
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 40%, #FDE68A 100%)",
+      // 🐝 협곡 풍경 배경 (그림책 일러스트 보호 위해 흰 오버레이 88%로 은은하게)
+      background: "linear-gradient(rgba(255,251,235,0.88), rgba(253,230,138,0.88)), url('/landing/game-canyon.webp') center / cover no-repeat",
+      backgroundAttachment: "fixed",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       padding: "20px 16px 40px",
     }}>
@@ -869,7 +877,9 @@ function StorybookFreeReader({
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 40%, #FDE68A 100%)",
+      // 🐝 협곡 풍경 배경 (그림책 일러스트 보호 위해 흰 오버레이 88%로 은은하게)
+      background: "linear-gradient(rgba(255,251,235,0.88), rgba(253,230,138,0.88)), url('/landing/game-canyon.webp') center / cover no-repeat",
+      backgroundAttachment: "fixed",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       padding: "16px 12px 32px",
     }}>

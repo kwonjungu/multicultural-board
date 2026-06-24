@@ -5,6 +5,7 @@ import { ref, onValue, off, set, remove, update } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES, BRAND_GRADIENT } from "@/lib/constants";
 import { CardData, UserConfig, PostData, RoomConfig, CardStatus, CommentData } from "@/lib/types";
+import { useBackLayer } from "@/lib/backStack";
 import { t } from "@/lib/i18n";
 import PadletCard from "./PadletCard";
 import PostModal from "./PostModal";
@@ -472,6 +473,14 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     setPosting(false);
     setEditModal(null);
   }, [editModal, posting, user, isTeacher, teacherLangs, roomCode]);
+
+  // 뒤로 가기: 열려 있는 모달(글쓰기·학습하기·통역·감정·편집)을 한 단계씩 닫는다
+  // (소통창에서 바로 나가지 않음). 중앙 백스택이 가장 안쪽 모달부터 닫는다.
+  useBackLayer(!!modal, () => setModal(null));
+  useBackLayer(!!editModal, () => setEditModal(null));
+  useBackLayer(practiceOpen, () => setPracticeOpen(false));
+  useBackLayer(interpreterOpen, () => setInterpreterOpen(false));
+  useBackLayer(emotionOpen, () => setEmotionOpen(false));
 
   return (
     <div style={{

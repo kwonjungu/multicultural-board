@@ -24,6 +24,7 @@ import { suggestGoal } from "@/lib/dailyGoal";
 import { subscribeExpressions, filterDue, type ExpressionEntry } from "@/lib/expressionLog";
 import ExpressionReview from "./ExpressionReview";
 import { UserConfig, CardData } from "@/lib/types";
+import { useBackLayer } from "@/lib/backStack";
 import { t, tFmt } from "@/lib/i18n";
 import VocabCard from "./VocabCard";
 import VocabNotebook from "./VocabNotebook";
@@ -246,6 +247,15 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   const masteredTotal = masteredCount(progress);
   const isTeacher = user.isTeacher ?? false;
 
+  // 뒤로 가기: 열려 있는 학습/시험 화면을 한 단계씩 닫는다 (단어공부에서 바로
+  // 나가지 않음). 중첩(레슨시트 위 학습/시험)은 중앙 백스택이 안쪽부터 닫는다.
+  useBackLayer(isTeacher && teacherView, () => setTeacherView(false));
+  useBackLayer(!!lessonSheet, () => setLessonSheet(null));
+  useBackLayer(!!studyQueue, () => setStudyQueue(null));
+  useBackLayer(!!openWord, () => setOpenWord(null));
+  useBackLayer(reviewOpen, () => setReviewOpen(false));
+  useBackLayer(!!quiz, () => { setQuiz(null); setLessonContext(null); });
+
   // 교사가 대시보드 토글 켜면 다른 화면 전체 가리고 대시보드만 렌더
   if (isTeacher && teacherView) {
     return (
@@ -391,20 +401,27 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
             onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            <div style={{ fontSize: 40, flexShrink: 0 }}>🔥</div>
+            <div style={{ fontSize: 46, flexShrink: 0 }}>🔥</div>
             <div style={{ flex: 1, minWidth: 0, color: "#fff" }}>
-              <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: -0.3 }}>
-                나의 단어 일일 챌린지
+              <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: -0.3 }}>
+                오늘의 일일 챌린지 도전하기!
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2, opacity: 0.95 }}>
-                🎧 듣고 찾기 · 소통판 단어 {boardCount}개 + 약점 단어 {studiedCount}개 섞어서 출제
+              <div style={{
+                display: "inline-block", marginTop: 5,
+                background: "rgba(255,255,255,0.28)", borderRadius: 999,
+                padding: "3px 10px", fontSize: 12, fontWeight: 900,
+              }}>
+                ⚡ 추가 경험치 획득 가능
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4, opacity: 0.95 }}>
+                🎧 듣고 찾기 · 소통판 단어 {boardCount}개 + 약점 단어 {studiedCount}개
               </div>
             </div>
             <div style={{
-              background: "rgba(255,255,255,0.25)", color: "#fff",
-              fontSize: 14, fontWeight: 900, padding: "8px 14px", borderRadius: 12,
+              background: "rgba(255,255,255,0.28)", color: "#fff",
+              fontSize: 15, fontWeight: 900, padding: "10px 16px", borderRadius: 12,
               flexShrink: 0,
-            }}>시작 →</div>
+            }}>도전 →</div>
           </button>
         );
       })()}

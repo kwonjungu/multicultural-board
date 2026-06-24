@@ -3,6 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { LANGUAGES } from "@/lib/constants";
+import { useBackLayer } from "@/lib/backStack";
 import BeeMascot from "./BeeMascot";
 import CountryGuess from "./games/CountryGuess";
 import WordMemory from "./games/WordMemory";
@@ -94,6 +95,9 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
 
   const viewerLang = myLang || "ko";
   const ActiveGame = GAMES.find((g) => g.id === gameId);
+
+  // 뒤로 가기: 게임 플레이 중이면 게임 목록으로 (허브로 바로 나가지 않음).
+  useBackLayer(gameId !== null, () => setGameId(null));
 
   // 한국 학생끼리도 플레이 가능하도록 같은 언어 중복 선택 허용 (filter 제거)
   const availableFriendLangs = friendLangCodes;
