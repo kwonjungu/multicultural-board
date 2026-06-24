@@ -31,9 +31,27 @@ test("다른 의미 범주는 혼동 아님", () => {
   assert.equal(areConfusable(word("happy"), word("eat")), false);
 });
 
+test("인사말끼리는 혼동 가능 — 빈칸 문맥에서 서로 자연스러워 복수 정답 위험", () => {
+  // "선생님, ___!" 에는 안녕하세요/안녕히 가세요/감사합니다 모두 들어간다.
+  assert.equal(areConfusable(word("hello"), word("goodbye")), true);
+  assert.equal(areConfusable(word("hello"), word("thanks")), true);
+  assert.equal(areConfusable(word("goodbye"), word("congrats")), true);
+});
+
+test("pickDistractors(hello) 는 다른 인사말을 오답으로 내지 않는다", () => {
+  const target = word("hello");
+  for (let i = 0; i < 60; i++) {
+    const ds = pickDistractors(target, 3, VOCAB_WORDS);
+    assert.equal(ds.length, 3);
+    for (const d of ds) {
+      assert.notEqual(d.subcategory, "인사", `오답에 다른 인사말 ${d.id} 가 섞임`);
+    }
+  }
+});
+
 test("pickDistractors 는 정답과 혼동 가능한 단어를 절대 오답으로 내지 않는다", () => {
   // 셔플 무작위성 때문에 여러 번 반복 검증.
-  const targets = ["happy", "excited", "like", "want", "thankful"];
+  const targets = ["happy", "excited", "like", "want", "thankful", "hello", "goodbye"];
   for (const id of targets) {
     const target = word(id);
     for (let i = 0; i < 40; i++) {

@@ -31,6 +31,11 @@ export const SENSE_GROUPS: string[][] = [
   ["thankful", "thanks"],   // 고맙다 ↔ 감사합니다
 ];
 
+// 빈칸/문장 문맥에서 서로 바꿔도 자연스러워 "복수 정답"이 되기 쉬운 subcategory.
+// 예: "선생님, ___!" 에는 안녕하세요·안녕히 가세요·감사합니다·축하해요가 다 들어간다.
+// 이런 카테고리는 극성과 무관하게 같은 subcategory 단어끼리 오답으로 쓰지 않는다.
+const INTERCHANGEABLE_SUBCATS = new Set<string>(["인사"]);
+
 const groupIndex = new Map<string, number>();
 SENSE_GROUPS.forEach((g, i) => g.forEach((id) => groupIndex.set(id, i)));
 
@@ -44,12 +49,15 @@ export function sameSenseGroup(aId: string, bId: string): boolean {
  * 오답 후보 b 가 정답 a 와 "복수 정답"으로 헷갈릴 위험이 있는가 (= 오답 부적격).
  * - 같은 단어
  * - 같은 동의어군
+ * - 문맥 호환 subcategory(인사 등) + 같은 subcategory
  * - 같은 의미 범주(subcategory) + 같은 극성 (예: 둘 다 긍정 감정)
  */
 export function areConfusable(a: VocabWord, b: VocabWord): boolean {
   if (a.id === b.id) return true;
   if (sameSenseGroup(a.id, b.id)) return true;
   if (a.subcategory === b.subcategory) {
+    // 인사말처럼 문맥상 서로 바꿔도 자연스러운 카테고리는 전부 혼동 가능.
+    if (INTERCHANGEABLE_SUBCATS.has(a.subcategory)) return true;
     const pa = WORD_POLARITY[a.id];
     const pb = WORD_POLARITY[b.id];
     if (pa && pb && pa === pb) return true;
