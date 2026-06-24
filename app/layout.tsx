@@ -15,14 +15,49 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&family=Jua&display=swap"
           rel="stylesheet"
         />
+        {/* 1~2학년 친화: 둥근 고딕 본문 (Pretendard, OFL). Noto 는 폴백 유지 */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendard-variable.css"
+        />
       </head>
-      <body style={{ margin: 0, padding: 0, fontFamily: "'Noto Sans KR', sans-serif", WebkitFontSmoothing: "antialiased" as const }}>
+      <body style={{
+        margin: 0, padding: 0,
+        fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
+        lineHeight: 1.6,
+        letterSpacing: "0.02em",
+        color: "var(--ink)",
+        background: "var(--bg)",
+        WebkitFontSmoothing: "antialiased" as const,
+      }}>
         {children}
         <style>{`
+          /* ── 1~2학년 친화판 디자인 토큰 (단일 소스) ── */
+          :root{
+            --bg:#FFFBEB; --surface:#FFFFFF; --ink:#2B2A33; --ink-soft:#5B5566;
+            --honey-fill:#F59E0B; --honey-text:#B45309;
+            --accent-fill:#FB6E3A; --accent-text:#C2410C;
+            --c-board:#F59E0B; --c-interp:#3B82F6; --c-games:#FB7185;
+            --c-hive:#22C55E; --c-vocab:#8B5CF6; --c-story:#FB923C;
+            --ok-text:#15803D; --ok-fill:#22C55E; --error-text:#B91C1C;
+            --tap-min:56px; --tap-cta:72px; --gap:24px; --pad:16px;
+            --radius:24px; --radius-pill:999px; --lh:1.6;
+            --shadow:0 6px 18px rgba(180,83,9,.16);
+            --ease:cubic-bezier(.22,.61,.36,1); --dur:240ms;
+            --z-nav:100; --z-sheet:300; --z-toast:500;
+          }
+          [data-theme="dark"]{ --bg:#141026; --surface:#221A3D; --ink:#F4ECFF; --ink-soft:#C9B8E8; }
+
           *, *::before, *::after { box-sizing: border-box; }
-          body { color: #111827; }
+          body { color: var(--ink); }
           button, input, textarea, select { font-family: inherit; }
-          *:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; border-radius: 4px; }
+          *:focus-visible { outline: 3px solid var(--accent-text); outline-offset: 2px; border-radius: 4px; }
+
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+          }
 
           @keyframes spin { to { transform: rotate(360deg); } }
           @keyframes slideUp {
