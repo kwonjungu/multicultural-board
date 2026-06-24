@@ -685,7 +685,7 @@ function ChoiceBody({
           let border = `2px solid ${PURPLE}33`;
           let color = "#1F2937";
           if (reveal && isCorrect) { bg = "#ECFDF5"; border = `2.5px solid ${GREEN}`; color = GREEN_DARK; }
-          else if (reveal && isPicked && !isCorrect) { bg = "#FEF2F2"; border = `2.5px solid ${RED}`; color = "#B91C1C"; }
+          else if (reveal && isPicked && !isCorrect) { bg = "#FEF2F2"; border = `2.5px solid ${RED}`; color = "var(--error-text)"; }
           else if (isPicked) { bg = PURPLE_LIGHT; border = `2.5px solid ${PURPLE_DARK}`; color = PURPLE_DARK; }
           return (
             <button
@@ -699,8 +699,9 @@ function ChoiceBody({
                 cursor: phase === "answering" ? "pointer" : "default",
                 fontFamily: "inherit",
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                minHeight: isImage ? 110 : 56,
+                minHeight: isImage ? 110 : 72,
                 transition: "transform 0.12s, background 0.15s",
+                animation: (reveal && isPicked && !isCorrect) ? "shake 0.4s var(--ease)" : undefined,
               }}
               onMouseDown={(e) => { if (phase === "answering") e.currentTarget.style.transform = "scale(0.96)"; }}
               onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
@@ -716,7 +717,8 @@ function ChoiceBody({
                 />
               )}
               <span>{c.label}</span>
-              {reveal && isCorrect && <span style={{ fontSize: 12 }}>✓ 정답</span>}
+              {reveal && isCorrect && <span style={{ fontSize: 12, color: "var(--ok-text)", fontWeight: 900 }}>✓ 정답</span>}
+              {reveal && isPicked && !isCorrect && <span style={{ fontSize: 12, color: "var(--error-text)", fontWeight: 900 }}>✗ 다시 해보자</span>}
             </button>
           );
         })}
