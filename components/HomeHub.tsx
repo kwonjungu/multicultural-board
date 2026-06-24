@@ -97,8 +97,8 @@ interface Props {
 
 export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLang, availableLangs }: Props) {
   const lang = user.myLang;
-  // 교사는 로그인 직후 시작화면에서 관리 패널을 바로 본다 (기본 펼침).
-  const [manageOpen, setManageOpen] = useState(true);
+  // 관리 패널은 기본 접힘 — 교사가 필요할 때 직접 펼친다 (자동 펼치기 안 함).
+  const [manageOpen, setManageOpen] = useState(false);
   return (
     <div style={{
       minHeight: "100vh",
