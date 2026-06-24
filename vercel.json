@@ -5,6 +5,12 @@
     },
     "app/api/worksheet/route.ts": {
       "maxDuration": 120
+    },
+    "app/api/storybook-agent/text/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/storybook-agent/image/route.ts": {
+      "maxDuration": 60
     }
   }
 }

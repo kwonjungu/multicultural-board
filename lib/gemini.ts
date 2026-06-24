@@ -9,9 +9,11 @@ const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai
 const GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 // Text models — ordered by preference with fallback on rate-limit.
+// #7: gemini-2.0-flash 는 2026-06-01 종료되어 API 가 에러를 반환한다(사용 금지).
+// 2.5-flash 가 현행 stable. 느린 원인은 모델이 아니라 thinking(추론) 단계였으므로
+// generateJson 에서 reasoning_effort:"none" 으로 thinking 을 꺼 속도를 회복한다.
 export const GEMINI_TEXT_MODELS = [
   "gemini-2.5-flash",
-  "gemini-2.0-flash",
   "gemini-2.5-flash-lite",
 ];
 
@@ -28,6 +30,11 @@ export function geminiTextClient(): OpenAI {
   return new OpenAI({
     apiKey: requireKey(),
     baseURL: GEMINI_BASE_URL,
+    // #7: 호출당 45s 상한 — 한 호출이 함수 예산(60s)을 통째로 잡아먹고 504 되는
+    // 것을 막고, 느린 호출은 빨리 실패시켜 다음 모델로 폴백한다.
+    timeout: 45000,
+    // SDK 자동 재시도는 429 Retry-After(수십 초)를 기다려 체감 지연만 키운다.
+    maxRetries: 0,
   });
 }
 
@@ -60,6 +67,10 @@ export async function generateJson<T = unknown>(
         temperature: opts.temperature ?? 0.75,
         max_tokens: opts.maxTokens ?? 8192,
         response_format: { type: "json_object" },
+        // #7: 2.5 계열의 thinking 을 꺼 생성 지연(20~40s)을 제거 — Gemini OpenAI
+        // 호환 엔드포인트는 reasoning_effort:"none" 으로 thinking 을 끈다.
+        // (OpenAI SDK 타입에는 "none" 이 없어 추가 필드로 주입)
+        ...({ reasoning_effort: "none" } as Record<string, unknown>),
       });
       const raw = completion.choices[0]?.message?.content?.trim() || "";
       if (!raw) {

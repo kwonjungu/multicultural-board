@@ -16,7 +16,7 @@ import SentencePracticeModal from "./SentencePracticeModal";
 import EmotionCardDeck from "./EmotionCardDeck";
 import { pushEmotion, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
 import { pushExpressionDedup } from "@/lib/expressionLog";
-import { filterTodayCards } from "@/lib/sentencePractice";
+import { filterPracticeCards } from "@/lib/sentencePractice";
 import { columnIconFor } from "@/lib/assets";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -552,12 +552,12 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             }}>BETA</span>
           </button>
 
-          {/* 📖 학습하기 — student-only, when today's cards exist */}
+          {/* 📖 학습하기 — student-only. 오늘 카드 우선, 없으면 누적 카드로 복습 (#2) */}
           {!isTeacher && (() => {
             const cardsById: Record<string, CardData> = {};
             for (const c of cards) cardsById[c.id] = c;
-            const today = filterTodayCards(cardsById);
-            if (today.length === 0) return null;
+            const practiceCards = filterPracticeCards(cardsById);
+            if (practiceCards.length === 0) return null;
             return (
               <button
                 onClick={() => setPracticeOpen(true)}
@@ -579,7 +579,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 <span style={{
                   fontSize: 11, fontWeight: 900, background: "rgba(255,255,255,0.25)", color: "#fff",
                   padding: "2px 8px", borderRadius: 999,
-                }}>{today.length}</span>
+                }}>{practiceCards.length}</span>
               </button>
             );
           })()}
@@ -1223,7 +1223,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           cards={(() => {
             const byId: Record<string, CardData> = {};
             for (const c of cards) byId[c.id] = c;
-            return filterTodayCards(byId);
+            return filterPracticeCards(byId);
           })()}
           onClose={() => setPracticeOpen(false)}
         />

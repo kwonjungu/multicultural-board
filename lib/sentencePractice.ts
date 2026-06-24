@@ -30,6 +30,14 @@ function startOfTodayMs(): number {
   return d.getTime();
 }
 
+/** 문장 연습 대상이 될 수 있는 텍스트 카드인지 (날짜 무관). */
+function isPracticeCard(c: CardData | null | undefined): boolean {
+  if (!c || typeof c !== "object") return false;
+  if (c.cardType !== "text") return false;
+  if (!c.originalText || !c.originalText.trim()) return false;
+  return true;
+}
+
 /**
  * 오늘 작성된 텍스트 카드만 뽑아서 반환.
  * - text/comment 타입 (image/youtube 제외)
@@ -42,14 +50,38 @@ export function filterTodayCards(cards: Record<string, CardData> | null | undefi
   const since = startOfTodayMs();
   const out: CardData[] = [];
   for (const [id, c] of Object.entries(cards)) {
-    if (!c || typeof c !== "object") continue;
-    if (c.cardType !== "text") continue;
-    if (!c.originalText || !c.originalText.trim()) continue;
+    if (!isPracticeCard(c)) continue;
     if (typeof c.timestamp !== "number" || c.timestamp < since) continue;
     out.push({ ...c, id: c.id ?? id });
   }
   out.sort((a, b) => b.timestamp - a.timestamp);
   return out;
+}
+
+/** fallback 으로 노출할 최근 누적 카드 최대 개수 */
+const PRACTICE_FALLBACK_LIMIT = 30;
+
+/**
+ * 문장 연습용 카드 선별 (#2 노출 안정화).
+ * - 오늘 작성된 카드가 있으면 그것을 우선 사용.
+ * - 오늘 카드가 없으면 최근 누적 텍스트 카드를 fallback 으로 제공해
+ *   "학습하기" 버튼이 사라지지 않고 항상 복습할 수 있게 한다.
+ */
+export function filterPracticeCards(
+  cards: Record<string, CardData> | null | undefined,
+  limit: number = PRACTICE_FALLBACK_LIMIT,
+): CardData[] {
+  const today = filterTodayCards(cards);
+  if (today.length > 0) return today;
+  if (!cards || typeof cards !== "object") return [];
+  const out: CardData[] = [];
+  for (const [id, c] of Object.entries(cards)) {
+    if (!isPracticeCard(c)) continue;
+    if (typeof c.timestamp !== "number") continue;
+    out.push({ ...c, id: c.id ?? id });
+  }
+  out.sort((a, b) => b.timestamp - a.timestamp);
+  return out.slice(0, limit);
 }
 
 /**

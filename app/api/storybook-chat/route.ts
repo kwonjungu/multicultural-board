@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { streamChatResponse, sseSingleFinal } from "@/lib/groq-stream";
+import { sanitizeReply } from "@/lib/langGuard";
 import type { StorybookCharacter } from "@/lib/types";
 
 // 스트리밍 응답이라 정적 최적화 대상에서 제외
@@ -56,14 +57,10 @@ function enforceQuestionEnding(reply: string, lang: string): string {
   return `${cleaned} ${followup}`;
 }
 
-// 한국어 답변 정리 — LLM 이 가끔 섞는 외국어 토큰("çok 좋아해")과
-// 어색한 명사절 의문형("~무엇인지?")을 마지막 안전망으로 교정한다.
-function sanitizeKorean(reply: string): string {
+// 한국어 답변의 어색한 명사절 의문형("~무엇인지?")을 구어체로 교정한다.
+// (외국어 토큰 제거는 langGuard 의 sanitizeReply 가 전 언어 공통으로 담당)
+function fixKoreanRegister(reply: string): string {
   let out = reply;
-  // 분음 라틴 문자(ç, ğ, ü, à …)가 든 토큰은 한국어 문장에 정상적으로
-  // 등장할 일이 없다 — 통째로 제거
-  out = out.replace(/[A-Za-z]*[À-ÿĀ-žơưƠƯ]+[A-Za-z À-ÿĀ-ž]*/g, "").replace(/\s{2,}/g, " ");
-  // "~무엇인지?" / "~어떤지?" / "~는지?" 류 명사절 의문형 → 구어체로
   out = out.replace(/무엇인지\s*\?/g, "뭐야?");
   out = out.replace(/인지\s*\?/g, "이야?");
   out = out.replace(/([가-힣])는지\s*\?/g, "$1?");
@@ -189,7 +186,9 @@ export async function POST(req: NextRequest) {
     temperature: 0.6,
     maxTokens: 180,
     finalize: (full) => {
-      const cleaned = body.studentLang === "ko" ? sanitizeKorean(full) : full;
+      // #8 전 언어 외국어 토큰 제거 → (ko) 명사절 의문형 교정 → 질문형 종결 강제
+      let cleaned = sanitizeReply(full, body.studentLang);
+      if (body.studentLang === "ko") cleaned = fixKoreanRegister(cleaned);
       return enforceQuestionEnding(cleaned, body.studentLang);
     },
   });

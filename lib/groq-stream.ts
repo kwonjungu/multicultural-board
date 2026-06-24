@@ -14,6 +14,61 @@
 import type OpenAI from "openai";
 import { checkSafety, replyForSafety } from "./chatSafety";
 import { withGroqKeyFallback } from "./groq-client";
+import { scrubDelta, sanitizeReply, targetScriptRatio } from "./langGuard";
+import { LANGUAGES } from "./constants";
+
+// 타깃 언어 비율이 이 값 미만이면 외국어 오염으로 보고 1회 재생성.
+const POLLUTION_THRESHOLD = 0.6;
+
+function langDisplayName(lang: string): string {
+  const e = LANGUAGES[lang as keyof typeof LANGUAGES] as { name?: string; label?: string } | undefined;
+  return e?.name || e?.label || lang;
+}
+
+/**
+ * #8 외국어 오염 복구 — full 의 타깃 언어 비율이 낮으면 STRICT 메시지를 덧붙여
+ * 비스트리밍으로 1회 재생성한다. 더 나은 결과만 채택한다(보수적).
+ */
+async function ensureTargetLang(
+  full: string,
+  ctx: { messages: ChatMessage[]; models: string[]; lang: string; allow: string[]; temperature: number; maxTokens: number },
+): Promise<string> {
+  if (targetScriptRatio(full, ctx.allow) >= POLLUTION_THRESHOLD) return full;
+  const name = langDisplayName(ctx.lang);
+  const strict: ChatMessage = {
+    role: "system",
+    content: `STRICT: Reply ONLY in ${name}. Do NOT use Chinese/Japanese/other-language characters unless the reply language is that language. Keep it short.`,
+  };
+  try {
+    const regen = await withGroqKeyFallback(async (client) => {
+      let lastErr: unknown = null;
+      for (const model of ctx.models) {
+        try {
+          const c = await client.chat.completions.create({
+            model,
+            messages: [...ctx.messages, strict],
+            temperature: Math.min(ctx.temperature, 0.5),
+            max_tokens: ctx.maxTokens,
+            stream: false,
+          });
+          return c.choices?.[0]?.message?.content?.trim() || "";
+        } catch (err) {
+          lastErr = err;
+          const status = (err as { status?: number })?.status ?? 0;
+          if (status === 400 || status === 404) continue;
+          throw err;
+        }
+      }
+      throw lastErr ?? new Error("regenerate: no model");
+    });
+    if (regen && targetScriptRatio(regen, ctx.allow) > targetScriptRatio(full, ctx.allow)) {
+      return regen;
+    }
+  } catch (err) {
+    console.warn("groq-stream: clean regeneration failed", err);
+  }
+  return full;
+}
 
 export type ChatKind = "normal" | "block" | "distress" | "error";
 
@@ -30,6 +85,11 @@ interface StreamChatParams {
   maxTokens?: number;
   /** 완성된 전체 텍스트에 적용할 후처리 (예: 질문형 종결 강제) */
   finalize?: (full: string) => string;
+  /**
+   * #8 언어 가드가 허용할 스크립트 언어 목록 (delta 스크럽·오염 판정용).
+   * 기본 [lang]. 튜터처럼 타깃 언어 + 한국어 예시를 함께 쓰면 [lang,"ko"] 전달.
+   */
+  scrubLangs?: string[];
 }
 
 const SSE_HEADERS = {
@@ -56,6 +116,8 @@ export function sseSingleFinal(reply: string, kind: ChatKind): Response {
 /** Groq 스트리밍 챗 → SSE Response. 키/모델 폴백 + 증분 안전검사 포함. */
 export async function streamChatResponse(params: StreamChatParams): Promise<Response> {
   const { messages, models, lang, temperature = 0.7, maxTokens = 180, finalize } = params;
+  // #8 허용 언어(스크립트) 목록 — 기본 [lang].
+  const allow = params.scrubLangs && params.scrubLangs.length ? params.scrubLangs : [lang];
 
   // 1) 스트림 획득까지는 기존 키/모델 폴백 체계를 그대로 사용.
   //    (429/401/403 → 다음 키, 400/404 → 다음 모델. create() 시점에 throw 됨)
@@ -108,7 +170,10 @@ export async function streamChatResponse(params: StreamChatParams): Promise<Resp
             controller.close();
             return;
           }
-          controller.enqueue(sseLine({ type: "delta", text: delta }));
+          // #8 delta 스크럽 — 외국어가 화면에 "뜨는" 것을 차단. acc(원본)는
+          // 종료 시 오염 판정·재생성에 쓰므로 그대로 둔다.
+          const shown = scrubDelta(delta, allow);
+          if (shown) controller.enqueue(sseLine({ type: "delta", text: shown }));
         }
 
         const full = (acc || "").trim();
@@ -117,7 +182,11 @@ export async function streamChatResponse(params: StreamChatParams): Promise<Resp
             type: "final", reply: replyForSafety(lang, "block"), kind: "error", model,
           }));
         } else {
-          const reply = finalize ? finalize(full) : full;
+          // #8 오염 시 1회 재생성 → finalize(라우트의 sanitize/질문종결) →
+          //    그래도 비면 안전 폴백(타깃 언어). 외국어 덩어리는 절대 노출 안 됨.
+          const cleaned = await ensureTargetLang(full, { messages, models, lang, allow, temperature, maxTokens });
+          let reply = finalize ? finalize(cleaned) : sanitizeReply(cleaned, allow);
+          if (!reply || reply.replace(/\s/g, "").length < 2) reply = replyForSafety(lang, "block");
           controller.enqueue(sseLine({ type: "final", reply, kind: "normal", model }));
         }
         controller.close();
@@ -126,7 +195,7 @@ export async function streamChatResponse(params: StreamChatParams): Promise<Resp
         console.error("groq-stream: mid-stream error", err);
         const full = acc.trim();
         const reply = full.length >= 10
-          ? (finalize ? finalize(full) : full)
+          ? (finalize ? finalize(full) : sanitizeReply(full, allow))
           : replyForSafety(lang, "block");
         const kind: ChatKind = full.length >= 10 ? "normal" : "error";
         try {

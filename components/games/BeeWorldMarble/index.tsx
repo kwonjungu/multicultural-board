@@ -212,6 +212,9 @@ const rootIntro: CSSProperties = {
   maxWidth: 720,
   margin: "0 auto",
   boxSizing: "border-box",
+  // #3 하단 여백 — 3~4인 설정으로 길어져도 '▶ 시작!' 버튼이 화면 끝/기기 UI에
+  // 가려지지 않고 충분히 스크롤되어 탭 가능하도록 한다.
+  paddingBottom: "calc(28px + env(safe-area-inset-bottom, 0px))",
 };
 
 const topBar: CSSProperties = {

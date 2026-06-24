@@ -40,6 +40,7 @@ import { readChatStream } from "@/lib/chatStreamClient";
 import MicButton from "./MicButton";
 import { speak as speakText } from "@/lib/ttsMulti";
 import StorybookCreator from "./StorybookCreator";
+import StorybookWordQuiz from "./StorybookWordQuiz";
 import EmotionCardDeck from "./EmotionCardDeck";
 import { pushEmotion, emotionById, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
 import { t, tFmt } from "@/lib/i18n";
@@ -135,8 +136,8 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
     return () => { cancel = true; };
   }, [session?.bookId]);
 
-  const handleStart = useCallback(async (bookId: string) => {
-    await startSession(roomCode, bookId, myClientId);
+  const handleStart = useCallback(async (bookId: string, opts?: { wordQuizEnabled?: boolean }) => {
+    await startSession(roomCode, bookId, myClientId, opts);
   }, [roomCode, myClientId]);
 
   const handleEnd = useCallback(async () => {
@@ -299,9 +300,11 @@ function TeacherSetup({
   lang: string;
   teacherName: string;
   onBack: () => void;
-  onStart: (bookId: string) => void;
+  onStart: (bookId: string, opts?: { wordQuizEnabled?: boolean }) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  // [신규] 수업 전 단어 퀴즈 토글
+  const [wordQuizEnabled, setWordQuizEnabled] = useState(false);
   const [generated, setGenerated] = useState<BookListEntry[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -350,7 +353,7 @@ function TeacherSetup({
           setCreating(false);
           if (busy) return;
           setBusy(true);
-          try { await onStart(id); } finally { setBusy(false); }
+          try { await onStart(id, { wordQuizEnabled }); } finally { setBusy(false); }
         }}
         onCancel={() => setCreating(false)}
       />
@@ -411,6 +414,42 @@ function TeacherSetup({
           AI로 새 그림책 만들기
         </button>
 
+        {/* [신규] 단어 퀴즈 토글 — 수업 시작 시 적용 */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={wordQuizEnabled}
+          onClick={() => setWordQuizEnabled((v) => !v)}
+          style={{
+            width: "100%", marginBottom: 14,
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 14px",
+            background: wordQuizEnabled ? "linear-gradient(135deg, #ECFDF5, #D1FAE5)" : "#fff",
+            border: `2px solid ${wordQuizEnabled ? "#10B981" : "#FDE68A"}`,
+            borderRadius: 16, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+          }}
+        >
+          <span style={{ fontSize: 24 }}>📝</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 14, fontWeight: 900, color: "#1F2937" }}>
+              단어 퀴즈로 시작
+            </span>
+            <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 1 }}>
+              수업 전 그림책 핵심 낱말 4지선다 (어휘 4개 이상일 때)
+            </span>
+          </span>
+          <span style={{
+            width: 46, height: 26, borderRadius: 999, flexShrink: 0, position: "relative",
+            background: wordQuizEnabled ? "#10B981" : "#D1D5DB", transition: "background 0.15s",
+          }}>
+            <span style={{
+              position: "absolute", top: 3, left: wordQuizEnabled ? 23 : 3,
+              width: 20, height: 20, borderRadius: "50%", background: "#fff",
+              transition: "left 0.15s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+            }} />
+          </span>
+        </button>
+
         {loadingList ? (
           <div style={{ textAlign: "center", padding: 30, color: "#92400E", fontWeight: 700 }}>
             📚 그림책 목록 불러오는 중…
@@ -429,7 +468,7 @@ function TeacherSetup({
                   if ((e.target as HTMLElement).closest("button")) return;
                   if (busy) return;
                   setBusy(true);
-                  try { await onStart(b.id); } finally { setBusy(false); }
+                  try { await onStart(b.id, { wordQuizEnabled }); } finally { setBusy(false); }
                 }}
                 role="button"
                 tabIndex={0}
@@ -524,7 +563,7 @@ function TeacherSetup({
                     onClick={async () => {
                       if (busy) return;
                       setBusy(true);
-                      try { await onStart(b.id); } finally { setBusy(false); }
+                      try { await onStart(b.id, { wordQuizEnabled }); } finally { setBusy(false); }
                     }}
                     disabled={busy}
                     style={{
@@ -735,10 +774,28 @@ function BeforePhase({
   book: Storybook;
   isTeacher: boolean;
 }) {
+  // [신규] 수업 전 단어 퀴즈 게이트 — 학생만, 토글 ON + 어휘 4개 이상일 때.
+  // 학생이 퀴즈를 마치면 본문(표지/도입)으로 진행. 단계 신설 없이 로컬 게이트.
+  // (Hooks 규칙: 모든 훅은 early-return 앞에서 호출)
+  const [quizDone, setQuizDone] = useState(false);
   const introQuestions = useMemo(
     () => book.questions.filter((q) => q.tier === "intro"),
     [book.questions],
   );
+
+  const quizEligible = !isTeacher
+    && !!session.wordQuizEnabled
+    && (book.vocab?.length ?? 0) >= 4;
+  if (quizEligible && !quizDone) {
+    return (
+      <StorybookWordQuiz
+        book={book}
+        viewerLang={lang}
+        onDone={() => setQuizDone(true)}
+      />
+    );
+  }
+
   const currentQ = session.currentQuestionId
     ? introQuestions.find((q) => q.id === session.currentQuestionId) ?? null
     : null;

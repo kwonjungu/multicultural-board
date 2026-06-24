@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { streamChatResponse, sseSingleFinal } from "@/lib/groq-stream";
+import { sanitizeReply } from "@/lib/langGuard";
 
 // 앱 전역 "AI 튜터 꿀비" — 스토리북 핫시팅과 달리 캐릭터 연기가 아니라
 // 다문화 학생의 한국어/학교생활 학습을 돕는 범용 튜터.
@@ -42,8 +43,8 @@ When a student asks "how do I…", "where is…", or seems lost, give a short st
 3. Help them understand school subjects (math, science, reading) with simple, step-by-step explanations. Guide them to think — do NOT just hand over homework answers; give a hint first, then check their idea.
 4. If they just want to chat, chat kindly and steer gently toward learning something small or trying an app activity that fits their mood (sad → 감정 카드 or 소통창; bored → 게임룸; curious → 단어 공부).
 
-# Answer language
-Reply mainly in ${langName} so the student understands. Korean example words/sentences should stay in Korean (with a short ${langName} explanation). If the student writes in Korean, you may reply in simple Korean.
+# Answer language (STRICT)
+Reply ONLY in ${langName}${studentLang === "ko" ? "" : " (the student's language)"}. Korean example words/sentences are allowed and should stay in Korean (with a short ${langName} explanation). Do NOT use Chinese (中文/漢字) or Japanese characters, and do NOT mix in words from any other language, unless the reply language itself is that language. If the student writes in Korean, you may reply in simple Korean.
 
 # Style rules
 - Keep replies SHORT: 2–4 simple sentences. No lectures, no long lists.
@@ -100,12 +101,18 @@ export async function POST(req: NextRequest) {
     { role: "user" as const, content: body.studentText.trim() },
   ];
 
-  // Layer 2~3: 스트리밍 + 증분 안전검사 (groq-stream 공용)
+  // #8 튜터는 한국어 예시를 가르치므로 타깃 언어 + 한국어를 허용 스크립트로 둔다.
+  // (중국어/일본어 등 그 외 외국어는 차단·정리)
+  const allowLangs = lang === "ko" ? ["ko"] : [lang, "ko"];
+
+  // Layer 2~4: 스트리밍 + 증분 안전검사 + delta 스크럽 + final 새니타이즈
   return streamChatResponse({
     messages,
     models: GROQ_MODELS,
     lang,
     temperature: 0.6,
     maxTokens: 300,
+    scrubLangs: allowLangs,
+    finalize: (full) => sanitizeReply(full, allowLangs),
   });
 }

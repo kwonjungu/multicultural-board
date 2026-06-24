@@ -162,6 +162,7 @@ export async function startSession(
   roomCode: string,
   bookId: string,
   teacherClientId: string,
+  opts?: { wordQuizEnabled?: boolean },
 ): Promise<void> {
   const db = getClientDb();
   const initial: StorybookSession = {
@@ -172,8 +173,9 @@ export async function startSession(
     activeCharacterId: null,
     teacherClientId,
     startedAt: Date.now(),
+    wordQuizEnabled: !!opts?.wordQuizEnabled,
   };
-  await set(ref(db, sessionPath(roomCode)), initial);
+  await set(ref(db, sessionPath(roomCode)), stripUndefined(initial));
 }
 
 export async function endSession(roomCode: string): Promise<void> {

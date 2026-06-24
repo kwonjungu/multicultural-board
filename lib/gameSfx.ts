@@ -72,3 +72,45 @@ export function playSequence(
     );
   }
 }
+
+// 단어카드 시험 등 세션 완료 축하 팡파레 (#6).
+// 결과 강도에 따라 차등: full(별3) → good(별2) → soft(격려).
+// 모두 공유 싱글턴 컨텍스트를 쓰므로 톤마다 new AudioContext 금지 (가드레일).
+export type FanfareLevel = "full" | "good" | "soft";
+
+export function playFanfare(level: FanfareLevel = "full"): void {
+  if (typeof window === "undefined") return;
+  if (level === "soft") {
+    // 격려 — 부드러운 2음 상승 (저점수)
+    playSequence([
+      { freq: 523, durationMs: 160, delayMs: 0,   type: "sine", volume: 0.16 },
+      { freq: 659, durationMs: 260, delayMs: 150, type: "sine", volume: 0.18 },
+    ]);
+    return;
+  }
+  if (level === "good") {
+    // 잘했어요 — C–E–G–C 상승 아르페지오
+    playSequence([
+      { freq: 523,  durationMs: 130, delayMs: 0,   type: "triangle", volume: 0.18 },
+      { freq: 659,  durationMs: 130, delayMs: 110, type: "triangle", volume: 0.18 },
+      { freq: 784,  durationMs: 130, delayMs: 220, type: "triangle", volume: 0.18 },
+      { freq: 1047, durationMs: 320, delayMs: 330, type: "triangle", volume: 0.2 },
+    ]);
+    return;
+  }
+  // full — 완벽! 화려한 팡파레: 상승 아르페지오 + 마무리 화음(C장조 트라이어드)
+  playSequence([
+    { freq: 523,  durationMs: 120, delayMs: 0,   type: "triangle", volume: 0.2 },
+    { freq: 659,  durationMs: 120, delayMs: 110, type: "triangle", volume: 0.2 },
+    { freq: 784,  durationMs: 120, delayMs: 220, type: "triangle", volume: 0.2 },
+    { freq: 1047, durationMs: 160, delayMs: 330, type: "triangle", volume: 0.22 },
+    { freq: 1319, durationMs: 160, delayMs: 470, type: "triangle", volume: 0.22 },
+    // 마무리 트라이어드 한 방
+    { freq: 523,  durationMs: 520, delayMs: 640, type: "triangle", volume: 0.16 },
+    { freq: 784,  durationMs: 520, delayMs: 640, type: "triangle", volume: 0.16 },
+    { freq: 1047, durationMs: 520, delayMs: 640, type: "triangle", volume: 0.18 },
+    // 반짝이는 종소리 장식
+    { freq: 1568, durationMs: 240, delayMs: 720, type: "sine", volume: 0.12 },
+    { freq: 2093, durationMs: 320, delayMs: 880, type: "sine", volume: 0.1 },
+  ]);
+}

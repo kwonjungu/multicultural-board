@@ -17,7 +17,8 @@ const PLAYER_A_ACCENT = "#DB2777";
 const PLAYER_B_BG = "#ECFDF5"; // green
 const PLAYER_B_ACCENT = "#059669";
 
-const DECK_SIZE = 20;
+// #5 저학년(1~2학년) 난이도 하향 — 한 판 길이를 줄여 집중·피로도를 낮춘다.
+const DECK_SIZE = 12;
 
 const CATEGORIES: WYRCategory[] = ["food", "season", "school", "home", "taste"];
 const CATEGORY_META: Record<WYRCategory, { emoji: string; label: string; color: string }> = {

@@ -230,6 +230,17 @@ export interface StorybookCharacter {
   systemPromptExtra?: string; // additional hardening
 }
 
+// [신규] 그림책 단어 퀴즈 — 동화 생성 시 추출한 핵심·어려운 낱말.
+export interface StorybookVocabWord {
+  id: string;
+  lemma: string;                          // ko 기본형
+  word: Record<string, string>;           // lang -> 낱말 표기
+  gloss: Record<string, string>;          // lang -> 1~2학년용 짧은 뜻풀이
+  distractors: Record<string, string[]>;  // lang -> 오답 3개
+  pageIdx: number;                        // 처음 등장 페이지
+  difficulty: "easy" | "mid" | "hard";
+}
+
 export interface Storybook {
   id: string;
   title: Record<string, string>;
@@ -239,6 +250,7 @@ export interface Storybook {
   pages: StorybookPage[];
   characters: StorybookCharacter[];
   questions: StorybookQuestion[];
+  vocab?: StorybookVocabWord[];           // [신규] 단어 퀴즈용 어휘 세트
 }
 
 export interface StorybookSession {
@@ -249,6 +261,7 @@ export interface StorybookSession {
   activeCharacterId: string | null;  // which character is being chatted with (after phase)
   teacherClientId: string;
   startedAt: number;
+  wordQuizEnabled?: boolean;  // [신규] 수업 전 단어 퀴즈(4지선다) 게이트 사용 여부
 }
 
 export interface StorybookResponse {

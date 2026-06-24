@@ -2,6 +2,7 @@ import { VOCAB_WORDS, type VocabWord } from "./vocabWords";
 import type { ProgressMap } from "./vocabProgress";
 import { buildQuiz, punchHole, type QuizQuestion as ClozeRaw } from "./vocabTest";
 import { wordsForLesson } from "./lessons";
+import { pickDistractors as pickDistractorsPure } from "./distractorMeta";
 
 export type QuizFormat = "cloze" | "mc4" | "mc4-image" | "matching" | "listening";
 
@@ -73,13 +74,9 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+// 오답 선정은 distractorMeta 의 순수 함수에 위임 (복수 정답 방지 가드 포함).
 function pickDistractors(target: VocabWord, n: number): VocabWord[] {
-  // 같은 subcategory 우선, 부족하면 같은 category, 그래도 부족하면 전체
-  const sameSub = VOCAB_WORDS.filter((w) => w.id !== target.id && w.subcategory === target.subcategory);
-  const sameCat = VOCAB_WORDS.filter((w) => w.id !== target.id && w.category === target.category && w.subcategory !== target.subcategory);
-  const others = VOCAB_WORDS.filter((w) => w.id !== target.id && w.category !== target.category);
-  const pool = [...shuffle(sameSub), ...shuffle(sameCat), ...shuffle(others)];
-  return pool.slice(0, n);
+  return pickDistractorsPure(target, n, VOCAB_WORDS);
 }
 
 function genId(format: QuizFormat, wordId: string): string {

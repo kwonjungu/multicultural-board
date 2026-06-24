@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { AwardResult } from "@/lib/lms";
 import BeeMascot from "./BeeMascot";
+import { playFanfare } from "@/lib/gameSfx";
 
 const PURPLE = "#8B5CF6";
 const PURPLE_DARK = "#6D28D9";
@@ -26,16 +27,22 @@ interface Props {
 export default function SessionResultScreen({
   outOfHearts, finalizing, correct, total, sessionXp, combo, award, stars, lessonTitle, onRetry, onClose,
 }: Props) {
-  // 진입 시 살짝 진동/사운드는 추후 추가 가능
+  // #6 결과 화면 진입 시 꿀비 축하 연출 — 팡파레 + 햅틱 (별 개수 차등).
+  const celebrating = !outOfHearts && total > 0;
+  const fanfareLevel: "full" | "good" | "soft" =
+    stars === 3 ? "full" : stars === 2 ? "good" : "soft";
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!outOfHearts && correct > 0) {
-      try {
-        // 가벼운 햅틱 — 모바일에서만 동작
-        (window.navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean }).vibrate?.(60);
-      } catch { /* silent */ }
-    }
-  }, [outOfHearts, correct]);
+    if (!celebrating) return;
+    try { playFanfare(fanfareLevel); } catch { /* audio unavailable */ }
+    try {
+      // 햅틱 — 모바일에서만. 강도도 결과에 맞춰 차등.
+      const pattern = fanfareLevel === "full" ? [40, 40, 80] : fanfareLevel === "good" ? [40, 40] : 60;
+      (window.navigator as Navigator & { vibrate?: (p: number | number[]) => boolean }).vibrate?.(pattern);
+    } catch { /* silent */ }
+    // 마운트 1회만 — 결과 화면은 세션당 한 번 생성됨
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (outOfHearts) {
     return (
@@ -74,10 +81,19 @@ export default function SessionResultScreen({
   const headlineEmoji = stars === 3 ? "🏆" : stars === 2 ? "🎉" : pct >= 60 ? "✨" : "💪";
   const headlineText = stars === 3 ? "완벽해요!" : stars === 2 ? "잘했어요!" : pct >= 60 ? "수고했어요!" : "다시 도전해봐요!";
 
+  const partyLevel: "full" | "good" | "none" =
+    stars === 3 ? "full" : stars === 2 ? "good" : "none";
+
   return (
-    <div style={{ textAlign: "center", padding: "24px 16px 8px" }}>
-      <BeeMascot size={104} mood={stars !== null && stars >= 2 ? "cheer" : pct >= 60 ? "celebrate" : "think"} />
-      <div style={{ fontSize: 40, marginBottom: 4 }}>{headlineEmoji}</div>
+    <div style={{ textAlign: "center", padding: "24px 16px 8px", position: "relative", overflow: "hidden" }}>
+      {partyLevel !== "none" && <Confetti level={partyLevel} />}
+      <div style={{
+        position: "relative", zIndex: 1, display: "inline-block",
+        animation: "beeCelebrateIn 0.6s cubic-bezier(.2,1.4,.4,1) both",
+      }}>
+        <BeeMascot size={104} mood={stars !== null && stars >= 2 ? "cheer" : pct >= 60 ? "celebrate" : "think"} />
+      </div>
+      <div style={{ fontSize: 40, marginBottom: 4, position: "relative", zIndex: 1 }}>{headlineEmoji}</div>
       <div style={{ fontSize: 24, fontWeight: 900, color: PURPLE_DARK, marginBottom: 4 }}>
         {headlineText}
       </div>
@@ -131,7 +147,54 @@ export default function SessionResultScreen({
         @keyframes barFill {
           from { width: 0; }
         }
+        @keyframes beeCelebrateIn {
+          0% { transform: scale(0.3) translateY(20px) rotate(-12deg); opacity: 0; }
+          60% { transform: scale(1.12) translateY(-6px) rotate(5deg); opacity: 1; }
+          80% { transform: scale(0.97) translateY(0) rotate(-2deg); }
+          100% { transform: scale(1) translateY(0) rotate(0); opacity: 1; }
+        }
+        @keyframes confettiFall {
+          0% { transform: translateY(-12px) rotate(0deg); opacity: 0; }
+          12% { opacity: 1; }
+          100% { transform: translateY(360px) rotate(540deg); opacity: 0; }
+        }
       `}</style>
+    </div>
+  );
+}
+
+// #6 컨페티 — 결과 화면 상단에서 색종이가 쏟아지는 축하 연출.
+// full(별3)=많고 화려하게, good(별2)=절제된 양.
+function Confetti({ level }: { level: "full" | "good" }) {
+  const count = level === "full" ? 40 : 20;
+  const colors = ["#F59E0B", "#8B5CF6", "#10B981", "#FB7185", "#3B82F6", "#FACC15"];
+  const pieces = Array.from({ length: count }, (_, i) => {
+    const left = (i * 97) % 100;            // 결정적 분포 (SSR/CSR 일치)
+    const delay = ((i * 53) % 100) / 100;   // 0~1s
+    const dur = 1.6 + (((i * 31) % 100) / 100) * 1.4; // 1.6~3.0s
+    const size = 6 + ((i * 17) % 6);        // 6~11px
+    const color = colors[i % colors.length];
+    const round = i % 3 === 0;
+    return (
+      <span
+        key={i}
+        style={{
+          position: "absolute", top: -12, left: `${left}%`,
+          width: size, height: round ? size : size * 0.5,
+          background: color,
+          borderRadius: round ? "50%" : 2,
+          animation: `confettiFall ${dur}s linear ${delay}s ${level === "full" ? 2 : 1}`,
+          opacity: 0,
+        }}
+      />
+    );
+  });
+  return (
+    <div aria-hidden style={{
+      position: "absolute", inset: 0, zIndex: 0,
+      pointerEvents: "none", overflow: "hidden",
+    }}>
+      {pieces}
     </div>
   );
 }

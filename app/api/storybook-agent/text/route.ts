@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateJson } from "@/lib/gemini";
 
-// Vercel Hobby: 10s, Pro: 60s. We keep each call under ~25s by issuing 2 LLM
-// rounds (draft + critique-revise) on a single fast model.
+// Vercel Hobby 상한 60s. #7: 시간 예산을 지키기 위해 기본 경로는 LLM 호출을
+// 최소화한다 — draft 1회(2.5-flash, thinking off) + 언어별 번역(병렬). 검수/수정
+// (critique/revise) 라운드는 시간을 크게 잡아먹어 기본 비활성(opt-in)으로 둔다.
 export const maxDuration = 60;
 
 export type TextLength = "short" | "medium" | "long";
@@ -14,6 +15,7 @@ interface TextAgentRequest {
   pageCount: number;   // 4..12
   targetLangs: string[];  // e.g. ["ko","en","vi","zh","fil"]
   textLength?: TextLength;
+  critique?: boolean;  // #7: 검수/수정 라운드 사용 여부 (기본 false — 시간 절약)
 }
 
 const LENGTH_SPEC: Record<TextLength, { instruction: string; example: string }> = {
@@ -59,6 +61,15 @@ interface DraftBook {
     ibConcept?: "form" | "function" | "causation" | "change" | "connection" | "perspective" | "responsibility" | "reflection";
     standard?: string;
   }>;
+  // [신규] 단어 퀴즈용 어휘 — 같은 라운드에서 추출(추가 호출 없음). ko 기준.
+  vocab?: Array<{
+    id: string;            // kebab-case
+    lemmaKo: string;       // ko 기본형(원형)
+    glossKo: string;       // 1~2학년용 짧은 뜻풀이 (ko)
+    distractorsKo: string[]; // 그럴듯한 오답 뜻풀이 3개 (ko)
+    pageIdx: number;       // 처음 등장 페이지
+    difficulty: "easy" | "mid" | "hard";
+  }>;
 }
 
 interface TextAgentResponse {
@@ -69,6 +80,16 @@ interface TextAgentResponse {
     pageTexts: Record<number, Record<string, string>>;
     characterNames: Record<string, Record<string, string>>;
     questionTexts: Record<string, Record<string, string>>;
+    // [신규] 단어 퀴즈 어휘 (다국어). StorybookVocabWord 와 동형.
+    vocabWords?: Array<{
+      id: string;
+      lemma: string;
+      word: Record<string, string>;
+      gloss: Record<string, string>;
+      distractors: Record<string, string[]>;
+      pageIdx: number;
+      difficulty: "easy" | "mid" | "hard";
+    }>;
   };
   model?: string;
   error?: string;
@@ -122,6 +143,16 @@ You MUST reply with valid JSON matching this schema (all text in Korean unless t
     { "id": string, "tier": "core", "textKo": string }, ... 1-2 core questions,
     { "id": string, "tier": "deep", "textKo": string, "standard": string }, ... 1-2 deep questions tying to the provided standard,
     { "id": string, "tier": "concept", "textKo": string, "ibConcept": one of the IB concepts above }, ... 1-2 concept questions
+  ],
+  "vocab": [
+    {
+      "id": string (kebab-case, e.g. "v-honey"),
+      "lemmaKo": string (the word in its DICTIONARY/BASE form — verbs/adjectives as 기본형, e.g. "모으다" not "모았어요"),
+      "glossKo": string (a SHORT kid-friendly definition for ages 7-9, one phrase, NOT using the word itself),
+      "distractorsKo": [string, string, string] (THREE plausible-but-WRONG definitions — see distractor rules),
+      "pageIdx": number (the page where the word first appears),
+      "difficulty": "easy" | "mid" | "hard"
+    }, ... pick 6-8 words (max 10) that are the most FREQUENT and/or DIFFICULT content words in the book
   ]
 }
 
@@ -135,7 +166,16 @@ Rules:
 - IB concept questions should use the Korean word naturally (e.g. '변화', '책임', '연결').
 - Character speechStyle should include an example phrase in quotes so the downstream chatbot stays consistent.
 - Use kebab-case ids like "q-intro-1", "q-check-2", "q-core-1", "char-buzz".
-- The cover prompt must visually match page 1's style to keep the art consistent.`;
+- The cover prompt must visually match page 1's style to keep the art consistent.
+
+=== Vocabulary extraction (for the pre-reading word quiz) ===
+Pick 6-8 (max 10) KEY or DIFFICULT content words (nouns/verbs/adjectives) that actually appear in the page texts. Prefer words that are frequent in the book OR hard for a 1st-2nd grader. Exclude particles, endings, and trivial words.
+For each word write a short kid-friendly definition (glossKo) and THREE wrong definitions (distractorsKo).
+Distractor rules (CRITICAL — prevent multiple correct answers):
+1. Each wrong definition must be CLEARLY wrong for this word — a child who knows the word must be able to rule it out.
+2. Do NOT write a near-synonym or a definition that could also fit the correct word. Avoid same-meaning paraphrases.
+3. Make the three wrong definitions describe DIFFERENT, unrelated things (different category) so none of them is accidentally also correct.
+4. Keep every definition equally short and simple so the wrong ones are not obviously "the odd long one".`;
 }
 
 function buildCritiqueSystemPrompt(): string {
@@ -159,17 +199,19 @@ function buildReviseSystemPrompt(): string {
 function buildPerLangTranslatePrompt(targetLang: string): string {
   return `You translate a Korean children's picture book into ${targetLang}.
 
-Input JSON: { titleKo, pages[{idx,textKo}], characters[{id,nameKo}], questions[{id,textKo}] }.
+Input JSON: { titleKo, pages[{idx,textKo}], characters[{id,nameKo}], questions[{id,textKo}], vocab[{id,lemmaKo,glossKo,distractorsKo}] }.
 Output JSON exactly in this shape:
 {
   "title": string,
   "pages": { "<idx as string>": string },
   "characters": { "<id>": string },
-  "questions": { "<id>": string }
+  "questions": { "<id>": string },
+  "vocab": { "<id>": { "word": string, "gloss": string, "distractors": [string, string, string] } }
 }
 
 Rules:
 - Translate into ${targetLang}. Natural, age-appropriate for 7-9 year-old.
+- For vocab: "word" = the word itself translated, "gloss"/"distractors" = the short definitions translated. Keep distractors clearly wrong (do not turn any into a correct definition).
 - Preserve emojis and punctuation.
 - Do not explain. Only JSON.`;
 }
@@ -209,27 +251,31 @@ export async function POST(req: NextRequest) {
       maxTokens: 8192,
     });
 
-    // === Step 2: critique ===
+    // === Step 2: critique (opt-in only) ===
+    // #7: 기본 경로에서는 건너뛴다. 직렬 LLM 1~2회를 더해 Hobby 60s 예산을
+    // 넘기던 원인이었다. body.critique === true 일 때만 수행한다.
     let final: DraftBook = draft1;
-    try {
-      const { value: critique } = await generateJson<{ issues: string[]; needsRevision: boolean }>({
-        systemPrompt: buildCritiqueSystemPrompt(),
-        userPrompt: `다음 초안을 검토하세요:\n\n${JSON.stringify(draft1)}`,
-        temperature: 0.2,
-        maxTokens: 400,
-      });
-      if (critique.needsRevision && critique.issues.length > 0) {
-        const { value: revised } = await generateJson<DraftBook>({
-          systemPrompt: buildReviseSystemPrompt() + "\n\n" + LENGTH_SPEC[textLength].instruction,
-          userPrompt: `이전 초안:\n${JSON.stringify(draft1)}\n\n수정할 부분:\n${critique.issues.map((i) => "- " + i).join("\n")}`,
-          temperature: 0.7,
-          maxTokens: 8192,
+    if (body.critique) {
+      try {
+        const { value: critique } = await generateJson<{ issues: string[]; needsRevision: boolean }>({
+          systemPrompt: buildCritiqueSystemPrompt(),
+          userPrompt: `다음 초안을 검토하세요:\n\n${JSON.stringify(draft1)}`,
+          temperature: 0.2,
+          maxTokens: 400,
         });
-        final = revised;
+        if (critique.needsRevision && critique.issues.length > 0) {
+          const { value: revised } = await generateJson<DraftBook>({
+            systemPrompt: buildReviseSystemPrompt() + "\n\n" + LENGTH_SPEC[textLength].instruction,
+            userPrompt: `이전 초안:\n${JSON.stringify(draft1)}\n\n수정할 부분:\n${critique.issues.map((i) => "- " + i).join("\n")}`,
+            temperature: 0.7,
+            maxTokens: 8192,
+          });
+          final = revised;
+        }
+      } catch (err) {
+        // Critique is best-effort; fall back to draft if it fails
+        console.warn("critique/revise failed, using draft", err);
       }
-    } catch (err) {
-      // Critique is best-effort; fall back to draft if it fails
-      console.warn("critique/revise failed, using draft", err);
     }
 
     // === Step 3: translate — parallel per language (safer JSON) ===
@@ -238,20 +284,31 @@ export async function POST(req: NextRequest) {
       pages: {} as Record<string, Record<string, string>>,
       characters: {} as Record<string, Record<string, string>>,
       questions: {} as Record<string, Record<string, string>>,
+      // [신규] vocab: id -> { word/gloss: lang->str, distractors: lang->str[] }
+      vocab: {} as Record<string, {
+        word: Record<string, string>;
+        gloss: Record<string, string>;
+        distractors: Record<string, string[]>;
+      }>,
     };
     const nonKo = targetLangs.filter((l) => l !== "ko");
     if (nonKo.length > 0) {
+      const vocabList = final.vocab || [];
       const translationInput = {
         titleKo: final.titleKo,
         pages: final.pages.map((p) => ({ idx: p.idx, textKo: p.textKo })),
         characters: final.characters.map((c) => ({ id: c.id, nameKo: c.nameKo })),
         questions: final.questions.map((q) => ({ id: q.id, textKo: q.textKo })),
+        vocab: vocabList.map((v) => ({
+          id: v.id, lemmaKo: v.lemmaKo, glossKo: v.glossKo, distractorsKo: v.distractorsKo,
+        })),
       };
       interface PerLangResult {
         title: string;
         pages: Record<string, string>;
         characters: Record<string, string>;
         questions: Record<string, string>;
+        vocab?: Record<string, { word?: string; gloss?: string; distractors?: string[] }>;
       }
       const perLang = await Promise.all(
         nonKo.map(async (lang) => {
@@ -288,6 +345,15 @@ export async function POST(req: NextRequest) {
             translations.questions[id] = { ...(translations.questions[id] || {}), [lang]: text };
           }
         }
+        if (value.vocab) {
+          for (const [id, v] of Object.entries(value.vocab)) {
+            const slot = translations.vocab[id] || { word: {}, gloss: {}, distractors: {} };
+            if (v.word) slot.word[lang] = v.word;
+            if (v.gloss) slot.gloss[lang] = v.gloss;
+            if (Array.isArray(v.distractors)) slot.distractors[lang] = v.distractors;
+            translations.vocab[id] = slot;
+          }
+        }
       }
     }
 
@@ -318,6 +384,20 @@ export async function POST(req: NextRequest) {
       pageTexts[p.idx] = translations.pages[String(p.idx)] || { ko: p.textKo };
     }
 
+    // [신규] vocabWords 조립 — ko 기본값 + 번역 병합. 4지선다에 바로 쓸 형태.
+    const vocabWords = (final.vocab || []).map((v) => {
+      const t = translations.vocab[v.id] || { word: {}, gloss: {}, distractors: {} };
+      return {
+        id: v.id,
+        lemma: v.lemmaKo,
+        word: { ...t.word, ko: v.lemmaKo },
+        gloss: { ...t.gloss, ko: v.glossKo },
+        distractors: { ...t.distractors, ko: v.distractorsKo },
+        pageIdx: typeof v.pageIdx === "number" ? v.pageIdx : 1,
+        difficulty: v.difficulty || "mid" as const,
+      };
+    });
+
     return NextResponse.json<TextAgentResponse>({
       ok: true,
       model,
@@ -327,6 +407,7 @@ export async function POST(req: NextRequest) {
         pageTexts,
         characterNames: translations.characters,
         questionTexts: translations.questions,
+        vocabWords,
       },
     });
   } catch (err) {

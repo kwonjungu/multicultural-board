@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { ref, onValue } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
@@ -96,6 +96,36 @@ export default function RoomPage() {
     if (!id) { id = crypto.randomUUID(); localStorage.setItem("clientId", id); }
     return id;
   });
+
+  // #1 브라우저/기기 뒤로 가기 → 홈 허브 복귀 (사이트 이탈 방지)
+  // 서브뷰에 있는 동안 히스토리 가드 항목 1개를 유지한다. 어느 서브뷰든
+  // 뒤로 가기 한 번이면 허브로 돌아오고, 허브에서의 뒤로 가기만 사이트를 이탈한다.
+  const subviewGuardRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPop = () => {
+      // 가드 항목이 소비됨 → 허브로 복귀시키고 이탈을 막는다.
+      subviewGuardRef.current = false;
+      setHubView("hub");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (hubView !== "hub") {
+      // 서브뷰 진입: 가드가 없으면 히스토리 항목을 1개 쌓는다.
+      if (!subviewGuardRef.current) {
+        window.history.pushState({ hubGuard: true }, "");
+        subviewGuardRef.current = true;
+      }
+    } else if (subviewGuardRef.current) {
+      // 인앱 버튼으로 허브 복귀: 남아 있는 가드 항목을 소비해
+      // 허브에서의 뒤로 가기가 곧장 사이트를 이탈하도록 정합성을 맞춘다.
+      subviewGuardRef.current = false;
+      window.history.back();
+    }
+  }, [hubView]);
 
   const validCode = /^\d{4}$/.test(roomCode);
 

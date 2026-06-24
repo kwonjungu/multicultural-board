@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Storybook, StorybookPage, StorybookCharacter, StorybookQuestion, QuestionTier, IbConcept } from "@/lib/types";
+import type { Storybook, StorybookPage, StorybookCharacter, StorybookQuestion, StorybookVocabWord, QuestionTier, IbConcept } from "@/lib/types";
 import { saveGeneratedBook, updateGeneratedBookPageImage, updateGeneratedBookField, updateGeneratedBookCharacterAvatar } from "@/lib/storybook";
 
 interface Props {
@@ -89,6 +89,7 @@ interface TextAgentBook {
   pageTexts: Record<number, Record<string, string>>;
   characterNames: Record<string, Record<string, string>>;
   questionTexts: Record<string, Record<string, string>>;
+  vocabWords?: StorybookVocabWord[];
 }
 
 function agentToStorybook(
@@ -139,6 +140,7 @@ function agentToStorybook(
     pages,
     characters,
     questions,
+    vocab: src.vocabWords && src.vocabWords.length > 0 ? src.vocabWords : undefined,
   };
 }
 
@@ -191,8 +193,13 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
         }),
       });
       if (!textRes.ok) {
-        const err = await textRes.json().catch(() => ({ error: "network error" }));
-        throw new Error(err.error || "텍스트 생성 실패");
+        // #7: 504(시간 초과)는 JSON 본문이 없어 .json() 이 실패한다 → 모호한
+        // "network error" 대신 원인별로 명확히 안내한다.
+        if (textRes.status === 504 || textRes.status === 408) {
+          throw new Error("생성 시간이 초과되었어요. 페이지 수를 줄이거나 잠시 후 다시 시도해 주세요.");
+        }
+        const err = await textRes.json().catch(() => ({ error: "" }));
+        throw new Error(err.error || `텍스트 생성 실패 (오류 ${textRes.status})`);
       }
       const textData = await textRes.json() as { ok: boolean; book?: TextAgentBook; error?: string };
       if (!textData.ok || !textData.book) {

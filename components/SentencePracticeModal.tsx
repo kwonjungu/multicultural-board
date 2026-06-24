@@ -219,7 +219,7 @@ export default function SentencePracticeModal({ user, roomCode, cards, onClose }
         marginBottom: 14,
       }}>
         <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937" }}>
-          📖 오늘의 문장 연습
+          📖 문장 연습 · 복습
         </div>
         <button
           onClick={onClose}
