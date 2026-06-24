@@ -20,6 +20,20 @@ const PLAYER_B_ACCENT = "#059669";
 // #5 저학년(1~2학년) 난이도 하향 — 한 판 길이를 줄여 집중·피로도를 낮춘다.
 const DECK_SIZE = 12;
 
+// #5 저학년 친화 카테고리 — 일상에 가까워 어휘가 쉽다. 명절·계절 등 문화
+// 어휘가 많은 카드(다문화 교육 핵심이라 보존)는 소수만 섞는다.
+const EASY_CATEGORIES: WYRCategory[] = ["food", "taste", "school", "home"];
+
+// 쉬운 카테고리 카드를 우선 채우고, 부족분만 나머지(season 등)로 보충한다.
+function buildEasyDeck(n: number): WYRCard[] {
+  const easy = WYR_CARDS.filter((c) => EASY_CATEGORIES.includes(c.category));
+  const rest = WYR_CARDS.filter((c) => !EASY_CATEGORIES.includes(c.category));
+  const picked = pickN(easy, n);
+  if (picked.length < n) picked.push(...pickN(rest, n - picked.length));
+  // 카테고리가 한쪽에 몰리지 않게 마지막에 한 번 더 섞는다.
+  return pickN(picked, picked.length);
+}
+
 const CATEGORIES: WYRCategory[] = ["food", "season", "school", "home", "taste"];
 const CATEGORY_META: Record<WYRCategory, { emoji: string; label: string; color: string }> = {
   food:   { emoji: "🍚", label: "음식",   color: "#EA580C" },
@@ -69,7 +83,7 @@ export default function WouldYouRather({ langA, langB }: { langA: string; langB:
   const [voteB, setVoteB] = useState<Vote>(null);
   const [stats, setStats] = useState<StatsState>(INITIAL_STATS);
 
-  const deck = useMemo<WYRCard[]>(() => pickN(WYR_CARDS, DECK_SIZE), [resetKey]);
+  const deck = useMemo<WYRCard[]>(() => buildEasyDeck(DECK_SIZE), [resetKey]);
   const card = deck[idx];
 
   function handleVote(player: "A" | "B", option: "A" | "B") {

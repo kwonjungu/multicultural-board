@@ -51,6 +51,32 @@ export interface GenerateJsonOptions {
  * Ask Gemini for JSON output. Parses and returns the first valid JSON object
  * found. Falls through model list on 429/400/404.
  */
+async function createJsonCompletion(
+  client: OpenAI,
+  model: string,
+  opts: GenerateJsonOptions,
+  thinkingOff: boolean,
+) {
+  const base = {
+    model,
+    messages: [
+      { role: "system" as const, content: opts.systemPrompt },
+      { role: "user" as const, content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.75,
+    max_tokens: opts.maxTokens ?? 8192,
+    response_format: { type: "json_object" as const },
+  };
+  // #7: 2.5 계열의 thinking 을 꺼 생성 지연(20~40s)을 제거. Gemini OpenAI 호환
+  // 엔드포인트는 reasoning_effort:"none" 으로 thinking 을 끈다(OpenAI SDK 타입엔
+  // 없어 추가 필드로 주입). 엔드포인트가 이 값을 거부하면 호출자가 thinkingOff=false
+  // 로 폴백한다 — 파라미터 호환성 변화에도 그림책 생성이 깨지지 않도록.
+  const params = thinkingOff
+    ? { ...base, ...({ reasoning_effort: "none" } as Record<string, unknown>) }
+    : base;
+  return client.chat.completions.create(params);
+}
+
 export async function generateJson<T = unknown>(
   opts: GenerateJsonOptions,
 ): Promise<{ value: T; model: string }> {
@@ -58,20 +84,17 @@ export async function generateJson<T = unknown>(
   let lastErr: unknown = null;
   for (const model of GEMINI_TEXT_MODELS) {
     try {
-      const completion = await client.chat.completions.create({
-        model,
-        messages: [
-          { role: "system", content: opts.systemPrompt },
-          { role: "user", content: opts.userPrompt },
-        ],
-        temperature: opts.temperature ?? 0.75,
-        max_tokens: opts.maxTokens ?? 8192,
-        response_format: { type: "json_object" },
-        // #7: 2.5 계열의 thinking 을 꺼 생성 지연(20~40s)을 제거 — Gemini OpenAI
-        // 호환 엔드포인트는 reasoning_effort:"none" 으로 thinking 을 끈다.
-        // (OpenAI SDK 타입에는 "none" 이 없어 추가 필드로 주입)
-        ...({ reasoning_effort: "none" } as Record<string, unknown>),
-      });
+      let completion;
+      try {
+        completion = await createJsonCompletion(client, model, opts, true);
+      } catch (err) {
+        // reasoning_effort:"none" 이 거부되면(400) thinking 파라미터 없이 1회 재시도.
+        if ((err as { status?: number })?.status === 400) {
+          completion = await createJsonCompletion(client, model, opts, false);
+        } else {
+          throw err;
+        }
+      }
       const raw = completion.choices[0]?.message?.content?.trim() || "";
       if (!raw) {
         lastErr = new Error(`empty reply from ${model}`);

@@ -53,11 +53,16 @@ export default function RoomPage() {
 
   // 그림책 수업 세션 활성 상태. 학생은 계속 강제 동기화, 교사도 수업 중 이탈 방지용.
   const [storybookActive, setStorybookActive] = useState(false);
+  // popstate 핸들러(마운트 1회 바인딩)가 최신값을 읽도록 ref 로 보관.
+  const storybookActiveRef = useRef(false);
+  const isStudentRef = useRef(false);
+  useEffect(() => { isStudentRef.current = !!user && !user.isTeacher; }, [user]);
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeSession(roomCode, (session) => {
       const active = !!session && session.phase !== "done";
       setStorybookActive(active);
+      storybookActiveRef.current = active;
       if (active && !user.isTeacher) {
         // 학생은 세션 활성 동안 항상 그림책 화면으로 강제 동기화
         setHubView("storybook");
@@ -104,6 +109,14 @@ export default function RoomPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onPop = () => {
+      // 그림책 수업이 진행 중인 학생은 허브로 빠지면 강제 동기화 의도가 깨진다 →
+      // 가드를 다시 쌓아 그림책 화면을 유지한다.
+      if (storybookActiveRef.current && isStudentRef.current) {
+        window.history.pushState({ hubGuard: true }, "");
+        subviewGuardRef.current = true;
+        setHubView("storybook");
+        return;
+      }
       // 가드 항목이 소비됨 → 허브로 복귀시키고 이탈을 막는다.
       subviewGuardRef.current = false;
       setHubView("hub");
