@@ -212,6 +212,15 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
           <p style={{ margin: "6px 0 0", fontSize: 14, color: "#92400E", fontWeight: 700 }}>
             {t("hubPrompt", lang)}
           </p>
+          <p style={{
+            margin: "8px auto 0", maxWidth: 360,
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "6px 14px", borderRadius: 999,
+            background: "rgba(255,255,255,0.75)", border: "2px solid #FDE68A",
+            fontSize: 12, fontWeight: 800, color: "#B45309",
+          }}>
+            🐝 {t("hubTagline", lang)}
+          </p>
         </div>
 
         {/* 4 sections grid */}

@@ -44,8 +44,8 @@ export default function InterpreterFab({
           title={label}
           style={{
             // zIndex 는 전체화면 뷰(게임룸 460·토론 450·모달 400)보다 낮게 —
-            // 튜터 꿀비(우하단 zIndex 300)와 동일 레이어, 좌우 대칭.
-            position: "fixed", bottom: 84, left: 18, zIndex: 300,
+            // 튜터 꿀비(우하단 bottom 84 · 60px) 바로 위에 세로로 쌓는다.
+            position: "fixed", bottom: 156, right: 18, zIndex: 300,
             width: 60, height: 60, borderRadius: "50%",
             border: "3px solid #BFDBFE",
             background: "linear-gradient(135deg, #3B82F6, #2563EB)",
