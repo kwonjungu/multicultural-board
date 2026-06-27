@@ -11,6 +11,7 @@ import { getClientDb } from "./firebase-client";
 
 export interface WhiteboardMeta {
   prompt?: string;
+  active?: boolean;   // 교사가 활성화하면 학생 화면이 자동으로 화이트보드로 따라온다
   updatedAt?: number;
 }
 
@@ -32,6 +33,12 @@ function boardsPath(roomCode: string): string {
 export async function setWhiteboardPrompt(roomCode: string, prompt: string): Promise<void> {
   const db = getClientDb();
   await update(ref(db, metaPath(roomCode)), { prompt, updatedAt: Date.now() });
+}
+
+// 교사: 화이트보드 활성화 ON/OFF — ON 이면 학생 화면이 자동으로 따라온다
+export async function setWhiteboardActive(roomCode: string, active: boolean): Promise<void> {
+  const db = getClientDb();
+  await update(ref(db, metaPath(roomCode)), { active, updatedAt: Date.now() });
 }
 
 export function subscribeWhiteboardMeta(

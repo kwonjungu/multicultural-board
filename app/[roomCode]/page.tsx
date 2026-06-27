@@ -23,6 +23,7 @@ import HubTutorialBootstrap from "@/components/tutorial/HubTutorialBootstrap";
 import SectionCaption from "@/components/tutorial/SectionCaption";
 import { subscribeStudentStickers } from "@/lib/stickers";
 import { subscribeSession } from "@/lib/storybook";
+import { subscribeWhiteboardMeta } from "@/lib/whiteboard";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { useBackLayer } from "@/lib/backStack";
 import { t } from "@/lib/i18n";
@@ -67,6 +68,18 @@ export default function RoomPage() {
       if (active && !user.isTeacher) {
         // 학생은 세션 활성 동안 항상 그림책 화면으로 강제 동기화
         setHubView("storybook");
+      }
+    });
+    return () => unsub();
+  }, [roomCode, user]);
+
+  // [#6] 화이트보드 활성화 시 학생 화면 자동 따라오기 (그림책 세션과 동일 패턴).
+  //   단, 그림책 수업이 활성이면 그쪽이 우선이라 화이트보드로 끌어가지 않는다.
+  useEffect(() => {
+    if (!user || user.isTeacher) return;
+    const unsub = subscribeWhiteboardMeta(roomCode, (meta) => {
+      if (meta.active && !storybookActiveRef.current) {
+        setHubView("whiteboard");
       }
     });
     return () => unsub();

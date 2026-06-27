@@ -10,6 +10,7 @@ import type { UserConfig } from "@/lib/types";
 import { useBackLayer } from "@/lib/backStack";
 import {
   setWhiteboardPrompt,
+  setWhiteboardActive,
   subscribeWhiteboardMeta,
   pushWhiteboardSnapshot,
   subscribeWhiteboardBoards,
@@ -46,9 +47,13 @@ interface Props {
 
 export default function WhiteboardRoom({ user, roomCode, myClientId, onBack }: Props) {
   const [prompt, setPrompt] = useState("");
+  const [active, setActive] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeWhiteboardMeta(roomCode, (m) => setPrompt(m.prompt || ""));
+    const unsub = subscribeWhiteboardMeta(roomCode, (m) => {
+      setPrompt(m.prompt || "");
+      setActive(!!m.active);
+    });
     return () => unsub();
   }, [roomCode]);
 
@@ -85,7 +90,7 @@ export default function WhiteboardRoom({ user, roomCode, myClientId, onBack }: P
         </div>
 
         {user.isTeacher ? (
-          <TeacherWhiteboard roomCode={roomCode} prompt={prompt} />
+          <TeacherWhiteboard roomCode={roomCode} prompt={prompt} active={active} />
         ) : (
           <StudentWhiteboard roomCode={roomCode} myClientId={myClientId} name={user.myName} prompt={prompt} />
         )}
@@ -95,13 +100,20 @@ export default function WhiteboardRoom({ user, roomCode, myClientId, onBack }: P
 }
 
 // ════════════════════ 교사: 갤러리 + 프롬프트 ════════════════════
-function TeacherWhiteboard({ roomCode, prompt }: { roomCode: string; prompt: string }) {
+function TeacherWhiteboard({ roomCode, prompt, active }: { roomCode: string; prompt: string; active: boolean }) {
   const [boards, setBoards] = useState<WhiteboardBoard[]>([]);
   const [draft, setDraft] = useState(prompt);
   const [saving, setSaving] = useState(false);
   const [enlarged, setEnlarged] = useState<WhiteboardBoard | null>(null);
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => { setDraft(prompt); }, [prompt]);
+
+  async function toggleActive() {
+    setToggling(true);
+    try { await setWhiteboardActive(roomCode, !active); } catch { /* noop */ }
+    setToggling(false);
+  }
 
   useEffect(() => {
     const unsub = subscribeWhiteboardBoards(roomCode, setBoards);
@@ -123,6 +135,41 @@ function TeacherWhiteboard({ roomCode, prompt }: { roomCode: string; prompt: str
 
   return (
     <>
+      {/* 활성화 토글 — ON 이면 학생 화면이 자동으로 화이트보드로 따라온다 */}
+      <button
+        onClick={toggleActive}
+        disabled={toggling}
+        aria-pressed={active}
+        style={{
+          width: "100%", marginBottom: 14, display: "flex", alignItems: "center", gap: 12,
+          padding: "14px 16px", borderRadius: 18, cursor: toggling ? "wait" : "pointer",
+          fontFamily: "inherit", textAlign: "left",
+          background: active ? "linear-gradient(135deg, #CCFBF1, #99F6E4)" : "#fff",
+          border: `2px solid ${active ? "#14B8A6" : "#FDE68A"}`,
+          boxShadow: "0 6px 18px rgba(180,83,9,0.1)",
+        }}
+      >
+        <span style={{ fontSize: 24 }}>{active ? "🟢" : "⚪"}</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 15, fontWeight: 900, color: "#1F2937" }}>
+            화이트보드 {active ? "활성화됨" : "활성화"}
+          </span>
+          <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: active ? "#0F766E" : "#92400E", marginTop: 1 }}>
+            {active ? "학생 화면이 자동으로 화이트보드로 모였어요" : "켜면 모든 학생 화면이 화이트보드로 자동 이동해요"}
+          </span>
+        </span>
+        <span style={{
+          width: 46, height: 26, borderRadius: 999, flexShrink: 0, position: "relative",
+          background: active ? "#14B8A6" : "#D1D5DB", transition: "background 0.15s",
+        }}>
+          <span style={{
+            position: "absolute", top: 3, left: active ? 23 : 3,
+            width: 20, height: 20, borderRadius: "50%", background: "#fff",
+            transition: "left 0.15s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+          }} />
+        </span>
+      </button>
+
       {/* 프롬프트 편집 */}
       <div style={{
         background: "#fff", borderRadius: 18, padding: "14px 16px",
