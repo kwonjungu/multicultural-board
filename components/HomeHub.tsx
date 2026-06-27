@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { UserConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import RoomManagePanel from "./RoomManagePanel";
@@ -39,9 +40,9 @@ const SECTIONS: SectionMeta[] = [
     sub: "Whiteboard",
     descKey: "hubSectionWhiteboardDesc",
     mascot: "/mascot/bee-think.png",
-    color: "#14B8A6",
-    bg: "linear-gradient(135deg, #CCFBF1, #99F6E4)",
-    accent: "#0F766E",
+    color: "#3B82F6",
+    bg: "linear-gradient(135deg, #DBEAFE, #BFDBFE)",
+    accent: "#1D4ED8",
   },
   {
     id: "games",
@@ -98,6 +99,9 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
   const lang = user.myLang;
   // 관리 패널은 기본 접힘 — 교사가 필요할 때 직접 펼친다 (자동 펼치기 안 함).
   const [manageOpen, setManageOpen] = useState(false);
+  // 교사용 QR 모달 (학생 입장 주소 공유)
+  const [showQR, setShowQR] = useState(false);
+  const joinUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/${roomCode}`;
   return (
     <div style={{
       minHeight: "100vh",
@@ -149,6 +153,19 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
               )}
             </div>
           </div>
+          {/* QR 코드 — 교사만. 학생 입장 주소를 바로 띄워 공유 */}
+          {user.isTeacher && (
+            <button
+              onClick={() => setShowQR(true)}
+              aria-label="입장 QR 코드"
+              style={{
+                width: 40, height: 40, borderRadius: 12, border: "2px solid #A7F3D0",
+                background: "#ECFDF5", fontSize: 18, color: "#047857", cursor: "pointer",
+                flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >📱</button>
+          )}
+
           {/* 언어 설정 — 교사·학생 공통, 입장 후에도 변경 가능 */}
           <LangSwitchButton
             currentLang={user.myLang}
@@ -323,6 +340,55 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
           })}
         </div>
       </div>
+
+      {/* 입장 QR 모달 — 교사용 */}
+      {showQR && (
+        <div
+          onClick={() => setShowQR(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(15,12,40,0.6)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff", borderRadius: 24, padding: "26px 28px",
+              maxWidth: 360, width: "100%", textAlign: "center",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", marginBottom: 4 }}>
+              📱 우리 반 입장하기
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 18 }}>
+              학생이 휴대폰 카메라로 찍으면 바로 입장해요
+            </div>
+            <div style={{
+              display: "inline-flex", padding: 14, borderRadius: 16,
+              background: "#fff", border: "3px solid #FDE68A",
+            }}>
+              <QRCodeSVG value={joinUrl} size={200} />
+            </div>
+            <div style={{ marginTop: 14, fontSize: 13, fontWeight: 800, color: "#374151", wordBreak: "break-all" }}>
+              {joinUrl}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 24, fontWeight: 900, color: "#B45309", letterSpacing: 2 }}>
+              🚪 {roomCode}
+            </div>
+            <button
+              onClick={() => setShowQR(false)}
+              style={{
+                marginTop: 18, width: "100%", padding: "12px",
+                background: "linear-gradient(135deg, #F59E0B, #D97706)",
+                color: "#fff", border: "none", borderRadius: 14,
+                fontSize: 15, fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
+              }}
+            >닫기</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
