@@ -769,64 +769,17 @@ function FruitTree({
       width: "100%",
       overflow: "hidden",
     }}>
-      {/* 🌳 Landscape tree SVG */}
-      <svg
-        viewBox="0 0 1600 800"
-        preserveAspectRatio="xMidYMid slice"
+      {/* 🌳 Landscape tree background image (was inline SVG) */}
+      <img
+        src="/discussion/tree-bg.png"
+        alt=""
+        aria-hidden="true"
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
         style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
-          zIndex: 0,
+          objectFit: "cover", zIndex: 0,
         }}
-        aria-hidden="true"
-      >
-        {/* Sky gradient handled by container */}
-        {/* Ground */}
-        <ellipse cx="800" cy="790" rx="900" ry="46" fill="#A4D68B" opacity="0.55" />
-        <ellipse cx="800" cy="800" rx="1100" ry="28" fill="#8FC874" opacity="0.4" />
-        {/* Trunk */}
-        <path
-          d="M772 790 Q760 620 790 470 Q800 410 812 470 Q840 620 828 790 Z"
-          fill="#8B5A3C"
-        />
-        <path
-          d="M790 520 Q700 480 640 440" stroke="#8B5A3C" strokeWidth="14" fill="none"
-          strokeLinecap="round"
-        />
-        <path
-          d="M810 510 Q900 470 960 430" stroke="#8B5A3C" strokeWidth="14" fill="none"
-          strokeLinecap="round"
-        />
-        {/* Canopy — wide landscape spread */}
-        <g>
-          <ellipse cx="800" cy="380" rx="560" ry="260" fill="#7AB96A" />
-          <ellipse cx="380" cy="420" rx="280" ry="180" fill="#86C87A" />
-          <ellipse cx="1220" cy="420" rx="280" ry="180" fill="#86C87A" />
-          <ellipse cx="550" cy="260" rx="220" ry="160" fill="#92D387" />
-          <ellipse cx="1050" cy="260" rx="220" ry="160" fill="#92D387" />
-          <ellipse cx="800" cy="180" rx="180" ry="150" fill="#9EDD92" />
-          <ellipse cx="180" cy="360" rx="150" ry="110" fill="#86C87A" />
-          <ellipse cx="1420" cy="360" rx="150" ry="110" fill="#86C87A" />
-        </g>
-        {/* Highlights */}
-        <g opacity="0.55">
-          <ellipse cx="620" cy="230" rx="60" ry="42" fill="#B7E8A9" />
-          <ellipse cx="420" cy="360" rx="50" ry="34" fill="#B7E8A9" />
-          <ellipse cx="980" cy="310" rx="44" ry="30" fill="#B7E8A9" />
-          <ellipse cx="1180" cy="230" rx="52" ry="36" fill="#B7E8A9" />
-          <ellipse cx="760" cy="140" rx="46" ry="32" fill="#B7E8A9" />
-        </g>
-        {/* 🐝 Honeybee mascot flying near tree */}
-        <g transform="translate(1380 170) rotate(-10)">
-          <ellipse cx="0" cy="0" rx="26" ry="18" fill="#FBBF24" />
-          <path d="M-14 -12 Q0 -4 14 -12" fill="none" stroke="#1F2937" strokeWidth="4" strokeLinecap="round"/>
-          <path d="M-8 -14 L-8 14" stroke="#1F2937" strokeWidth="4" />
-          <path d="M0 -16 L0 16" stroke="#1F2937" strokeWidth="4" />
-          <path d="M8 -14 L8 14" stroke="#1F2937" strokeWidth="4" />
-          <ellipse cx="-10" cy="-14" rx="16" ry="10" fill="#fff" opacity="0.82" />
-          <ellipse cx="10" cy="-14" rx="16" ry="10" fill="#fff" opacity="0.82" />
-          <circle cx="-20" cy="-2" r="3" fill="#1F2937" />
-        </g>
-      </svg>
+      />
 
       {/* 🎉 Confetti burst on reveal */}
       <RevealConfetti />
