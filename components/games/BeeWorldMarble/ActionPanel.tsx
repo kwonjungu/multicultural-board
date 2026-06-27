@@ -33,9 +33,16 @@ export interface ActionPanelProps {
 export function renderActionPanels(
   props: Omit<ActionPanelProps, "slot">,
 ): { center: ReactNode; overlay: ReactNode } {
+  // overlay 슬롯은 chance/quiz 일 때만 내용이 있다. 그 외 phase 에서는 null 을
+  // 돌려줘야 Board 가 전체를 덮는 빈 모달(반투명 + pointer-events)을 렌더하지 않는다.
+  // (이전엔 항상 <ActionPanel slot="overlay"/> 라는 truthy 엘리먼트를 반환해,
+  //  rolling/landed 등에서도 보드 전체를 가리는 투명 오버레이가 깔려 주사위·버튼
+  //  클릭이 모두 막혔다 → '시작 후 게임이 안 된다'의 원인.)
+  const ph = props.state.phase;
+  const isOverlayPhase = ph.kind === "chance" || ph.kind === "quiz";
   return {
     center: <ActionPanel {...props} slot="center" />,
-    overlay: <ActionPanel {...props} slot="overlay" />,
+    overlay: isOverlayPhase ? <ActionPanel {...props} slot="overlay" /> : null,
   };
 }
 
