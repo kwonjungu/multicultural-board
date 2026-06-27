@@ -7,7 +7,8 @@ import type { TutorialScenario } from "../types";
  *
  * 필요한 data-tutorial-id 앵커 (HomeHub.tsx 에):
  *   - hub-header
- *   - hub-section-board / -interpreter / -games / -dashboard / -vocab
+ *   - hub-section-board / -games / -dashboard / -vocab
+ *   (실시간 통역은 허브 타일에서 빠지고 앱 전역 좌하단 플로팅 아이콘으로 이동함)
  */
 
 const sharedReward = { emoji: "🏅", label: "꿀벌 탐험가 배지 획득!" };
@@ -49,16 +50,6 @@ export const mainHubStudentScenario: TutorialScenario = {
         { text: "첫 번째는 소통창! 🧡" },
         { text: "네가 한국어로 글을 쓰면, 다른 나라 친구들 화면엔 자기 나라말로 짠 하고 바뀌어.", expression: "celebrate" },
         { text: "친구 글에 좋아요도 눌러주고, 칭찬 스티커도 받아봐~", expression: "welcome" },
-      ],
-    },
-    {
-      kind: "highlight",
-      target: '[data-tutorial-id="hub-section-interpreter"]',
-      side: "right",
-      expression: "think",
-      lines: [
-        { text: "여긴 실시간 통역이야. 🎙️" },
-        { text: "선생님 말이 어려울 때 마이크 누르고 말하면 네 언어로 바꿔줘!", expression: "cheer" },
       ],
     },
     {
@@ -141,16 +132,6 @@ export const mainHubTeacherScenario: TutorialScenario = {
         { text: "첫 번째는 **소통창**입니다. 🧡" },
         { text: "학생이 글을 올리면 **반 언어 전체로 자동 번역**되어 표시돼요.", expression: "welcome" },
         { text: "카드의 칭찬 버튼으로 학생에게 **스티커**를 보낼 수 있고, 주제 컬럼도 추가하실 수 있어요.", expression: "celebrate" },
-      ],
-    },
-    {
-      kind: "highlight",
-      target: '[data-tutorial-id="hub-section-interpreter"]',
-      side: "right",
-      expression: "think",
-      lines: [
-        { text: "**실시간 통역** 도우미예요. 🎙️" },
-        { text: "수업 중 학생과 일대일 대화가 필요할 때 열어주세요. 양방향 실시간 번역이 됩니다.", expression: "cheer" },
       ],
     },
     {

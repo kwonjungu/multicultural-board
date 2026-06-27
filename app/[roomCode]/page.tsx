@@ -9,7 +9,7 @@ import SetupScreen from "@/components/SetupScreen";
 import PadletBoard from "@/components/PadletBoard";
 import HomeHub, { HubView } from "@/components/HomeHub";
 import GameRoom from "@/components/GameRoom";
-import InterpreterDrawer from "@/components/InterpreterDrawer";
+import InterpreterFab from "@/components/InterpreterFab";
 import PraiseHive from "@/components/PraiseHive";
 import VocabHub from "@/components/VocabHub";
 import StorybookRoom from "@/components/StorybookRoom";
@@ -37,7 +37,6 @@ export default function RoomPage() {
   const [roomConfig, setRoomConfig] = useState<RoomConfig>({ languages: ALL_LANGS });
   const [langsLoaded, setLangsLoaded] = useState(false);
   const [hubView, setHubView] = useState<HubView | "hub">("hub");
-  const [interpreterOpen, setInterpreterOpen] = useState(false);
   const [giveModalFor, setGiveModalFor] = useState<{ clientId: string; name: string } | null>(null);
   const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
   const [myStickerCount, setMyStickerCount] = useState(0);
@@ -217,6 +216,12 @@ export default function RoomPage() {
         user={user}
         hidden={hubView === "games"}
       />
+      {/* 앱 전역 실시간 통역 — 튜터 꿀비와 대칭(좌하단). 모든 탭에서 상주. */}
+      <InterpreterFab
+        viewerLang={user.myLang}
+        availableLangs={roomLangs}
+        hidden={hubView === "games"}
+      />
     </>
   );
 
@@ -227,23 +232,12 @@ export default function RoomPage() {
         <HomeHub
           user={user}
           roomCode={roomCode}
-          onSelect={(v) => {
-            if (v === "interpreter") setInterpreterOpen(true);
-            else setHubView(v);
-          }}
+          onSelect={(v) => setHubView(v)}
           onLogout={() => setUser(null)}
           onChangeLang={(l) => setUser({ ...user, myLang: l })}
           availableLangs={roomLangs}
         />
         <HubTutorialBootstrap isTeacher={user.isTeacher} />
-        {/* Interpreter은 drawer 오버레이, hub 위에서 직접 열림 */}
-        <InterpreterDrawer
-          open={interpreterOpen}
-          onClose={() => setInterpreterOpen(false)}
-          viewerLang={user.myLang}
-          availableLangs={roomLangs}
-        />
-        {interpreterOpen && <SectionCaption section="interpreter" isTeacher={user.isTeacher} />}
         {overlays}
       </TutorialProvider>
     );

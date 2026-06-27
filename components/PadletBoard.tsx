@@ -12,7 +12,6 @@ import PostModal from "./PostModal";
 import PptxTranslateModal from "./PptxTranslateModal";
 import DiscussionCreateModal from "./DiscussionCreateModal";
 import DiscussionSession from "./DiscussionSession";
-import InterpreterDrawer from "./InterpreterDrawer";
 import SentencePracticeModal from "./SentencePracticeModal";
 import EmotionCardDeck from "./EmotionCardDeck";
 import { pushEmotion, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
@@ -54,7 +53,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     COLUMNS_DEFAULT.map((col, i) => ({ ...col, order: i }))
   );
   const [modal, setModal] = useState<{ colId: string; colTitle: string; colColor: string } | null>(null);
-  const [interpreterOpen, setInterpreterOpen] = useState(false);
   const [emotionOpen, setEmotionOpen] = useState(false);
   const [emotionToast, setEmotionToast] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
@@ -479,7 +477,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   useBackLayer(!!modal, () => setModal(null));
   useBackLayer(!!editModal, () => setEditModal(null));
   useBackLayer(practiceOpen, () => setPracticeOpen(false));
-  useBackLayer(interpreterOpen, () => setInterpreterOpen(false));
   useBackLayer(emotionOpen, () => setEmotionOpen(false));
 
   return (
@@ -539,29 +536,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             )}
           </div>
 
-          {/* 🎙️ 통역 도우미 — available to everyone */}
-          <button
-            onClick={() => setInterpreterOpen(true)}
-            aria-label="통역 도우미 열기"
-            style={{
-              background: "linear-gradient(135deg, #1F2937, #374151)",
-              border: "none", color: "#fff",
-              borderRadius: 16, padding: "10px 16px",
-              fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 56,
-              boxShadow: "0 6px 18px rgba(31,41,55,0.35)",
-              display: "inline-flex", alignItems: "center", gap: 6,
-              transition: "transform 0.12s",
-            }}
-            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          >
-            🎙️ 통역
-            <span style={{
-              fontSize: 9, fontWeight: 900, background: "#F59E0B", color: "#fff",
-              padding: "2px 6px", borderRadius: 999, letterSpacing: 0.5,
-            }}>BETA</span>
-          </button>
+          {/* 🎙️ 통역 도우미는 앱 전역 좌하단 플로팅 아이콘(InterpreterFab)으로 이동 — 여기서는 제거 */}
 
           {/* 📖 학습하기 — student-only. 오늘 카드 우선, 없으면 누적 카드로 복습 (#2) */}
           {!isTeacher && (() => {
@@ -1218,13 +1193,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         />
       )}
 
-      {/* ── 🎙️ 통역 도우미 Drawer ── */}
-      <InterpreterDrawer
-        open={interpreterOpen}
-        onClose={() => setInterpreterOpen(false)}
-        viewerLang={lang}
-        availableLangs={teacherLangs.length > 0 ? teacherLangs : Object.keys(LANGUAGES)}
-      />
+      {/* 🎙️ 통역 도우미 Drawer 는 앱 전역 InterpreterFab(좌하단)로 이동 — 여기서는 제거 */}
 
       {/* ── 📖 오늘의 문장 연습 (학생) ── */}
       {practiceOpen && !isTeacher && (
