@@ -13,6 +13,7 @@ import InterpreterFab from "@/components/InterpreterFab";
 import PraiseHive from "@/components/PraiseHive";
 import VocabHub from "@/components/VocabHub";
 import StorybookRoom from "@/components/StorybookRoom";
+import WhiteboardRoom from "@/components/WhiteboardRoom";
 import StickerGiveModal from "@/components/StickerGiveModal";
 import CosmeticPicker from "@/components/CosmeticPicker";
 import Toast from "@/components/Toast";
@@ -262,6 +263,21 @@ export default function RoomPage() {
           onBack={() => setHubView("hub")}
         />
         <SectionCaption section="vocab" isTeacher={user.isTeacher} />
+        {overlays}
+      </>
+    );
+  }
+
+  if (hubView === "whiteboard") {
+    return (
+      <>
+        <WhiteboardRoom
+          user={user}
+          roomCode={roomCode}
+          myClientId={myClientId}
+          onBack={() => setHubView("hub")}
+        />
+        <SectionCaption section="whiteboard" isTeacher={user.isTeacher} />
         {overlays}
       </>
     );

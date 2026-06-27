@@ -676,6 +676,22 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "Общайся с друзьями", uz: "Do'stlar bilan", hi: "दोस्तों से बात",
     id: "Ngobrol", ar: "دردش مع الأصدقاء", my: "သူငယ်ချင်းနဲ့စကားပြော",
   },
+  hubSectionWhiteboard: {
+    ko: "화이트보드", en: "Whiteboard", vi: "Bảng vẽ",
+    zh: "白板", fil: "Whiteboard", ja: "ホワイトボード",
+    th: "ไวท์บอร์ด", km: "ក្ដារខៀន", mn: "Самбар",
+    ru: "Доска", uz: "Doska", hi: "व्हाइटबोर्ड",
+    id: "Papan Tulis", ar: "السبورة", my: "ဘုတ်အဖြူ",
+  },
+  hubSectionWhiteboardDesc: {
+    ko: "그림 그리고 선생님과 나눠요", en: "Draw and share with the teacher",
+    vi: "Vẽ và chia sẻ với cô", zh: "画画并分享给老师",
+    fil: "Gumuhit at ibahagi sa guro", ja: "絵をかいて先生にみせよう",
+    th: "วาดและแบ่งปันกับคุณครู", km: "គូរ និងចែករំលែកជាមួយគ្រូ", mn: "Зураад багштайгаа хуваалцах",
+    ru: "Рисуй и покажи учителю", uz: "Chizing va o'qituvchiga ko'rsating",
+    hi: "चित्र बनाओ और शिक्षक को दिखाओ", id: "Gambar dan bagikan ke guru",
+    ar: "ارسم وشارك مع المعلم", my: "ပုံဆွဲပြီး ဆရာနဲ့ မျှဝေပါ",
+  },
   hubSectionInterp: {
     ko: "실시간 통역", en: "Interpreter", vi: "Thông dịch",
     zh: "实时翻译", fil: "Interpreter", ja: "通訳",

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { beePng } from "@/lib/assets";
 import type { BeeExpression } from "./BeeGuide";
 
-type CaptionKey = "board" | "games" | "interpreter" | "praise" | "vocab" | "storybook";
+type CaptionKey = "board" | "whiteboard" | "games" | "interpreter" | "praise" | "vocab" | "storybook";
 
 interface CaptionVariant {
   title: string;
@@ -42,6 +42,32 @@ const CAPTIONS: Record<CaptionKey, CaptionMeta> = {
         "카드 칭찬 버튼 → 스티커 지급",
         "주제 컬럼 추가 가능",
         "부적절 문구는 ⚠️ 뱃지로 표시",
+      ],
+      expression: "teacher",
+    },
+  },
+  whiteboard: {
+    key: "whiteboard",
+    student: {
+      title: "화이트보드 🖍️",
+      body: [
+        "그림을 그리면 선생님이 실시간으로 봐요!",
+      ],
+      tips: [
+        "위에 나온 주제로 그려봐",
+        "색·굵기 바꾸고 지우개도 써봐~",
+      ],
+      expression: "celebrate",
+    },
+    teacher: {
+      title: "실시간 화이트보드",
+      body: [
+        "학생들의 그림을 갤러리로 실시간 모니터링합니다.",
+      ],
+      tips: [
+        "위에서 그리기 주제를 내려줄 수 있어요",
+        "그림을 누르면 크게 보기",
+        "전체 비우기로 새 활동 시작",
       ],
       expression: "teacher",
     },

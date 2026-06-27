@@ -8,7 +8,7 @@ import FontSizeButton from "./FontSizeButton";
 import LangSwitchButton from "./LangSwitchButton";
 import FlyingBees from "./ui/FlyingBees";
 
-export type HubView = "board" | "games" | "dashboard" | "vocab" | "storybook";
+export type HubView = "board" | "whiteboard" | "games" | "dashboard" | "vocab" | "storybook";
 
 interface SectionMeta {
   id: HubView;
@@ -32,6 +32,16 @@ const SECTIONS: SectionMeta[] = [
     color: "#F59E0B",
     bg: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
     accent: "#B45309",
+  },
+  {
+    id: "whiteboard",
+    titleKey: "hubSectionWhiteboard",
+    sub: "Whiteboard",
+    descKey: "hubSectionWhiteboardDesc",
+    mascot: "/mascot/bee-think.png",
+    color: "#14B8A6",
+    bg: "linear-gradient(135deg, #CCFBF1, #99F6E4)",
+    accent: "#0F766E",
   },
   {
     id: "games",
