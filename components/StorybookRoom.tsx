@@ -1565,8 +1565,6 @@ function QuestionCard({
   const [busy, setBusy] = useState(false);
   const [responses, setResponses] = useState<StorybookResponse[]>([]);
   const [inputMode, setInputMode] = useState<QInputMode>("text");
-  const [recording, setRecording] = useState(false);
-  const [processing, setProcessing] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [selectedFruit, setSelectedFruit] = useState<number | null>(null);
   // Translation cache for responses: key = `${responseId}:${toLang}`
@@ -1578,8 +1576,6 @@ function QuestionCard({
   const [introTyped, setIntroTyped] = useState(0);
   const introTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const mediaRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
@@ -1673,32 +1669,8 @@ function QuestionCard({
     setBusy(false);
   }
 
-  // Voice recording
-  async function startRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm"
-        : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : undefined;
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((tr) => tr.stop());
-        setProcessing(true);
-        try {
-          const form = new FormData();
-          form.append("audio", new Blob(chunksRef.current, { type: mimeType || "audio/webm" }), "rec.webm");
-          form.append("lang", lang);
-          const res = await fetch("/api/stt", { method: "POST", body: form });
-          const data = await res.json();
-          if (data.text) setDraft(data.text); else alert("음성을 인식하지 못했어요.");
-        } catch { alert("음성 인식 실패"); }
-        setProcessing(false);
-      };
-      recorder.start(); mediaRef.current = recorder; setRecording(true);
-    } catch { alert("마이크를 사용할 수 없어요."); }
-  }
-  function stopRecording() { mediaRef.current?.stop(); setRecording(false); }
+  // [#4] 음성 입력은 앱 공용 STT 엔진(MicButton)로 통일 — 인식 결과를 draft 에 이어붙인다.
+  //   기존의 인라인 MediaRecorder 구현은 언마운트 정리 누락 등 오류 원인이라 제거함.
 
   // Canvas drawing
   function getCanvasPos(e: React.MouseEvent | React.TouchEvent) {
@@ -1952,18 +1924,15 @@ function QuestionCard({
           )}
 
           {inputMode === "voice" && (
-            <div style={{ textAlign: "center", padding: "18px 0" }}>
-              {processing ? <div style={{ fontSize: 13, color: "#6B7280" }}>🔄 음성 변환 중...</div> : (
-                <button onClick={recording ? stopRecording : startRecording} style={{
-                  width: 72, height: 72, borderRadius: "50%",
-                  background: recording ? "linear-gradient(135deg,#EF4444,#DC2626)" : "linear-gradient(135deg,#3B82F6,#2563EB)",
-                  border: "none", cursor: "pointer", fontSize: 28, color: "#fff",
-                  boxShadow: recording ? "0 0 0 8px rgba(239,68,68,0.2)" : "0 6px 16px rgba(59,130,246,0.3)",
-                  animation: recording ? "pulse 1s ease-in-out infinite" : "none",
-                }}>{recording ? "⏹" : "🎤"}</button>
-              )}
-              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 10 }}>{recording ? "녹음 중... 눌러서 멈추기" : "버튼을 눌러 말해보세요"}</div>
-              {draft && <div style={{ marginTop: 10, fontSize: 14, color: "#1F2937", fontWeight: 600 }}>&ldquo;{draft}&rdquo;</div>}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "14px 0" }}>
+              {/* 앱 공용 STT 엔진 — 소통창/튜터와 동일 (오류 적은 단일 구현) */}
+              <MicButton
+                lang={lang}
+                size={72}
+                onText={(text) => setDraft((d) => (d ? `${d} ${text}` : text))}
+              />
+              <div style={{ fontSize: 12, color: "#6B7280" }}>버튼을 눌러 말해보세요</div>
+              {draft && <div style={{ marginTop: 4, fontSize: 14, color: "#1F2937", fontWeight: 600 }}>&ldquo;{draft}&rdquo;</div>}
             </div>
           )}
 
