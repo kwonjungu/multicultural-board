@@ -160,10 +160,11 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
               aria-label="입장 QR 코드"
               style={{
                 width: 40, height: 40, borderRadius: 12, border: "2px solid #A7F3D0",
-                background: "#ECFDF5", fontSize: 18, color: "#047857", cursor: "pointer",
+                background: "#ECFDF5", fontSize: 14, fontWeight: 900, letterSpacing: 0.5,
+                color: "#047857", cursor: "pointer",
                 flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
               }}
-            >📱</button>
+            >QR</button>
           )}
 
           {/* 언어 설정 — 교사·학생 공통, 입장 후에도 변경 가능 */}
