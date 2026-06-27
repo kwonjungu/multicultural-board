@@ -40,6 +40,8 @@ export default function DiscussionSession({
   const [submitting, setSubmitting] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState("");
+  // 공개 화면 보기 모드: 나무(과일) ↔ 격자(다인원 가독 보장)
+  const [closedView, setClosedView] = useState<"tree" | "grid">("tree");
 
   const basePath = `rooms/${roomCode}/sessions/${sessionId}`;
 
@@ -215,18 +217,22 @@ export default function DiscussionSession({
             isTeacher={isTeacher}
             onExit={onExit}
             onDelete={handleDeleteSession}
+            view={closedView}
+            onToggleView={() => setClosedView((v) => (v === "tree" ? "grid" : "tree"))}
           />
 
           {responses.length === 0 ? (
             <div style={{ textAlign: "center", color: "#6B7280", padding: "60px 0", fontSize: 14 }}>
               제출된 응답이 없습니다.
             </div>
-          ) : (
+          ) : closedView === "tree" ? (
             <FruitTree
               question={displayTitle}
               responses={responses}
               myLang={myLang}
             />
+          ) : (
+            <ResponseGrid responses={responses} myLang={myLang} />
           )}
         </div>
       </div>
@@ -391,6 +397,11 @@ export default function DiscussionSession({
 
   // ═════════════════════════════ ACTIVE — student view ═════════════════════════════
   const hasSubmitted = !!myResponse;
+  // 실시간 집계 — 많은 친구가 참여 중임이 학생에게도 보이게 (텍스트는 종료 전 비공개 유지)
+  const liveConnected = Object.values(presence).filter(
+    (p) => Date.now() - p.lastSeen < 45000,
+  ).length;
+  const liveSubmitted = responses.length;
 
   return (
     <div style={overlayStyle}>
@@ -413,6 +424,21 @@ export default function DiscussionSession({
             💭 의견 나누기
           </div>
           <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.35 }}>{displayTitle}</div>
+          {/* 실시간 참여 집계 — 많은 친구가 응답해도 참여가 보이게 */}
+          <div style={{
+            marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap",
+          }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "4px 10px", background: "rgba(255,255,255,0.22)",
+              borderRadius: 999, fontSize: 12, fontWeight: 800,
+            }}>🐝 지금 {liveConnected}명 접속</span>
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "4px 10px", background: "rgba(255,255,255,0.22)",
+              borderRadius: 999, fontSize: 12, fontWeight: 800,
+            }}>✍️ {liveSubmitted}명 생각 나눔</span>
+          </div>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "18px 22px" }}>
@@ -756,11 +782,15 @@ function FruitTree({
 }) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const n = responses.length;
-  const ringCount = n <= 8 ? 1 : n <= 18 ? 2 : 3;
+  // 인원이 늘어도 빈 수관 안에서 겹치지 않도록 링 수를 동적으로 늘린다.
+  const ringCount = n <= 6 ? 1 : n <= 14 ? 2 : n <= 24 ? 3 : 4;
   const perRing = Math.ceil(n / ringCount);
-  const ringRadii = [34, 44, 52]; // % spread from center
-
-  const cardWidth = n <= 6 ? 170 : n <= 14 ? 150 : 128;
+  // 과일 크기는 인원이 많을수록 줄이되 하한을 둔다.
+  const fruitScale = n <= 8 ? 1.05 : n <= 16 ? 0.9 : n <= 26 ? 0.76 : 0.64;
+  const labelMax = n <= 10 ? 120 : n <= 20 ? 96 : 78;
+  const labelFont = n <= 16 ? 11 : 10;
+  // tree-bg.png 의 빈 수관(열린 타원)에 맞춘 배치 중심/반지름 (컨테이너 % 기준)
+  const CX = 50, CY = 36, RX = 30, RY = 21;
 
   return (
     <div style={{
@@ -789,12 +819,11 @@ function FruitTree({
         const ringIdx = Math.min(Math.floor(i / perRing), ringCount - 1);
         const posInRing = i % perRing;
         const itemsInRing = Math.min(perRing, n - ringIdx * perRing);
-        const angleOffset = ringIdx * (Math.PI / Math.max(itemsInRing, 1));
-        const angle = ((posInRing + 0.5) / itemsInRing) * Math.PI * 2
-          - Math.PI / 2 + angleOffset;
-        const radius = ringRadii[ringIdx];
-        const cx = 50 + Math.cos(angle) * radius * 1.55;
-        const cy = 48 + Math.sin(angle) * radius * 0.78;
+        const frac = ringCount === 1 ? 0.6 : (ringIdx + 1) / ringCount;
+        const angleStep = (Math.PI * 2) / Math.max(itemsInRing, 1);
+        const angle = posInRing * angleStep - Math.PI / 2 + (ringIdx % 2) * (angleStep / 2);
+        const cx = CX + Math.cos(angle) * RX * frac;
+        const cy = CY + Math.sin(angle) * RY * frac;
         const kind = FRUIT_KINDS[i % FRUIT_KINDS.length];
 
         return (
@@ -816,12 +845,12 @@ function FruitTree({
             onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "translate(-50%, -55%) scale(1.08)")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "translate(-50%, -50%) scale(1)")}
           >
-            <Fruit kind={kind} scale={Math.max(0.85, Math.min(1.15, cardWidth / 140))} />
+            <Fruit kind={kind} scale={fruitScale} />
             <div style={{
               background: "rgba(255,255,255,0.95)", color: "#1F2937",
-              padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 800,
+              padding: "3px 10px", borderRadius: 999, fontSize: labelFont, fontWeight: 800,
               boxShadow: "0 2px 6px rgba(0,0,0,0.15)", whiteSpace: "nowrap",
-              maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis",
+              maxWidth: labelMax, overflow: "hidden", textOverflow: "ellipsis",
             }}>{r.authorName}</div>
           </button>
         );
@@ -837,30 +866,30 @@ function FruitTree({
         />
       )}
 
-      {/* ❓ Center question */}
+      {/* ❓ 질문 — 과일이 차지하는 수관 아래(나무 밑동) 쪽에 배치해 겹침 방지 */}
       <div style={{
         position: "absolute",
         left: "50%",
-        top: "48%",
+        top: "85%",
         transform: "translate(-50%, -50%)",
         zIndex: 3,
-        background: "#fff",
-        borderRadius: 24,
-        padding: "22px 28px",
-        boxShadow: "0 18px 44px rgba(0,0,0,0.22), 0 0 0 4px rgba(245,158,11,0.18)",
-        maxWidth: 360,
-        minWidth: 240,
+        background: "rgba(255,255,255,0.96)",
+        borderRadius: 18,
+        padding: "10px 20px",
+        boxShadow: "0 12px 30px rgba(0,0,0,0.22), 0 0 0 4px rgba(245,158,11,0.18)",
+        maxWidth: 340,
+        minWidth: 200,
         textAlign: "center",
         border: "3px solid #F59E0B",
       }}>
         <div style={{
           fontSize: 10, fontWeight: 900, color: "#F59E0B",
-          letterSpacing: 1.2, marginBottom: 8,
+          letterSpacing: 1.2, marginBottom: 3,
         }}>
           ❓ 질문
         </div>
         <div style={{
-          fontSize: 18, fontWeight: 900, color: "#111827", lineHeight: 1.35,
+          fontSize: 16, fontWeight: 900, color: "#111827", lineHeight: 1.3,
         }}>
           {question}
         </div>
@@ -889,11 +918,29 @@ function FruitTree({
   );
 }
 
+// 다인원 응답을 한눈에 — 과일나무 대신 격자 카드로 보는 모드 (가독 보장).
+function ResponseGrid({ responses, myLang }: { responses: SessionResponse[]; myLang: string }) {
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px 28px" }}>
+      <div style={{
+        display: "grid", gap: 12,
+        gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+        maxWidth: 1100, margin: "0 auto",
+      }}>
+        {responses.map((r, i) => (
+          <ResponseCard key={r.id} resp={r} idx={i} myLang={myLang} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ClosedHeader({
-  title, bodyText, count, isTeacher, onExit, onDelete,
+  title, bodyText, count, isTeacher, onExit, onDelete, view, onToggleView,
 }: {
   title: string; bodyText: string; count: number; isTeacher: boolean;
   onExit: () => void; onDelete: () => void;
+  view: "tree" | "grid"; onToggleView: () => void;
 }) {
   return (
     <div style={{
@@ -916,6 +963,15 @@ function ClosedHeader({
         }}>{title}</div>
       </div>
       <div style={{ display: "flex", gap: 6 }}>
+        <button
+          onClick={onToggleView}
+          title={view === "tree" ? "격자로 보기" : "나무로 보기"}
+          style={{
+            background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
+            height: 34, padding: "0 12px", borderRadius: 8, cursor: "pointer",
+            fontSize: 13, fontWeight: 800, whiteSpace: "nowrap",
+          }}
+        >{view === "tree" ? "▦ 격자" : "🍎 나무"}</button>
         {isTeacher && (
           <button
             onClick={onDelete}
