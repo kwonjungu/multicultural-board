@@ -28,6 +28,11 @@ function chatPath(roomCode: string, clientId: string): string {
 function alertsPath(roomCode: string): string {
   return `rooms/${roomCode}/storybook/alerts`;
 }
+// [#1] 책별 영속 답변 — storybook 서브트리 밖이라 endSession 의 wipe 영향을 받지 않는다.
+//   rooms/{roomCode}/bookAnswers/{bookId}/{questionId}/{clientId}
+function bookAnswersPath(roomCode: string, bookId: string, questionId: string): string {
+  return `rooms/${roomCode}/bookAnswers/${bookId}/${questionId}`;
+}
 
 // === Book loading ===
 // Static books live under /public/storybooks/{id}/book.json.
@@ -262,6 +267,7 @@ export async function submitResponse(
   studentName: string,
   studentLang: string,
   text: string,
+  bookId?: string,
 ): Promise<void> {
   const db = getClientDb();
   const r = ref(db, `${responsesPath(roomCode, questionId)}/${clientId}`);
@@ -274,7 +280,33 @@ export async function submitResponse(
     text: text.trim(),
     timestamp: Date.now(),
   };
+  // [#1] 책별 영속 사본 — 세션이 끝나도 친구들 답변이 남아 자유 읽기에서 보인다.
+  //   표시용 부가 쓰기이므로 fire-and-forget (가드레일: 부가 쓰기는 await 금지).
+  if (bookId) {
+    set(ref(db, `${bookAnswersPath(roomCode, bookId, questionId)}/${clientId}`), payload).catch(() => {});
+  }
   await set(r, payload);
+}
+
+// [#1] 책별 영속 답변 구독 — 자유 읽기 화면에서 친구들의 예전 답변 표시.
+export function subscribeBookAnswers(
+  roomCode: string,
+  bookId: string,
+  questionId: string,
+  cb: (list: StorybookResponse[]) => void,
+): () => void {
+  const db = getClientDb();
+  const r = ref(db, bookAnswersPath(roomCode, bookId, questionId));
+  const unsub = onValue(r, (snap) => {
+    const val = snap.val() as Record<string, StorybookResponse> | null;
+    const list = val
+      ? Object.values(val)
+          .filter(Boolean)
+          .sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0))
+      : [];
+    cb(list);
+  });
+  return () => { unsub(); };
 }
 
 export function subscribeResponses(

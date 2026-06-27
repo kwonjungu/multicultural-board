@@ -24,6 +24,7 @@ import {
   showQuestion,
   submitResponse,
   subscribeResponses,
+  subscribeBookAnswers,
   setActiveCharacter,
   appendChatTurn,
   subscribeChat,
@@ -159,7 +160,7 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
       );
     }
     // [신규] 학생: 수업이 없으면 교사가 공개한 책을 자유롭게 읽을 수 있다.
-    return <StudentFreeLibrary lang={lang} viewerLang={lang} onBack={onBack} />;
+    return <StudentFreeLibrary lang={lang} viewerLang={lang} roomCode={roomCode} onBack={onBack} />;
   }
 
   // ── Loading book ─────────────────────────────────────────
@@ -705,8 +706,8 @@ function FlagChip({
 // ============================================================
 
 function StudentFreeLibrary({
-  lang, viewerLang, onBack,
-}: { lang: string; viewerLang: string; onBack: () => void }) {
+  lang, viewerLang, roomCode, onBack,
+}: { lang: string; viewerLang: string; roomCode: string; onBack: () => void }) {
   const [books, setBooks] = useState<BookListEntry[] | null>(null);
   const [openBook, setOpenBook] = useState<Storybook | null>(null);
   const [loadingBook, setLoadingBook] = useState(false);
@@ -741,6 +742,7 @@ function StudentFreeLibrary({
       <StorybookFreeReader
         book={openBook}
         viewerLang={viewerLang}
+        roomCode={roomCode}
         onBack={() => setOpenBook(null)}
       />
     );
@@ -836,8 +838,8 @@ function StudentFreeLibrary({
 // [신규] 자유 리더 — 학생이 스스로 페이지를 넘기며 읽고 듣는다 (질문/핫시팅 없음).
 // 책에 단어 퀴즈가 켜져 있고 어휘가 4개 이상이면 읽기 전에 퀴즈를 먼저 푼다(규칙).
 function StorybookFreeReader({
-  book, viewerLang, onBack,
-}: { book: Storybook; viewerLang: string; onBack: () => void }) {
+  book, viewerLang, roomCode, onBack,
+}: { book: Storybook; viewerLang: string; roomCode: string; onBack: () => void }) {
   const quizFirst = !!book.wordQuizEnabled && (book.vocab?.length ?? 0) >= 4;
   const [quizDone, setQuizDone] = useState(false);
   // 0 = 표지, 1..N = 페이지
@@ -914,6 +916,20 @@ function StorybookFreeReader({
           ? <CoverCard lang={viewerLang} book={book} />
           : curPage && <PageCard lang={viewerLang} page={curPage} total={total} />}
 
+        {/* [#1] 이 책으로 했던 수업의 친구들 답변 — 책 단위로 영속 저장되어 그대로 보인다 */}
+        {(onCover
+          ? book.questions.filter((q) => q.tier === "intro")
+          : book.questions.filter((q) => q.pageIdx === page)
+        ).map((q) => (
+          <FriendAnswers
+            key={q.id}
+            roomCode={roomCode}
+            bookId={book.id}
+            question={q}
+            viewerLang={viewerLang}
+          />
+        ))}
+
         {/* nav */}
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
           <button
@@ -937,6 +953,87 @@ function StorybookFreeReader({
             }}
           >{page >= total ? "끝!" : onCover ? "읽기 시작 ▶" : "다음 ▶"}</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// [#1] 친구들의 예전 답변 — 책별 영속 저장(bookAnswers)을 읽어 자유 읽기 화면에 표시.
+//   뷰어 언어와 다른 답변은 언어별로 묶어 한 번에 번역한다.
+function FriendAnswers({
+  roomCode, bookId, question, viewerLang,
+}: {
+  roomCode: string; bookId: string; question: StorybookQuestion; viewerLang: string;
+}) {
+  const [answers, setAnswers] = useState<StorybookResponse[]>([]);
+  const [trans, setTrans] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const unsub = subscribeBookAnswers(roomCode, bookId, question.id, setAnswers);
+    return () => unsub();
+  }, [roomCode, bookId, question.id]);
+
+  useEffect(() => {
+    const groups: Record<string, StorybookResponse[]> = {};
+    for (const a of answers) {
+      if (!a.studentLang || a.studentLang === viewerLang || trans[a.id]) continue;
+      (groups[a.studentLang] ||= []).push(a);
+    }
+    const langs = Object.keys(groups);
+    if (langs.length === 0) return;
+    let cancel = false;
+    (async () => {
+      for (const fl of langs) {
+        const grp = groups[fl];
+        try {
+          const res = await fetch("/api/storybook-translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ texts: grp.map((a) => a.text), fromLang: fl, toLang: viewerLang }),
+          });
+          const data = (await res.json()) as { ok: boolean; translated?: string[] };
+          if (!cancel && data.ok && data.translated) {
+            setTrans((prev) => {
+              const next = { ...prev };
+              grp.forEach((a, i) => { if (data.translated![i]) next[a.id] = data.translated![i]; });
+              return next;
+            });
+          }
+        } catch { /* 원문 유지 */ }
+      }
+    })();
+    return () => { cancel = true; };
+    // trans 는 의도적으로 제외(루프 방지) — 새 답변 도착 시에만 재번역
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, viewerLang]);
+
+  if (answers.length === 0) return null;
+
+  return (
+    <div style={{
+      background: "#fff", borderRadius: 20, border: "2px solid #FDE68A",
+      boxShadow: "0 8px 24px rgba(180,83,9,0.1)", padding: "14px 16px", marginBottom: 14,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 900, color: "#92400E", marginBottom: 4 }}>
+        💬 {pick(question.text, viewerLang)}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: "#B45309", marginBottom: 10 }}>
+        친구들의 생각 {answers.length}개
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {answers.map((a) => (
+          <div key={a.id} style={{
+            background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12,
+            padding: "8px 12px",
+          }}>
+            <div style={{ fontSize: 14, color: "#1F2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+              {trans[a.id] || a.text}
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#92400E", marginTop: 4 }}>
+              — {a.studentName}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1570,7 +1667,7 @@ function QuestionCard({
     if (!draft.trim() || busy) return;
     setBusy(true);
     try {
-      await submitResponse(roomCode, q.id, myClientId, user.myName, user.myLang, draft);
+      await submitResponse(roomCode, q.id, myClientId, user.myName, user.myLang, draft, book?.id);
       setSaved(true);
     } catch (err) { console.error("submitResponse failed", err); }
     setBusy(false);
@@ -1907,7 +2004,7 @@ function QuestionCard({
                       context: "storybook",
                       bookId: book?.id,
                     });
-                    await submitResponse(roomCode, q.id, myClientId, user.myName, user.myLang, text);
+                    await submitResponse(roomCode, q.id, myClientId, user.myName, user.myLang, text, book?.id);
                     awardEmotionStickerOncePerDay({
                       roomCode,
                       clientId: myClientId,
