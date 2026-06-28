@@ -199,6 +199,13 @@ export function Board({
 
   return (
     <div style={outer} aria-label="비마블 보드">
+      {/* 벌 토큰 통통 튀는 모션 (이동 중인 타일에서) */}
+      <style jsx global>{`
+        @keyframes marbleBeeHop {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-22%); }
+        }
+      `}</style>
       {TILES.map((tile) => {
         const slot = slotFor(tile.idx);
         const cellStyle: CSSProperties = {
@@ -219,6 +226,7 @@ export function Board({
               viewerLang={viewerLang}
               friendLang={friendLang}
               highlight={highlighted === tile.idx}
+              skinOf={(id) => state.players[id]?.skin}
             />
           </div>
         );

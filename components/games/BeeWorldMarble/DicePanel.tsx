@@ -214,11 +214,17 @@ export function DicePanel({
 
   const diceRow: CSSProperties = {
     display: "flex",
-    gap: compact ? 10 : 16,
-    padding: compact ? "4px 0" : "8px 0",
+    gap: compact ? 14 : 20,
+    padding: compact ? "10px 18px" : "14px 24px",
+    borderRadius: 18,
+    // 굴리는 순간 주사위를 또렷이 보여주는 무대(배경 글로우)
+    background: rolling
+      ? "radial-gradient(circle, rgba(245,158,11,0.22), rgba(245,158,11,0) 70%)"
+      : "transparent",
+    transition: "background 0.2s",
   };
 
-  const size = compact ? 44 : 60;
+  const size = compact ? 58 : 84;
 
   const buttonPad = compact ? "10px 18px" : "12px 26px";
   const buttonFontSize = compact ? 14 : 16;

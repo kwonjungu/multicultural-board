@@ -16,6 +16,8 @@ export interface TileProps {
   viewerLang: string;
   friendLang: string;
   highlight?: boolean;
+  /** 점유 플레이어의 벌 스킨 조회 (없으면 색 점으로 폴백) */
+  skinOf?: (id: PlayerId) => string | undefined;
 }
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -64,6 +66,7 @@ export function Tile({
   viewerLang,
   friendLang,
   highlight,
+  skinOf,
 }: TileProps) {
   // Two-step fallback for city art: first try tile.image (city-specific),
   // then the generic country landmark, finally the emoji glyph.
@@ -219,37 +222,66 @@ export function Tile({
         </div>
       )}
 
-      {/* Occupants — small player dots bottom-right */}
+      {/* Occupants — 실제 벌 토큰(스킨 PNG). 로드 실패 시 색 점으로 폴백. */}
       {occupants.length > 0 && (
         <div
           aria-hidden="true"
           style={{
             position: "absolute",
-            right: "6%",
-            bottom: "6%",
+            right: "4%",
+            bottom: "4%",
             display: "flex",
-            gap: 2,
+            gap: 1,
             flexWrap: "wrap",
-            maxWidth: "60%",
+            maxWidth: "72%",
             justifyContent: "flex-end",
           }}
         >
           {occupants.map((p) => (
-            <span
-              key={p}
-              style={{
-                width: "clamp(8px, 1.8vw, 14px)",
-                height: "clamp(8px, 1.8vw, 14px)",
-                borderRadius: "50%",
-                background: PLAYER_COLOR[p],
-                border: "2px solid #fff",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
-              }}
-            />
+            <BeeToken key={p} id={p} skin={skinOf?.(p)} moving={!!highlight} />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+// 실제 벌 토큰 — 플레이어 스킨 PNG를 색 링과 함께 표시. 이동 중(highlight)이면 통통 튀게.
+function BeeToken({ id, skin, moving }: { id: PlayerId; skin?: string; moving?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  const color = PLAYER_COLOR[id];
+  const dim = "clamp(14px, 3vw, 24px)";
+  if (!skin || failed) {
+    return (
+      <span
+        style={{
+          width: dim, height: dim, borderRadius: "50%",
+          background: color, border: "2px solid #fff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
+          animation: moving ? "marbleBeeHop 0.5s ease-in-out infinite" : undefined,
+        }}
+      />
+    );
+  }
+  return (
+    <span
+      style={{
+        width: dim, height: dim, borderRadius: "50%",
+        background: "#fff", border: `2px solid ${color}`,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        overflow: "hidden",
+        animation: moving ? "marbleBeeHop 0.5s ease-in-out infinite" : undefined,
+      }}
+    >
+      <img
+        src={`/stickers/skin-${skin}.png`}
+        alt=""
+        aria-hidden="true"
+        onError={() => setFailed(true)}
+        style={{ width: "88%", height: "88%", objectFit: "contain" }}
+      />
+    </span>
   );
 }
 
