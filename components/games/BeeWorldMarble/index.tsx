@@ -184,6 +184,10 @@ export default function BeeWorldMarble({
   );
 }
 
+// 세계 명소 배경 — 크림색 오버레이로 타일/글자 가독성 유지.
+const WORLD_BG =
+  "linear-gradient(rgba(255,251,235,0.80), rgba(255,247,224,0.80)), url('/backgrounds/world-landmarks.jpg') center top / cover no-repeat";
+
 const root: CSSProperties = {
   width: "100%",
   maxWidth: 720,
@@ -193,6 +197,8 @@ const root: CSSProperties = {
   flexDirection: "column",
   gap: 8,
   boxSizing: "border-box",
+  background: WORLD_BG,
+  backgroundAttachment: "fixed",
 };
 
 const rootWide: CSSProperties = {
@@ -205,6 +211,8 @@ const rootWide: CSSProperties = {
   gap: 16,
   alignItems: "start",
   boxSizing: "border-box",
+  background: WORLD_BG,
+  backgroundAttachment: "fixed",
 };
 
 const rootIntro: CSSProperties = {
@@ -215,6 +223,8 @@ const rootIntro: CSSProperties = {
   // #3 하단 여백 — 3~4인 설정으로 길어져도 '▶ 시작!' 버튼이 화면 끝/기기 UI에
   // 가려지지 않고 충분히 스크롤되어 탭 가능하도록 한다.
   paddingBottom: "calc(28px + env(safe-area-inset-bottom, 0px))",
+  background: WORLD_BG,
+  backgroundAttachment: "fixed",
 };
 
 const topBar: CSSProperties = {

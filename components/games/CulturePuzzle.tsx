@@ -117,7 +117,11 @@ export default function CulturePuzzle({ langA, langB }: { langA: string; langB: 
 
   if (allDone) {
     return (
-      <div style={{ padding: "40px 16px", maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
+      <div style={{
+        padding: "40px 16px", maxWidth: 520, margin: "0 auto", textAlign: "center",
+        minHeight: "100%",
+        background: "linear-gradient(rgba(255,251,235,0.86), rgba(255,247,224,0.86)), url('/backgrounds/world-landmarks.jpg') center top / cover no-repeat",
+      }}>
         <div style={{ fontSize: 64, marginBottom: 12 }}>🏆</div>
         <div style={{ fontSize: 28, fontWeight: 900, color: "#16A34A", marginBottom: 6 }}>
           전체 완료!
@@ -141,7 +145,10 @@ export default function CulturePuzzle({ langA, langB }: { langA: string; langB: 
   }
 
   return (
-    <div style={{ padding: "16px 16px 40px", maxWidth: 520, margin: "0 auto" }}>
+    <div style={{
+      padding: "16px 16px 40px", maxWidth: 520, margin: "0 auto", minHeight: "100%",
+      background: "linear-gradient(rgba(255,251,235,0.88), rgba(255,247,224,0.88)), url('/backgrounds/world-landmarks.jpg') center top / cover no-repeat",
+    }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <div style={{ fontSize: 13, color: "#6B7280", fontWeight: 700 }}>
           🧩 조각을 맞춰보세요
