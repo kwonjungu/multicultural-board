@@ -2,6 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import BeeMascot from "../BeeMascot";
+import { gt, UI, type LangMap } from "./uiText";
+
+// 게임 고유 UI 문구 (제목·설명)
+const NT: Record<string, LangMap> = {
+  title: {
+    ko: "숫자 빨리 누르기", en: "Tap the Number", vi: "Bấm số nhanh", zh: "快速按数字",
+    fil: "Pindutin ang Numero", ja: "すうじタップ", th: "กดเลขให้ไว", id: "Tekan Angka",
+    ru: "Нажми число", hi: "नंबर दबाओ", ar: "اضغط الرقم",
+  },
+  howto: {
+    ko: "둘이서 마주 앉아, 들려주는 숫자를 먼저 눌러요!",
+    en: "Sit facing each other and tap the number you hear first!",
+    vi: "Ngồi đối diện, ai bấm đúng số nghe được trước thì thắng!",
+    zh: "两人面对面坐，先按出听到的数字!",
+    fil: "Magkaharap kayo, pindutin agad ang numerong narinig!",
+    ja: "むかいあって、きこえたすうじをはやくおして!",
+    th: "นั่งหันหน้าเข้าหากัน กดเลขที่ได้ยินให้ไวที่สุด!",
+    id: "Duduk berhadapan, tekan angka yang kamu dengar lebih dulu!",
+    ru: "Сядьте напротив и нажмите услышанное число первым!",
+    hi: "आमने-सामने बैठो, सुना हुआ नंबर पहले दबाओ!",
+    ar: "اجلسا متقابلين واضغطا الرقم المسموع أولًا!",
+  },
+};
 
 const NUMBERS_WORDS: Record<string, string[]> = {
   ko: ["영","하나","둘","셋","넷","다섯","여섯","일곱","여덟","아홉"],
@@ -120,20 +143,22 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
     return (
       <div style={{ textAlign: "center", padding: 40 }}>
         <BeeMascot size={120} mood="happy" />
-        <div style={{ fontSize: 22, fontWeight: 900, margin: "18px 0 10px" }}>🔢 숫자 빨리 누르기</div>
+        <div style={{ fontSize: 22, fontWeight: 900, margin: "18px 0 10px" }}>🔢 {gt(NT.title, langA)}</div>
         <div style={{ color: "#6B7280", marginBottom: 20, fontSize: 14 }}>
-          둘이서 마주 앉아, 들려주는 숫자를 먼저 눌러요! ({ROUND_COUNT}라운드)
+          {gt(NT.howto, langA)} ({ROUND_COUNT} {gt(UI.round, langA)})
         </div>
         <div style={{ color: "#6B7280", marginBottom: 20, fontSize: 13 }}>
           A: {langA.toUpperCase()} · B: {langB.toUpperCase()}
         </div>
-        <button onClick={start} style={primaryBtn}>▶ 시작</button>
+        <button onClick={start} style={primaryBtn}>▶ {gt(UI.start, langA)}</button>
       </div>
     );
   }
 
   if (phase === "done") {
-    const winner = scoreA === scoreB ? "무승부" : scoreA > scoreB ? "Player A 승!" : "Player B 승!";
+    const winner = scoreA === scoreB
+      ? gt(UI.draw, langA)
+      : scoreA > scoreB ? `Player A ${gt(UI.win, langA)}` : `Player B ${gt(UI.win, langA)}`;
     return (
       <div style={{ textAlign: "center", padding: 40 }}>
         <BeeMascot size={120} mood="cheer" />
@@ -143,7 +168,7 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
         <div style={{ color: "#6B7280", fontSize: 15, marginBottom: 20 }}>
           A: {scoreA} · B: {scoreB}
         </div>
-        <button onClick={start} style={primaryBtn}>🔁 다시 하기</button>
+        <button onClick={start} style={primaryBtn}>🔁 {gt(UI.playAgain, langA)}</button>
       </div>
     );
   }
@@ -173,7 +198,7 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
         gap: 10, borderTop: "3px solid #fff", borderBottom: "3px solid #fff",
       }}>
         <div style={{ fontSize: 12, fontWeight: 800 }}>
-          <div style={{ opacity: 0.85 }}>라운드 {round}/{ROUND_COUNT}</div>
+          <div style={{ opacity: 0.85 }}>{gt(UI.round, langA)} {round}/{ROUND_COUNT}</div>
           <div style={{ fontSize: 15, marginTop: 2 }}>
             🎧 {target?.lang.toUpperCase()} · {targetWord}
           </div>
@@ -183,13 +208,13 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
         </div>
         <button
           onClick={replayTts}
-          aria-label="문제 다시 듣기"
+          aria-label={gt(UI.replay, langA)}
           style={{
             background: "rgba(255,255,255,0.25)", border: "none", color: "#fff",
             padding: "8px 14px", borderRadius: 99, cursor: "pointer",
             fontSize: 13, fontWeight: 800, whiteSpace: "nowrap",
           }}
-        >🔊 재생</button>
+        >🔊 {gt(UI.replay, langA)}</button>
       </div>
 
       <PlayerArea
