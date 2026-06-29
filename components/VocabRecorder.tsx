@@ -150,7 +150,7 @@ export default function VocabRecorder({
       const j = (await res.json()) as { text?: string };
       const recognized = (j.text ?? "").trim();
       const check = checkSpeechMatch({
-        recognized, target: sentenceText, wordForms, threshold: 0.7,
+        recognized, target: sentenceText, wordForms, threshold: 0.55, pass: "either",
       });
       setCheckResult({ passed: check.passed, recognized, similarity: check.similarity, hasForm: check.hasForm });
       setAttempts((n) => n + 1);
