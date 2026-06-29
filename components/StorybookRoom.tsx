@@ -13,6 +13,7 @@ import type {
   StorybookCharacter,
   StorybookChatTurn,
   StorybookAlert,
+  StorybookLiveBoard,
 } from "@/lib/types";
 import {
   loadBook,
@@ -26,6 +27,7 @@ import {
   subscribeResponses,
   subscribeBookAnswers,
   pushStorybookBoard,
+  subscribeStorybookBoards,
   setActiveCharacter,
   appendChatTurn,
   subscribeChat,
@@ -1551,6 +1553,105 @@ function playIntroBeep(ctxRef: React.MutableRefObject<AudioContext | null>, ch: 
   } catch { /* audio unavailable */ }
 }
 
+// [#6] 교사 라이브 모니터링 갤러리 — 현재 질문에 대해 학생들이 그리는 중인 그림을
+//   화이트보드 갤러리와 같은 방식(썸네일 그리드 + 확대 + 제출 배지)으로 실시간 표시.
+function TeacherDrawMonitor({ roomCode, questionId }: { roomCode: string; questionId: string }) {
+  const [boards, setBoards] = useState<StorybookLiveBoard[]>([]);
+  const [enlarged, setEnlarged] = useState<StorybookLiveBoard | null>(null);
+
+  useEffect(() => {
+    const unsub = subscribeStorybookBoards(roomCode, questionId, setBoards);
+    return () => unsub();
+  }, [roomCode, questionId]);
+
+  useBackLayer(enlarged !== null, () => setEnlarged(null));
+
+  if (boards.length === 0) return null;
+
+  const submitted = boards.filter((b) => b.submitted).length;
+
+  return (
+    <div style={{
+      background: "#fff", borderRadius: 16, border: "2px solid #DBEAFE",
+      boxShadow: "0 6px 18px rgba(59,130,246,0.12)", padding: "12px 14px", marginBottom: 12,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 13, fontWeight: 900, color: "#1E40AF" }}>
+          🖍 실시간 그림 모니터링
+        </span>
+        <span style={{
+          fontSize: 11, fontWeight: 800, color: "#1E40AF",
+          background: "#DBEAFE", padding: "2px 10px", borderRadius: 999,
+        }}>그리는 중 {boards.length} · 제출 {submitted}</span>
+      </div>
+      <div style={{
+        display: "grid", gap: 10,
+        gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+      }}>
+        {boards.map((b) => (
+          <button
+            key={b.clientId}
+            onClick={() => setEnlarged(b)}
+            style={{
+              background: "#fff", border: `2px solid ${b.submitted ? "#10B981" : "#DBEAFE"}`,
+              borderRadius: 12, padding: 6, cursor: "pointer", textAlign: "left",
+            }}
+          >
+            <div style={{ position: "relative" }}>
+              <img
+                src={b.dataUrl}
+                alt={`${b.studentName} 그림`}
+                style={{ width: "100%", borderRadius: 8, display: "block", background: "#fff", aspectRatio: "3 / 2", objectFit: "cover" }}
+              />
+              {b.submitted && (
+                <span style={{
+                  position: "absolute", top: 4, right: 4,
+                  fontSize: 10, fontWeight: 900, color: "#fff", background: "#10B981",
+                  padding: "2px 7px", borderRadius: 999,
+                }}>✓ 제출</span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 900, color: "#1F2937", marginTop: 5, paddingLeft: 2 }}>
+              {b.studentName}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {enlarged && (
+        <div
+          onClick={() => setEnlarged(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 450,
+            background: "rgba(9,7,30,0.8)", backdropFilter: "blur(6px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: "#fff", borderRadius: 22, padding: 16, maxWidth: 760, width: "100%",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ flex: 1, fontSize: 16, fontWeight: 900, color: "#1F2937" }}>
+                🖍 {enlarged.studentName}{enlarged.submitted ? " · ✓ 제출" : " · 그리는 중"}
+              </div>
+              <button
+                onClick={() => setEnlarged(null)}
+                aria-label="close"
+                style={{
+                  width: 36, height: 36, borderRadius: 10, border: "2px solid #DBEAFE",
+                  background: "#fff", color: "#1E40AF", fontSize: 16, fontWeight: 900, cursor: "pointer",
+                }}
+              >✕</button>
+            </div>
+            <img src={enlarged.dataUrl} alt={`${enlarged.studentName} 그림`} style={{ width: "100%", borderRadius: 12, background: "#fff" }} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuestionCard({
   lang, roomCode, user, myClientId, q, isTeacher, book,
 }: {
@@ -2054,6 +2155,9 @@ function QuestionCard({
           <span style={{ fontSize: 14, fontWeight: 800, color: "#065F46" }}>{t("sbAnswerSaved", lang)}</span>
         </div>
       )}
+
+      {/* [#6] 교사 라이브 모니터링 — 학생들이 그리는 중인 그림을 실시간으로 본다. */}
+      {isTeacher && <TeacherDrawMonitor roomCode={roomCode} questionId={q.id} />}
 
       {/* ── Fruit-tree style responses (열매나무) ── */}
       {(isTeacher || saved) && responses.length > 0 && (
