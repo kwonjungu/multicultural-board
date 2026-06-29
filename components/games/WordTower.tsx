@@ -3,6 +3,16 @@
 import { useMemo, useState } from "react";
 import { VOCAB, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
+import { gt, UI, type LangMap } from "./uiText";
+
+const WT_HEIGHT: LangMap = {
+  ko: "탑 높이", en: "Tower height", vi: "Chiều cao tháp", zh: "塔高", fil: "Taas ng tore",
+  ja: "タワーのたかさ", th: "ความสูงหอ", id: "Tinggi menara", ru: "Высота башни", hi: "मीनार ऊँचाई", ar: "ارتفاع البرج",
+};
+const WT_FLOOR: LangMap = {
+  ko: "칸", en: "floors", vi: "tầng", zh: "层", fil: "palapag",
+  ja: "かい", th: "ชั้น", id: "lantai", ru: "этажей", hi: "मंज़िल", ar: "طوابق",
+};
 
 export default function WordTower({ langA, langB }: { langA: string; langB: string }) {
   const [height, setHeight] = useState(0);
@@ -51,14 +61,14 @@ export default function WordTower({ langA, langB }: { langA: string; langB: stri
       <div style={{ textAlign: "center", padding: 40 }}>
         <BeeMascot size={120} mood="happy" />
         <div style={{ fontSize: 26, fontWeight: 900, marginTop: 14 }}>
-          🏗️ 탑 높이 {height}칸
+          🏗️ {gt(WT_HEIGHT, langA)} {height}{gt(WT_FLOOR, langA)}
         </div>
         <button onClick={restart} style={{
           marginTop: 18,
           background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
           color: "#fff", border: "none", padding: "12px 28px",
           borderRadius: 99, fontSize: 14, fontWeight: 800, cursor: "pointer",
-        }}>🔁 다시 하기</button>
+        }}>🔁 {gt(UI.playAgain, langA)}</button>
       </div>
     );
   }
@@ -68,7 +78,7 @@ export default function WordTower({ langA, langB }: { langA: string; langB: stri
       {/* Quiz */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 13, fontWeight: 700 }}>
-          <span style={{ color: "#16A34A" }}>🏗️ {height}칸</span>
+          <span style={{ color: "#16A34A" }}>🏗️ {height}{gt(WT_FLOOR, langA)}</span>
           <span style={{ color: "#DC2626" }}>{"❤️".repeat(lives)}</span>
         </div>
         <div style={{
