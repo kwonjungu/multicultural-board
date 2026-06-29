@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { UserConfig, PostData, CardType, CardData, CardStatus } from "@/lib/types";
 import { t } from "@/lib/i18n";
-import DrawingCanvas from "./DrawingCanvas";
+import DrawBoard from "./DrawBoard";
 import WorksheetTab from "./WorksheetTab";
 import BeeMascot from "./BeeMascot";
 import { WorksheetAnalyzeView } from "./WorksheetAnalyzeModal";
@@ -780,29 +780,9 @@ export default function PostModal({
           </div>
         )}
 
-        {/* ── 그림 모드 ── */}
+        {/* ── 그림 모드 (화이트보드급 멀티툴 공용 DrawBoard) ── */}
         {mode === "drawing" && (
-          drawingDataUrl ? (
-            <div>
-              <div style={{ position: "relative" }}>
-                <img src={drawingDataUrl} alt="drawing" style={{ width: "100%", borderRadius: 12 }} />
-                <button
-                  onClick={() => setDrawingDataUrl(null)}
-                  style={{
-                    position: "absolute", top: 8, right: 8,
-                    background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%",
-                    width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 13,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}
-                >✕</button>
-              </div>
-              <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 8, textAlign: "center" }}>
-                다시 그리려면 ✕ 버튼을 누르세요
-              </div>
-            </div>
-          ) : (
-            <DrawingCanvas onDone={(dataUrl) => setDrawingDataUrl(dataUrl)} />
-          )
+          <DrawBoard width={720} height={480} accent="#F59E0B" onChange={(url) => setDrawingDataUrl(url)} />
         )}
 
         {/* ── 활동지 모드 (not available in edit mode) ── */}

@@ -3,6 +3,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { VOCAB, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
+import { gt, UI, type LangMap } from "./uiText";
+
+const WM: Record<string, LangMap> = {
+  allMatched: {
+    ko: "모두 맞췄어요!", en: "All matched!", vi: "Khớp hết rồi!", zh: "全部配对成功!",
+    fil: "Tama lahat!", ja: "ぜんぶそろった!", th: "จับคู่ครบแล้ว!", id: "Semua cocok!",
+    ru: "Все пары найдены!", hi: "सब मिल गए!", ar: "تطابق الكل!",
+  },
+  tries: {
+    ko: "시도", en: "Tries", vi: "Lượt", zh: "次数", fil: "Subok",
+    ja: "かいすう", th: "ครั้ง", id: "Coba", ru: "Попытки", hi: "कोशिश", ar: "محاولات",
+  },
+  matchedPairs: {
+    ko: "맞춘 쌍", en: "Matched", vi: "Cặp đúng", zh: "配对", fil: "Tugma",
+    ja: "そろったペア", th: "คู่ที่ได้", id: "Pasangan", ru: "Пары", hi: "जोड़े", ar: "أزواج",
+  },
+};
 
 type Card = {
   id: string;
@@ -61,9 +78,9 @@ export default function WordMemory({ langA, langB }: { langA: string; langB: str
       <div style={{ textAlign: "center", padding: 40 }}>
         <BeeMascot size={120} mood="cheer" />
         <div style={{ fontSize: 28, fontWeight: 900, color: "#111827", margin: "18px 0 6px" }}>
-          🎉 모두 맞췄어요!
+          🎉 {gt(WM.allMatched, langA)}
         </div>
-        <div style={{ color: "#6B7280", fontSize: 14 }}>{moves}번 시도</div>
+        <div style={{ color: "#6B7280", fontSize: 14 }}>{gt(WM.tries, langA)} {moves}</div>
       </div>
     );
   }
@@ -74,8 +91,8 @@ export default function WordMemory({ langA, langB }: { langA: string; langB: str
         display: "flex", justifyContent: "space-between",
         marginBottom: 14, fontSize: 13, fontWeight: 700, color: "#6B7280",
       }}>
-        <span>시도 {moves}번</span>
-        <span>맞춘 쌍 {matched.size} / {pairCount}</span>
+        <span>{gt(WM.tries, langA)} {moves}</span>
+        <span>{gt(WM.matchedPairs, langA)} {matched.size} / {pairCount}</span>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>

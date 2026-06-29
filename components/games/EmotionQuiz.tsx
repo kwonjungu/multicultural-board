@@ -4,6 +4,12 @@ import { useMemo, useState } from "react";
 import { EMOTIONS, EmotionItem, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
 import { ProgressBar } from "./CountryGuess";
+import { gt, type LangMap } from "./uiText";
+
+const SITUATION: LangMap = {
+  ko: "상황", en: "Situation", vi: "Tình huống", zh: "情境", fil: "Sitwasyon",
+  ja: "ばめん", th: "สถานการณ์", id: "Situasi", ru: "Ситуация", hi: "स्थिति", ar: "موقف",
+};
 
 const EMOJI_POOL = ["😊","😢","😠","😨","😳","🤗","😴","😮","🤔","🥳","🥰","😭","🏆","🤝","😟","💔"];
 
@@ -68,7 +74,7 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
         boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
       }}>
         <div style={{ fontSize: 10, fontWeight: 800, color: "#F59E0B", letterSpacing: 1.2, marginBottom: 8 }}>
-          💭 상황
+          💭 {gt(SITUATION, langA)}
         </div>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
           {/* key 로 라운드마다 리마운트 — imgOk(onError) 상태가 다음 문제로 새어가지 않게 */}

@@ -4,6 +4,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GREETINGS, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
 import { ProgressBar } from "./CountryGuess";
+import { gt, type LangMap } from "./uiText";
+
+// {a}=듣는 언어, {b}=고르는 언어
+const GR: Record<string, LangMap> = {
+  instruction: {
+    ko: "{a}로 들려요 → {b}로 고르세요", en: "Listen in {a} → choose in {b}",
+    vi: "Nghe bằng {a} → chọn {b}", zh: "用{a}听 → 选{b}", fil: "Pakinggan sa {a} → piliin sa {b}",
+    ja: "{a}できこえる → {b}でえらぶ", th: "ฟัง {a} → เลือก {b}", id: "Dengar {a} → pilih {b}",
+    ru: "Слушай на {a} → выбери на {b}", hi: "{a} में सुनो → {b} में चुनो", ar: "استمع بـ{a} → اختر بـ{b}",
+  },
+  replay: {
+    ko: "다시 듣기", en: "Listen again", vi: "Nghe lại", zh: "重听", fil: "Ulitin",
+    ja: "もういちど", th: "ฟังอีกครั้ง", id: "Dengar lagi", ru: "Ещё раз", hi: "फिर सुनो", ar: "استمع ثانية",
+  },
+};
 
 export default function GreetingRelay({ langA, langB }: { langA: string; langB: string }) {
   const rounds = useMemo(() => {
@@ -75,13 +90,13 @@ export default function GreetingRelay({ langA, langB }: { langA: string; langB: 
         marginBottom: 18, boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
       }}>
         <div style={{ fontSize: 10, color: "#F59E0B", fontWeight: 800, letterSpacing: 1 }}>
-          🎧 {cur.askLang.toUpperCase()}로 들려요 → {cur.answerLang.toUpperCase()}로 고르세요
+          🎧 {gt(GR.instruction, langA).replace("{a}", cur.askLang.toUpperCase()).replace("{b}", cur.answerLang.toUpperCase())}
         </div>
         <button onClick={replay} style={{
           marginTop: 10, background: "#F59E0B", color: "#fff", border: "none",
           padding: "10px 24px", borderRadius: 99, cursor: "pointer",
           fontSize: 14, fontWeight: 800,
-        }}>🔊 다시 듣기</button>
+        }}>🔊 {gt(GR.replay, langA)}</button>
       </div>
 
       <div style={{ display: "grid", gap: 10 }}>
