@@ -274,6 +274,20 @@ export interface StorybookResponse {
   studentLang: string;
   text: string;
   timestamp: number;
+  /** 응답 종류 — 그림이면 "drawing", 감정 카드면 "emotion", 그 외 글/말은 "text". */
+  kind?: "text" | "drawing" | "emotion";
+  /** 그림 응답일 때 업로드된 이미지 URL. */
+  imageUrl?: string;
+}
+
+// [#6 그림책] 그리는 중 실시간 스냅샷 — 교사 라이브 모니터링용.
+//   rooms/{roomCode}/storybook/boards/{questionId}/{clientId}
+export interface StorybookLiveBoard {
+  clientId: string;
+  studentName: string;
+  dataUrl: string;
+  updatedAt: number;
+  submitted: boolean;
 }
 
 export interface StorybookChatTurn {

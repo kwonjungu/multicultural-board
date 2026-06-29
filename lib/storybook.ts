@@ -7,6 +7,7 @@ import type {
   StorybookPhase,
   StorybookChatTurn,
   StorybookAlert,
+  StorybookLiveBoard,
 } from "./types";
 
 // Firebase path layout:
@@ -268,6 +269,7 @@ export async function submitResponse(
   studentLang: string,
   text: string,
   bookId?: string,
+  opts?: { kind?: "text" | "drawing" | "emotion"; imageUrl?: string },
 ): Promise<void> {
   const db = getClientDb();
   const r = ref(db, `${responsesPath(roomCode, questionId)}/${clientId}`);
@@ -280,12 +282,62 @@ export async function submitResponse(
     text: text.trim(),
     timestamp: Date.now(),
   };
+  if (opts?.kind) payload.kind = opts.kind;
+  if (opts?.imageUrl) payload.imageUrl = opts.imageUrl;
   // [#1] 책별 영속 사본 — 세션이 끝나도 친구들 답변이 남아 자유 읽기에서 보인다.
   //   표시용 부가 쓰기이므로 fire-and-forget (가드레일: 부가 쓰기는 await 금지).
   if (bookId) {
     set(ref(db, `${bookAnswersPath(roomCode, bookId, questionId)}/${clientId}`), payload).catch(() => {});
   }
   await set(r, payload);
+  // 그림 응답으로 제출되면 라이브 보드를 "제출됨"으로 표시 (교사 모니터링 종료 신호).
+  if (opts?.kind === "drawing") {
+    update(ref(db, `${liveBoardsPath(roomCode, questionId)}/${clientId}`), { submitted: true }).catch(() => {});
+  }
+}
+
+// === [#6 그림책] 라이브 그림 보드 — 학생이 그리는 중 스냅샷, 교사 실시간 모니터링 ===
+
+function liveBoardsPath(roomCode: string, questionId: string): string {
+  return `rooms/${roomCode}/storybook/boards/${questionId}`;
+}
+
+// 학생: 그리는 중 스냅샷 업로드 (호출 측에서 디바운스). 제출 전이므로 submitted=false.
+export async function pushStorybookBoard(
+  roomCode: string,
+  questionId: string,
+  clientId: string,
+  studentName: string,
+  dataUrl: string,
+): Promise<void> {
+  const db = getClientDb();
+  await set(ref(db, `${liveBoardsPath(roomCode, questionId)}/${clientId}`), {
+    clientId,
+    studentName,
+    dataUrl,
+    updatedAt: Date.now(),
+    submitted: false,
+  } satisfies StorybookLiveBoard);
+}
+
+// 교사: 현재 질문의 전 학생 라이브 보드 구독 (이름순).
+export function subscribeStorybookBoards(
+  roomCode: string,
+  questionId: string,
+  cb: (boards: StorybookLiveBoard[]) => void,
+): () => void {
+  const db = getClientDb();
+  const r = ref(db, liveBoardsPath(roomCode, questionId));
+  const unsub = onValue(r, (snap) => {
+    const val = snap.val() as Record<string, StorybookLiveBoard> | null;
+    const list: StorybookLiveBoard[] = val
+      ? Object.values(val)
+          .filter((b) => b && b.dataUrl)
+          .sort((a, b) => (a.studentName || "").localeCompare(b.studentName || ""))
+      : [];
+    cb(list);
+  });
+  return () => { unsub(); };
 }
 
 // [#1] 책별 영속 답변 구독 — 자유 읽기 화면에서 친구들의 예전 답변 표시.
