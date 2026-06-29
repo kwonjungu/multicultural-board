@@ -25,6 +25,7 @@ import {
   submitResponse,
   subscribeResponses,
   subscribeBookAnswers,
+  pushStorybookBoard,
   setActiveCharacter,
   appendChatTurn,
   subscribeChat,
@@ -40,6 +41,7 @@ import { exportStorybookToPptx } from "@/lib/storybookPptx";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { readChatStream } from "@/lib/chatStreamClient";
 import MicButton from "./MicButton";
+import DrawBoard, { type DrawBoardHandle } from "./DrawBoard";
 import { speak as speakText } from "@/lib/ttsMulti";
 import StorybookCreator from "./StorybookCreator";
 import StorybookWordQuiz from "./StorybookWordQuiz";
@@ -1564,7 +1566,8 @@ function QuestionCard({
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [responses, setResponses] = useState<StorybookResponse[]>([]);
-  const [inputMode, setInputMode] = useState<QInputMode>("text");
+  // [#6] 그림이 주인공 — 기본 모드는 그리기.
+  const [inputMode, setInputMode] = useState<QInputMode>("draw");
   const [speaking, setSpeaking] = useState(false);
   const [selectedFruit, setSelectedFruit] = useState<number | null>(null);
   // Translation cache for responses: key = `${responseId}:${toLang}`
@@ -1576,14 +1579,14 @@ function QuestionCard({
   const [introTyped, setIntroTyped] = useState(0);
   const introTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawing, setDrawing] = useState(false);
-  const lastPos = useRef<{ x: number; y: number } | null>(null);
+  // [#6] 공용 DrawBoard — 제출 시 ref.getDataUrl(), 그리는 중 onChange 로 라이브 스트리밍.
+  const drawRef = useRef<DrawBoardHandle>(null);
+  const [hasDrawn, setHasDrawn] = useState(false);
   const ttsPlayedRef = useRef<string>("");
 
   // Reset when question changes — trigger tutorial intro for students
   useEffect(() => {
-    setDraft(""); setSaved(false); setSelectedFruit(null);
+    setDraft(""); setSaved(false); setSelectedFruit(null); setHasDrawn(false);
     if (!isTeacher) {
       setShowIntro(true);
       setIntroTyped(0);
@@ -1659,34 +1662,55 @@ function QuestionCard({
     if (text) { setSpeaking(true); speakText(text, lang).finally(() => setSpeaking(false)); }
   }
 
+  // dataURL → Blob (그림 업로드용)
+  function dataUrlToBlob(dataUrl: string): Blob {
+    const [header, data] = dataUrl.split(",");
+    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+    const bin = atob(data);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  }
+
   async function handleSubmit() {
-    if (!draft.trim() || busy) return;
+    if (busy) return;
+    // [#6] 그림 모드: 캔버스를 이미지로 업로드 후 그림 응답으로 제출.
+    if (inputMode === "draw") {
+      const dataUrl = drawRef.current?.getDataUrl(0.8);
+      if (!dataUrl) return;
+      setBusy(true);
+      try {
+        const fd = new FormData();
+        fd.append("file", dataUrlToBlob(dataUrl), `draw_${Date.now()}.jpg`);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        const data = await res.json() as { url?: string };
+        const imageUrl = data.url || dataUrl; // 업로드 실패 시 dataURL 폴백
+        await submitResponse(
+          roomCode, q.id, myClientId, user.myName, user.myLang,
+          draft.trim(), book?.id, { kind: "drawing", imageUrl },
+        );
+        setSaved(true);
+      } catch (err) { console.error("drawing submit failed", err); }
+      setBusy(false);
+      return;
+    }
+    // 글/말 모드
+    if (!draft.trim()) return;
     setBusy(true);
     try {
-      await submitResponse(roomCode, q.id, myClientId, user.myName, user.myLang, draft, book?.id);
+      await submitResponse(roomCode, q.id, myClientId, user.myName, user.myLang, draft, book?.id, { kind: "text" });
       setSaved(true);
     } catch (err) { console.error("submitResponse failed", err); }
     setBusy(false);
   }
 
-  // [#4] 음성 입력은 앱 공용 STT 엔진(MicButton)로 통일 — 인식 결과를 draft 에 이어붙인다.
-  //   기존의 인라인 MediaRecorder 구현은 언마운트 정리 누락 등 오류 원인이라 제거함.
+  // 그리는 중 라이브 스냅샷 → 교사 모니터링 (디바운스는 DrawBoard 내부에서).
+  function handleDrawChange(dataUrl: string) {
+    setHasDrawn(true);
+    pushStorybookBoard(roomCode, q.id, myClientId, user.myName, dataUrl).catch(() => {});
+  }
 
-  // Canvas drawing
-  function getCanvasPos(e: React.MouseEvent | React.TouchEvent) {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    if ("touches" in e) { const t = e.touches[0] || e.changedTouches[0]; return { x: t.clientX - rect.left, y: t.clientY - rect.top }; }
-    return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top };
-  }
-  function drawStart(e: React.MouseEvent | React.TouchEvent) { e.preventDefault(); setDrawing(true); lastPos.current = getCanvasPos(e); }
-  function drawMove(e: React.MouseEvent | React.TouchEvent) {
-    if (!drawing) return; e.preventDefault();
-    const pos = getCanvasPos(e); const ctx = canvasRef.current?.getContext("2d");
-    if (ctx && lastPos.current) { ctx.strokeStyle = "#1F2937"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
-    lastPos.current = pos;
-  }
-  function drawEnd() { setDrawing(false); lastPos.current = null; }
-  function clearCanvas() { const ctx = canvasRef.current?.getContext("2d"); if (ctx) ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height); }
+  // [#4] 음성 입력은 앱 공용 STT 엔진(MicButton)로 통일 — 인식 결과를 draft 에 이어붙인다.
 
   const activeChar = book?.characters?.[0];
   const charImg = activeChar?.avatarUrl || "/mascot/bee-think.png";
@@ -1898,9 +1922,9 @@ function QuestionCard({
         }}>
           <div style={{ display: "flex", gap: 0, marginBottom: 14, background: "#F3F4F6", borderRadius: 12, padding: 3, border: "1px solid #E5E7EB" }}>
             {([
+              { id: "draw" as QInputMode, icon: "🖍", label: "그림" },
               { id: "text" as QInputMode, icon: "✏️", label: "글자" },
               { id: "voice" as QInputMode, icon: "🎤", label: "말" },
-              { id: "draw" as QInputMode, icon: "🖌️", label: "그리기" },
               { id: "emotion" as QInputMode, icon: "💗", label: "감정" },
             ]).map((tab) => (
               <button key={tab.id} onClick={() => setInputMode(tab.id)} style={{
@@ -1938,16 +1962,24 @@ function QuestionCard({
 
           {inputMode === "draw" && (
             <div>
-              <div style={{ border: "2px solid #E5E7EB", borderRadius: 12, overflow: "hidden", touchAction: "none", background: "#fff", position: "relative" }}>
-                <canvas ref={canvasRef} width={400} height={160}
-                  style={{ width: "100%", height: 160, display: "block", cursor: "crosshair" }}
-                  onMouseDown={drawStart} onMouseMove={drawMove} onMouseUp={drawEnd} onMouseLeave={drawEnd}
-                  onTouchStart={drawStart} onTouchMove={drawMove} onTouchEnd={drawEnd} />
+              {/* 화이트보드와 동일한 공용 멀티툴 그림판. 그리는 동안 교사가 실시간으로 본다.
+                  질문이 바뀌면 key 로 새 캔버스로 리셋. */}
+              <DrawBoard key={q.id} ref={drawRef} width={720} height={480} accent="#3B82F6" onChange={handleDrawChange} />
+              <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: "#3B82F6" }}>
+                🐝 그리는 동안 선생님이 실시간으로 보고 있어요
               </div>
-              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                <button onClick={clearCanvas} style={{ flex: 1, padding: "8px", borderRadius: 10, background: "#F3F4F6", border: "1px solid #E5E7EB", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🗑️ 지우기</button>
-                <button onClick={() => { const text = prompt("그린 글자를 입력해주세요:"); if (text) setDraft(text); }} style={{ flex: 1, padding: "8px", borderRadius: 10, background: "#DBEAFE", border: "1px solid #BFDBFE", fontSize: 12, fontWeight: 700, color: "#1E40AF", cursor: "pointer" }}>✨ 글자 인식</button>
-              </div>
+              {/* 그림에 곁들일 한 줄 설명(선택) */}
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="한 줄 설명을 더해도 좋아요 (선택)"
+                disabled={busy}
+                style={{
+                  width: "100%", marginTop: 8, padding: "9px 12px", borderRadius: 12,
+                  border: "2px solid #DBEAFE", fontSize: 14, fontFamily: "inherit",
+                  outline: "none", background: "#FAFAFA", color: "#1F2937", boxSizing: "border-box",
+                }}
+              />
             </div>
           )}
 
@@ -1991,24 +2023,28 @@ function QuestionCard({
             </div>
           )}
 
-          {draft && inputMode !== "text" && inputMode !== "emotion" && (
+          {draft && inputMode === "voice" && (
             <div style={{ marginTop: 10, padding: "8px 12px", background: "#F0F9FF", borderRadius: 10, fontSize: 13, color: "#1E40AF", fontWeight: 600 }}>
               입력: &ldquo;{draft}&rdquo;
             </div>
           )}
-          {inputMode !== "emotion" && (
+          {inputMode !== "emotion" && (() => {
+            // 그림 모드는 그림을 그렸으면 제출 가능, 그 외엔 텍스트가 있어야 한다.
+            const canSubmit = inputMode === "draw" ? hasDrawn : !!draft.trim();
+            return (
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-              <button onClick={handleSubmit} disabled={busy || !draft.trim()} style={{
+              <button onClick={handleSubmit} disabled={busy || !canSubmit} style={{
                 minHeight: 56, padding: "10px 24px",
-                background: !draft.trim() ? "#E5E7EB" : "linear-gradient(135deg, #3B82F6, #2563EB)",
-                color: !draft.trim() ? "#9CA3AF" : "#fff",
+                background: !canSubmit ? "#E5E7EB" : "linear-gradient(135deg, #3B82F6, #2563EB)",
+                color: !canSubmit ? "#9CA3AF" : "#fff",
                 fontSize: 15, fontWeight: 900, border: "none", borderRadius: 14,
-                cursor: !draft.trim() || busy ? "not-allowed" : "pointer",
-                boxShadow: !draft.trim() ? "none" : "0 6px 16px rgba(59,130,246,0.3)",
+                cursor: !canSubmit || busy ? "not-allowed" : "pointer",
+                boxShadow: !canSubmit ? "none" : "0 6px 16px rgba(59,130,246,0.3)",
                 transition: "all 0.2s",
-              }}>{busy ? "제출 중..." : "📨 포스트잇 붙이기"}</button>
+              }}>{busy ? "제출 중..." : inputMode === "draw" ? "🖍 그림 제출하기" : "📨 포스트잇 붙이기"}</button>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
