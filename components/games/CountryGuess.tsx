@@ -3,6 +3,70 @@
 import { useMemo, useState } from "react";
 import { COUNTRIES, pickN, tr, type CountryDifficulty } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
+import { gt, UI, type LangMap } from "./uiText";
+
+// 게임 고유 UI 문구
+const CG: Record<string, LangMap> = {
+  pickDiff: {
+    ko: "난이도를 골라주세요", en: "Choose a difficulty", vi: "Chọn độ khó", zh: "选择难度",
+    fil: "Pumili ng antas", ja: "なんいどをえらんでね", th: "เลือกระดับ", id: "Pilih tingkat",
+    ru: "Выбери уровень", hi: "कठिनाई चुनो", ar: "اختر المستوى",
+  },
+  ofPick: {
+    ko: "개 나라 중에서 8문제가 나와요", en: "countries — 8 questions from them",
+    vi: "quốc gia — 8 câu hỏi", zh: "个国家中出8题", fil: "bansa — 8 tanong",
+    ja: "かこくから8もん", th: "ประเทศ — 8 ข้อ", id: "negara — 8 soal",
+    ru: "стран — 8 вопросов", hi: "देशों में से 8 सवाल", ar: "دولة — 8 أسئلة",
+  },
+  countriesUnit: {
+    ko: "개 나라", en: "countries", vi: "quốc gia", zh: "个国家", fil: "bansa",
+    ja: "かこく", th: "ประเทศ", id: "negara", ru: "стран", hi: "देश", ar: "دولة",
+  },
+  goodJob: {
+    ko: "수고했어요!", en: "Well done!", vi: "Giỏi lắm!", zh: "做得好!", fil: "Magaling!",
+    ja: "よくできました!", th: "เก่งมาก!", id: "Bagus!", ru: "Молодец!", hi: "शाबाश!", ar: "أحسنت!",
+  },
+  changeDiff: {
+    ko: "난이도 바꾸기", en: "Change difficulty", vi: "Đổi độ khó", zh: "换难度",
+    fil: "Palitan ang antas", ja: "なんいどへんこう", th: "เปลี่ยนระดับ", id: "Ganti tingkat",
+    ru: "Сменить уровень", hi: "कठिनाई बदलो", ar: "غيّر المستوى",
+  },
+  noData: {
+    ko: "데이터가 부족합니다.", en: "Not enough data.", vi: "Không đủ dữ liệu.", zh: "数据不足。",
+    fil: "Kulang ang datos.", ja: "データがたりません。", th: "ข้อมูลไม่พอ", id: "Data kurang.",
+    ru: "Недостаточно данных.", hi: "पर्याप्त डेटा नहीं।", ar: "بيانات غير كافية.",
+  },
+  whichCountry: {
+    ko: "이 국기의 나라는?", en: "Which country is this flag?", vi: "Lá cờ này của nước nào?",
+    zh: "这是哪国国旗?", fil: "Aling bansa ang bandilang ito?", ja: "このこっきはどこ?",
+    th: "ธงนี้ของประเทศใด?", id: "Bendera negara mana?", ru: "Чей это флаг?",
+    hi: "यह झंडा किस देश का?", ar: "علم أي دولة؟",
+  },
+  diffElementary: {
+    ko: "초급", en: "Easy", vi: "Dễ", zh: "初级", fil: "Madali", ja: "しょきゅう",
+    th: "ง่าย", id: "Mudah", ru: "Лёгкий", hi: "आसान", ar: "سهل",
+  },
+  diffMiddle: {
+    ko: "중급", en: "Medium", vi: "Vừa", zh: "中级", fil: "Katamtaman", ja: "ちゅうきゅう",
+    th: "ปานกลาง", id: "Sedang", ru: "Средний", hi: "मध्यम", ar: "متوسط",
+  },
+  diffHigh: {
+    ko: "고급", en: "Hard", vi: "Khó", zh: "高级", fil: "Mahirap", ja: "じょうきゅう",
+    th: "ยาก", id: "Sulit", ru: "Сложный", hi: "कठिन", ar: "صعب",
+  },
+  subEasy: {
+    ko: "쉬운 나라", en: "Easy countries", vi: "Nước dễ", zh: "简单的国家", fil: "Madaling bansa",
+    ja: "やさしいくに", th: "ประเทศง่าย", id: "Negara mudah", ru: "Простые страны", hi: "आसान देश", ar: "دول سهلة",
+  },
+  subMid: {
+    ko: "조금 어려움", en: "A bit harder", vi: "Hơi khó", zh: "稍难", fil: "Medyo mahirap",
+    ja: "すこしむずかしい", th: "ยากขึ้น", id: "Agak sulit", ru: "Посложнее", hi: "थोड़ा कठिन", ar: "أصعب قليلًا",
+  },
+  subHard: {
+    ko: "도전!", en: "Challenge!", vi: "Thử thách!", zh: "挑战!", fil: "Hamon!",
+    ja: "ちょうせん!", th: "ท้าทาย!", id: "Tantangan!", ru: "Вызов!", hi: "चुनौती!", ar: "تحدٍّ!",
+  },
+};
 
 // Real flag image via flagcdn (open, CC-licensed). Provide 2x for sharp displays.
 function flagUrl(code: string, size: "w320" | "w640" = "w640"): string {
@@ -11,16 +75,16 @@ function flagUrl(code: string, size: "w320" | "w640" = "w640"): string {
 
 interface DifficultyMeta {
   key: CountryDifficulty;
-  label: string;
-  sub: string;
+  labelMap: LangMap;
+  subMap: LangMap;
   color: string;
   emoji: string;
 }
 
 const DIFFICULTIES: DifficultyMeta[] = [
-  { key: "elementary", label: "초급", sub: "쉬운 나라", color: "#10B981", emoji: "🌱" },
-  { key: "middle",     label: "중급", sub: "조금 어려움", color: "#F59E0B", emoji: "🌻" },
-  { key: "high",       label: "고급", sub: "도전!",     color: "#EF4444", emoji: "🔥" },
+  { key: "elementary", labelMap: CG.diffElementary, subMap: CG.subEasy, color: "#10B981", emoji: "🌱" },
+  { key: "middle",     labelMap: CG.diffMiddle,     subMap: CG.subMid,  color: "#F59E0B", emoji: "🌻" },
+  { key: "high",       labelMap: CG.diffHigh,       subMap: CG.subHard, color: "#EF4444", emoji: "🔥" },
 ];
 
 export default function CountryGuess({ langA, langB }: { langA: string; langB: string }) {
@@ -91,10 +155,10 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <BeeMascot size={96} mood="cheer" />
           <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginTop: 10 }}>
-            난이도를 골라주세요
+            {gt(CG.pickDiff, langA)}
           </div>
           <div style={{ fontSize: 13, color: "#6B7280", marginTop: 6 }}>
-            총 {COUNTRIES.length}개 나라 중에서 8문제가 나와요
+            {COUNTRIES.length} {gt(CG.ofPick, langA)}
           </div>
         </div>
 
@@ -132,10 +196,10 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
               </div>
               <div style={{ flex: 1, textAlign: "left" }}>
                 <div style={{ fontSize: 20, fontWeight: 900, color: d.color }}>
-                  {d.label}
+                  {gt(d.labelMap, langA)}
                 </div>
                 <div style={{ fontSize: 13, color: "#6B7280", fontWeight: 700, marginTop: 2 }}>
-                  {d.sub} · {counts[d.key]}개 나라
+                  {gt(d.subMap, langA)} · {counts[d.key]} {gt(CG.countriesUnit, langA)}
                 </div>
               </div>
               <div style={{ fontSize: 22, color: d.color, fontWeight: 900 }}>›</div>
@@ -154,10 +218,10 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
       <div style={{ textAlign: "center", padding: 40 }}>
         <BeeMascot size={120} mood="cheer" />
         <div style={{ fontSize: 28, fontWeight: 900, color: "#111827", margin: "18px 0 6px" }}>
-          🎉 점수 {score} / {rounds.length}
+          🎉 {gt(UI.score, langA)} {score} / {rounds.length}
         </div>
         <div style={{ color: "#6B7280", fontSize: 13, marginBottom: 20 }}>
-          수고했어요!
+          {gt(CG.goodJob, langA)}
         </div>
         <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
           <button
@@ -170,7 +234,7 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
               boxShadow: "0 4px 12px rgba(245,158,11,0.35)",
             }}
           >
-            🔁 다시 하기
+            🔁 {gt(UI.playAgain, langA)}
           </button>
           <button
             onClick={resetToDifficultyPick}
@@ -181,7 +245,7 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
               cursor: "pointer",
             }}
           >
-            🎚️ 난이도 바꾸기
+            🎚️ {gt(CG.changeDiff, langA)}
           </button>
         </div>
       </div>
@@ -192,7 +256,7 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
     // Safety guard (pool unexpectedly empty).
     return (
       <div style={{ textAlign: "center", padding: 40, color: "#6B7280" }}>
-        데이터가 부족합니다.
+        {gt(CG.noData, langA)}
       </div>
     );
   }
@@ -219,7 +283,7 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
           }}
         />
         <div style={{ fontSize: 13, color: "#6B7280", marginTop: 12, fontWeight: 700 }}>
-          이 국기의 나라는?
+          {gt(CG.whichCountry, langA)}
         </div>
       </div>
 
