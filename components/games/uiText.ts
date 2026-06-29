@@ -66,4 +66,21 @@ export const UI: Record<string, LangMap> = {
     ko: "끝!", en: "Finish!", vi: "Kết thúc!", zh: "结束!", fil: "Tapos!",
     ja: "おわり!", th: "จบ!", id: "Selesai!", ru: "Конец!", hi: "खत्म!", ar: "انتهى!",
   },
+  submit: {
+    ko: "제출", en: "Submit", vi: "Gửi", zh: "提交", fil: "Isumite",
+    ja: "ていしゅつ", th: "ส่ง", id: "Kirim", ru: "Отправить", hi: "जमा करो", ar: "إرسال",
+  },
+  allDone: {
+    ko: "모두 끝났어요!", en: "All done!", vi: "Xong hết rồi!", zh: "全部完成!",
+    fil: "Tapos na lahat!", ja: "ぜんぶおわり!", th: "เสร็จหมดแล้ว!", id: "Semua selesai!",
+    ru: "Всё готово!", hi: "सब हो गया!", ar: "تم كل شيء!",
+  },
+  players: {
+    ko: "인원", en: "Players", vi: "Số người", zh: "人数", fil: "Manlalaro",
+    ja: "にんずう", th: "ผู้เล่น", id: "Pemain", ru: "Игроки", hi: "खिलाड़ी", ar: "اللاعبون",
+  },
+  difficulty: {
+    ko: "난이도", en: "Difficulty", vi: "Độ khó", zh: "难度", fil: "Antas",
+    ja: "なんいど", th: "ระดับ", id: "Tingkat", ru: "Уровень", hi: "कठिनाई", ar: "المستوى",
+  },
 };

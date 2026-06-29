@@ -3,6 +3,51 @@
 import { useMemo, useState, useRef, useEffect, KeyboardEvent } from "react";
 import { VOCAB, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
+import { gt, UI, type LangMap } from "./uiText";
+
+const DG: Record<string, LangMap> = {
+  whatDrawing: {
+    ko: "🐝 꿀벌이 그린 그림은 무엇일까요?", en: "🐝 What did the bee draw?",
+    vi: "🐝 Ong vẽ gì vậy?", zh: "🐝 蜜蜂画的是什么?", fil: "🐝 Ano ang iginuhit ng bubuyog?",
+    ja: "🐝 みつばちがかいたのはなに?", th: "🐝 ผึ้งวาดอะไร?", id: "🐝 Lebah menggambar apa?",
+    ru: "🐝 Что нарисовала пчёлка?", hi: "🐝 मधुमक्खी ने क्या बनाया?", ar: "🐝 ماذا رسمت النحلة؟",
+  },
+  enterAnswer: {
+    ko: "답을 입력하세요", en: "Type your answer", vi: "Nhập câu trả lời", zh: "输入答案",
+    fil: "I-type ang sagot", ja: "こたえをいれてね", th: "พิมพ์คำตอบ", id: "Ketik jawaban",
+    ru: "Введите ответ", hi: "उत्तर लिखो", ar: "اكتب الإجابة",
+  },
+  answerPlaceholder: {
+    ko: "여기에 답을 써주세요", en: "Write your answer here", vi: "Viết câu trả lời ở đây",
+    zh: "在这里写答案", fil: "Isulat ang sagot dito", ja: "ここにこたえをかいてね",
+    th: "เขียนคำตอบที่นี่", id: "Tulis jawaban di sini", ru: "Напишите ответ здесь",
+    hi: "यहाँ उत्तर लिखो", ar: "اكتب إجابتك هنا",
+  },
+  tryAgainHint: {
+    ko: "다시 한 번! 힌트:", en: "Try again! Hint:", vi: "Thử lại! Gợi ý:", zh: "再试一次!提示:",
+    fil: "Subukan ulit! Pahiwatig:", ja: "もういちど!ヒント:", th: "ลองอีกครั้ง! ใบ้:",
+    id: "Coba lagi! Petunjuk:", ru: "Ещё раз! Подсказка:", hi: "फिर कोशिश! संकेत:", ar: "حاول ثانية! تلميح:",
+  },
+  otherLangHint: {
+    ko: "다른 언어 힌트:", en: "Other language hint:", vi: "Gợi ý ngôn ngữ khác:",
+    zh: "其他语言提示:", fil: "Pahiwatig sa ibang wika:", ja: "べつのことばのヒント:",
+    th: "ใบ้ภาษาอื่น:", id: "Petunjuk bahasa lain:", ru: "Подсказка на другом языке:",
+    hi: "दूसरी भाषा संकेत:", ar: "تلميح بلغة أخرى:",
+  },
+  showAnswer: {
+    ko: "정답 보기", en: "Show answer", vi: "Xem đáp án", zh: "看答案", fil: "Ipakita ang sagot",
+    ja: "こたえをみる", th: "ดูคำตอบ", id: "Lihat jawaban", ru: "Показать ответ", hi: "उत्तर देखो", ar: "أظهر الإجابة",
+  },
+  theAnswerIs: {
+    ko: "정답은", en: "The answer is", vi: "Đáp án là", zh: "答案是", fil: "Ang sagot ay",
+    ja: "こたえは", th: "คำตอบคือ", id: "Jawabannya", ru: "Ответ:", hi: "उत्तर है", ar: "الإجابة هي",
+  },
+  toGuess: {
+    ko: "맞혀야 할 그림", en: "Picture to guess", vi: "Hình cần đoán", zh: "要猜的图",
+    fil: "Larawang huhulaan", ja: "あてるえ", th: "ภาพที่ต้องทาย", id: "Gambar tebakan",
+    ru: "Картинка для угадывания", hi: "अनुमान चित्र", ar: "صورة للتخمين",
+  },
+};
 
 const DRAW_KEYS = new Set([
   "apple","banana","dog","cat","book","water","school","friend",
@@ -40,9 +85,9 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
     return (
       <div style={{ textAlign: "center", padding: 40 }}>
         <BeeMascot size={120} mood="cheer" />
-        <div style={{ fontSize: 24, fontWeight: 900, marginTop: 14 }}>🎉 모두 끝났어요!</div>
+        <div style={{ fontSize: 24, fontWeight: 900, marginTop: 14 }}>🎉 {gt(UI.allDone, langA)}</div>
         <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, color: "#6B7280" }}>
-          점수: {score} / {rounds.length}
+          {gt(UI.score, langA)}: {score} / {rounds.length}
         </div>
       </div>
     );
@@ -99,8 +144,8 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
         display: "flex", justifyContent: "space-between", alignItems: "center",
         fontSize: 12, color: "#6B7280", fontWeight: 700, marginBottom: 10,
       }}>
-        <span>🐝 꿀벌이 그린 그림은 무엇일까요?</span>
-        <span>점수 {score} · {round + 1} / {rounds.length}</span>
+        <span>{gt(DG.whatDrawing, langA)}</span>
+        <span>{gt(UI.score, langA)} {score} · {round + 1} / {rounds.length}</span>
       </div>
 
       <div style={{
@@ -109,7 +154,7 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
         boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
       }}>
         <img
-          src={imgSrc} alt="맞혀야 할 그림"
+          src={imgSrc} alt={gt(DG.toGuess, langA)}
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
         />
       </div>
@@ -121,7 +166,7 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
           </div>
 
           <label htmlFor="draw-guess-input" style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
-            ✏️ 답을 입력하세요
+            ✏️ {gt(DG.enterAnswer, langA)}
           </label>
           <input
             id="draw-guess-input"
@@ -130,8 +175,8 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
             value={input}
             onChange={(e) => { setInput(e.target.value); if (feedback === "wrong") setFeedback("idle"); }}
             onKeyDown={handleKey}
-            aria-label="답을 입력하세요"
-            placeholder="여기에 답을 써주세요"
+            aria-label={gt(DG.enterAnswer, langA)}
+            placeholder={gt(DG.answerPlaceholder, langA)}
             autoComplete="off"
             style={{
               width: "100%", padding: "12px 14px", borderRadius: 12,
@@ -147,10 +192,10 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
               borderRadius: 10, color: "#B91C1C", fontSize: 13, fontWeight: 700,
               textAlign: "center",
             }} role="status" aria-live="polite">
-              다시 한 번! 힌트: <span style={{ fontFamily: "monospace", letterSpacing: 2 }}>{firstHint(answerA)}</span>
+              {gt(DG.tryAgainHint, langA)} <span style={{ fontFamily: "monospace", letterSpacing: 2 }}>{firstHint(answerA)}</span>
               {wrongCount >= 2 && (
                 <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600 }}>
-                  다른 언어 힌트: <span style={{ fontFamily: "monospace", letterSpacing: 2 }}>{firstHint(answerB)}</span>
+                  {gt(DG.otherLangHint, langA)} <span style={{ fontFamily: "monospace", letterSpacing: 2 }}>{firstHint(answerB)}</span>
                 </div>
               )}
             </div>
@@ -160,24 +205,24 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
             <button
               type="button"
               onClick={handleSubmit}
-              aria-label="답 제출하기"
+              aria-label={gt(UI.submit, langA)}
               style={{
                 flex: 1,
                 background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
                 color: "#fff", border: "none", padding: 14, borderRadius: 14,
                 fontSize: 15, fontWeight: 800, cursor: "pointer",
               }}
-            >✅ 제출</button>
+            >✅ {gt(UI.submit, langA)}</button>
             <button
               type="button"
               onClick={giveUp}
-              aria-label="정답 보기"
+              aria-label={gt(DG.showAnswer, langA)}
               style={{
                 background: "#F3F4F6", color: "#6B7280", border: "none",
                 padding: "14px 16px", borderRadius: 14,
                 fontSize: 13, fontWeight: 800, cursor: "pointer",
               }}
-            >💡 정답 보기</button>
+            >💡 {gt(DG.showAnswer, langA)}</button>
           </div>
         </div>
       ) : (
@@ -186,7 +231,7 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
             <BeeMascot size={80} mood={feedback === "correct" ? "cheer" : "think"} />
           </div>
           <div style={{ fontSize: 14, fontWeight: 800, color: feedback === "correct" ? "#065F46" : "#92400E", marginBottom: 6 }}>
-            {feedback === "correct" ? "🎉 정답!" : "정답은"}
+            {feedback === "correct" ? `🎉 ${gt(UI.correct, langA)}` : gt(DG.theAnswerIs, langA)}
           </div>
           <div style={{ fontSize: 32 }}>{cur.emoji}</div>
           <div style={{ fontSize: 17, fontWeight: 900, marginTop: 6 }}>{answerA}</div>
@@ -194,13 +239,13 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
           <button
             type="button"
             onClick={goNext}
-            aria-label="다음 라운드로"
+            aria-label={gt(UI.next, langA)}
             style={{
               marginTop: 14, background: "#F59E0B", color: "#fff", border: "none",
               padding: "10px 24px", borderRadius: 99, cursor: "pointer",
               fontSize: 14, fontWeight: 800,
             }}
-          >➡ 다음</button>
+          >➡ {gt(UI.next, langA)}</button>
         </div>
       )}
     </div>
