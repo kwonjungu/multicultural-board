@@ -29,6 +29,7 @@ import { t, tFmt } from "@/lib/i18n";
 import VocabCard from "./VocabCard";
 import VocabNotebook from "./VocabNotebook";
 import VocabTest from "./VocabTest";
+import VocabWriteSheet from "./VocabWriteSheet";
 import TeacherVocabDashboard from "./TeacherVocabDashboard";
 
 const PURPLE = "#8B5CF6";
@@ -88,6 +89,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   const goalAdjustedRef = useRef(false);
   const [expressions, setExpressions] = useState<ExpressionEntry[]>([]);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [showWriteSheet, setShowWriteSheet] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeLearner(roomCode, user.myName, setLearner);
@@ -243,6 +245,30 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
     if (activeSub === "all") return VOCAB_WORDS;
     return VOCAB_WORDS.filter((w) => w.subcategory === activeSub);
   }, [activeSub]);
+
+  // 쓰기 학습지 단어 목록 — 소통판 단어(matched) + 학습한 단어(progress) 합집합.
+  // id 중복 제거 + undefined 필터 + 최대 12개. 없으면 레벨1 단어 8개로 폴백.
+  const worksheetWords = useMemo<VocabWord[]>(() => {
+    const ids: string[] = [
+      ...matched.map((m) => m.wordId),
+      ...Object.entries(progress)
+        .filter(([, p]) => (p.doneSentences?.length ?? 0) > 0 || (p.listenCount ?? 0) > 0)
+        .map(([id]) => id),
+    ];
+    const seen = new Set<string>();
+    const words: VocabWord[] = [];
+    for (const id of ids) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const w = wordById(id);
+      if (w) words.push(w);
+      if (words.length >= 12) break;
+    }
+    if (words.length === 0) {
+      return VOCAB_WORDS.filter((w) => w.level === 1).slice(0, 8);
+    }
+    return words;
+  }, [matched, progress]);
 
   const masteredTotal = masteredCount(progress);
   const isTeacher = user.isTeacher ?? false;
@@ -443,6 +469,39 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
               fontSize: 15, fontWeight: 900, padding: "10px 16px", borderRadius: 12,
               flexShrink: 0,
             }}>도전 →</div>
+          </button>
+
+          {/* 📄 단어 쓰기 학습지 — 손글씨 연습용 인쇄 시트 (보조 버튼) */}
+          <button
+            onClick={() => setShowWriteSheet(true)}
+            style={{
+              maxWidth: 760, width: "100%", margin: "0 auto 14px",
+              display: "flex", alignItems: "center", gap: 12, textAlign: "left",
+              background: "#fff",
+              border: "2px solid " + PURPLE + "44",
+              borderRadius: 16, padding: "12px 16px",
+              cursor: "pointer", fontFamily: "inherit",
+              boxShadow: "0 4px 12px rgba(139, 92, 246, 0.12)",
+              transition: "transform 0.15s",
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            <div style={{ fontSize: 30, flexShrink: 0 }}>📄</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2 }}>
+                쓰기 학습지 만들기
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2 }}>
+                🖨 핵심 단어를 손으로 따라 쓰는 인쇄용 연습지
+              </div>
+            </div>
+            <div style={{
+              background: PURPLE_LIGHT, color: PURPLE_DARK,
+              fontSize: 13, fontWeight: 900, padding: "8px 14px", borderRadius: 12,
+              flexShrink: 0,
+            }}>만들기 →</div>
           </button>
           </>
         );
@@ -910,6 +969,15 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           studentName={user.myName}
           studentLang={user.myLang}
           onClose={() => setReviewOpen(false)}
+        />
+      )}
+
+      {/* 단어 쓰기 학습지 모달 */}
+      {showWriteSheet && (
+        <VocabWriteSheet
+          words={worksheetWords}
+          onClose={() => setShowWriteSheet(false)}
+          studentName={user.myName}
         />
       )}
 
