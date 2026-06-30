@@ -65,8 +65,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   // Management modal state
   const [showManage, setShowManage] = useState(false);
   const [editTitle, setEditTitle] = useState<Record<string, string>>({});
-  const [newColTitle, setNewColTitle] = useState("");
-  const [newColColor, setNewColColor] = useState(COL_COLORS[0]);
+  const [deleteMode, setDeleteMode] = useState(false); // 칸 삭제 모드 (교사) — 켜야만 컬럼 삭제 가능
 
   // Room config state (live-updated)
   const [roomConfigState, setRoomConfigState] = useState<RoomConfig>(roomConfig);
@@ -262,6 +261,20 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     });
   }
 
+  // 삭제 모드에서 컬럼의 ✕ 클릭 — 안전장치: 카드가 있으면 개수까지 알리고 확인받는다.
+  // 삭제 후엔 deleteCol 의 되돌리기(undo) 토스트가 한 번 더 안전망이 된다.
+  function confirmDeleteCol(colId: string) {
+    const col = columns.find((c) => c.id === colId);
+    if (!col) return;
+    const cardCount = cards.filter((c) => c.colId === colId).length;
+    const title = col.title.replace(/^[^A-Za-z가-힣]+/, "").trim() || col.title;
+    const msg = cardCount > 0
+      ? `"${title}" 칸을 삭제할까요?\n안에 있는 카드 ${cardCount}개도 함께 사라집니다.`
+      : `"${title}" 칸을 삭제할까요?`;
+    if (!window.confirm(msg)) return;
+    deleteCol(colId);
+  }
+
   function moveCol(colId: string, direction: "up" | "down") {
     const idx = columns.findIndex((c) => c.id === colId);
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
@@ -287,13 +300,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         set(ref(db, `rooms/${roomCode}/cards/${cardId}`), fullCard);
       }
     );
-  }
-
-  function addColumn() {
-    if (!newColTitle.trim()) return;
-    createColumn(newColTitle.trim(), newColColor);
-    setNewColTitle("");
-    setNewColColor(COL_COLORS[0]);
   }
 
   // 패들렛식 즉시 추가 — 이름 입력 없이 + 만 누르면 칸이 바로 생긴다(교사가 제목을 인라인 편집).
@@ -650,6 +656,26 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 📊 PPTX 번역
               </button>
 
+              {/* 칸 삭제 모드 토글 — 켜야만 컬럼을 지울 수 있다(실수 방지) */}
+              <button
+                onClick={() => setDeleteMode((v) => !v)}
+                aria-pressed={deleteMode}
+                title="칸 삭제 모드"
+                style={{
+                  background: deleteMode ? "#DC2626" : "#FEF2F2",
+                  border: `2px solid ${deleteMode ? "#B91C1C" : "#FECACA"}`,
+                  color: deleteMode ? "#fff" : "#B91C1C",
+                  borderRadius: 16, padding: "10px 16px",
+                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
+                  transition: "transform 0.12s",
+                }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                {deleteMode ? "✓ 삭제 끝내기" : "🗑 칸 삭제"}
+              </button>
+
               {/* Manage button */}
               <button
                 onClick={() => {
@@ -735,9 +761,24 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   return null;
                 })()}
                 <span style={{ flex: 1, fontWeight: 900, fontSize: 18, color: "#fff", letterSpacing: -0.3, lineHeight: 1.3, textShadow: "0 1px 2px rgba(0,0,0,0.12)" }}>{col.title.replace(/^[^A-Za-z가-힣]+/, "").trim()}</span>
-                <span style={{ background: "rgba(255,255,255,0.3)", color: "#fff", borderRadius: 999, fontSize: 14, fontWeight: 900, padding: "4px 12px", minWidth: 32, textAlign: "center" }}>
-                  {colCards.length}
-                </span>
+                {deleteMode && isTeacher ? (
+                  <button
+                    onClick={() => confirmDeleteCol(col.id)}
+                    aria-label={`${col.title} 칸 삭제`}
+                    title="이 칸 삭제"
+                    style={{
+                      width: 34, height: 34, borderRadius: 999, flexShrink: 0,
+                      background: "#fff", color: "#DC2626", border: "none",
+                      fontSize: 17, fontWeight: 900, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+                    }}
+                  >✕</button>
+                ) : (
+                  <span style={{ background: "rgba(255,255,255,0.3)", color: "#fff", borderRadius: 999, fontSize: 14, fontWeight: 900, padding: "4px 12px", minWidth: 32, textAlign: "center" }}>
+                    {colCards.length}
+                  </span>
+                )}
               </div>
 
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px 6px", background: "#FFFEF7", scrollbarWidth: "thin", scrollbarColor: "#FDE68A transparent" }}>
@@ -1153,62 +1194,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 </div>
               </div>
 
-              {/* Add column */}
-              <div style={{ borderTop: "1px dashed #E5E7EB", paddingTop: 18 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 10 }}>
-                  새 컬럼 추가
-                </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                  <input
-                    value={newColTitle}
-                    onChange={(e) => setNewColTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addColumn()}
-                    placeholder="컬럼 이름 입력..."
-                    style={{
-                      flex: 1, padding: "10px 14px", borderRadius: 11,
-                      border: "1.5px solid #E5E7EB", fontSize: 14, color: "#111827",
-                      background: "#F9FAFB", outline: "none",
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#F59E0B";
-                      e.target.style.background = "#fff";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#E5E7EB";
-                      e.target.style.background = "#F9FAFB";
-                    }}
-                  />
-                  <button
-                    onClick={addColumn}
-                    disabled={!newColTitle.trim()}
-                    style={{
-                      padding: "10px 18px", borderRadius: 11, border: "none",
-                      background: newColTitle.trim() ? BRAND_GRADIENT : "#F3F4F6",
-                      color: newColTitle.trim() ? "#fff" : "#D1D5DB",
-                      fontWeight: 800, fontSize: 13, cursor: newColTitle.trim() ? "pointer" : "not-allowed",
-                      boxShadow: newColTitle.trim() ? "0 4px 14px rgba(245,158,11,0.35)" : "none",
-                      whiteSpace: "nowrap",
-                    }}
-                  >+ 추가</button>
-                </div>
-
-                {/* New col color picker */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {COL_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setNewColColor(color)}
-                      style={{
-                        width: 26, height: 26, borderRadius: "50%", background: color, border: "none",
-                        cursor: "pointer", transition: "transform 0.12s",
-                        outline: newColColor === color ? `3px solid ${color}` : "none",
-                        outlineOffset: 2,
-                        transform: newColColor === color ? "scale(1.2)" : "scale(1)",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
+              {/* 새 칸 추가는 소통판의 패들렛식 ＋ 버튼에서. 관리 패널에서는 제거됨. */}
             </div>
           </div>
         </div>
