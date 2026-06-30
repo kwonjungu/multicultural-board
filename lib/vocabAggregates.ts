@@ -150,6 +150,7 @@ const EMPTY_FMT: Record<QuizFormat, { correct: number; total: number }> = {
   "mc4-image": { correct: 0, total: 0 },
   matching: { correct: 0, total: 0 },
   listening: { correct: 0, total: 0 },
+  speak: { correct: 0, total: 0 },
 };
 
 export function rollupStudent(s: ClassStudent): StudentRollup {
@@ -198,7 +199,7 @@ export function rollupWord(word: VocabWord, students: ClassStudent[]): WordRollu
   let correct = 0;
   const fmt: Record<QuizFormat, { c: number; t: number }> = {
     cloze: { c: 0, t: 0 }, mc4: { c: 0, t: 0 }, "mc4-image": { c: 0, t: 0 },
-    matching: { c: 0, t: 0 }, listening: { c: 0, t: 0 },
+    matching: { c: 0, t: 0 }, listening: { c: 0, t: 0 }, speak: { c: 0, t: 0 },
   };
   for (const s of students) {
     const p = s.progress[word.id];
@@ -249,6 +250,7 @@ export function rollupFormats(students: ClassStudent[]): FormatRollup[] {
     "mc4-image": { total: 0, correct: 0, durSum: 0, durN: 0 },
     matching: { total: 0, correct: 0, durSum: 0, durN: 0 },
     listening: { total: 0, correct: 0, durSum: 0, durN: 0 },
+    speak: { total: 0, correct: 0, durSum: 0, durN: 0 },
   };
   for (const s of students) {
     for (const a of s.attempts) {

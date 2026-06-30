@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect } from "react";
 import { isAnswerCorrect } from "@/lib/vocabTest";
 import { checkSpeechMatch } from "@/lib/vocabUtils";
-import type { QuizItem, ClozeItem, Mc4Item, Mc4ImageItem, MatchingItem, ListeningItem } from "@/lib/quizFormats";
+import type { QuizItem, ClozeItem, Mc4Item, Mc4ImageItem, MatchingItem, ListeningItem, SpeakItem } from "@/lib/quizFormats";
 import { FORMAT_ICON } from "@/lib/quizFormats";
 import { logAttempt } from "@/lib/vocabAttempts";
 import {
   XP_PER_CORRECT, comboBonus, loseHeart, awardXp, recordLessonResult,
   subscribeLearner, effectiveHearts, MAX_HEARTS, type LearnerState,
 } from "@/lib/lms";
+import VocabRecorder from "./VocabRecorder";
 import SessionResultScreen from "./SessionResultScreen";
 
 const PURPLE = "#8B5CF6";
@@ -335,6 +336,14 @@ export default function VocabTest({
     setMatchRightOrder(idx);
   }, [qIdx, currentQ?.format]);
 
+  // 말하기(발음) 문항 완료 — VocabRecorder 가 통과/관용통과를 자체 판정하고 onComplete 호출.
+  // 참여 정답으로 기록하고 다음 문제로 진행(피드백 패널 없이). qIdx 변경이 문항 상태를 리셋.
+  function completeSpeak() {
+    if (!currentQ || currentQ.format !== "speak") return;
+    recordAttempt(true, { inputMode: "voice" });
+    setQIdx((i) => i + 1);
+  }
+
   function proceedAfterFeedback() {
     if (!currentQ) return;
     const advance = lastCorrect || attempts >= 3 || currentQ.format === "matching";
@@ -482,7 +491,56 @@ export default function VocabTest({
           onProceed={proceedAfterFeedback}
         />
       )}
+
+      {currentQ.format === "speak" && (
+        <SpeakBody
+          key={currentQ.id}
+          q={currentQ}
+          roomCode={roomCode}
+          clientId={clientId}
+          onComplete={completeSpeak}
+        />
+      )}
     </Shell>
+  );
+}
+
+// ════════════════════════════════════════
+//                  SPEAK (말하기)
+// ════════════════════════════════════════
+
+function SpeakBody({
+  q, roomCode, clientId, onComplete,
+}: {
+  q: SpeakItem;
+  roomCode: string;
+  clientId: string;
+  onComplete: () => void;
+}) {
+  return (
+    <>
+      <SentenceImage wordId={q.wordId} sentenceIdx={q.sentenceIdx} />
+      <WordIconHeader wordId={q.wordId} subcategory={q.word.subcategory} />
+      <div style={{
+        background: `linear-gradient(135deg, #fff, ${PURPLE_LIGHT})`,
+        border: `3px solid ${PURPLE_DARK}`,
+        borderRadius: 18, padding: "16px 14px",
+        textAlign: "center", fontSize: 20, fontWeight: 900, color: "#1F2937",
+        lineHeight: 1.6, marginBottom: 14,
+      }}>
+        🎤 {q.sentenceText}
+      </div>
+      <VocabRecorder
+        sentenceText={q.sentenceText}
+        wordForms={q.wordForms}
+        roomCode={roomCode}
+        clientId={clientId}
+        wordId={q.wordId}
+        sentenceIdx={q.sentenceIdx}
+        onOriginalPlay={() => speakKorean(q.sentenceText)}
+        onComplete={onComplete}
+      />
+    </>
   );
 }
 

@@ -4,7 +4,7 @@ import { buildQuiz, punchHole, type QuizQuestion as ClozeRaw } from "./vocabTest
 import { wordsForLesson } from "./lessons";
 import { pickDistractors as pickDistractorsPure } from "./distractorMeta";
 
-export type QuizFormat = "cloze" | "mc4" | "mc4-image" | "matching" | "listening";
+export type QuizFormat = "cloze" | "mc4" | "mc4-image" | "matching" | "listening" | "speak";
 
 export interface QuizChoice {
   wordId: string;
@@ -61,7 +61,14 @@ export interface ListeningItem extends BaseItem {
   correctIdx: 0 | 1 | 2 | 3;
 }
 
-export type QuizItem = ClozeItem | Mc4Item | Mc4ImageItem | MatchingItem | ListeningItem;
+export interface SpeakItem extends BaseItem {
+  format: "speak";
+  sentenceIdx: 0 | 1 | 2;
+  sentenceText: string;   // 따라 말할 한국어 예문
+  wordForms: string[];    // 활용형 포함 — 발음 채점용
+}
+
+export type QuizItem = ClozeItem | Mc4Item | Mc4ImageItem | MatchingItem | ListeningItem | SpeakItem;
 
 // ── 공통 헬퍼 ──
 
@@ -234,6 +241,20 @@ export function buildMixedQuiz(
   return out;
 }
 
+function buildSpeakItem(word: VocabWord, sentenceIdx: 0 | 1 | 2): SpeakItem | null {
+  const sentence = word.sentences[sentenceIdx];
+  if (!sentence?.ko?.trim()) return null;
+  return {
+    id: genId("speak", word.id),
+    format: "speak",
+    wordId: word.id,
+    word,
+    sentenceIdx,
+    sentenceText: sentence.ko,
+    wordForms: [word.ko, ...word.conjugations].filter((f) => f.length >= 2),
+  };
+}
+
 function makeItem(fmt: QuizFormat, word: VocabWord, sentenceIdx: 0 | 1 | 2): QuizItem | null {
   switch (fmt) {
     case "cloze": return buildClozeItem(word, sentenceIdx);
@@ -241,6 +262,7 @@ function makeItem(fmt: QuizFormat, word: VocabWord, sentenceIdx: 0 | 1 | 2): Qui
     case "mc4-image": return buildMc4ImageItem(word, sentenceIdx);
     case "matching": return buildMatchingItem(word);
     case "listening": return buildListeningItem(word, sentenceIdx);
+    case "speak": return buildSpeakItem(word, sentenceIdx);
   }
 }
 
@@ -259,6 +281,12 @@ export function buildLessonQuiz(lessonId: string, formatCycle: QuizFormat[] = DE
       }
     }
   });
+  // 레슨 끝에 말하기(발음) 문항 1개 추가 — 첫 번째로 생성 가능한 단어 기준.
+  // (format cycle 엔 넣지 않아 일일챌린지/믹스퀴즈엔 영향 없음)
+  for (const w of words) {
+    const speak = buildSpeakItem(w, 0);
+    if (speak) { out.push(speak); break; }
+  }
   return out;
 }
 
@@ -341,6 +369,7 @@ export const FORMAT_LABEL: Record<QuizFormat, string> = {
   "mc4-image": "그림 4지선다",
   matching: "단어-상황 짝짓기",
   listening: "듣고 고르기",
+  speak: "말하기",
 };
 
 export const FORMAT_ICON: Record<QuizFormat, string> = {
@@ -349,4 +378,5 @@ export const FORMAT_ICON: Record<QuizFormat, string> = {
   "mc4-image": "🖼️",
   matching: "🔗",
   listening: "🎧",
+  speak: "🎤",
 };
