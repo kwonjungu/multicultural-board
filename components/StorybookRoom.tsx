@@ -28,7 +28,6 @@ import {
   subscribeBookAnswers,
   pushStorybookBoard,
   subscribeStorybookBoards,
-  setActiveCharacter,
   appendChatTurn,
   subscribeChat,
   raiseAlert,
@@ -2567,9 +2566,14 @@ function AfterPhase({
   myClientId: string;
   user: UserConfig;
 }) {
-  const activeChar = session.activeCharacterId
-    ? book.characters.find((c) => c.id === session.activeCharacterId) ?? null
-    : null;
+  // Per-client local pick. session.activeCharacterId is reserved for a future
+  // teacher-led "featured character" flow — students must not write it.
+  const [myCharId, setMyCharId] = useState<string | null>(null);
+  const findChar = (id: string | null | undefined) =>
+    id ? book.characters.find((c) => c.id === id) ?? null : null;
+  // 교사: 공유 featured(향후 교사 주도용). 학생: 오직 본인 로컬 선택 — 공유 필드를 무시해
+  // 한 명의 선택이 전원에게 적용되던 버그 + 구버전이 남긴 stale 공유값 재발을 차단.
+  const activeChar = isTeacher ? findChar(session.activeCharacterId) : findChar(myCharId);
 
   // Teacher view: roster of chats in progress + end button
   if (isTeacher) {
@@ -2590,12 +2594,8 @@ function AfterPhase({
       <CharacterPicker
         lang={lang}
         book={book}
-        onPick={async (id) => {
-          // Student's pick seeds their own clientId → activeCharacterId only
-          // stores the "featured" character for teacher-led flow. But in MVP
-          // each student can choose independently — we store locally via
-          // react state by using a per-student path.
-          await setActiveCharacter(roomCode, id);
+        onPick={(id) => {
+          setMyCharId(id);
         }}
       />
     );
