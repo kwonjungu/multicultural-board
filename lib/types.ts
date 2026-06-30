@@ -145,6 +145,8 @@ export interface SessionResponse {
   position?: { x: number; y: number };
   reactions?: Record<string, string>;        // clientId → emoji (한 사람당 하나)
   replies?: Record<string, SessionReply>;    // replyId → reply
+  kind?: "text" | "drawing";   // 없으면 text (하위호환)
+  imageUrl?: string;           // kind==="drawing" 일 때 그림 URL
 }
 
 export interface PresenceEntry {

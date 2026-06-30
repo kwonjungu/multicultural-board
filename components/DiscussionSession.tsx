@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ref,
   onValue,
@@ -14,6 +14,17 @@ import { getClientDb } from "@/lib/firebase-client";
 import { BRAND_GRADIENT, LANGUAGES } from "@/lib/constants";
 import { SessionMeta, SessionResponse, SessionReply, PresenceEntry } from "@/lib/types";
 import MicButton from "./MicButton";
+import DrawBoard, { type DrawBoardHandle } from "./DrawBoard";
+
+// dataURL → Blob (그림 업로드용). StorybookRoom 패턴 복사.
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [head, body] = dataUrl.split(",");
+  const mime = head.match(/:(.*?);/)?.[1] || "image/jpeg";
+  const bin = atob(body);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
 
 interface Props {
   roomCode: string;
@@ -38,6 +49,8 @@ export default function DiscussionSession({
   const [responses, setResponses] = useState<SessionResponse[]>([]);
   const [presence, setPresence] = useState<Record<string, PresenceEntry>>({});
   const [draft, setDraft] = useState("");
+  const [composerMode, setComposerMode] = useState<"text" | "draw">("text");
+  const drawRef = useRef<DrawBoardHandle>(null);
   const [submitting, setSubmitting] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState("");
@@ -114,7 +127,48 @@ export default function DiscussionSession({
   const live = !!meta?.liveReveal; // 활성 세션 중 실시간 공개 모드
 
   async function handleSubmit() {
-    if (!draft.trim() || submitting || isClosed || isTeacher) return;
+    if (submitting || isClosed || isTeacher) return;
+
+    // ── 그림 모드 ── (빈 draft 가드를 적용하지 않는다)
+    if (composerMode === "draw") {
+      const dataUrl = drawRef.current?.getDataUrl(0.8);
+      if (!dataUrl) return;
+      setError("");
+      setSubmitting(true);
+      try {
+        let imageUrl = dataUrl;
+        try {
+          const fd = new FormData();
+          fd.append("file", dataUrlToBlob(dataUrl), "drawing.jpg");
+          const ures = await fetch("/api/upload", { method: "POST", body: fd });
+          const udata = await ures.json();
+          imageUrl = udata.url || dataUrl;
+        } catch { /* 업로드 실패 시 dataUrl 그대로 사용 */ }
+
+        const db = getClientDb();
+        const newRef = push(ref(db, `${basePath}/responses`));
+        const body: Omit<SessionResponse, "id"> = {
+          authorName: myName,
+          authorLang: myLang,
+          authorClientId: myClientId,
+          text: "",
+          kind: "drawing",
+          imageUrl,
+          timestamp: Date.now(),
+        };
+        await set(newRef, body);
+        await set(ref(db, `${basePath}/presence/${myClientId}/submitted`), true);
+        setDraft("");
+        setComposerMode("text");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "제출 실패");
+      }
+      setSubmitting(false);
+      return;
+    }
+
+    // ── 글 모드 ── (기존 동작 그대로)
+    if (!draft.trim()) return;
     setError("");
     setSubmitting(true);
     try {
@@ -422,6 +476,8 @@ export default function DiscussionSession({
 
   // ═════════════════════════════ ACTIVE — student view ═════════════════════════════
   const hasSubmitted = !!myResponse;
+  // 제출 버튼 비활성: 글 모드는 빈 입력일 때, 그림 모드는 제출 중일 때만
+  const disableSubmit = submitting || (composerMode === "text" && !draft.trim());
   // 실시간 집계 — 많은 친구가 참여 중임이 학생에게도 보이게 (텍스트는 종료 전 비공개 유지)
   const liveConnected = Object.values(presence).filter(
     (p) => Date.now() - p.lastSeen < 45000,
@@ -504,43 +560,82 @@ export default function DiscussionSession({
                 <div style={{ fontSize: 10, fontWeight: 800, color: "#6B7280", marginBottom: 4 }}>
                   내 응답
                 </div>
-                {myResponse.text}
+                {myResponse.kind === "drawing" && myResponse.imageUrl ? (
+                  <img src={myResponse.imageUrl} alt="내 그림" style={{
+                    width: "100%", borderRadius: 8, background: "#fff",
+                    border: "1px solid #D1FAE5", display: "block",
+                  }} />
+                ) : (
+                  myResponse.text
+                )}
               </div>
             </div>
           ) : (
             <>
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                marginBottom: 6, gap: 8,
-              }}>
-                <label style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>
-                  내 생각 ({myName})
-                </label>
-                {/* 🎤 음성 입력 — 한국어 타이핑이 어려운 학생은 말로 입력(STT) */}
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF" }}>말로 입력</span>
-                  <MicButton
-                    lang={myLang}
-                    size={38}
-                    onText={(text) => setDraft((d) => (d.trim() ? `${d} ${text}` : text))}
-                  />
-                </span>
+              {/* ✍️ 글 ↔ 🖍️ 그림 모드 전환 탭 */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                {([["text", "✍️ 글"], ["draw", "🖍️ 그림"]] as const).map(([mode, label]) => {
+                  const active = composerMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setComposerMode(mode)}
+                      style={{
+                        padding: "6px 14px", borderRadius: 999, fontSize: 13, fontWeight: 800,
+                        cursor: "pointer",
+                        border: `2px solid ${active ? "#F59E0B" : "#E5E7EB"}`,
+                        background: active ? "rgba(245,158,11,0.14)" : "#fff",
+                        color: active ? "#B45309" : "#6B7280",
+                      }}
+                    >{label}</button>
+                  );
+                })}
               </div>
-              <textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="자유롭게 생각을 적어보세요... (🎤 로 말해도 돼요)"
-                rows={5}
-                autoFocus
-                style={{
-                  width: "100%", padding: "12px 14px", borderRadius: 12,
-                  border: "2px solid #E5E7EB", fontSize: 14, color: "#111827",
-                  background: "#F9FAFB", outline: "none", boxSizing: "border-box",
-                  resize: "vertical", fontFamily: "inherit", lineHeight: 1.5,
-                }}
-                onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; }}
-                onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
-              />
+
+              {composerMode === "text" ? (
+                <>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    marginBottom: 6, gap: 8,
+                  }}>
+                    <label style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>
+                      내 생각 ({myName})
+                    </label>
+                    {/* 🎤 음성 입력 — 한국어 타이핑이 어려운 학생은 말로 입력(STT) */}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF" }}>말로 입력</span>
+                      <MicButton
+                        lang={myLang}
+                        size={38}
+                        onText={(text) => setDraft((d) => (d.trim() ? `${d} ${text}` : text))}
+                      />
+                    </span>
+                  </div>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="자유롭게 생각을 적어보세요... (🎤 로 말해도 돼요)"
+                    rows={5}
+                    autoFocus
+                    style={{
+                      width: "100%", padding: "12px 14px", borderRadius: 12,
+                      border: "2px solid #E5E7EB", fontSize: 14, color: "#111827",
+                      background: "#F9FAFB", outline: "none", boxSizing: "border-box",
+                      resize: "vertical", fontFamily: "inherit", lineHeight: 1.5,
+                    }}
+                    onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; }}
+                    onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
+                  />
+                </>
+              ) : (
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 800, color: "#374151", display: "block", marginBottom: 6 }}>
+                    그림으로 표현하기 ({myName})
+                  </label>
+                  <DrawBoard ref={drawRef} width={460} height={300} />
+                </div>
+              )}
               {error && (
                 <div style={{
                   marginTop: 10, padding: "8px 12px", background: "#FEF2F2",
@@ -575,14 +670,14 @@ export default function DiscussionSession({
           }}>
             <button
               onClick={handleSubmit}
-              disabled={!draft.trim() || submitting}
+              disabled={disableSubmit}
               style={{
                 flex: 1, padding: "13px 0", borderRadius: 12, fontSize: 14,
-                background: !draft.trim() || submitting ? "#F3F4F6" : BRAND_GRADIENT,
-                color: !draft.trim() || submitting ? "#D1D5DB" : "#fff",
+                background: disableSubmit ? "#F3F4F6" : BRAND_GRADIENT,
+                color: disableSubmit ? "#D1D5DB" : "#fff",
                 fontWeight: 800, border: "none",
-                cursor: !draft.trim() || submitting ? "not-allowed" : "pointer",
-                boxShadow: !draft.trim() || submitting ? "none" : "0 4px 16px rgba(245,158,11,0.4)",
+                cursor: disableSubmit ? "not-allowed" : "pointer",
+                boxShadow: disableSubmit ? "none" : "0 4px 16px rgba(245,158,11,0.4)",
               }}
             >
               {submitting ? "제출 중..." : "📨 제출하기"}
@@ -713,12 +808,23 @@ function ResponseCard({
       boxShadow: "0 6px 14px rgba(0,0,0,0.12)",
       display: "flex", flexDirection: "column", gap: 6,
     }}>
-      <div style={{
-        fontSize: 13, color: "#111827", lineHeight: 1.45,
-        whiteSpace: "pre-wrap", wordBreak: "break-word",
-      }}>
-        {text}
-      </div>
+      {resp.kind === "drawing" && resp.imageUrl ? (
+        <img
+          src={resp.imageUrl}
+          alt={`${resp.authorName} 그림`}
+          style={{
+            width: "100%", borderRadius: 10, background: "#fff",
+            border: "1px solid rgba(0,0,0,0.08)", display: "block",
+          }}
+        />
+      ) : (
+        <div style={{
+          fontSize: 13, color: "#111827", lineHeight: 1.45,
+          whiteSpace: "pre-wrap", wordBreak: "break-word",
+        }}>
+          {text}
+        </div>
+      )}
       <div style={{
         fontSize: 10, fontWeight: 800, color: "#6B7280",
         borderTop: "1px dashed rgba(0,0,0,0.12)", paddingTop: 5,
