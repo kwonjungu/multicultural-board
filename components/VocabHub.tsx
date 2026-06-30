@@ -435,7 +435,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
                 ⚡ 추가 경험치 획득 가능
               </div>
               <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4, opacity: 0.95 }}>
-                🎧 듣고 찾기 · 소통판 단어 {boardCount}개 + 약점 단어 {studiedCount}개
+                🎧 듣고 찾기 · 소통판 단어 {boardCount}개 + 약점 단어(틀린 단어) {studiedCount}개
               </div>
             </div>
             <div style={{
