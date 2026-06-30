@@ -291,16 +291,26 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
   function addColumn() {
     if (!newColTitle.trim()) return;
+    createColumn(newColTitle.trim(), newColColor);
+    setNewColTitle("");
+    setNewColColor(COL_COLORS[0]);
+  }
+
+  // 패들렛식 즉시 추가 — 이름 입력 없이 + 만 누르면 칸이 바로 생긴다(교사가 제목을 인라인 편집).
+  function createColumn(title: string, color: string): void {
     const db = getClientDb();
     const newId = `col_${Date.now()}`;
     const maxOrder = columns.length > 0 ? Math.max(...columns.map((c) => c.order)) : -1;
+    const nextColor = color || COL_COLORS[columns.length % COL_COLORS.length];
     set(ref(db, `rooms/${roomCode}/columns/${newId}`), {
-      title: newColTitle.trim(),
-      color: newColColor,
+      title,
+      color: nextColor,
       order: maxOrder + 1,
     });
-    setNewColTitle("");
-    setNewColColor(COL_COLORS[0]);
+  }
+
+  function addColumnQuick() {
+    createColumn("새 칸", COL_COLORS[columns.length % COL_COLORS.length]);
   }
 
   // ── Approval actions ──
@@ -828,6 +838,26 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             </div>
           );
         })}
+
+        {/* 패들렛식 + 컬럼 추가 — 교사만. 누르면 '새 칸'이 바로 생기고 헤더에서 이름 편집. */}
+        {isTeacher && (
+          <button
+            onClick={addColumnQuick}
+            aria-label="새 칸 추가"
+            title="새 칸 추가"
+            style={{
+              width: "clamp(150px, 16vw, 200px)", flexShrink: 0,
+              height: "calc(100vh - 90px)", borderRadius: 22,
+              border: "3px dashed #FCD34D", background: "rgba(255,251,235,0.6)",
+              color: "#B45309", cursor: "pointer", fontFamily: "inherit",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              gap: 10, scrollSnapAlign: "start",
+            }}
+          >
+            <span style={{ fontSize: 44, fontWeight: 900, lineHeight: 1 }}>＋</span>
+            <span style={{ fontSize: 15, fontWeight: 900 }}>새 칸 추가</span>
+          </button>
+        )}
       </main>
 
       {/* ── Management modal ── */}
