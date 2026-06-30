@@ -32,6 +32,7 @@ export default function DiscussionCreateModal({
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [liveReveal, setLiveReveal] = useState(false); // 기본 OFF = 종료 후 공개(열매나무)
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -108,6 +109,7 @@ export default function DiscussionCreateModal({
         if (bodyTextTranslations) meta.bodyTextTranslations = bodyTextTranslations;
       }
       if (imageUrl) meta.imageUrl = imageUrl;
+      if (liveReveal) meta.liveReveal = true;
 
       await set(ref(db, `rooms/${roomCode}/sessions/${sessionId}/meta`), meta);
       await set(ref(db, `rooms/${roomCode}/activeSession`), sessionId);
@@ -250,6 +252,43 @@ export default function DiscussionCreateModal({
                 />
               </label>
             )}
+          </div>
+
+          {/* 실시간 공개 토글 (기본 OFF) */}
+          <div style={{ marginBottom: 22 }}>
+            <button
+              type="button"
+              onClick={() => setLiveReveal((v) => !v)}
+              aria-pressed={liveReveal}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 12,
+                padding: "12px 14px", borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+                border: `2px solid ${liveReveal ? "#F59E0B" : "#E5E7EB"}`,
+                background: liveReveal ? "#FFFBEB" : "#F9FAFB", textAlign: "left",
+              }}
+            >
+              <span style={{ fontSize: 20 }}>{liveReveal ? "👀" : "🌳"}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: "#111827" }}>
+                  실시간으로 친구 의견 보기
+                </span>
+                <span style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#9CA3AF", marginTop: 2 }}>
+                  {liveReveal
+                    ? "제출한 학생부터 친구들의 생각을 바로 볼 수 있어요"
+                    : "끄면 세션을 종료할 때 모두의 의견을 공개해요 (열매나무)"}
+                </span>
+              </span>
+              <span style={{
+                width: 44, height: 25, borderRadius: 999, flexShrink: 0, position: "relative",
+                background: liveReveal ? "#F59E0B" : "#D1D5DB", transition: "background 0.15s",
+              }}>
+                <span style={{
+                  position: "absolute", top: 3, left: liveReveal ? 22 : 3,
+                  width: 19, height: 19, borderRadius: "50%", background: "#fff",
+                  transition: "left 0.15s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                }} />
+              </span>
+            </button>
           </div>
 
           {error && (

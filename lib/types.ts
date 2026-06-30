@@ -121,6 +121,8 @@ export interface SessionMeta {
   teacherLang: string;
   teacherName: string;
   targetLangs: string[];
+  /** true 면 활성 세션 중에도 응답을 실시간 공개(학생은 본인 제출 후 열람). 기본/undefined = 종료 후 공개(열매나무). */
+  liveReveal?: boolean;
 }
 
 export interface SessionResponse {

@@ -110,6 +110,7 @@ export default function DiscussionSession({
   );
 
   const isClosed = meta?.status === "closed";
+  const live = !!meta?.liveReveal; // 활성 세션 중 실시간 공개 모드
 
   async function handleSubmit() {
     if (!draft.trim() || submitting || isClosed || isTeacher) return;
@@ -353,6 +354,15 @@ export default function DiscussionSession({
                   ))}
               </div>
             )}
+
+            {live && responses.length > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", marginBottom: 8 }}>
+                  실시간 의견 ({responses.length})
+                </div>
+                <ResponseGrid responses={responses} myLang={myLang} />
+              </div>
+            )}
           </div>
 
           {/* Footer actions */}
@@ -467,7 +477,9 @@ export default function DiscussionSession({
                 제출 완료!
               </div>
               <div style={{ fontSize: 12, color: "#047857", marginBottom: 14 }}>
-                선생님이 세션을 종료하면 모두의 의견을 볼 수 있어요.
+                {live
+                  ? "친구들의 생각이 아래에 실시간으로 올라와요."
+                  : "선생님이 세션을 종료하면 모두의 의견을 볼 수 있어요."}
               </div>
               <div style={{
                 background: "#fff", padding: "10px 12px", borderRadius: 8,
@@ -508,6 +520,15 @@ export default function DiscussionSession({
                 }}>{error}</div>
               )}
             </>
+          )}
+
+          {live && hasSubmitted && responses.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#6B7280", marginBottom: 8 }}>
+                친구들의 생각 (실시간)
+              </div>
+              <ResponseGrid responses={responses} myLang={myLang} />
+            </div>
           )}
         </div>
 
