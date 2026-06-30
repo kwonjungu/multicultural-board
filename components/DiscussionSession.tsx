@@ -13,6 +13,7 @@ import {
 import { getClientDb } from "@/lib/firebase-client";
 import { BRAND_GRADIENT, LANGUAGES } from "@/lib/constants";
 import { SessionMeta, SessionResponse, SessionReply, PresenceEntry } from "@/lib/types";
+import MicButton from "./MicButton";
 
 interface Props {
   roomCode: string;
@@ -508,13 +509,27 @@ export default function DiscussionSession({
             </div>
           ) : (
             <>
-              <label style={{ fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 6, display: "block" }}>
-                내 생각 ({myName})
-              </label>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 6, gap: 8,
+              }}>
+                <label style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>
+                  내 생각 ({myName})
+                </label>
+                {/* 🎤 음성 입력 — 한국어 타이핑이 어려운 학생은 말로 입력(STT) */}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF" }}>말로 입력</span>
+                  <MicButton
+                    lang={myLang}
+                    size={38}
+                    onText={(text) => setDraft((d) => (d.trim() ? `${d} ${text}` : text))}
+                  />
+                </span>
+              </div>
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="자유롭게 생각을 적어보세요..."
+                placeholder="자유롭게 생각을 적어보세요... (🎤 로 말해도 돼요)"
                 rows={5}
                 autoFocus
                 style={{
