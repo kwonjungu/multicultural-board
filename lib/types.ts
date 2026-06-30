@@ -125,6 +125,15 @@ export interface SessionMeta {
   liveReveal?: boolean;
 }
 
+export interface SessionReply {
+  authorName: string;
+  authorLang: string;
+  authorClientId: string;
+  text: string;
+  translations?: Record<string, string>;
+  timestamp: number;
+}
+
 export interface SessionResponse {
   id: string;
   authorName: string;
@@ -134,6 +143,8 @@ export interface SessionResponse {
   translations?: Record<string, string>;
   timestamp: number;
   position?: { x: number; y: number };
+  reactions?: Record<string, string>;        // clientId → emoji (한 사람당 하나)
+  replies?: Record<string, SessionReply>;    // replyId → reply
 }
 
 export interface PresenceEntry {

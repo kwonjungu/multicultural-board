@@ -12,7 +12,7 @@ import {
 } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { BRAND_GRADIENT, LANGUAGES } from "@/lib/constants";
-import { SessionMeta, SessionResponse, PresenceEntry } from "@/lib/types";
+import { SessionMeta, SessionResponse, SessionReply, PresenceEntry } from "@/lib/types";
 
 interface Props {
   roomCode: string;
@@ -233,7 +233,14 @@ export default function DiscussionSession({
               myLang={myLang}
             />
           ) : (
-            <ResponseGrid responses={responses} myLang={myLang} />
+            <ResponseGrid
+              responses={responses}
+              myLang={myLang}
+              basePath={basePath}
+              myClientId={myClientId}
+              myName={myName}
+              targetLangs={meta?.targetLangs || []}
+            />
           )}
         </div>
       </div>
@@ -360,7 +367,14 @@ export default function DiscussionSession({
                 <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", marginBottom: 8 }}>
                   실시간 의견 ({responses.length})
                 </div>
-                <ResponseGrid responses={responses} myLang={myLang} />
+                <ResponseGrid
+                  responses={responses}
+                  myLang={myLang}
+                  basePath={basePath}
+                  myClientId={myClientId}
+                  myName={myName}
+                  targetLangs={meta?.targetLangs || []}
+                />
               </div>
             )}
           </div>
@@ -527,7 +541,14 @@ export default function DiscussionSession({
               <div style={{ fontSize: 11, fontWeight: 800, color: "#6B7280", marginBottom: 8 }}>
                 친구들의 생각 (실시간)
               </div>
-              <ResponseGrid responses={responses} myLang={myLang} />
+              <ResponseGrid
+                responses={responses}
+                myLang={myLang}
+                basePath={basePath}
+                myClientId={myClientId}
+                myName={myName}
+                targetLangs={meta?.targetLangs || []}
+              />
             </div>
           )}
         </div>
@@ -581,9 +602,95 @@ const CARD_COLORS = [
   "#FEE2E2", "#FFEDD5", "#E0F2FE", "#F3E8FF", "#FEF9C3",
 ];
 
-function ResponseCard({ resp, idx, myLang }: { resp: SessionResponse; idx: number; myLang: string }) {
+const REACTIONS = ["👍", "❤️", "😮", "👏"];
+
+function ResponseCard({
+  resp, idx, myLang, basePath, myClientId, myName, targetLangs,
+}: {
+  resp: SessionResponse;
+  idx: number;
+  myLang: string;
+  basePath: string;
+  myClientId: string;
+  myName: string;
+  targetLangs: string[];
+}) {
   const bg = CARD_COLORS[idx % CARD_COLORS.length];
   const text = resp.translations?.[myLang] || resp.text;
+
+  const [showComposer, setShowComposer] = useState(false);
+  const [replyDraft, setReplyDraft] = useState("");
+  const [sending, setSending] = useState(false);
+
+  // roomCode 는 basePath = rooms/{roomCode}/sessions/{sessionId} 에서 추출
+  const roomCode = basePath.split("/")[1] || "";
+
+  // 반응 집계: emoji → count
+  const reactionCounts: Record<string, number> = {};
+  if (resp.reactions) {
+    for (const emoji of Object.values(resp.reactions)) {
+      reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
+    }
+  }
+  const myReaction = resp.reactions?.[myClientId];
+
+  function toggleReaction(emoji: string) {
+    const db = getClientDb();
+    const myRef = ref(db, `${basePath}/responses/${resp.id}/reactions/${myClientId}`);
+    if (myReaction === emoji) {
+      remove(myRef).catch(() => {});
+    } else {
+      set(myRef, emoji).catch(() => {});
+    }
+  }
+
+  // 답글 목록 (timestamp 정렬)
+  const replyList: SessionReply[] = resp.replies
+    ? Object.values(resp.replies).sort((a, b) => a.timestamp - b.timestamp)
+    : [];
+
+  async function sendReply() {
+    const t = replyDraft.trim();
+    if (!t || sending) return;
+    setSending(true);
+    try {
+      const targets = targetLangs.filter((l) => l !== myLang);
+      let translations: Record<string, string> = { [myLang]: t };
+      if (targets.length > 0) {
+        try {
+          const tres = await fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: t,
+              fromLang: myLang,
+              targetLangs: targets,
+              authorName: myName,
+              isTeacher: false,
+              paletteIdx: 0,
+              roomCode,
+              cardType: "comment",
+            }),
+          });
+          const tdata = await tres.json();
+          if (tdata.translations) translations = tdata.translations;
+        } catch { /* fall back to original */ }
+      }
+      const db = getClientDb();
+      const newRef = push(ref(db, `${basePath}/responses/${resp.id}/replies`));
+      await set(newRef, {
+        authorName: myName,
+        authorLang: myLang,
+        authorClientId: myClientId,
+        text: t,
+        translations,
+        timestamp: Date.now(),
+      } satisfies SessionReply);
+      setReplyDraft("");
+    } catch { /* ignore */ }
+    setSending(false);
+  }
+
   return (
     <div style={{
       background: bg, borderRadius: 18, padding: "12px 13px 10px",
@@ -603,6 +710,87 @@ function ResponseCard({ resp, idx, myLang }: { resp: SessionResponse; idx: numbe
       }}>
         — {resp.authorName}
       </div>
+
+      {/* 반응 이모지 행 */}
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {REACTIONS.map((emoji) => {
+          const count = reactionCounts[emoji] || 0;
+          const mine = myReaction === emoji;
+          return (
+            <button
+              key={emoji}
+              onClick={() => toggleReaction(emoji)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 3,
+                padding: "2px 7px", borderRadius: 999, cursor: "pointer",
+                fontSize: 12, lineHeight: 1.4,
+                background: mine ? "rgba(245,158,11,0.22)" : "rgba(255,255,255,0.65)",
+                border: mine ? "1px solid #F59E0B" : "1px solid rgba(0,0,0,0.08)",
+                fontWeight: mine ? 800 : 600,
+                color: "#374151",
+              }}
+            >
+              <span>{emoji}</span>
+              {count > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 800, color: "#6B7280" }}>{count}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 답글 목록 */}
+      {replyList.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 2 }}>
+          {replyList.map((rep, ri) => (
+            <div key={ri} style={{
+              fontSize: 11, color: "#4B5563", lineHeight: 1.4,
+              wordBreak: "break-word",
+            }}>
+              {rep.translations?.[myLang] || rep.text}
+              <span style={{ color: "#9CA3AF", fontWeight: 700 }}> — {rep.authorName}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 답글 토글 + 작성 */}
+      {!showComposer ? (
+        <button
+          onClick={() => setShowComposer(true)}
+          style={{
+            alignSelf: "flex-start", background: "transparent", border: "none",
+            color: "#6B7280", fontSize: 11, fontWeight: 800, cursor: "pointer",
+            padding: "1px 0",
+          }}
+        >💬 답글</button>
+      ) : (
+        <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
+          <input
+            value={replyDraft}
+            onChange={(e) => setReplyDraft(e.target.value)}
+            placeholder="답글..."
+            onKeyDown={(e) => { if (e.key === "Enter") sendReply(); }}
+            style={{
+              flex: 1, minWidth: 0, padding: "5px 8px", borderRadius: 8,
+              border: "1px solid rgba(0,0,0,0.12)", fontSize: 12,
+              background: "rgba(255,255,255,0.85)", color: "#111827",
+              outline: "none",
+            }}
+          />
+          <button
+            onClick={sendReply}
+            disabled={!replyDraft.trim() || sending}
+            style={{
+              padding: "5px 9px", borderRadius: 8, fontSize: 11, fontWeight: 800,
+              border: "none", whiteSpace: "nowrap",
+              background: !replyDraft.trim() || sending ? "#E5E7EB" : "#F59E0B",
+              color: !replyDraft.trim() || sending ? "#9CA3AF" : "#fff",
+              cursor: !replyDraft.trim() || sending ? "not-allowed" : "pointer",
+            }}
+          >{sending ? "..." : "답글"}</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -940,7 +1128,16 @@ function FruitTree({
 }
 
 // 다인원 응답을 한눈에 — 과일나무 대신 격자 카드로 보는 모드 (가독 보장).
-function ResponseGrid({ responses, myLang }: { responses: SessionResponse[]; myLang: string }) {
+function ResponseGrid({
+  responses, myLang, basePath, myClientId, myName, targetLangs,
+}: {
+  responses: SessionResponse[];
+  myLang: string;
+  basePath: string;
+  myClientId: string;
+  myName: string;
+  targetLangs: string[];
+}) {
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px 28px" }}>
       <div style={{
@@ -949,7 +1146,16 @@ function ResponseGrid({ responses, myLang }: { responses: SessionResponse[]; myL
         maxWidth: 1100, margin: "0 auto",
       }}>
         {responses.map((r, i) => (
-          <ResponseCard key={r.id} resp={r} idx={i} myLang={myLang} />
+          <ResponseCard
+            key={r.id}
+            resp={r}
+            idx={i}
+            myLang={myLang}
+            basePath={basePath}
+            myClientId={myClientId}
+            myName={myName}
+            targetLangs={targetLangs}
+          />
         ))}
       </div>
     </div>
