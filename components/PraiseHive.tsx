@@ -199,16 +199,23 @@ export default function PraiseHive({
   onOpenCosmetics,
 }: Props) {
   const lang = user.myLang;
-  const [tab, setTab] = useState<Tab>("mine");
+  const [tab, setTab] = useState<Tab>(user.isTeacher ? "race" : "mine");
 
   const tabs: { id: Tab; labelKey: string }[] = useMemo(() => {
-    const base: { id: Tab; labelKey: string }[] = [
+    // 교사: 주는 UI 중심 — '나의 꿀벌집'(mine) 제거, 관리·개인전·단체전 순.
+    if (user.isTeacher) {
+      return [
+        { id: "manage", labelKey: "phTabManage" },
+        { id: "race", labelKey: "phTabIndividual" },
+        { id: "team", labelKey: "phTabTeam" },
+      ];
+    }
+    // 학생: 기존 그대로 (나의 꿀벌집·개인전·단체전)
+    return [
       { id: "mine", labelKey: "phTabMine" },
       { id: "race", labelKey: "phTabIndividual" },
       { id: "team", labelKey: "phTabTeam" },
     ];
-    if (user.isTeacher) base.push({ id: "manage", labelKey: "phTabManage" });
-    return base;
   }, [user.isTeacher]);
 
   return (

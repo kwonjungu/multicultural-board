@@ -236,6 +236,23 @@ export default function RoomPage() {
         availableLangs={roomLangs}
         hidden={hubView === "games"}
       />
+      {/* 교사 전용 — 칭찬 스티커 주는 화면 바로가기. 번역 위젯(InterpreterFab) 바로 위에 상시 표시. */}
+      {user.isTeacher && hubView !== "games" && hubView !== "dashboard" && (
+        <button
+          onClick={() => setHubView("dashboard")}
+          aria-label="칭찬 스티커 주기"
+          title="칭찬 스티커 주기"
+          style={{
+            position: "fixed", bottom: 228, right: 18, zIndex: 300,
+            width: 60, height: 60, borderRadius: "50%",
+            border: "3px solid #FDE68A",
+            background: "linear-gradient(135deg, #F59E0B, #D97706)",
+            boxShadow: "0 8px 20px rgba(180,83,9,0.4)",
+            fontSize: 30, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >🍯</button>
+      )}
     </>
   );
 
