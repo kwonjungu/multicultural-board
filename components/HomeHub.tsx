@@ -2,6 +2,7 @@
 
 import { UserConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
+import BeeBanner from "./BeeBanner";
 
 export type HubView = "board" | "interpreter" | "games" | "dashboard" | "vocab" | "storybook";
 
@@ -103,13 +104,16 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout }: Props) {
         position: "fixed", inset: 0,
         backgroundImage: "url('/patterns/honeycomb.png')",
         backgroundSize: "300px auto", backgroundRepeat: "repeat",
-        opacity: 0.22, pointerEvents: "none", zIndex: 0,
+        opacity: 0.12, pointerEvents: "none", zIndex: 0,
       }} />
 
       <div style={{
         maxWidth: 760, margin: "0 auto",
         position: "relative", zIndex: 1,
       }}>
+        {/* 🐝 상단 배너 — 주아체 무지개 (설계서 항목 10) */}
+        <BeeBanner compact />
+
         {/* Header */}
         <div data-tutorial-id="hub-header" style={{
           display: "flex", alignItems: "center", gap: 14, marginBottom: 24,

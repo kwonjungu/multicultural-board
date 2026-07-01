@@ -12,7 +12,8 @@ import {
 import { extractVocabLocal, MatchedWord, wordById } from "@/lib/vocabUtils";
 import { checkAndAward, RewardRule, getAwardedIds } from "@/lib/vocabRewards";
 import { cleanupExpiredRecordings } from "@/lib/vocabRecordings";
-import { buildMixedQuiz, buildLessonQuiz, type QuizItem } from "@/lib/quizFormats";
+import { buildMixedQuiz, buildLessonQuiz, buildQuizForWords, type QuizItem } from "@/lib/quizFormats";
+import { pickWeakWords, MIN_REVIEW_WORDS, type WeakWordStat } from "@/lib/weakWords";
 import { getUnits, wordsForLesson, type Unit, type Lesson } from "@/lib/lessons";
 import BeeMascot from "./BeeMascot";
 import {
@@ -87,6 +88,9 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   const goalAdjustedRef = useRef(false);
   const [expressions, setExpressions] = useState<ExpressionEntry[]>([]);
   const [reviewOpen, setReviewOpen] = useState(false);
+  // 약점 단어 자동 복습 — attempts 로그 기반 (학생 전용)
+  const [weakStats, setWeakStats] = useState<WeakWordStat[]>([]);
+  const [weakSheet, setWeakSheet] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeLearner(roomCode, user.myName, setLearner);
@@ -126,6 +130,15 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
     })();
     return () => { cancelled = true; };
   }, [learner, roomCode, user.myName]);
+
+  // 약점 단어 산출 — 마운트 시 attempts 1회 fetch (실패해도 카드만 안 보일 뿐)
+  useEffect(() => {
+    let cancelled = false;
+    fetchStudentAttempts(roomCode, user.myName)
+      .then((attempts) => { if (!cancelled) setWeakStats(pickWeakWords(attempts)); })
+      .catch(() => { /* silent — 약점 카드 미표시 */ });
+    return () => { cancelled = true; };
+  }, [roomCode, user.myName]);
 
   useEffect(() => {
     setProgress(loadProgress(roomCode, user.myName));
@@ -360,10 +373,49 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       <LearnerHUD learner={learner} now={now} />
 
       {viewMode === "tree" ? (
-        <SkillTreeView
-          learner={learner}
-          onStartLesson={(lesson, unit) => setLessonSheet({ lesson, unit })}
-        />
+        <>
+          {/* 🔥 나만의 약점 복습 — 약점 단어 3개 이상일 때만 */}
+          {!isTeacher && weakStats.length >= MIN_REVIEW_WORDS && (
+            <div
+              onClick={() => setWeakSheet(true)}
+              role="button"
+              aria-label="나만의 약점 복습"
+              style={{
+                maxWidth: 760, margin: "0 auto 14px",
+                background: "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")",
+                borderRadius: 20,
+                padding: "14px 18px",
+                display: "flex", alignItems: "center", gap: 14,
+                cursor: "pointer",
+                boxShadow: "0 10px 26px rgba(139, 92, 246, 0.35)",
+                transition: "transform 0.15s",
+              }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
+              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              <div style={{ fontSize: 40, flexShrink: 0 }}>🔥</div>
+              <div style={{ flex: 1, minWidth: 0, color: "#fff" }}>
+                <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: -0.3 }}>
+                  나만의 약점 복습
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2, opacity: 0.95 }}>
+                  자주 틀린 단어 {weakStats.length}개를 모아 만든 맞춤 레슨
+                </div>
+              </div>
+              <div style={{
+                background: "rgba(255,255,255,0.25)",
+                color: "#fff", fontSize: 14, fontWeight: 900,
+                padding: "8px 14px", borderRadius: 12,
+                flexShrink: 0,
+              }}>시작 →</div>
+            </div>
+          )}
+          <SkillTreeView
+            learner={learner}
+            onStartLesson={(lesson, unit) => setLessonSheet({ lesson, unit })}
+          />
+        </>
       ) : (
       <>
 
@@ -742,6 +794,84 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
               >⚡ 시험 보기 (XP 도전!)</button>
               <button
                 onClick={() => setLessonSheet(null)}
+                style={{
+                  background: "#F3F4F6", color: "#6B7280", border: "none",
+                  borderRadius: 14, padding: "10px", fontSize: 13, fontWeight: 800, cursor: "pointer",
+                }}
+              >닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 약점 복습 시트 — 단어 미리보기 + 복습 시작 */}
+      {weakSheet && !quiz && (
+        <div
+          onClick={() => setWeakSheet(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 600,
+            background: "rgba(15,10,40,0.55)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 18,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(420px, 100%)",
+              background: "#fff", borderRadius: 24,
+              border: `4px solid ${PURPLE}`,
+              boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
+              padding: "20px 18px", textAlign: "center",
+            }}
+          >
+            <BeeMascot size={84} mood="welcome" />
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", margin: "8px 0 2px" }}>
+              🔥 나만의 약점 복습
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 12 }}>
+              최근에 자주 틀린 단어들이에요. 한 번 더 도전!
+            </div>
+            {/* 단어 미리보기 */}
+            <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
+              {weakStats.map((s) => {
+                const w = wordById(s.wordId);
+                if (!w) return null;
+                return (
+                  <div key={w.id} style={{
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                    background: PURPLE_LIGHT, borderRadius: 12, padding: "8px 6px", width: 64,
+                  }}>
+                    <img
+                      src={`/vocab-images/icons/${w.id}.png`}
+                      alt=""
+                      aria-hidden="true"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      style={{ width: 36, height: 36, objectFit: "contain" }}
+                    />
+                    <span style={{ fontSize: 11, fontWeight: 800, color: "#374151" }}>{w.ko}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                onClick={() => {
+                  const q = buildQuizForWords(weakStats.map((s) => s.wordId));
+                  if (q.length > 0) {
+                    setLessonContext({ id: "weak-review", title: "🔥 나만의 약점 복습" });
+                    setQuiz(q);
+                    setWeakSheet(false);
+                  }
+                }}
+                style={{
+                  background: `linear-gradient(135deg, ${PURPLE}, ${PURPLE_DARK})`,
+                  color: "#fff", border: "none", borderRadius: 16,
+                  padding: "14px", fontSize: 16, fontWeight: 900, cursor: "pointer",
+                  boxShadow: `0 6px 16px ${PURPLE}55`,
+                }}
+              >🔥 복습 시작 (XP 도전!)</button>
+              <button
+                onClick={() => setWeakSheet(false)}
                 style={{
                   background: "#F3F4F6", color: "#6B7280", border: "none",
                   borderRadius: 14, padding: "10px", fontSize: 13, fontWeight: 800, cursor: "pointer",

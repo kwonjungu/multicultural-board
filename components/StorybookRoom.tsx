@@ -1066,7 +1066,6 @@ function QuestionCard({
   // Translation cache for responses: key = `${responseId}:${toLang}`
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [translating, setTranslating] = useState<Record<string, boolean>>({});
-  const [showOriginal, setShowOriginal] = useState<Record<string, boolean>>({});
   // Tutorial-style entrance for students
   const [showIntro, setShowIntro] = useState(false);
   const [introTyped, setIntroTyped] = useState(0);
@@ -1616,16 +1615,16 @@ function QuestionCard({
             }}>❓ {responses.length}명</div>
           </div>
 
-          {/* Fruit detail modal — auto-translates into the viewer's language */}
+          {/* Fruit detail modal — 원문 + 뷰어 언어 번역을 항상 2줄로 표시.
+              (설계서 항목 5: 번역만 보이고 원문이 숨겨지던 토글 제거) */}
           {selectedFruit !== null && responses[selectedFruit] && (() => {
             const r = responses[selectedFruit];
             const key = `${r.id}:${lang}`;
             const needsTranslation = !!r.studentLang && r.studentLang !== lang;
             const translated = translations[key];
             const isTranslating = !!translating[key];
-            const isOwn = r.clientId === myClientId;
-            const showOrig = !!showOriginal[r.id];
-            const displayText = needsTranslation && translated && !showOrig ? translated : r.text;
+            // 메인 표시는 뷰어 언어(번역 도착 시), 아래에 원문을 항상 함께 표시
+            const displayText = needsTranslation && translated ? translated : r.text;
 
             return (
               <div onClick={() => setSelectedFruit(null)} style={{
@@ -1668,37 +1667,33 @@ function QuestionCard({
                     {displayText}
                   </div>
 
-                  {needsTranslation && translated && !showOrig && !isOwn && (
+                  {/* 원문 — 번역이 메인일 때 항상 함께 표시 (숨김 없음) */}
+                  {needsTranslation && translated && (
                     <div style={{
                       marginTop: 10, padding: "8px 12px",
                       background: "rgba(255,255,255,0.55)",
                       borderRadius: 10,
                       borderLeft: "3px solid rgba(245,158,11,0.5)",
-                      fontSize: 12, fontWeight: 500, color: "#4B5563",
+                      fontSize: 13, fontWeight: 500, color: "#4B5563",
                       lineHeight: 1.5, whiteSpace: "pre-wrap",
                     }}>
                       <div style={{ fontSize: 9, fontWeight: 800, color: "#92400E", marginBottom: 3, letterSpacing: 0.3 }}>
-                        ORIGINAL · {(r.studentLang || "").toUpperCase()}
+                        📜 원문 · {(r.studentLang || "").toUpperCase()}
                       </div>
                       {r.text}
                     </div>
                   )}
 
+                  {/* 번역이 아직 준비 안 됨 — 원문이 메인으로 표시 중임을 안내 */}
+                  {needsTranslation && !translated && (
+                    <div style={{
+                      marginTop: 10, fontSize: 11, fontWeight: 700, color: "#92400E",
+                    }}>
+                      {isTranslating ? "⟳ 내 언어로 번역 준비 중…" : "🌐 번역을 불러오지 못했어요 — 원문으로 표시 중"}
+                    </div>
+                  )}
+
                   <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
-                    {needsTranslation && translated && (
-                      <button
-                        onClick={() => setShowOriginal((s) => ({ ...s, [r.id]: !showOrig }))}
-                        style={{
-                          flex: 1, padding: "10px 0", borderRadius: 12,
-                          background: "rgba(255,255,255,0.7)",
-                          border: "1.5px solid rgba(245,158,11,0.4)",
-                          fontSize: 12, fontWeight: 800,
-                          color: "#92400E", cursor: "pointer",
-                        }}
-                      >
-                        {showOrig ? "🌐 번역 보기" : "📜 원문만 보기"}
-                      </button>
-                    )}
                     <button onClick={() => setSelectedFruit(null)} style={{
                       flex: 1, padding: "10px 0", borderRadius: 12,
                       background: "rgba(0,0,0,0.06)", border: "none", fontSize: 13, fontWeight: 800,

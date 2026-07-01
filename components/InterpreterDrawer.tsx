@@ -488,7 +488,7 @@ export default function InterpreterDrawer({ open, onClose, viewerLang, available
 
         <div style={{
           padding: "10px 14px 14px", flexShrink: 0,
-          textAlign: "center", fontSize: 11, color: "#6B7280", fontWeight: 700,
+          textAlign: "center", fontSize: 12, color: "#9CA3AF", fontWeight: 700,
         }}>
           💡 파파고처럼 내 목소리를 친구 말로 바꿔 주는 도구예요
         </div>

@@ -262,6 +262,30 @@ export function buildLessonQuiz(lessonId: string, formatCycle: QuizFormat[] = DE
   return out;
 }
 
+// 임의 단어 목록용 — 약점 복습 등. 5포맷 라운드로빈 + 빌더 실패 시 다음 포맷 폴백.
+// 예문은 단어 순서에 따라 0→1→2 를 순환시켜 같은 단어도 매번 다른 문장이 나오게 한다.
+export function buildQuizForWords(
+  wordIds: string[],
+  formatCycle: QuizFormat[] = DEFAULT_FORMAT_CYCLE,
+): QuizItem[] {
+  const out: QuizItem[] = [];
+  wordIds.forEach((wordId, i) => {
+    const word = VOCAB_WORDS.find((w) => w.id === wordId);
+    if (!word) return;
+    const sentenceIdx = (i % 3) as 0 | 1 | 2;
+    const primary = formatCycle[i % formatCycle.length];
+    const order: QuizFormat[] = [primary, ...formatCycle.filter((f) => f !== primary)];
+    for (const fmt of order) {
+      const item = makeItem(fmt, word, sentenceIdx);
+      if (item) {
+        out.push(item);
+        return;
+      }
+    }
+  });
+  return out;
+}
+
 export const FORMAT_LABEL: Record<QuizFormat, string> = {
   cloze: "빈칸 채우기",
   mc4: "4지선다",

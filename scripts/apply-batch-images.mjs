@@ -29,6 +29,25 @@ const PLAN = [
   { key: "puzzle-naadam",   out: "public/game-assets/puzzle/naadam.png",      type: "scene",   size: 768 },
   { key: "puzzle-jeepney",  out: "public/game-assets/puzzle/jeepney.png",     type: "scene",   size: 768 },
   { key: "puzzle-taekwondo",out: "public/game-assets/puzzle/taekwondo.png",   type: "scene",   size: 768 },
+  // ── 2차 배치 ──
+  { key: "yut-stick-flat",  out: "public/yut/stick-flat.png",                 type: "sticker", size: 280 },
+  { key: "yut-stick-round", out: "public/yut/stick-round.png",                type: "sticker", size: 280 },
+  { key: "halligalli-bell", out: "public/halligalli/bell.png",                type: "sticker", size: 280 },
+  { key: "trophy-honeypot", out: "public/icons/trophy.png",                   type: "sticker", size: 320 },
+  { key: "honey-block",     out: "public/icons/honey-block.png",              type: "sticker", size: 200 },
+  { key: "hero-landing",    out: "public/icons/hero-landing.png",             type: "raw",     w: 1280, h: 720 },
+  { key: "cafe-kimchi-jjigae", out: "public/cafe/kimchi-jjigae.png",          type: "sticker", size: 320 },
+  { key: "cafe-bibimbap",   out: "public/cafe/bibimbap.png",                  type: "sticker", size: 320 },
+  { key: "cafe-pho",        out: "public/cafe/pho.png",                       type: "sticker", size: 320 },
+  { key: "cafe-banh-mi",    out: "public/cafe/banh-mi.png",                   type: "sticker", size: 320 },
+  { key: "cafe-pad-thai",   out: "public/cafe/pad-thai.png",                  type: "sticker", size: 320 },
+  { key: "cafe-mango-sticky", out: "public/cafe/mango-sticky.png",            type: "sticker", size: 320 },
+  { key: "cafe-curry-rice", out: "public/cafe/curry-rice.png",                type: "sticker", size: 320 },
+  { key: "cafe-dumpling",   out: "public/cafe/dumpling.png",                  type: "sticker", size: 320 },
+  { key: "cafe-sushi",      out: "public/cafe/sushi.png",                     type: "sticker", size: 320 },
+  { key: "cafe-adobo",      out: "public/cafe/adobo.png",                     type: "sticker", size: 320 },
+  { key: "cafe-nasi-goreng", out: "public/cafe/nasi-goreng.png",              type: "sticker", size: 320 },
+  { key: "cafe-plov",       out: "public/cafe/plov.png",                      type: "sticker", size: 320 },
 ];
 
 // ── 흰 배경 제거: 4변 에지에서 흰색 계열만 flood-fill (clean-bg.mjs 축약판) ──

@@ -2,6 +2,7 @@
 
 import { tr } from "@/lib/gameData";
 import { INGR_BY_ID, MENU_BY_ID, STEP_BY_ID } from "./cafeData";
+import MenuImg from "./MenuImg";
 import type {
   IngredientId,
   MenuId,
@@ -58,7 +59,9 @@ export default function ServeResult({
         textAlign: "center",
       }}
     >
-      <div style={{ fontSize: 64 }}>{menu.emoji}</div>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <MenuImg menuId={menu.id} emoji={menu.emoji} size={96} />
+      </div>
       <div style={{ fontWeight: 900, fontSize: 20, marginTop: 4 }}>
         {tr(menu.name, chefLang)}
       </div>

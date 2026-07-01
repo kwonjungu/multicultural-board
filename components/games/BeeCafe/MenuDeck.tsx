@@ -2,6 +2,7 @@
 
 import { tr } from "@/lib/gameData";
 import { MENU_BY_ID } from "./cafeData";
+import MenuImg from "./MenuImg";
 import type { MenuId, Role } from "./types";
 
 interface Props {
@@ -81,7 +82,9 @@ export default function MenuDeck({
               onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
               onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
             >
-              <div style={{ fontSize: 54 }}>{menu.emoji}</div>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <MenuImg menuId={menu.id} emoji={menu.emoji} size={72} />
+              </div>
               <div style={{ fontWeight: 900, marginTop: 6 }}>
                 {tr(menu.name, cLang)}
               </div>

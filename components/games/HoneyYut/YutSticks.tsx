@@ -57,20 +57,40 @@ export default function YutSticks({
           <div
             key={i}
             style={{
-              width: 26, height: 84, borderRadius: 13,
-              background: up
-                ? "linear-gradient(180deg, #FDE68A, #D4A95C)"   // 배(평평한 면)
-                : "linear-gradient(180deg, #92400E, #6B3410)",  // 등(둥근 면)
-              border: "2.5px solid #78350F",
-              boxShadow: spinning ? "0 8px 18px rgba(0,0,0,0.3)" : "0 3px 8px rgba(0,0,0,0.2)",
+              position: "relative",
+              width: 34, height: 96,
+              filter: spinning
+                ? "drop-shadow(0 8px 18px rgba(0,0,0,0.3))"
+                : "drop-shadow(0 3px 8px rgba(0,0,0,0.2))",
               transform: spinning ? `translateY(-${6 + (i % 2) * 6}px) rotate(${(i - 1.5) * 8}deg)` : "none",
-              transition: "transform 0.13s, background 0.13s",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 900, color: up ? "#92400E" : "#FDE68A",
+              transition: "transform 0.13s",
             }}
           >
+            <img
+              src={up ? "/yut/stick-flat.png" : "/yut/stick-round.png"}
+              alt=""
+              aria-hidden="true"
+              onError={(e) => {
+                // 이미지 없으면 기존 CSS 막대로 폴백
+                const el = e.currentTarget;
+                el.style.display = "none";
+                const parent = el.parentElement!;
+                parent.style.borderRadius = "13px";
+                parent.style.border = "2.5px solid #78350F";
+                parent.style.background = up
+                  ? "linear-gradient(180deg, #FDE68A, #D4A95C)"
+                  : "linear-gradient(180deg, #92400E, #6B3410)";
+              }}
+              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            />
             {/* 백도 표시 가락 (첫 번째) */}
-            {i === 0 && up && !spinning ? "✕" : ""}
+            {i === 0 && up && !spinning && (
+              <span style={{
+                position: "absolute", top: "50%", left: "50%",
+                transform: "translate(-50%, -50%)",
+                fontSize: 15, fontWeight: 900, color: "#92400E",
+              }}>✕</span>
+            )}
           </div>
         ))}
       </div>

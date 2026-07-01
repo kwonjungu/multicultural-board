@@ -5,6 +5,7 @@ import { LANGUAGES } from "@/lib/constants";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import { landmarkFor, PATTERN } from "@/lib/assets";
+import BeeBanner from "./BeeBanner";
 
 interface Props {
   onDone: (config: UserConfig) => void;
@@ -67,7 +68,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
     <div style={{
       minHeight: "100vh",
       background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 50%, #FDE68A 100%)",
-      display: "flex", alignItems: "center", justifyContent: "center",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       fontFamily: "'Noto Sans KR', sans-serif", padding: "20px",
       position: "relative", overflow: "hidden",
     }}>
@@ -80,6 +81,9 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
         opacity: 0.12,
       }} aria-hidden="true" />
       <div style={{ position: "fixed", bottom: "-15%", left: "-10%", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.45) 0%, transparent 65%)", pointerEvents: "none", zIndex: 0 }} />
+
+      {/* 🐝 상단 배너 — 주아체 무지개 (설계서 항목 10) */}
+      <BeeBanner />
 
       <div style={{
         background: "#fff", borderRadius: 32, padding: "clamp(22px, 4vw, 32px) clamp(20px, 4vw, 30px)",
@@ -276,7 +280,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                   style={{
                     width: "100%", padding: "16px 20px", borderRadius: 18,
                     border: `3px solid ${codeError ? "#EF4444" : "#D1FAE5"}`,
-                    fontSize: 26, textAlign: "center", letterSpacing: 14,
+                    fontSize: 26, textAlign: "center", letterSpacing: 14, textIndent: 14,
                     color: "#1F2937", background: "#F0FDF4", outline: "none",
                     fontWeight: 900, boxSizing: "border-box",
                   }}

@@ -1828,6 +1828,48 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "🥉 3-е", uz: "🥉 3-o'rin", hi: "🥉 तृतीय",
     id: "🥉 3", ar: "🥉 الثالث", my: "🥉 ၃",
   },
+  ytCaptionShow: {
+    ko: "📺 자막 보기", en: "📺 View captions", vi: "📺 Xem phụ đề",
+    zh: "📺 查看字幕", fil: "📺 Tingnan ang subtitle", ja: "📺 字幕を見る",
+    th: "📺 ดูคำบรรยาย", km: "📺 មើលអក្សររត់", mn: "📺 Хадмал үзэх",
+    ru: "📺 Субтитры", uz: "📺 Subtitrlarni ko'rish", hi: "📺 सबटाइटल देखें",
+    id: "📺 Lihat subtitle", ar: "📺 عرض الترجمة", my: "📺 စာတန်းကြည့်ရန်",
+  },
+  ytCaptionHide: {
+    ko: "▲ 자막 접기", en: "▲ Hide captions", vi: "▲ Ẩn phụ đề",
+    zh: "▲ 收起字幕", fil: "▲ Itago ang subtitle", ja: "▲ 字幕を閉じる",
+    th: "▲ ซ่อนคำบรรยาย", km: "▲ បិទអក្សររត់", mn: "▲ Хадмал хаах",
+    ru: "▲ Скрыть субтитры", uz: "▲ Subtitrlarni yashirish", hi: "▲ सबटाइटल छिपाएं",
+    id: "▲ Sembunyikan subtitle", ar: "▲ إخفاء الترجمة", my: "▲ စာတန်းပိတ်ရန်",
+  },
+  ytCaptionTitle: {
+    ko: "📺 영상 자막 요약", en: "📺 Video captions", vi: "📺 Phụ đề video",
+    zh: "📺 视频字幕", fil: "📺 Subtitle ng video", ja: "📺 動画の字幕",
+    th: "📺 คำบรรยายวิดีโอ", km: "📺 អក្សររត់វីដេអូ", mn: "📺 Бичлэгийн хадмал",
+    ru: "📺 Субтитры видео", uz: "📺 Video subtitrlari", hi: "📺 वीडियो सबटाइटल",
+    id: "📺 Subtitle video", ar: "📺 ترجمة الفيديو", my: "📺 ဗီဒီယိုစာတန်း",
+  },
+  ytCaptionLoading: {
+    ko: "자막을 가져와서 번역하는 중...", en: "Fetching & translating captions...", vi: "Đang tải và dịch phụ đề...",
+    zh: "正在获取并翻译字幕...", fil: "Kinukuha at isinasalin ang subtitle...", ja: "字幕を取得して翻訳中...",
+    th: "กำลังโหลดและแปลคำบรรยาย...", km: "កំពុងទាញយក និងបកប្រែ...", mn: "Хадмалыг татаж орчуулж байна...",
+    ru: "Загрузка и перевод субтитров...", uz: "Subtitrlar yuklanmoqda...", hi: "सबटाइटल लोड और अनुवाद हो रहा है...",
+    id: "Memuat & menerjemahkan subtitle...", ar: "جارٍ تحميل الترجمة...", my: "စာတန်းရယူ ဘာသာပြန်နေသည်...",
+  },
+  ytCaptionNone: {
+    ko: "자막이 없는 영상이에요", en: "This video has no captions", vi: "Video này không có phụ đề",
+    zh: "这个视频没有字幕", fil: "Walang subtitle ang video na ito", ja: "この動画には字幕がありません",
+    th: "วิดีโอนี้ไม่มีคำบรรยาย", km: "វីដេអូនេះគ្មានអក្សររត់ទេ", mn: "Энэ бичлэгт хадмал алга",
+    ru: "У этого видео нет субтитров", uz: "Bu videoda subtitr yo'q", hi: "इस वीडियो में सबटाइटल नहीं हैं",
+    id: "Video ini tidak punya subtitle", ar: "لا توجد ترجمة لهذا الفيديو", my: "ဤဗီဒီယိုတွင် စာတန်းမရှိပါ",
+  },
+  ytCaptionError: {
+    ko: "자막을 가져오지 못했어요. 다시 눌러보세요", en: "Couldn't load captions. Tap again to retry", vi: "Không tải được phụ đề. Hãy thử lại",
+    zh: "无法加载字幕，请重试", fil: "Hindi ma-load ang subtitle. Subukan muli", ja: "字幕を取得できませんでした。もう一度お試しください",
+    th: "โหลดคำบรรยายไม่สำเร็จ ลองอีกครั้ง", km: "មិនអាចទាញយកបានទេ សូមព្យាយាមម្តងទៀត", mn: "Хадмал ачаалж чадсангүй. Дахин оролдоно уу",
+    ru: "Не удалось загрузить субтитры. Попробуйте ещё раз", uz: "Subtitr yuklanmadi. Qayta urinib ko'ring", hi: "सबटाइटल लोड नहीं हुआ। फिर से कोशिश करें",
+    id: "Gagal memuat subtitle. Coba lagi", ar: "تعذر تحميل الترجمة. حاول مرة أخرى", my: "စာတန်းမရနိုင်ပါ။ ထပ်စမ်းကြည့်ပါ",
+  },
 };
 
 export function t(key: string, lang: string): string {

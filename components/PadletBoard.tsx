@@ -89,9 +89,10 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const [editModal, setEditModal] = useState<{ card: CardData; colTitle: string; colColor: string } | null>(null);
 
   const boardRef = useRef<HTMLDivElement>(null);
+  // 컬럼 삭제 경고 상태 (교사 헤더 더블클릭 or 관리 팝오버 🗑 로 진입)
   const [colDeleteActive, setColDeleteActive] = useState<string | null>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wasLongPress = useRef(false);
+  // 보드 내 컬럼 관리 팝오버 (이름/색/순서) — 관리 모달에서 이전됨
+  const [colManageOpen, setColManageOpen] = useState<string | null>(null);
 
   // Undo snackbar
   const [undoToast, setUndoToast] = useState<{
@@ -464,7 +465,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     el.style.height = "auto";
     try {
       const canvas = await html2canvas(el, {
-        backgroundColor: "#F8F9FE",
+        backgroundColor: "#FEF9E7",
         scale: window.devicePixelRatio > 1 ? 2 : 1.5,
         useCORS: true,
         logging: false,
@@ -964,7 +965,10 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       {/* ── Board ── */}
       <main
         ref={boardRef}
-        onClick={() => { if (colDeleteActive) setColDeleteActive(null); }}
+        onClick={() => {
+          if (colDeleteActive) setColDeleteActive(null);
+          if (colManageOpen) setColManageOpen(null);
+        }}
         style={{
           flex: 1, overflowX: "auto", overflowY: "hidden",
           display: "flex", gap: 14, padding: "16px 18px",
@@ -977,12 +981,19 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           return (
             <div key={col.id} style={{
               width: "clamp(270px, 28vw, 330px)", flexShrink: 0, display: "flex", flexDirection: "column",
-              height: "calc(100vh - 90px)", borderRadius: 22, overflow: "hidden",
+              // 교사 헤더가 2~3줄로 늘어나도 잘리지 않게 부모(main flex:1) 기준
+            height: "100%", borderRadius: 22, overflow: "hidden",
               boxShadow: "0 4px 18px rgba(245,158,11,0.12), 0 1px 3px rgba(0,0,0,0.05)",
               background: "#fff", border: "2px solid #FEF3C7",
               scrollSnapAlign: "start",
             }}>
-              <div style={{
+              <div
+                onDoubleClick={() => {
+                  // 교사: 컬럼 헤더 더블클릭 → 삭제 경고 배너 (안전판, 설계서 항목 2)
+                  if (isTeacher) { setColManageOpen(null); setColDeleteActive(col.id); }
+                }}
+                title={isTeacher ? "더블클릭: 컬럼 삭제" : undefined}
+                style={{
                 padding: "14px 18px 12px",
                 display: "flex", alignItems: "center", gap: 12, flexShrink: 0,
                 background: `linear-gradient(135deg, ${col.color}, ${col.color}dd)`,
@@ -1011,7 +1022,129 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 <span style={{ background: "rgba(255,255,255,0.3)", color: "#fff", borderRadius: 999, fontSize: 14, fontWeight: 900, padding: "4px 12px", minWidth: 32, textAlign: "center" }}>
                   {colCards.length}
                 </span>
+                {isTeacher && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setColDeleteActive(null);
+                      setColManageOpen((prev) => (prev === col.id ? null : col.id));
+                    }}
+                    aria-label={`"${col.title}" 컬럼 관리`}
+                    title="컬럼 관리 (이름·색·순서·삭제)"
+                    style={{
+                      width: 30, height: 30, borderRadius: 9, border: "none",
+                      background: colManageOpen === col.id ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.25)",
+                      color: "#fff", fontSize: 14, cursor: "pointer", flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >⚙</button>
+                )}
               </div>
+
+              {/* ── 컬럼 삭제 경고 (더블클릭/🗑 진입, 안전판) ── */}
+              {isTeacher && colDeleteActive === col.id && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    padding: "10px 14px", background: "#FEF2F2",
+                    borderBottom: "1px solid #FECACA", flexShrink: 0,
+                  }}
+                >
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: "#B91C1C", lineHeight: 1.45 }}>
+                    ⚠ &quot;{col.title}&quot; 컬럼을 삭제할까요?
+                    {colCards.length > 0 ? ` 카드 ${colCards.length}개가 함께 사라져요.` : ""}
+                    {" "}삭제 후 8초 안에 되돌릴 수 있어요.
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button
+                      onClick={() => { deleteCol(col.id); setColDeleteActive(null); }}
+                      style={{
+                        flex: 1, padding: "9px 0", borderRadius: 10, border: "none",
+                        background: "#EF4444", color: "#fff", fontWeight: 900, fontSize: 13, cursor: "pointer",
+                      }}
+                    >🗑 삭제</button>
+                    <button
+                      onClick={() => setColDeleteActive(null)}
+                      style={{
+                        flex: 1, padding: "9px 0", borderRadius: 10,
+                        border: "1.5px solid #E5E7EB", background: "#fff",
+                        color: "#6B7280", fontWeight: 800, fontSize: 13, cursor: "pointer",
+                      }}
+                    >취소</button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── 컬럼 관리 팝오버 (관리 모달에서 이전) ── */}
+              {isTeacher && colManageOpen === col.id && colDeleteActive !== col.id && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    padding: "12px 14px", background: "#FFFBEB",
+                    borderBottom: "1px solid #FDE68A", flexShrink: 0,
+                    display: "flex", flexDirection: "column", gap: 10,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      value={editTitle[col.id] ?? col.title}
+                      onChange={(e) => setEditTitle((prev) => ({ ...prev, [col.id]: e.target.value }))}
+                      onBlur={() => saveColTitle(col.id)}
+                      onKeyDown={(e) => e.key === "Enter" && saveColTitle(col.id)}
+                      aria-label="컬럼 이름"
+                      style={{
+                        flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 9,
+                        border: "1.5px solid #E5E7EB", fontSize: 13, fontWeight: 700,
+                        color: "#111827", background: "#fff", outline: "none",
+                      }}
+                      onFocus={(e) => (e.target.style.borderColor = col.color)}
+                    />
+                    <button
+                      onClick={() => moveCol(col.id, "up")}
+                      aria-label="왼쪽으로 이동"
+                      title="왼쪽으로"
+                      style={{
+                        width: 30, height: 30, borderRadius: 8, border: "1px solid #E5E7EB",
+                        background: "#fff", cursor: "pointer", fontSize: 12, color: "#6B7280", flexShrink: 0,
+                      }}
+                    >◀</button>
+                    <button
+                      onClick={() => moveCol(col.id, "down")}
+                      aria-label="오른쪽으로 이동"
+                      title="오른쪽으로"
+                      style={{
+                        width: 30, height: 30, borderRadius: 8, border: "1px solid #E5E7EB",
+                        background: "#fff", cursor: "pointer", fontSize: 12, color: "#6B7280", flexShrink: 0,
+                      }}
+                    >▶</button>
+                    <button
+                      onClick={() => { setColManageOpen(null); setColDeleteActive(col.id); }}
+                      aria-label="컬럼 삭제"
+                      title="컬럼 삭제"
+                      style={{
+                        width: 30, height: 30, borderRadius: 8, border: "none",
+                        background: "#FEF2F2", color: "#EF4444", cursor: "pointer", fontSize: 13, flexShrink: 0,
+                      }}
+                    >🗑</button>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {COL_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => changeColColor(col.id, color)}
+                        aria-label={`색상 ${color}`}
+                        style={{
+                          width: 22, height: 22, borderRadius: "50%", background: color, border: "none",
+                          cursor: "pointer", transition: "transform 0.12s",
+                          outline: col.color === color ? `3px solid ${color}` : "none",
+                          outlineOffset: 2,
+                          transform: col.color === color ? "scale(1.2)" : "scale(1)",
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px 6px", background: "#FFFEF7", scrollbarWidth: "thin", scrollbarColor: "#FDE68A transparent" }}>
                 {colCards.length === 0 ? (
@@ -1052,65 +1185,90 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
               </div>
 
               <button
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  if (!isTeacher) return;
-                  wasLongPress.current = false;
-                  longPressTimer.current = setTimeout(() => {
-                    wasLongPress.current = true;
-                    setColDeleteActive(col.id);
-                  }, 600);
-                }}
-                onPointerUp={() => {
-                  if (longPressTimer.current) {
-                    clearTimeout(longPressTimer.current);
-                    longPressTimer.current = null;
-                  }
-                }}
-                onPointerLeave={() => {
-                  if (longPressTimer.current) {
-                    clearTimeout(longPressTimer.current);
-                    longPressTimer.current = null;
-                  }
-                }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (wasLongPress.current) { wasLongPress.current = false; return; }
-                  if (colDeleteActive === col.id) {
-                    deleteCol(col.id);
-                    setColDeleteActive(null);
-                    return;
-                  }
                   setModal({ colId: col.id, colTitle: col.title, colColor: col.color });
                 }}
                 style={{
                   flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  background: isTeacher && colDeleteActive === col.id ? "#FEF2F2" : "#fff",
+                  background: "#fff",
                   border: "none",
-                  borderTop: isTeacher && colDeleteActive === col.id ? "1px solid #FECACA" : "1px solid #FEF3C7",
+                  borderTop: "1px solid #FEF3C7",
                   padding: "13px 0", cursor: "pointer",
-                  color: isTeacher && colDeleteActive === col.id ? "#EF4444" : col.color,
+                  color: col.color,
                   fontWeight: 800, fontSize: 13,
                   transition: "background 0.15s, color 0.15s",
                   userSelect: "none",
                 }}
                 onMouseEnter={(e) => {
-                  const btn = e.currentTarget as HTMLButtonElement;
-                  btn.style.background = isTeacher && colDeleteActive === col.id ? "#FEE2E2" : col.color + "0D";
+                  (e.currentTarget as HTMLButtonElement).style.background = col.color + "0D";
                 }}
                 onMouseLeave={(e) => {
-                  const btn = e.currentTarget as HTMLButtonElement;
-                  btn.style.background = isTeacher && colDeleteActive === col.id ? "#FEF2F2" : "#fff";
+                  (e.currentTarget as HTMLButtonElement).style.background = "#fff";
                 }}
               >
-                {isTeacher && colDeleteActive === col.id
-                  ? <><span style={{ fontSize: 17, lineHeight: 1 }}>✕</span> 컬럼 삭제</>
-                  : <><span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span> {t("addHere", lang)}</>
-                }
+                <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span> {t("addHere", lang)}
               </button>
             </div>
           );
         })}
+
+        {/* ── ＋ 새 컬럼 추가 카드 (교사 전용, 관리 모달에서 이전) ── */}
+        {isTeacher && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "clamp(230px, 24vw, 280px)", flexShrink: 0,
+              borderRadius: 22, border: "2px dashed #FDE68A",
+              background: "rgba(255,255,255,0.75)",
+              padding: "16px 14px", display: "flex", flexDirection: "column", gap: 10,
+              scrollSnapAlign: "start", alignSelf: "flex-start",
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 900, color: "#B45309" }}>＋ 새 컬럼 추가</div>
+            <input
+              value={newColTitle}
+              onChange={(e) => setNewColTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addColumn()}
+              placeholder="컬럼 이름 입력…"
+              style={{
+                width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 11,
+                border: "1.5px solid #E5E7EB", fontSize: 14, color: "#111827",
+                background: "#fff", outline: "none",
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "#F59E0B")}
+              onBlur={(e) => (e.target.style.borderColor = "#E5E7EB")}
+            />
+            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+              {COL_COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setNewColColor(color)}
+                  aria-label={`새 컬럼 색상 ${color}`}
+                  style={{
+                    width: 24, height: 24, borderRadius: "50%", background: color, border: "none",
+                    cursor: "pointer", transition: "transform 0.12s",
+                    outline: newColColor === color ? `3px solid ${color}` : "none",
+                    outlineOffset: 2,
+                    transform: newColColor === color ? "scale(1.2)" : "scale(1)",
+                  }}
+                />
+              ))}
+            </div>
+            <button
+              onClick={addColumn}
+              disabled={!newColTitle.trim()}
+              style={{
+                padding: "10px 0", borderRadius: 11, border: "none",
+                background: newColTitle.trim() ? BRAND_GRADIENT : "#F3F4F6",
+                color: newColTitle.trim() ? "#fff" : "#D1D5DB",
+                fontWeight: 800, fontSize: 13,
+                cursor: newColTitle.trim() ? "pointer" : "not-allowed",
+                boxShadow: newColTitle.trim() ? "0 4px 14px rgba(245,158,11,0.35)" : "none",
+              }}
+            >+ 추가</button>
+          </div>
+        )}
       </main>
 
       {/* ── Management modal ── */}
@@ -1275,97 +1433,14 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 )}
               </div>
 
-              {/* Section: Column management */}
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 12 }}>
-                컬럼 관리
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-                {columns.map((col, idx) => (
-                  <div key={col.id} style={{
-                    background: "#FFFBEB", borderRadius: 14, padding: "12px 14px",
-                    border: "1px solid #E9ECF5",
-                  }}>
-                    {/* Row 1: order controls + title */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                      {/* Move buttons */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
-                        <button
-                          onClick={() => moveCol(col.id, "up")}
-                          disabled={idx === 0}
-                          style={{
-                            width: 22, height: 22, borderRadius: 6, border: "1px solid #E5E7EB",
-                            background: idx === 0 ? "#F9FAFB" : "#fff", cursor: idx === 0 ? "default" : "pointer",
-                            fontSize: 10, color: idx === 0 ? "#D1D5DB" : "#6B7280",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                          }}
-                        >▲</button>
-                        <button
-                          onClick={() => moveCol(col.id, "down")}
-                          disabled={idx === columns.length - 1}
-                          style={{
-                            width: 22, height: 22, borderRadius: 6, border: "1px solid #E5E7EB",
-                            background: idx === columns.length - 1 ? "#F9FAFB" : "#fff",
-                            cursor: idx === columns.length - 1 ? "default" : "pointer",
-                            fontSize: 10, color: idx === columns.length - 1 ? "#D1D5DB" : "#6B7280",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                          }}
-                        >▼</button>
-                      </div>
-
-                      {/* Color dot */}
-                      <div style={{
-                        width: 12, height: 12, borderRadius: "50%", background: col.color,
-                        flexShrink: 0, boxShadow: `0 0 0 3px ${col.color}33`,
-                      }} />
-
-                      {/* Title input */}
-                      <input
-                        value={editTitle[col.id] ?? col.title}
-                        onChange={(e) => setEditTitle((prev) => ({ ...prev, [col.id]: e.target.value }))}
-                        onBlur={() => saveColTitle(col.id)}
-                        onKeyDown={(e) => e.key === "Enter" && saveColTitle(col.id)}
-                        style={{
-                          flex: 1, padding: "7px 10px", borderRadius: 9,
-                          border: "1.5px solid #E5E7EB", fontSize: 13, fontWeight: 700,
-                          color: "#111827", background: "#fff", outline: "none",
-                        }}
-                        onFocus={(e) => (e.target.style.borderColor = col.color)}
-                        onBlurCapture={(e) => (e.target.style.borderColor = "#E5E7EB")}
-                      />
-
-                      {/* Delete */}
-                      <button
-                        onClick={() => deleteCol(col.id)}
-                        style={{
-                          width: 30, height: 30, borderRadius: 8, border: "none",
-                          background: "#FEF2F2", color: "#EF4444", cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
-                          flexShrink: 0,
-                        }}
-                        title="컬럼 삭제"
-                      >🗑</button>
-                    </div>
-
-                    {/* Row 2: color swatches */}
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingLeft: 30 }}>
-                      {COL_COLORS.map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => changeColColor(col.id, color)}
-                          style={{
-                            width: 22, height: 22, borderRadius: "50%", background: color, border: "none",
-                            cursor: "pointer", transition: "transform 0.12s",
-                            outline: col.color === color ? `3px solid ${color}` : "none",
-                            outlineOffset: 2,
-                            transform: col.color === color ? "scale(1.2)" : "scale(1)",
-                          }}
-                          title={color}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              {/* 컬럼 관리는 소통판(보드) 안으로 이전됨 — 각 컬럼 헤더 ⚙ 버튼,
+                  더블클릭 삭제, 보드 끝 ＋새 컬럼 카드 (설계서 항목 2) */}
+              <div style={{
+                background: "#FFFBEB", border: "1px dashed #FDE68A", borderRadius: 12,
+                padding: "10px 14px", marginBottom: 20,
+                fontSize: 12, fontWeight: 700, color: "#92400E", lineHeight: 1.5,
+              }}>
+                💡 컬럼(주제) 관리는 이제 소통판에서 바로 할 수 있어요 — 컬럼 위 ⚙ 버튼으로 이름·색·순서를 바꾸고, 컬럼 제목을 더블클릭하면 삭제할 수 있어요.
               </div>
 
               {/* Language management */}
@@ -1390,8 +1465,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                         style={{
                           padding: "5px 11px", borderRadius: 20, fontSize: 12,
                           border: `1.5px solid ${active ? "#F59E0B" : "#E5E7EB"}`,
-                          background: active ? "#EEEEFF" : "#F9FAFB",
-                          color: active ? "#F59E0B" : "#9CA3AF",
+                          background: active ? "#FEF3C7" : "#F9FAFB",
+                          color: active ? "#B45309" : "#9CA3AF",
                           fontWeight: active ? 700 : 400, cursor: "pointer",
                           transition: "all 0.12s",
                         }}
@@ -1406,62 +1481,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 </div>
               </div>
 
-              {/* Add column */}
-              <div style={{ borderTop: "1px dashed #E5E7EB", paddingTop: 18 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 10 }}>
-                  새 컬럼 추가
-                </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                  <input
-                    value={newColTitle}
-                    onChange={(e) => setNewColTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addColumn()}
-                    placeholder="컬럼 이름 입력..."
-                    style={{
-                      flex: 1, padding: "10px 14px", borderRadius: 11,
-                      border: "1.5px solid #E5E7EB", fontSize: 14, color: "#111827",
-                      background: "#F9FAFB", outline: "none",
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#F59E0B";
-                      e.target.style.background = "#fff";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#E5E7EB";
-                      e.target.style.background = "#F9FAFB";
-                    }}
-                  />
-                  <button
-                    onClick={addColumn}
-                    disabled={!newColTitle.trim()}
-                    style={{
-                      padding: "10px 18px", borderRadius: 11, border: "none",
-                      background: newColTitle.trim() ? BRAND_GRADIENT : "#F3F4F6",
-                      color: newColTitle.trim() ? "#fff" : "#D1D5DB",
-                      fontWeight: 800, fontSize: 13, cursor: newColTitle.trim() ? "pointer" : "not-allowed",
-                      boxShadow: newColTitle.trim() ? "0 4px 14px rgba(245,158,11,0.35)" : "none",
-                      whiteSpace: "nowrap",
-                    }}
-                  >+ 추가</button>
-                </div>
-
-                {/* New col color picker */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {COL_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setNewColColor(color)}
-                      style={{
-                        width: 26, height: 26, borderRadius: "50%", background: color, border: "none",
-                        cursor: "pointer", transition: "transform 0.12s",
-                        outline: newColColor === color ? `3px solid ${color}` : "none",
-                        outlineOffset: 2,
-                        transform: newColColor === color ? "scale(1.2)" : "scale(1)",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -1539,7 +1558,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           onClick={(e) => { if (e.target === e.currentTarget) setShowQR(false); }}
         >
           <div style={{
-            background: "#fff", borderRadius: 24, padding: "36px 40px",
+            background: "#fff", borderRadius: 24, padding: "28px clamp(20px, 5vw, 40px)",
             maxWidth: 460, width: "100%", textAlign: "center",
             boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
             animation: "fadeSlideIn 0.25s ease",
@@ -1553,7 +1572,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
               <QRCodeSVG
                 value={`${typeof window !== "undefined" ? window.location.origin : ""}/${roomCode}`}
-                size={260}
+                size={220}
               />
             </div>
             <p style={{ fontSize: 13, color: "#6B7280", wordBreak: "break-all", marginBottom: 24 }}>
@@ -1728,7 +1747,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             onClick={handleUndo}
             style={{
               background: "rgba(245,158,11,0.25)",
-              border: "1px solid rgba(165,180,252,0.5)",
+              border: "1px solid rgba(253,230,138,0.5)",
               color: "#FDE68A", borderRadius: 8,
               padding: "6px 12px", cursor: "pointer",
               fontWeight: 800, fontSize: 13,
@@ -1811,7 +1830,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           style={{
             position: "fixed",
             right: "clamp(16px, 3vw, 28px)",
-            bottom: "calc(clamp(16px, 3vw, 28px) + 80px)",
+            // AI 튜터 플로팅 버튼(bottom 84~144)과 겹치지 않게 그 위로
+            bottom: "calc(clamp(16px, 3vw, 28px) + 144px)",
             width: 56, height: 56, borderRadius: "50%", border: "none",
             background: "linear-gradient(135deg, #F472B6, #DB2777)",
             color: "#fff", fontSize: 24, fontWeight: 900,

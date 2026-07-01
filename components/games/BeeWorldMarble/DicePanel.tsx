@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, useEffect, useMemo, useState } from "react";
+import { CSSProperties, useEffect, useState } from "react";
 
 export interface DicePanelProps {
   a: number;
@@ -58,89 +58,43 @@ function clampFace(n: number): number {
   return Math.max(1, Math.min(6, Math.round(n)));
 }
 
-// Per-face CSS transforms for a cube of the given size. Face N is positioned
-// so that the "resting" transform of the cube shows face 1 toward the viewer.
-function faceTransforms(size: number): Record<1 | 2 | 3 | 4 | 5 | 6, string> {
-  const d = size / 2;
-  return {
-    1: `rotateY(0deg) translateZ(${d}px)`,
-    6: `rotateY(180deg) translateZ(${d}px)`,
-    3: `rotateY(90deg) translateZ(${d}px)`,
-    4: `rotateY(-90deg) translateZ(${d}px)`,
-    2: `rotateX(90deg) translateZ(${d}px)`,
-    5: `rotateX(-90deg) translateZ(${d}px)`,
-  };
-}
-
-// Rotation that brings face N to the front. Inverse of the face's placement.
-function restRotationFor(face: 1 | 2 | 3 | 4 | 5 | 6): string {
-  switch (face) {
-    case 1:
-      return "rotateX(0deg) rotateY(0deg)";
-    case 6:
-      return "rotateY(-180deg)";
-    case 3:
-      return "rotateY(-90deg)";
-    case 4:
-      return "rotateY(90deg)";
-    case 2:
-      return "rotateX(-90deg)";
-    case 5:
-      return "rotateX(90deg)";
-  }
-}
-
-// Each roll picks a random extra number of full rotations so the animation
-// feels like a real tumble.
-function spinRotationFor(face: 1 | 2 | 3 | 4 | 5 | 6, salt: number): string {
-  // Use salt to vary the spin so consecutive rolls of the same face still move.
-  const xTurns = 2 + ((salt * 3) % 3); // 2..4 full turns on X
-  const yTurns = 2 + ((salt * 5 + 1) % 3); // 2..4 full turns on Y
-  const rest = restRotationFor(face);
-  return `rotateX(${xTurns * 360}deg) rotateY(${yTurns * 360}deg) ${rest}`;
-}
-
+/**
+ * Flat 2D die face. The previous CSS 3D cube (preserve-3d + backface-hidden)
+ * collapsed on some tablet browsers/webviews and rendered as an EMPTY white
+ * square — pips ended up on hidden faces. A flat face with a shake animation
+ * has no 3D dependency and always shows its pips.
+ *
+ * While `rolling`, the shown face cycles randomly every ~90ms and the die
+ * shakes; when rolling ends it settles on the real value.
+ */
 function Die({
   value,
   rolling,
   size,
-  rollKey,
 }: {
   value: number;
   rolling: boolean;
   size: number;
-  /** Changes every time a new roll starts so CSS transitions re-run. */
-  rollKey: number;
 }) {
-  const face = clampFace(value) as 1 | 2 | 3 | 4 | 5 | 6;
-  const transforms = useMemo(() => faceTransforms(size), [size]);
+  const [shown, setShown] = useState(() => clampFace(value));
 
-  const cubeStyle: CSSProperties = {
-    position: "relative",
-    width: size,
-    height: size,
-    transformStyle: "preserve-3d",
-    transform: rolling
-      ? spinRotationFor(face, rollKey)
-      : restRotationFor(face),
-    transition: rolling
-      ? "transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1)"
-      : "transform 0.25s ease-out",
-  };
-
-  const wrapStyle: CSSProperties = {
-    width: size,
-    height: size,
-    perspective: size * 4,
-    display: "inline-block",
-  };
+  useEffect(() => {
+    if (!rolling) {
+      setShown(clampFace(value));
+      return;
+    }
+    const id = setInterval(() => {
+      setShown(1 + Math.floor(Math.random() * 6));
+    }, 90);
+    return () => clearInterval(id);
+  }, [rolling, value]);
 
   const pipSize = Math.max(6, Math.round(size * 0.16));
   const pad = Math.round(size * 0.12);
 
-  const faceBase: CSSProperties = {
-    position: "absolute",
-    inset: 0,
+  const faceStyle: CSSProperties = {
+    width: size,
+    height: size,
     background: "linear-gradient(135deg, #ffffff 0%, #FEF3C7 100%)",
     border: "2px solid #111827",
     borderRadius: Math.round(size * 0.14),
@@ -149,41 +103,33 @@ function Die({
     gridTemplateColumns: "1fr 1fr 1fr",
     gridTemplateRows: "1fr 1fr 1fr",
     padding: pad,
-    backfaceVisibility: "hidden",
-    WebkitBackfaceVisibility: "hidden",
-    boxShadow: "inset 0 0 8px rgba(180,83,9,0.15)",
+    boxShadow: "inset 0 0 8px rgba(180,83,9,0.15), 0 3px 6px rgba(0,0,0,0.12)",
+    animation: rolling ? "marbleDiceShake 0.22s ease-in-out infinite" : "none",
   };
 
   return (
     <span
-      style={wrapStyle}
-      aria-label={`주사위 ${face}`}
+      style={{ display: "inline-block" }}
+      aria-label={`주사위 ${clampFace(rolling ? shown : value)}`}
       role="img"
     >
-      <span style={cubeStyle}>
-        {([1, 2, 3, 4, 5, 6] as const).map((n) => (
+      <span style={faceStyle}>
+        {PIPS[clampFace(rolling ? shown : value) - 1].map(([col, row], i) => (
           <span
-            key={n}
-            style={{ ...faceBase, transform: transforms[n] }}
-          >
-            {PIPS[n - 1].map(([col, row], i) => (
-              <span
-                key={i}
-                style={{
-                  gridColumn: (col + 1) as 1 | 2 | 3,
-                  gridRow: (row + 1) as 1 | 2 | 3,
-                  width: pipSize,
-                  height: pipSize,
-                  borderRadius: "50%",
-                  background:
-                    "radial-gradient(circle at 30% 30%, #1F2937, #000)",
-                  justifySelf: "center",
-                  alignSelf: "center",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
-                }}
-              />
-            ))}
-          </span>
+            key={i}
+            style={{
+              gridColumn: (col + 1) as 1 | 2 | 3,
+              gridRow: (row + 1) as 1 | 2 | 3,
+              width: pipSize,
+              height: pipSize,
+              borderRadius: "50%",
+              background:
+                "radial-gradient(circle at 30% 30%, #1F2937, #000)",
+              justifySelf: "center",
+              alignSelf: "center",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
+            }}
+          />
         ))}
       </span>
     </span>
@@ -198,13 +144,6 @@ export function DicePanel({
   onRoll,
   compact = false,
 }: DicePanelProps) {
-  // A counter that increments when a new "rolling" phase starts. It feeds into
-  // spinRotationFor so even rolling the same face again produces a fresh spin.
-  const [rollKey, setRollKey] = useState(0);
-  useEffect(() => {
-    if (rolling) setRollKey((k) => k + 1);
-  }, [rolling]);
-
   const wrap: CSSProperties = {
     display: "flex",
     flexDirection: "column",
@@ -226,8 +165,8 @@ export function DicePanel({
   return (
     <div style={wrap}>
       <div style={diceRow} aria-live="polite">
-        <Die value={a} rolling={rolling} size={size} rollKey={rollKey} />
-        <Die value={b} rolling={rolling} size={size} rollKey={rollKey + 1} />
+        <Die value={a} rolling={rolling} size={size} />
+        <Die value={b} rolling={rolling} size={size} />
       </div>
       <button
         type="button"
@@ -255,6 +194,15 @@ export function DicePanel({
       >
         {rolling ? "🎲 구르는 중…" : "🎲 굴리기"}
       </button>
+      <style>{`
+        @keyframes marbleDiceShake {
+          0%   { transform: translate(0, 0) rotate(0deg); }
+          25%  { transform: translate(-2px, 1px) rotate(-7deg); }
+          50%  { transform: translate(2px, -1px) rotate(6deg); }
+          75%  { transform: translate(-1px, -2px) rotate(-4deg); }
+          100% { transform: translate(0, 0) rotate(0deg); }
+        }
+      `}</style>
     </div>
   );
 }

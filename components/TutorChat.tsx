@@ -273,7 +273,7 @@ export default function TutorChat({
               onClick={handleSend}
               disabled={busy || !draft.trim()}
               style={{
-                minWidth: 56, borderRadius: 12, border: "none",
+                minWidth: 56, minHeight: 42, borderRadius: 12, border: "none",
                 cursor: busy || !draft.trim() ? "default" : "pointer",
                 background: !draft.trim() || busy
                   ? "#E5E7EB"

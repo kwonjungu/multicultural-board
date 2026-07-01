@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { tr } from "@/lib/gameData";
 import { MENU_BY_ID } from "./cafeData";
+import MenuImg from "./MenuImg";
 import type { MenuId, Role } from "./types";
 
 interface Props {
@@ -88,7 +89,9 @@ export default function OrderScene({
           boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
         }}
       >
-        <div style={{ fontSize: 64 }}>{menu.emoji}</div>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <MenuImg menuId={menu.id} emoji={menu.emoji} size={96} />
+        </div>
         <div style={{ fontSize: 20, fontWeight: 900, marginTop: 6 }}>
           "{phrase}"
         </div>

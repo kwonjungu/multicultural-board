@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LANGUAGES } from "@/lib/constants";
 import BeeMascot from "@/components/BeeMascot";
+import BeeBanner from "@/components/BeeBanner";
 import { PATTERN } from "@/lib/assets";
 
 const DEFAULT_LANGS = ["ko", "en", "vi", "zh", "fil"];
@@ -252,7 +253,7 @@ export default function Home() {
     <div style={{
       minHeight: "100vh",
       background: "linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 60%, #FDE68A 100%)",
-      display: "flex", alignItems: "center", justifyContent: "center",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       fontFamily: "'Noto Sans KR', sans-serif", padding: 20,
       position: "relative", overflow: "hidden",
     }}>
@@ -264,6 +265,9 @@ export default function Home() {
         opacity: 0.12,
       }} />
       <div style={{ position: "fixed", bottom: "-20%", left: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(252,211,77,0.35) 0%, transparent 65%)", pointerEvents: "none", zIndex: 0 }} />
+
+      {/* 🐝 상단 배너 — 주아체 무지개 (설계서 항목 10) */}
+      <BeeBanner />
 
       <div style={{
         background: "#fff", borderRadius: 28, padding: view === "hero" ? "40px 28px 28px" : "22px 28px 28px",
@@ -363,6 +367,20 @@ export default function Home() {
                 position: "relative", zIndex: 1,
               }}
             >📄 문서 번역하기</button>
+
+            {/* 히어로 일러스트 — 교실 + 꿀벌 */}
+            <img
+              src="/icons/hero-landing.png"
+              alt=""
+              aria-hidden="true"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              style={{
+                width: "100%", marginTop: 18, borderRadius: 20,
+                border: "3px solid #FDE68A",
+                boxShadow: "0 10px 28px rgba(180,83,9,0.18)",
+                display: "block", position: "relative", zIndex: 1,
+              }}
+            />
           </>
         ) : (
           <>
@@ -505,7 +523,7 @@ export default function Home() {
                 style={{
                   width: "100%", padding: "14px 0", borderRadius: 14,
                   border: "2px solid #E5E7EB", fontSize: 28, fontWeight: 900,
-                  textAlign: "center", letterSpacing: 12, color: "#111827",
+                  textAlign: "center", letterSpacing: 12, textIndent: 12, color: "#111827",
                   background: "#F9FAFB", outline: "none", transition: "all 0.18s",
                   boxSizing: "border-box",
                 }}
@@ -529,7 +547,7 @@ export default function Home() {
                         padding: "6px 12px", borderRadius: 20, fontSize: 12,
                         border: `1.5px solid ${active ? "#F59E0B" : "#E5E7EB"}`,
                         background: active ? "#FEF3C7" : "#F9FAFB",
-                        color: active ? "#F59E0B" : "#6B7280",
+                        color: active ? "#B45309" : "#6B7280",
                         fontWeight: active ? 700 : 400, cursor: "pointer",
                         transition: "all 0.12s", whiteSpace: "nowrap",
                       }}

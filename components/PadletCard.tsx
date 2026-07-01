@@ -18,6 +18,16 @@ const WEB_SPEECH_SUPPORTED = new Set(["ko", "en", "vi", "zh", "ja", "th", "ru", 
 
 const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
+// 카드 텍스트 안의 유튜브 URL 감지 (watch / youtu.be / embed / shorts / live)
+const YT_URL_RE =
+  /(?:youtube\.com\/(?:watch\?[^\s]*?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+
+function detectYoutubeId(text: string): string | null {
+  if (!text) return null;
+  const m = text.match(YT_URL_RE);
+  return m ? m[1] : null;
+}
+
 // Singleton audio element to avoid overlapping playback
 let serverTtsAudio: HTMLAudioElement | null = null;
 
@@ -139,6 +149,18 @@ export default function PadletCard({
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
   const commentDraftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── YouTube 자막 번역 상태 ──
+  // 결과는 state 에 캐시: 같은 viewer 언어로 받아온 적이 있으면 재요청하지 않는다.
+  const ytVideoId =
+    (cardType === "youtube" && card.youtubeId) ||
+    detectYoutubeId(card.originalText || "") ||
+    null;
+  const [captionOpen, setCaptionOpen] = useState(false);
+  const [captionLoading, setCaptionLoading] = useState(false);
+  const [captionText, setCaptionText] = useState<string | null>(null);
+  const [captionLang, setCaptionLang] = useState<string | null>(null);
+  const [captionError, setCaptionError] = useState<"none" | "fail" | null>(null);
 
   // Tick to update edit window expiry
   useEffect(() => {
@@ -292,6 +314,38 @@ export default function PadletCard({
     set(ref(db, `rooms/${roomCode}/cards/${card.id}/comments/${commentId}/status`), "approved");
   }
 
+  async function toggleCaption() {
+    if (!ytVideoId) return;
+    const next = !captionOpen;
+    setCaptionOpen(next);
+    if (!next || captionLoading) return;
+    // 캐시 히트 — "자막 없음" 확정이거나 같은 언어 결과가 이미 있으면 재요청 금지
+    if (captionError === "none") return;
+    if (captionText !== null && captionLang === viewerLang) return;
+    setCaptionLoading(true);
+    setCaptionError(null);
+    try {
+      const res = await fetch("/api/youtube-transcript", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: ytVideoId, targetLang: viewerLang }),
+      });
+      const data: { error?: string; translated?: string; transcript?: string } =
+        await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setCaptionText(null);
+        setCaptionError(res.status === 404 || data.error === "NO_CAPTIONS" ? "none" : "fail");
+      } else {
+        setCaptionText(data.translated || data.transcript || "");
+        setCaptionLang(viewerLang);
+      }
+    } catch {
+      setCaptionText(null);
+      setCaptionError("fail");
+    }
+    setCaptionLoading(false);
+  }
+
   return (
     <div
       style={{
@@ -395,7 +449,7 @@ export default function PadletCard({
                 alignSelf: "flex-start",
                 flexWrap: "wrap",
                 justifyContent: "flex-end",
-                maxWidth: 108,
+                maxWidth: 136,
               }}
             >
               {canEdit && (
@@ -405,7 +459,7 @@ export default function PadletCard({
                   aria-label="수정"
                   style={{
                     background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8,
-                    width: 32, height: 32, padding: 0, cursor: "pointer", fontSize: 14, color: "#0369A1",
+                    width: 40, height: 40, padding: 0, cursor: "pointer", fontSize: 14, color: "#0369A1",
                     fontWeight: 700, transition: "all 0.15s",
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                   }}
@@ -422,7 +476,7 @@ export default function PadletCard({
                   aria-label={t("praiseAction", viewerLang)}
                   style={{
                     background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8,
-                    width: 32, height: 32, padding: 0, cursor: "pointer", fontSize: 15, color: "#B45309",
+                    width: 40, height: 40, padding: 0, cursor: "pointer", fontSize: 15, color: "#B45309",
                     fontWeight: 800, transition: "all 0.15s",
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                   }}
@@ -439,7 +493,7 @@ export default function PadletCard({
                   aria-label="삭제"
                   style={{
                     background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8,
-                    width: 32, height: 32, padding: 0, cursor: "pointer", fontSize: 14, color: "#DC2626",
+                    width: 40, height: 40, padding: 0, cursor: "pointer", fontSize: 14, color: "#DC2626",
                     fontWeight: 700, transition: "all 0.15s",
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                   }}
@@ -561,6 +615,71 @@ export default function PadletCard({
               </div>
             )}
           </>
+        )}
+
+        {/* ── YouTube 자막 자동 번역 ── */}
+        {ytVideoId && (
+          <div style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              onClick={toggleCaption}
+              aria-expanded={captionOpen}
+              aria-label={t("ytCaptionShow", viewerLang)}
+              style={{
+                width: "100%", minHeight: 44, borderRadius: 12,
+                background: captionOpen ? "#FEF3C7" : "#FFFBEB",
+                border: "2px solid #FDE68A",
+                color: "#B45309", fontSize: 14, fontWeight: 800,
+                cursor: "pointer", display: "flex", alignItems: "center",
+                justifyContent: "center", gap: 6,
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF3C7"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = captionOpen ? "#FEF3C7" : "#FFFBEB"; }}
+            >
+              {captionOpen ? t("ytCaptionHide", viewerLang) : t("ytCaptionShow", viewerLang)}
+            </button>
+
+            {captionOpen && (
+              <div style={{
+                marginTop: 8, padding: "12px 14px", borderRadius: 12,
+                background: "#FFFBEB", border: "1.5px solid #FDE68A",
+              }}>
+                {captionLoading && (
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    fontSize: 13, color: "#B45309", fontWeight: 700, padding: "6px 0",
+                  }}>
+                    <span style={{ display: "inline-block", animation: "pulse 1.2s ease-in-out infinite" }}>● ● ●</span>
+                    {t("ytCaptionLoading", viewerLang)}
+                  </div>
+                )}
+                {!captionLoading && captionError === "none" && (
+                  <div style={{ fontSize: 13, color: "#92400E", fontWeight: 700, textAlign: "center", padding: "6px 0" }}>
+                    📭 {t("ytCaptionNone", viewerLang)}
+                  </div>
+                )}
+                {!captionLoading && captionError === "fail" && (
+                  <div style={{ fontSize: 13, color: "#B91C1C", fontWeight: 700, textAlign: "center", padding: "6px 0" }}>
+                    ⚠️ {t("ytCaptionError", viewerLang)}
+                  </div>
+                )}
+                {!captionLoading && !captionError && captionText !== null && (
+                  <>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#B45309", marginBottom: 6 }}>
+                      {t("ytCaptionTitle", viewerLang)} · {LANGUAGES[viewerLang]?.flag} {LANGUAGES[viewerLang]?.label}
+                    </div>
+                    <div style={{
+                      fontSize: 14, color: "#374151", lineHeight: 1.7,
+                      whiteSpace: "pre-wrap", maxHeight: 280, overflowY: "auto",
+                    }}>
+                      {captionText}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

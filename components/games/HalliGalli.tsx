@@ -243,7 +243,9 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
     return (
       <div style={wrap}>
         <div style={{ textAlign: "center", padding: "24px 10px" }}>
-          <div style={{ fontSize: 72, margin: "10px 0 8px" }}>🔔</div>
+          <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 8px" }}>
+            <BellImg size={96} />
+          </div>
           <h2 style={{ fontSize: 26, fontWeight: 900, color: "#1F2937", margin: "0 0 6px" }}>할리갈리</h2>
           <p style={{ fontSize: 14, color: "#6B7280", fontWeight: 600, margin: 0 }}>
             같은 과일이 <b>정확히 5개</b>가 되면 종을 누르세요!
@@ -455,13 +457,29 @@ function PlayerControls({
         onClick={onBell}
         aria-label={`플레이어 ${label} 종 누르기`}
         style={{
-          minHeight: 44, minWidth: 56, padding: 0, borderRadius: 14,
+          minHeight: 44, minWidth: 56, padding: 2, borderRadius: 14,
           background: `linear-gradient(135deg, ${color}, ${color}cc)`,
           color: "#fff", border: "none", fontWeight: 900, fontSize: 24,
           cursor: "pointer", boxShadow: `0 4px 10px ${color}55`,
+          display: "flex", alignItems: "center", justifyContent: "center",
         }}
-      >🔔</button>
+      ><BellImg size={36} /></button>
     </div>
+  );
+}
+
+/** 종 일러스트 — 없으면 🔔 이모지 폴백 */
+function BellImg({ size }: { size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <span style={{ fontSize: size * 0.66 }}>🔔</span>;
+  return (
+    <img
+      src="/halligalli/bell.png"
+      alt=""
+      aria-hidden="true"
+      onError={() => setFailed(true)}
+      style={{ width: size, height: size, objectFit: "contain" }}
+    />
   );
 }
 
@@ -525,12 +543,13 @@ function PlayerPanel({
           onClick={onBell}
           aria-label={`플레이어 ${label} 종 누르기`}
           style={{
-            minHeight: 44, minWidth: 52, padding: 0, borderRadius: 14,
+            minHeight: 44, minWidth: 52, padding: 2, borderRadius: 14,
             background: `linear-gradient(135deg, ${color}, ${color}cc)`,
             color: "#fff", border: "none", fontWeight: 900, fontSize: 22,
             cursor: "pointer", boxShadow: `0 4px 10px ${color}55`,
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}
-        >🔔</button>
+        ><BellImg size={34} /></button>
       </div>
     </div>
   );
