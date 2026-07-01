@@ -256,6 +256,29 @@ export function subscribeCosmetics(
   return () => { off(cosRef); void unsub; };
 }
 
+/** 방 전체 학생의 코스메틱 일괄 구독 — 칭찬 전시장(설계서 항목 7)용 */
+export function subscribeAllCosmetics(
+  roomCode: string,
+  cb: (map: Record<string, StudentCosmetics>) => void,
+): () => void {
+  const db = getClientDb();
+  const cosRef = ref(db, `${basePath(roomCode)}/cosmetics`);
+  const unsub = onValue(cosRef, (snap) => {
+    const raw = snap.val();
+    const out: Record<string, StudentCosmetics> = {};
+    for (const [clientId, v] of entriesOf<Partial<StudentCosmetics>>(raw)) {
+      out[clientId] = {
+        skin: (v?.skin as StudentCosmetics["skin"]) ?? "classic",
+        hat: (v?.hat as StudentCosmetics["hat"]) ?? null,
+        pet: (v?.pet as StudentCosmetics["pet"]) ?? null,
+        trophy: (v?.trophy as StudentCosmetics["trophy"]) ?? null,
+      };
+    }
+    cb(out);
+  });
+  return () => { off(cosRef); void unsub; };
+}
+
 export async function setCosmetics(
   roomCode: string,
   studentClientId: string,

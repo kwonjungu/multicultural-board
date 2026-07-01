@@ -28,9 +28,20 @@ import {
   subscribeAllStudentCounts,
   subscribeGoal,
   subscribeCosmetics,
+  subscribeAllCosmetics,
   resetSeason,
   setGoalTarget,
 } from "@/lib/stickers";
+import {
+  subscribeGallery,
+  likeOncePerDay,
+  commentOncePerDay,
+  likeTotal,
+  commentsOf,
+  type GalleryData,
+  type GalleryEntry,
+} from "@/lib/gallery";
+import { checkSafety } from "@/lib/chatSafety";
 import { HONEY } from "@/lib/constants";
 import { t, tFmt } from "@/lib/i18n";
 import anchorsData from "@/public/stickers/anchors.json";
@@ -834,6 +845,8 @@ function MyHiveTab({
 // TAB 2 — Individual Race
 // ============================================================
 
+const DEFAULT_COSMETICS: StudentCosmetics = { skin: "classic", hat: null, pet: null, trophy: null };
+
 function RaceTab({
   lang,
   roomCode,
@@ -846,21 +859,40 @@ function RaceTab({
   myClientId: string;
 }) {
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // 전시장 (설계서 항목 7): 전원 코스메틱 + 좋아요/댓글 데이터
+  const [allCosmetics, setAllCosmetics] = useState<Record<string, StudentCosmetics>>({});
+  const [gallery, setGallery] = useState<GalleryData>({});
+  const [galleryFocus, setGalleryFocus] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = subscribeAllStudentCounts(roomCode, setCounts);
     return () => unsub();
   }, [roomCode]);
 
+  useEffect(() => {
+    const unsub = subscribeAllCosmetics(roomCode, setAllCosmetics);
+    return () => unsub();
+  }, [roomCode]);
+
+  useEffect(() => {
+    const unsub = subscribeGallery(roomCode, setGallery);
+    return () => unsub();
+  }, [roomCode]);
+
   const entries = useMemo(() => {
-    const arr = Object.entries(counts).map(([id, c]) => ({
+    // 스티커를 받았거나(counts) 꾸미기를 한(cosmetics) 학생 전원 표시
+    const ids = new Set([...Object.keys(counts), ...Object.keys(allCosmetics)]);
+    const arr = Array.from(ids).map((id) => ({
       id,
-      count: c,
+      count: counts[id] ?? 0,
       name: id === myClientId ? user.myName : `${t("phStudentPrefix", lang)} #${shortId(id)}`,
+      cosmetics: allCosmetics[id] ?? DEFAULT_COSMETICS,
     }));
     arr.sort((a, b) => b.count - a.count);
     return arr;
-  }, [counts, myClientId, user.myName, lang]);
+  }, [counts, allCosmetics, myClientId, user.myName, lang]);
+
+  const focusEntry = galleryFocus ? entries.find((e) => e.id === galleryFocus) ?? null : null;
 
   const top3 = entries.slice(0, 3);
   const rest = entries.slice(3);
@@ -874,6 +906,112 @@ function RaceTab({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* ── 🖼 우리 반 전시장 (설계서 항목 7) — 전원의 꾸민 벌 전시 ── */}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 22,
+          padding: "16px 14px",
+          border: `2px solid ${HONEY.h200}`,
+          boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 900, color: HONEY.h800, marginBottom: 4 }}>
+          🖼 우리 반 전시장
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: HONEY.h700, marginBottom: 12 }}>
+          친구의 벌을 눌러 하루 한 번 ❤️ 좋아요와 💬 응원을 남겨요
+        </div>
+        {entries.length === 0 ? (
+          <div style={{ fontSize: 13, color: HONEY.h700, fontWeight: 600, textAlign: "center", padding: 20 }}>
+            {t("phNoStickersYet", lang)}
+          </div>
+        ) : (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+            gap: 10,
+          }}>
+            {entries.map((e) => {
+              const g: GalleryEntry | undefined = gallery[e.id];
+              const nLikes = likeTotal(g);
+              const nComments = g?.comments ? Object.keys(g.comments).length : 0;
+              const st = stageOf(e.count);
+              const isSelf = e.id === myClientId;
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => setGalleryFocus(e.id)}
+                  aria-label={`${e.name} 전시 보기`}
+                  style={{
+                    background: isSelf
+                      ? `linear-gradient(160deg, ${HONEY.h100}, #fff)`
+                      : "#FFFDF6",
+                    border: `2px solid ${isSelf ? HONEY.h400 : HONEY.h100}`,
+                    borderRadius: 16,
+                    padding: "12px 8px 10px",
+                    cursor: "pointer",
+                    textAlign: "center",
+                    fontFamily: "inherit",
+                    transition: "transform 0.12s",
+                  }}
+                  onMouseDown={(ev) => (ev.currentTarget.style.transform = "scale(0.97)")}
+                  onMouseUp={(ev) => (ev.currentTarget.style.transform = "scale(1)")}
+                  onMouseLeave={(ev) => (ev.currentTarget.style.transform = "scale(1)")}
+                >
+                  <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto" }}>
+                    <CharacterImage stage={st} skin={e.cosmetics.skin} hat={e.cosmetics.hat} />
+                    {e.cosmetics.trophy && (
+                      <img
+                        src={`/stickers/trophy-${e.cosmetics.trophy}.png`}
+                        alt="" aria-hidden="true"
+                        style={{ position: "absolute", left: -8, bottom: -4, width: 32, height: 32, zIndex: 2 }}
+                      />
+                    )}
+                    {e.cosmetics.pet && (
+                      <img
+                        src={`/stickers/pet-${e.cosmetics.pet}.png`}
+                        alt="" aria-hidden="true"
+                        style={{ position: "absolute", right: -10, bottom: -6, width: 38, height: 38, zIndex: 2 }}
+                      />
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: 12, fontWeight: 900, color: "#1F2937", marginTop: 6,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    {e.name}{isSelf ? " ⭐" : ""}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: HONEY.h700, marginTop: 2 }}>
+                    {t(STAGE_LABEL_KEY[st], lang)}
+                  </div>
+                  <div style={{
+                    display: "flex", justifyContent: "center", gap: 8,
+                    fontSize: 11, fontWeight: 900, color: HONEY.h800, marginTop: 4,
+                  }}>
+                    <span>❤️ {nLikes}</span>
+                    <span>💬 {nComments}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 전시 상세 팝오버 — 좋아요/응원 (하루 1회) */}
+      {focusEntry && (
+        <GalleryPopover
+          lang={lang}
+          roomCode={roomCode}
+          target={focusEntry}
+          entry={gallery[focusEntry.id]}
+          myClientId={myClientId}
+          myName={user.myName}
+          onClose={() => setGalleryFocus(null)}
+        />
+      )}
+
       <div
         style={{
           background: "#fff",
@@ -2128,6 +2266,244 @@ function StickerDetailPopover({
           to   { transform: scale(1); opacity: 1; }
         }
       `}</style>
+    </div>
+  );
+}
+
+// ============================================================
+// Gallery Popover — 전시장 상세 (설계서 항목 7)
+// 캐릭터 크게 + ❤️ 좋아요(하루 1회) + 💬 응원 댓글(하루 1회)
+// ============================================================
+
+function GalleryPopover({
+  lang,
+  roomCode,
+  target,
+  entry,
+  myClientId,
+  myName,
+  onClose,
+}: {
+  lang: string;
+  roomCode: string;
+  target: { id: string; name: string; count: number; cosmetics: StudentCosmetics };
+  entry: GalleryEntry | undefined;
+  myClientId: string;
+  myName: string;
+  onClose: () => void;
+}) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const isSelf = target.id === myClientId;
+  const st = stageOf(target.count);
+  const nLikes = likeTotal(entry);
+  const comments = commentsOf(entry);
+
+  async function handleLike() {
+    if (isSelf || busy) return;
+    setBusy(true);
+    try {
+      const ok = await likeOncePerDay(roomCode, target.id, myClientId);
+      setMsg(ok ? "❤️ 좋아요를 보냈어요!" : "오늘은 이미 좋아요를 눌렀어요 — 내일 또 눌러줘요!");
+    } catch (err) {
+      console.error("likeOncePerDay failed", err);
+      setMsg("문제가 생겼어요. 다시 시도해 주세요.");
+    }
+    setBusy(false);
+  }
+
+  async function handleComment() {
+    const text = draft.trim();
+    if (!text || busy) return;
+    // 응원 댓글도 안전검사 (부적절 표현 차단)
+    const pre = checkSafety(text);
+    if (pre.blocked || pre.distress) {
+      setMsg("고운 말로 응원해 주세요 🙏");
+      return;
+    }
+    setBusy(true);
+    try {
+      const ok = await commentOncePerDay(
+        roomCode, target.id,
+        { clientId: myClientId, name: myName, lang },
+        text,
+      );
+      setMsg(ok ? "💬 응원을 남겼어요!" : "오늘은 이미 응원을 남겼어요 — 내일 또 남겨줘요!");
+      if (ok) setDraft("");
+    } catch (err) {
+      console.error("commentOncePerDay failed", err);
+      setMsg("문제가 생겼어요. 다시 시도해 주세요.");
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(9,7,30,0.68)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 220,
+        padding: 20,
+        backdropFilter: "blur(4px)",
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 22,
+          padding: "22px 20px 18px",
+          maxWidth: 400,
+          width: "100%",
+          maxHeight: "88vh",
+          overflowY: "auto",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          border: `3px solid ${HONEY.h300}`,
+          animation: "phPopoverIn 0.2s ease",
+          textAlign: "center",
+          position: "relative",
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="close"
+          style={{
+            position: "absolute", top: 10, right: 10,
+            width: 34, height: 34, borderRadius: 10,
+            background: HONEY.h50, border: `1.5px solid ${HONEY.h200}`,
+            fontSize: 14, fontWeight: 900, color: HONEY.h800, cursor: "pointer",
+          }}
+        >✕</button>
+
+        {/* 캐릭터 — 현재 꾸밈 상태 그대로 */}
+        <div style={{ position: "relative", width: 170, height: 170, margin: "4px auto 0" }}>
+          <CharacterImage stage={st} skin={target.cosmetics.skin} hat={target.cosmetics.hat} />
+          {target.cosmetics.trophy && (
+            <img
+              src={`/stickers/trophy-${target.cosmetics.trophy}.png`}
+              alt="" aria-hidden="true"
+              style={{ position: "absolute", left: -16, bottom: -4, width: 54, height: 54, zIndex: 2 }}
+            />
+          )}
+          {target.cosmetics.pet && (
+            <img
+              src={`/stickers/pet-${target.cosmetics.pet}.png`}
+              alt="" aria-hidden="true"
+              style={{ position: "absolute", right: -20, bottom: -8, width: 64, height: 64, zIndex: 2 }}
+            />
+          )}
+        </div>
+
+        <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", marginTop: 10 }}>
+          {target.name}{isSelf ? " (나)" : ""}
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: HONEY.h700, marginTop: 2 }}>
+          {t(STAGE_LABEL_KEY[st], lang)} · {tFmt("phCountLabel", lang, { n: target.count })}
+        </div>
+
+        {/* 좋아요 */}
+        <button
+          onClick={handleLike}
+          disabled={isSelf || busy}
+          style={{
+            marginTop: 12, minHeight: 46, padding: "10px 24px",
+            background: isSelf
+              ? "#F3F4F6"
+              : "linear-gradient(135deg, #F472B6, #DB2777)",
+            color: isSelf ? "#9CA3AF" : "#fff",
+            border: "none", borderRadius: 14,
+            fontSize: 15, fontWeight: 900,
+            cursor: isSelf || busy ? "default" : "pointer",
+            boxShadow: isSelf ? "none" : "0 6px 16px rgba(219,39,119,0.3)",
+            fontFamily: "inherit",
+          }}
+        >
+          ❤️ {nLikes} {isSelf ? "· 내 벌이에요" : "· 좋아요 보내기"}
+        </button>
+
+        {msg && (
+          <div style={{
+            marginTop: 8, fontSize: 12, fontWeight: 800, color: HONEY.h800,
+            background: HONEY.h50, border: `1px solid ${HONEY.h200}`,
+            borderRadius: 10, padding: "7px 10px",
+          }}>
+            {msg}
+          </div>
+        )}
+
+        {/* 응원 댓글 */}
+        <div style={{ marginTop: 14, textAlign: "left" }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color: HONEY.h800, marginBottom: 6 }}>
+            💬 응원 한마디 ({comments.length})
+          </div>
+          {comments.length > 0 && (
+            <div style={{
+              display: "flex", flexDirection: "column", gap: 6,
+              maxHeight: 170, overflowY: "auto", marginBottom: 8,
+            }}>
+              {comments.map((c) => (
+                <div key={c.id} style={{
+                  background: HONEY.h50, border: `1px solid ${HONEY.h100}`,
+                  borderRadius: 10, padding: "7px 10px",
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 900, color: HONEY.h700, marginBottom: 2 }}>
+                    {c.fromClientId === myClientId ? `${myName} (나)` : `${t("phStudentPrefix", lang)} #${shortId(c.fromClientId)}`}
+                    <span style={{ fontWeight: 700, marginLeft: 6 }}>{timeAgo(c.timestamp, lang)}</span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1F2937", lineHeight: 1.45, wordBreak: "break-word" }}>
+                    {c.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleComment(); }}
+              placeholder={isSelf ? "친구들의 응원을 기다려요…" : "따뜻한 응원을 남겨요…"}
+              maxLength={120}
+              style={{
+                flex: 1, minHeight: 40, padding: "8px 10px", borderRadius: 10,
+                border: `1.5px solid ${HONEY.h200}`, fontSize: 13, fontWeight: 600,
+                color: "#1F2937", background: HONEY.h50,
+                outline: "none", fontFamily: "inherit",
+              }}
+            />
+            <button
+              onClick={handleComment}
+              disabled={!draft.trim() || busy}
+              style={{
+                minWidth: 56, borderRadius: 10, border: "none",
+                background: draft.trim() && !busy
+                  ? `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`
+                  : "#F3F4F6",
+                color: draft.trim() && !busy ? "#fff" : "#9CA3AF",
+                fontSize: 13, fontWeight: 900,
+                cursor: draft.trim() && !busy ? "pointer" : "default",
+                fontFamily: "inherit",
+              }}
+            >등록</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

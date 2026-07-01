@@ -13,6 +13,7 @@ import type {
   StorybookCharacter,
   StorybookChatTurn,
   StorybookAlert,
+  StorybookResponseComment,
 } from "@/lib/types";
 import {
   loadBook,
@@ -24,7 +25,9 @@ import {
   showQuestion,
   submitResponse,
   subscribeResponses,
-  setActiveCharacter,
+  appendResponseComment,
+  subscribeResponseComments,
+  setAllowReviewChat,
   appendChatTurn,
   subscribeChat,
   raiseAlert,
@@ -868,6 +871,14 @@ function DuringPhase({
     ? book.questions.find((q) => q.id === session.currentQuestionId) ?? null
     : null;
 
+  // 설계서 항목 3: 교사 허용 시 복습(during) 중 캐릭터 챗봇 사용.
+  // 오버레이 안에서 캐릭터 선택 → 챗 → ← 로 다른 캐릭터 재선택 (항목 4 공유).
+  const [reviewChatOpen, setReviewChatOpen] = useState(false);
+  const [reviewCharId, setReviewCharId] = useState<string | null>(null);
+  const reviewChar = reviewCharId
+    ? book.characters.find((c) => c.id === reviewCharId) ?? null
+    : null;
+
   if (!page) {
     return <div>Page {pageIdx} not found</div>;
   }
@@ -896,8 +907,67 @@ function DuringPhase({
           totalPages={book.pages.length}
           questions={availableQuestions}
           activeQuestionId={session.currentQuestionId}
+          allowReviewChat={!!session.allowReviewChat}
           onGotoAfter={() => setPhase(roomCode, "after")}
         />
+      )}
+
+      {/* ── 학생: 복습 중 캐릭터에게 물어보기 (교사 허용 시에만) ── */}
+      {!isTeacher && session.allowReviewChat && book.characters.length > 0 && (
+        <button
+          onClick={() => setReviewChatOpen(true)}
+          style={{
+            width: "100%", minHeight: 52, marginBottom: 14,
+            background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
+            color: "#fff", fontSize: 15, fontWeight: 900,
+            border: "none", borderRadius: 16, cursor: "pointer",
+            boxShadow: "0 6px 18px rgba(245,158,11,0.35)",
+            letterSpacing: -0.2, fontFamily: "inherit",
+          }}
+        >🐝 {t("sbChooseCharacter", lang)} — 궁금한 걸 물어봐!</button>
+      )}
+
+      {!isTeacher && reviewChatOpen && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) { setReviewChatOpen(false); setReviewCharId(null); } }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 600,
+            background: "rgba(17,24,39,0.55)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 14, animation: "fadeIn 0.2s",
+          }}
+        >
+          <div style={{ width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto", position: "relative" }}>
+            <button
+              onClick={() => { setReviewChatOpen(false); setReviewCharId(null); }}
+              aria-label="닫기"
+              style={{
+                position: "sticky", top: 0, left: "100%", zIndex: 2,
+                width: 38, height: 38, borderRadius: 12, marginBottom: 6,
+                background: "#fff", border: "2px solid #FDE68A",
+                fontSize: 15, fontWeight: 900, color: "#92400E", cursor: "pointer",
+                display: "block",
+              }}
+            >✕</button>
+            {reviewChar ? (
+              <CharacterChat
+                lang={lang}
+                roomCode={roomCode}
+                myClientId={myClientId}
+                user={user}
+                book={book}
+                character={reviewChar}
+                onBack={() => setReviewCharId(null)}
+              />
+            ) : (
+              <CharacterPicker
+                lang={lang}
+                book={book}
+                onPick={(id) => setReviewCharId(id)}
+              />
+            )}
+          </div>
+        </div>
       )}
     </>
   );
@@ -1128,6 +1198,61 @@ function QuestionCard({
     const r = responses[selectedFruit];
     if (r) ensureTranslation(r);
   }, [selectedFruit, responses, ensureTranslation]);
+
+  // ── 응답 댓글: 복습 중 의견 추가 (설계서 항목 1) ──
+  const [fruitComments, setFruitComments] = useState<StorybookResponseComment[]>([]);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentWarn, setCommentWarn] = useState<string | null>(null);
+  const selectedRespId = selectedFruit !== null ? responses[selectedFruit]?.id ?? null : null;
+
+  // 선택된 응답 1개의 댓글만 구독 (전체 트리 구독 금지)
+  useEffect(() => {
+    setFruitComments([]);
+    setCommentDraft("");
+    setCommentWarn(null);
+    if (!selectedRespId) return;
+    const unsub = subscribeResponseComments(roomCode, q.id, selectedRespId, setFruitComments);
+    return () => unsub();
+  }, [roomCode, q.id, selectedRespId]);
+
+  // 댓글도 원문+번역 2줄 규칙 (항목 5) — 도착 시 자동 번역
+  useEffect(() => {
+    for (const c of fruitComments) {
+      if (c.studentLang && c.studentLang !== lang) {
+        ensureTranslation({ id: c.id, text: c.text, studentLang: c.studentLang } as StorybookResponse);
+      }
+    }
+  }, [fruitComments, lang, ensureTranslation]);
+
+  function handleAddComment() {
+    const text = commentDraft.trim();
+    if (!text || !selectedRespId) return;
+    // 클라이언트 사전 안전검사 (챗과 동일 레이어)
+    const pre = checkSafety(text);
+    if (pre.distress) {
+      setCommentWarn(replyForSafety(lang, "distress"));
+      raiseAlert(roomCode, {
+        clientId: myClientId, studentName: user.myName,
+        timestamp: Date.now(), kind: "distress",
+      }).catch(() => {});
+      setCommentDraft("");
+      return;
+    }
+    if (pre.blocked) {
+      setCommentWarn(replyForSafety(lang, "warning"));
+      return;
+    }
+    setCommentWarn(null);
+    // 낙관적 쓰기 — 로컬 에코가 즉시 목록에 반영된다
+    appendResponseComment(roomCode, q.id, selectedRespId, {
+      clientId: myClientId,
+      studentName: user.myName,
+      studentLang: user.myLang,
+      text,
+      timestamp: Date.now(),
+    }).catch((err) => console.error("comment write failed", err));
+    setCommentDraft("");
+  }
 
   // ── Typewriter effect for student intro ──
   const introText = pick(q.text, lang);
@@ -1693,6 +1818,81 @@ function QuestionCard({
                     </div>
                   )}
 
+                  {/* ── 💬 친구들의 생각: 복습 중 의견 추가 (설계서 항목 1) ── */}
+                  <div style={{
+                    marginTop: 12, borderTop: "1.5px dashed rgba(180,83,9,0.25)", paddingTop: 10,
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: "#92400E", marginBottom: 6 }}>
+                      💬 친구들의 생각 ({fruitComments.length})
+                    </div>
+                    {fruitComments.length > 0 && (
+                      <div style={{
+                        display: "flex", flexDirection: "column", gap: 6,
+                        maxHeight: 180, overflowY: "auto", marginBottom: 8,
+                      }}>
+                        {fruitComments.map((c) => {
+                          const ckey = `${c.id}:${lang}`;
+                          const cTranslated = c.studentLang && c.studentLang !== lang ? translations[ckey] : null;
+                          return (
+                            <div key={c.id} style={{
+                              background: "rgba(255,255,255,0.65)", borderRadius: 10, padding: "7px 10px",
+                            }}>
+                              <div style={{ fontSize: 10, fontWeight: 900, color: "#6B7280", marginBottom: 2 }}>
+                                {c.studentName}{c.clientId === myClientId ? " (나)" : ""}
+                              </div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "#1F2937", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
+                                {c.text}
+                              </div>
+                              {/* 원문+번역 2줄 규칙 (항목 5) */}
+                              {cTranslated && cTranslated !== c.text && (
+                                <div style={{
+                                  fontSize: 12, fontWeight: 600, color: "#4B5563", marginTop: 3,
+                                  paddingTop: 3, borderTop: "1px dashed rgba(0,0,0,0.1)",
+                                }}>
+                                  🌐 {cTranslated}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {commentWarn && (
+                      <div style={{ fontSize: 11, fontWeight: 800, color: "#B91C1C", marginBottom: 6, lineHeight: 1.4 }}>
+                        ⚠ {commentWarn}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input
+                        value={commentDraft}
+                        onChange={(e) => setCommentDraft(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleAddComment(); }}
+                        placeholder="내 생각을 덧붙여요…"
+                        maxLength={150}
+                        style={{
+                          flex: 1, minHeight: 38, padding: "6px 10px", borderRadius: 10,
+                          border: "1.5px solid rgba(245,158,11,0.4)", fontSize: 13, fontWeight: 600,
+                          color: "#1F2937", background: "rgba(255,255,255,0.8)",
+                          outline: "none", fontFamily: "inherit",
+                        }}
+                      />
+                      <button
+                        onClick={handleAddComment}
+                        disabled={!commentDraft.trim()}
+                        style={{
+                          minWidth: 54, borderRadius: 10, border: "none",
+                          background: commentDraft.trim()
+                            ? "linear-gradient(135deg, #F59E0B, #D97706)"
+                            : "rgba(0,0,0,0.08)",
+                          color: commentDraft.trim() ? "#fff" : "#9CA3AF",
+                          fontSize: 13, fontWeight: 900,
+                          cursor: commentDraft.trim() ? "pointer" : "default",
+                          fontFamily: "inherit",
+                        }}
+                      >등록</button>
+                    </div>
+                  </div>
+
                   <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
                     <button onClick={() => setSelectedFruit(null)} style={{
                       flex: 1, padding: "10px 0", borderRadius: 12,
@@ -1826,7 +2026,7 @@ function TeacherControls({
 // ============================================================
 
 function TeacherPageControls({
-  lang, roomCode, pageIdx, totalPages, questions, activeQuestionId, onGotoAfter,
+  lang, roomCode, pageIdx, totalPages, questions, activeQuestionId, allowReviewChat, onGotoAfter,
 }: {
   lang: string;
   roomCode: string;
@@ -1834,6 +2034,8 @@ function TeacherPageControls({
   totalPages: number;
   questions: StorybookQuestion[];
   activeQuestionId: string | null;
+  /** 복습 중 캐릭터 챗봇 허용 여부 (설계서 항목 3, 기본 OFF) */
+  allowReviewChat: boolean;
   onGotoAfter: () => void;
 }) {
   const prevDisabled = pageIdx <= 1;
@@ -1889,6 +2091,39 @@ function TeacherPageControls({
             }}
           >{t("sbPhaseNextAfter", lang)}</button>
         )}
+      </div>
+
+      {/* ── 복습 중 챗봇 허용 토글 (설계서 항목 3, 기본 OFF) ── */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 12px", marginBottom: 12,
+        background: "#FFFBEB", border: "1.5px solid #FDE68A", borderRadius: 12,
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: "#92400E" }}>
+            🐝 복습 중 캐릭터 챗봇 허용
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#B45309", opacity: 0.8, marginTop: 2 }}>
+            켜면 학생이 읽는 중에도 등장인물에게 질문할 수 있어요
+          </div>
+        </div>
+        <button
+          onClick={() => setAllowReviewChat(roomCode, !allowReviewChat).catch((err) => console.error("setAllowReviewChat failed", err))}
+          role="switch"
+          aria-checked={allowReviewChat}
+          aria-label="복습 중 캐릭터 챗봇 허용"
+          style={{
+            width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
+            background: allowReviewChat ? "#F59E0B" : "#E5E7EB",
+            position: "relative", transition: "background 0.2s", flexShrink: 0,
+          }}
+        >
+          <div style={{
+            position: "absolute", top: 3, left: allowReviewChat ? 25 : 3,
+            width: 20, height: 20, borderRadius: "50%", background: "#fff",
+            transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+          }} />
+        </button>
       </div>
 
       {questions.length > 0 && (
@@ -1947,9 +2182,10 @@ function AfterPhase({
   myClientId: string;
   user: UserConfig;
 }) {
-  const activeChar = session.activeCharacterId
-    ? book.characters.find((c) => c.id === session.activeCharacterId) ?? null
-    : null;
+  // 설계서 항목 4: 캐릭터 선택은 학생별 "로컬" 상태 — 세션 전역
+  // activeCharacterId 로 전 학급이 한 캐릭터에 묶이던 구조를 해체.
+  // 뒤로가기(onBack)로 언제든 다른 캐릭터를 다시 고를 수 있다.
+  const [pickedCharId, setPickedCharId] = useState<string | null>(null);
 
   // Teacher view: roster of chats in progress + end button
   if (isTeacher) {
@@ -1959,24 +2195,22 @@ function AfterPhase({
         roomCode={roomCode}
         book={book}
         session={session}
-        activeChar={activeChar}
+        activeChar={null}
       />
     );
   }
 
+  const picked = pickedCharId
+    ? book.characters.find((c) => c.id === pickedCharId) ?? null
+    : null;
+
   // Student view: pick character (if none picked yet) then chat
-  if (!activeChar) {
+  if (!picked) {
     return (
       <CharacterPicker
         lang={lang}
         book={book}
-        onPick={async (id) => {
-          // Student's pick seeds their own clientId → activeCharacterId only
-          // stores the "featured" character for teacher-led flow. But in MVP
-          // each student can choose independently — we store locally via
-          // react state by using a per-student path.
-          await setActiveCharacter(roomCode, id);
-        }}
+        onPick={(id) => setPickedCharId(id)}
       />
     );
   }
@@ -1988,7 +2222,8 @@ function AfterPhase({
       myClientId={myClientId}
       user={user}
       book={book}
-      character={activeChar}
+      character={picked}
+      onBack={() => setPickedCharId(null)}
     />
   );
 }
@@ -2071,7 +2306,7 @@ function CharacterPicker({
 }
 
 function CharacterChat({
-  lang, roomCode, myClientId, user, book, character,
+  lang, roomCode, myClientId, user, book, character, onBack,
 }: {
   lang: string;
   roomCode: string;
@@ -2079,6 +2314,8 @@ function CharacterChat({
   user: UserConfig;
   book: Storybook;
   character: StorybookCharacter;
+  /** 캐릭터 선택 화면으로 복귀 — 다른 챗봇과 대화 가능 (설계서 항목 4) */
+  onBack?: () => void;
 }) {
   const [turns, setTurns] = useState<StorybookChatTurn[]>([]);
   const [draft, setDraft] = useState("");
@@ -2086,10 +2323,12 @@ function CharacterChat({
   const [streamText, setStreamText] = useState<string | null>(null);
   const [showLangExpand, setShowLangExpand] = useState(false);
 
+  // 캐릭터별 분리된 로그 구독 — 캐릭터 전환 시 자동 재구독
   useEffect(() => {
-    const unsub = subscribeChat(roomCode, myClientId, setTurns);
+    setTurns([]);
+    const unsub = subscribeChat(roomCode, myClientId, character.id, setTurns);
     return () => unsub();
-  }, [roomCode, myClientId]);
+  }, [roomCode, myClientId, character.id]);
 
   const studentTurnCount = useMemo(
     () => turns.filter((t) => t.from === "student").length,
@@ -2114,10 +2353,10 @@ function CharacterChat({
     // Client-side pre-check (Layer 1)
     const pre = checkSafety(text);
     if (pre.distress) {
-      await appendChatTurn(roomCode, myClientId, {
+      await appendChatTurn(roomCode, myClientId, character.id, {
         from: "student", text, timestamp: Date.now(), flagged: true,
       });
-      await appendChatTurn(roomCode, myClientId, {
+      await appendChatTurn(roomCode, myClientId, character.id, {
         from: "character", text: replyForSafety(lang, "distress"),
         timestamp: Date.now() + 1,
       });
@@ -2138,10 +2377,10 @@ function CharacterChat({
       const priorFlagged = turns.filter((tt) => tt.from === "student" && tt.flagged).length;
       const isRepeat = priorFlagged >= 1;
 
-      await appendChatTurn(roomCode, myClientId, {
+      await appendChatTurn(roomCode, myClientId, character.id, {
         from: "student", text, timestamp: Date.now(), flagged: true,
       });
-      await appendChatTurn(roomCode, myClientId, {
+      await appendChatTurn(roomCode, myClientId, character.id, {
         from: "character",
         text: replyForSafety(lang, isRepeat ? "block" : "warning"),
         timestamp: Date.now() + 1,
@@ -2161,7 +2400,7 @@ function CharacterChat({
     // Record the student turn — await 하지 않는다. Firebase 는 로컬 쓰기를
     // 즉시 onValue 로 에코하므로 화면엔 바로 뜨고, 서버 ack 를 기다리느라
     // LLM 요청 시작이 늦어지는 게 기존 체감 지연의 한 축이었음.
-    appendChatTurn(roomCode, myClientId, {
+    appendChatTurn(roomCode, myClientId, character.id, {
       from: "student", text, timestamp: Date.now(),
     }).catch((err) => console.error("student turn write failed", err));
 
@@ -2195,14 +2434,14 @@ function CharacterChat({
       }
       // 로컬 에코가 즉시 발화하므로 await 없이 기록 → streamText 정리 순서로
       // 깜빡임 없이 확정 버블로 전환된다.
-      appendChatTurn(roomCode, myClientId, {
+      appendChatTurn(roomCode, myClientId, character.id, {
         from: "character", text: data.reply || replyForSafety(lang, "block"),
         timestamp: Date.now(),
         flagged: data.kind !== "normal",
       }).catch((err) => console.error("character turn write failed", err));
     } catch (err) {
       console.error("chat request failed", err);
-      appendChatTurn(roomCode, myClientId, {
+      appendChatTurn(roomCode, myClientId, character.id, {
         from: "character", text: replyForSafety(lang, "block"),
         timestamp: Date.now(), flagged: true,
       }).catch(() => {});
@@ -2231,6 +2470,18 @@ function CharacterChat({
         display: "flex", alignItems: "center", gap: 12,
         borderBottom: "2px solid #F59E0B33",
       }}>
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label="다른 캐릭터 고르기"
+            title="다른 캐릭터와 대화하기"
+            style={{
+              width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+              background: "#fff", border: "2px solid #F59E0B",
+              fontSize: 16, fontWeight: 900, color: "#92400E", cursor: "pointer",
+            }}
+          >←</button>
+        )}
         {character.avatarUrl ? (
           <img
             src={character.avatarUrl}
@@ -2461,7 +2712,7 @@ function LangExpandPanel({
     if (picked) return;
     setPicked(item.code);
     const farewell = `${item.greeting} ${character.avatarEmoji}`;
-    await appendChatTurn(roomCode, myClientId, {
+    await appendChatTurn(roomCode, myClientId, character.id, {
       from: "character",
       text: farewell,
       timestamp: Date.now(),

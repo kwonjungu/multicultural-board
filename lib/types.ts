@@ -236,6 +236,19 @@ export interface StorybookSession {
   activeCharacterId: string | null;  // which character is being chatted with (after phase)
   teacherClientId: string;
   startedAt: number;
+  /** 교사 허용 시 복습(during) 중에도 캐릭터 챗봇 사용 가능 — 기본 OFF (설계서 항목 3) */
+  allowReviewChat?: boolean;
+}
+
+/** 응답에 달리는 친구 의견 (복습 중 댓글 — 설계서 항목 1) */
+export interface StorybookResponseComment {
+  id: string;
+  clientId: string;
+  studentName: string;
+  studentLang: string;
+  text: string;
+  timestamp: number;
+  flagged?: boolean;
 }
 
 export interface StorybookResponse {
@@ -246,6 +259,8 @@ export interface StorybookResponse {
   studentLang: string;
   text: string;
   timestamp: number;
+  /** 하위 노드로 저장되는 댓글 — subscribeResponses raw 에 섞여 올 수 있음 */
+  comments?: Record<string, StorybookResponseComment>;
 }
 
 export interface StorybookChatTurn {
