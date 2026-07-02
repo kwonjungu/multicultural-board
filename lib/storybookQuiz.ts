@@ -58,10 +58,14 @@ function trimAnswerBias(answer: string, distractors: string[]): string {
   if (maxD === 0) return answer;
   if (answer.length <= maxD * 1.3 || answer.length - maxD <= 6) return answer;
   // 구두점(문장/절 경계) 후보 위치 중, 오답 최장에 가장 가까운 지점으로 컷
+  // (matchAll 은 tsconfig target 이 낮아 이터레이션 불가 — exec 루프 사용)
   const cutPoints: number[] = [];
-  for (const m of answer.matchAll(/[.。!?,，·;:]|(?:이에요|예요|해요|어요|아요|이다|한다)\s/g)) {
-    const end = (m.index ?? 0) + m[0].trimEnd().length;
+  const re = /[.。!?,，·;:]|(?:이에요|예요|해요|어요|아요|이다|한다)\s/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(answer)) !== null) {
+    const end = m.index + m[0].trimEnd().length;
     if (end >= 6) cutPoints.push(end);
+    if (m.index === re.lastIndex) re.lastIndex++; // 무한루프 가드
   }
   // 목표: maxD 근처(±40%) 길이가 되는 가장 긴 컷
   const target = cutPoints.filter((p) => p <= maxD * 1.4 && p < answer.length);
