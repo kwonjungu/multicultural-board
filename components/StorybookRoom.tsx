@@ -952,6 +952,8 @@ function StorybookFreeReader({
             bookId={book.id}
             question={q}
             viewerLang={viewerLang}
+            user={user}
+            myClientId={myClientId}
           />
         ))}
 
@@ -1045,23 +1047,37 @@ function StorybookFreeReader({
 // [#1] 친구들의 예전 답변 — 책별 영속 저장(bookAnswers)을 읽어 자유 읽기 화면에 표시.
 //   뷰어 언어와 다른 답변은 언어별로 묶어 한 번에 번역한다.
 function FriendAnswers({
-  roomCode, bookId, question, viewerLang,
+  roomCode, bookId, question, viewerLang, user, myClientId,
 }: {
   roomCode: string; bookId: string; question: StorybookQuestion; viewerLang: string;
+  user: UserConfig; myClientId: string;
 }) {
   const [answers, setAnswers] = useState<StorybookResponse[]>([]);
   const [trans, setTrans] = useState<Record<string, string>>({});
+  // 복습 중 의견 추가 (설계서 항목 1) — 답변별 댓글 입력
+  const [draftFor, setDraftFor] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [warn, setWarn] = useState<string | null>(null);
 
   useEffect(() => {
+    // comments 서브트리는 raw 에 함께 실려온다 (bookAnswers 하위 저장이라
+    // 별도 구독 불필요 — 댓글 추가 시 onValue 에코로 자동 갱신)
     const unsub = subscribeBookAnswers(roomCode, bookId, question.id, setAnswers);
     return () => unsub();
   }, [roomCode, bookId, question.id]);
 
   useEffect(() => {
-    const groups: Record<string, StorybookResponse[]> = {};
+    // 답변 + 댓글 텍스트를 언어별로 묶어 배치 번역 (항목 5: 원문+번역 2줄)
+    const groups: Record<string, Array<{ id: string; text: string }>> = {};
+    const add = (id: string, text: string, fromLang?: string) => {
+      if (!fromLang || fromLang === viewerLang || trans[id] || !text) return;
+      (groups[fromLang] ||= []).push({ id, text });
+    };
     for (const a of answers) {
-      if (!a.studentLang || a.studentLang === viewerLang || trans[a.id]) continue;
-      (groups[a.studentLang] ||= []).push(a);
+      add(a.id, a.text, a.studentLang);
+      for (const c of Object.values(a.comments ?? {})) {
+        if (c) add(c.id, c.text, c.studentLang);
+      }
     }
     const langs = Object.keys(groups);
     if (langs.length === 0) return;
@@ -1073,13 +1089,13 @@ function FriendAnswers({
           const res = await fetch("/api/storybook-translate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ texts: grp.map((a) => a.text), fromLang: fl, toLang: viewerLang }),
+            body: JSON.stringify({ texts: grp.map((g) => g.text), fromLang: fl, toLang: viewerLang }),
           });
           const data = (await res.json()) as { ok: boolean; translated?: string[] };
           if (!cancel && data.ok && data.translated) {
             setTrans((prev) => {
               const next = { ...prev };
-              grp.forEach((a, i) => { if (data.translated![i]) next[a.id] = data.translated![i]; });
+              grp.forEach((g, i) => { if (data.translated![i]) next[g.id] = data.translated![i]; });
               return next;
             });
           }
@@ -1087,9 +1103,38 @@ function FriendAnswers({
       }
     })();
     return () => { cancel = true; };
-    // trans 는 의도적으로 제외(루프 방지) — 새 답변 도착 시에만 재번역
+    // trans 는 의도적으로 제외(루프 방지) — 새 답변/댓글 도착 시에만 재번역
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, viewerLang]);
+
+  function handleAddComment(respId: string) {
+    const text = draft.trim();
+    if (!text) return;
+    // 클라이언트 사전 안전검사 (챗과 동일 레이어)
+    const pre = checkSafety(text);
+    if (pre.distress) {
+      setWarn(replyForSafety(viewerLang, "distress"));
+      raiseAlert(roomCode, {
+        clientId: myClientId, studentName: user.myName,
+        timestamp: Date.now(), kind: "distress",
+      }).catch(() => {});
+      setDraft("");
+      return;
+    }
+    if (pre.blocked) {
+      setWarn(replyForSafety(viewerLang, "warning"));
+      return;
+    }
+    setWarn(null);
+    appendResponseComment(roomCode, bookId, question.id, respId, {
+      clientId: myClientId,
+      studentName: user.myName,
+      studentLang: user.myLang,
+      text,
+      timestamp: Date.now(),
+    }).catch((err) => console.error("comment write failed", err));
+    setDraft("");
+  }
 
   if (answers.length === 0) return null;
 
@@ -1102,22 +1147,132 @@ function FriendAnswers({
         💬 {pick(question.text, viewerLang)}
       </div>
       <div style={{ fontSize: 11, fontWeight: 800, color: "#B45309", marginBottom: 10 }}>
-        친구들의 생각 {answers.length}개
+        친구들의 생각 {answers.length}개 — 눌러서 내 생각을 덧붙일 수 있어요
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {answers.map((a) => (
-          <div key={a.id} style={{
-            background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12,
-            padding: "8px 12px",
-          }}>
-            <div style={{ fontSize: 14, color: "#1F2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-              {trans[a.id] || a.text}
+        {answers.map((a) => {
+          const aTrans = trans[a.id];
+          const comments = Object.values(a.comments ?? {})
+            .filter(Boolean)
+            .sort((x, y) => (x.timestamp ?? 0) - (y.timestamp ?? 0));
+          const open = draftFor === a.id;
+          return (
+            <div key={a.id} style={{
+              background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12,
+              padding: "8px 12px",
+            }}>
+              {/* 메인 = 뷰어 언어(번역 도착 시), 아래 원문 항상 표시 (항목 5) */}
+              <div style={{ fontSize: 14, color: "#1F2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                {aTrans || a.text}
+              </div>
+              {aTrans && aTrans !== a.text && (
+                <div style={{
+                  marginTop: 5, padding: "5px 8px",
+                  background: "rgba(255,255,255,0.7)", borderRadius: 8,
+                  borderLeft: "3px solid rgba(245,158,11,0.5)",
+                  fontSize: 12, color: "#4B5563", lineHeight: 1.45, whiteSpace: "pre-wrap",
+                }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: "#92400E", marginRight: 4 }}>
+                    📜 원문 · {(a.studentLang || "").toUpperCase()}
+                  </span>
+                  {a.text}
+                </div>
+              )}
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#92400E", marginTop: 4 }}>
+                — {a.studentName}
+              </div>
+
+              {/* ── 💬 친구 의견 댓글 (설계서 항목 1, 영속) ── */}
+              {comments.length > 0 && (
+                <div style={{
+                  marginTop: 8, paddingTop: 8, borderTop: "1px dashed #FDE68A",
+                  display: "flex", flexDirection: "column", gap: 5,
+                }}>
+                  {comments.map((c) => {
+                    const cTrans = trans[c.id];
+                    return (
+                      <div key={c.id} style={{
+                        background: "#fff", border: "1px solid #FEF3C7",
+                        borderRadius: 9, padding: "6px 9px",
+                      }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
+                          {cTrans || c.text}
+                        </div>
+                        {cTrans && cTrans !== c.text && (
+                          <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2, lineHeight: 1.4 }}>
+                            📜 {c.text}
+                          </div>
+                        )}
+                        <div style={{ fontSize: 9.5, fontWeight: 800, color: "#B45309", marginTop: 2 }}>
+                          ↳ {c.studentName}{c.clientId === myClientId ? " (나)" : ""}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {open ? (
+                <div style={{ marginTop: 8 }}>
+                  {warn && (
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#B91C1C", marginBottom: 5, lineHeight: 1.4 }}>
+                      ⚠ {warn}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleAddComment(a.id); }}
+                      placeholder="내 생각을 덧붙여요…"
+                      maxLength={150}
+                      autoFocus
+                      style={{
+                        flex: 1, minHeight: 38, padding: "6px 10px", borderRadius: 10,
+                        border: "1.5px solid #FDE68A", fontSize: 13, fontWeight: 600,
+                        color: "#1F2937", background: "#fff",
+                        outline: "none", fontFamily: "inherit",
+                      }}
+                    />
+                    <button
+                      onClick={() => handleAddComment(a.id)}
+                      disabled={!draft.trim()}
+                      style={{
+                        minWidth: 54, borderRadius: 10, border: "none",
+                        background: draft.trim()
+                          ? "linear-gradient(135deg, #F59E0B, #D97706)"
+                          : "#F3F4F6",
+                        color: draft.trim() ? "#fff" : "#9CA3AF",
+                        fontSize: 13, fontWeight: 900,
+                        cursor: draft.trim() ? "pointer" : "default",
+                        fontFamily: "inherit",
+                      }}
+                    >등록</button>
+                    <button
+                      onClick={() => { setDraftFor(null); setDraft(""); setWarn(null); }}
+                      aria-label="닫기"
+                      style={{
+                        minWidth: 38, borderRadius: 10, border: "1.5px solid #E5E7EB",
+                        background: "#fff", color: "#9CA3AF", fontSize: 13, fontWeight: 900,
+                        cursor: "pointer", fontFamily: "inherit",
+                      }}
+                    >✕</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setDraftFor(a.id); setDraft(""); setWarn(null); }}
+                  style={{
+                    marginTop: 6, padding: "5px 12px", borderRadius: 999,
+                    background: "#fff", border: "1.5px dashed #F59E0B",
+                    color: "#B45309", fontSize: 11.5, fontWeight: 900,
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >💬 내 생각 남기기</button>
+              )}
             </div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#92400E", marginTop: 4 }}>
-              — {a.studentName}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1883,6 +2038,8 @@ function QuestionCard({
   }, [selectedFruit, responses, ensureTranslation]);
 
   // ── 응답 댓글: 복습 중 의견 추가 (설계서 항목 1) ──
+  // 영속 경로(bookAnswers) 하위에 저장 — 세션이 끝나도 자유 읽기(복습)에서 유지.
+  const bookIdForComments = book?.id ?? null;
   const [fruitComments, setFruitComments] = useState<StorybookResponseComment[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
   const [commentWarn, setCommentWarn] = useState<string | null>(null);
@@ -1893,10 +2050,10 @@ function QuestionCard({
     setFruitComments([]);
     setCommentDraft("");
     setCommentWarn(null);
-    if (!selectedRespId) return;
-    const unsub = subscribeResponseComments(roomCode, q.id, selectedRespId, setFruitComments);
+    if (!selectedRespId || !bookIdForComments) return;
+    const unsub = subscribeResponseComments(roomCode, bookIdForComments, q.id, selectedRespId, setFruitComments);
     return () => unsub();
-  }, [roomCode, q.id, selectedRespId]);
+  }, [roomCode, bookIdForComments, q.id, selectedRespId]);
 
   // 댓글도 원문+번역 2줄 규칙 (항목 5) — 도착 시 자동 번역
   useEffect(() => {
@@ -1909,7 +2066,7 @@ function QuestionCard({
 
   function handleAddComment() {
     const text = commentDraft.trim();
-    if (!text || !selectedRespId) return;
+    if (!text || !selectedRespId || !bookIdForComments) return;
     // 클라이언트 사전 안전검사 (챗과 동일 레이어)
     const pre = checkSafety(text);
     if (pre.distress) {
@@ -1927,7 +2084,7 @@ function QuestionCard({
     }
     setCommentWarn(null);
     // 낙관적 쓰기 — 로컬 에코가 즉시 목록에 반영된다
-    appendResponseComment(roomCode, q.id, selectedRespId, {
+    appendResponseComment(roomCode, bookIdForComments, q.id, selectedRespId, {
       clientId: myClientId,
       studentName: user.myName,
       studentLang: user.myLang,

@@ -301,8 +301,9 @@ export async function submitResponse(
   if (opts?.imageUrl) payload.imageUrl = opts.imageUrl;
   // [#1] 책별 영속 사본 — 세션이 끝나도 친구들 답변이 남아 자유 읽기에서 보인다.
   //   표시용 부가 쓰기이므로 fire-and-forget (가드레일: 부가 쓰기는 await 금지).
+  //   set 이 아니라 update — 하위 comments(친구 의견)를 재제출 시에도 보존.
   if (bookId) {
-    set(ref(db, `${bookAnswersPath(roomCode, bookId, questionId)}/${clientId}`), payload).catch(() => {});
+    update(ref(db, `${bookAnswersPath(roomCode, bookId, questionId)}/${clientId}`), payload as unknown as Record<string, unknown>).catch(() => {});
   }
   // set 이 아니라 update — 하위 comments 서브트리(친구 의견, 설계서 항목 1)를
   // 재제출 시에도 보존해야 한다.
@@ -379,31 +380,38 @@ export function subscribeBookAnswers(
 }
 
 // === Response comments (복습 중 의견 추가 — 설계서 항목 1) ===
-// rooms/{roomCode}/storybook/responses/{questionId}/{responseId}/comments/{commentId}
+// 저장 위치는 반드시 **영속 경로(bookAnswers)** 하위:
+//   rooms/{roomCode}/bookAnswers/{bookId}/{questionId}/{responseId}/comments/{commentId}
+// storybook/responses 하위에 두면 endSession 의 서브트리 wipe 로 댓글이 통째로
+// 사라진다(복습=자유 읽기의 핵심 데이터인데!). 자유 읽기의 subscribeBookAnswers 가
+// 같은 노드를 구독하므로 댓글은 답변 raw 의 `comments` 필드로 함께 도착한다.
 
 export async function appendResponseComment(
   roomCode: string,
+  bookId: string,
   questionId: string,
   responseId: string,
   comment: Omit<StorybookResponseComment, "id">,
 ): Promise<string> {
   const db = getClientDb();
-  const listRef = ref(db, `${responsesPath(roomCode, questionId)}/${responseId}/comments`);
+  const listRef = ref(db, `${bookAnswersPath(roomCode, bookId, questionId)}/${responseId}/comments`);
   const newRef = push(listRef);
   const id = newRef.key as string;
   await set(newRef, stripUndefined({ ...comment, id }));
   return id;
 }
 
-/** 선택된 응답 1개의 댓글만 구독 — 전체 응답 트리 구독 금지 (트래픽 절약) */
+/** 선택된 응답 1개의 댓글만 구독 (세션 중 fruit 모달용 — 자유 읽기는
+ *  subscribeBookAnswers raw 의 comments 필드를 그대로 쓰면 된다) */
 export function subscribeResponseComments(
   roomCode: string,
+  bookId: string,
   questionId: string,
   responseId: string,
   cb: (list: StorybookResponseComment[]) => void,
 ): () => void {
   const db = getClientDb();
-  const r = ref(db, `${responsesPath(roomCode, questionId)}/${responseId}/comments`);
+  const r = ref(db, `${bookAnswersPath(roomCode, bookId, questionId)}/${responseId}/comments`);
   const unsub = onValue(r, (snap) => {
     const val = snap.val() as Record<string, StorybookResponseComment> | null;
     const list = val

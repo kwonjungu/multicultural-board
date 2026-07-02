@@ -2,6 +2,7 @@
 
 import { CSSProperties, useEffect, useMemo, useReducer, useState } from "react";
 import { LangMap, TREASURE_SCENES, TreasureScene, tr } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 
 // ============================================================
@@ -240,8 +241,8 @@ function SetupView(p: {
               background: state.scene === s.key ? "#FFFBEB" : "#FFFFFF",
             }}>
             <div style={{ fontSize: 30 }}>{s.emoji}</div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#374151", marginTop: 4 }}>{tr(s.name, langA)}</div>
-            <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>{tr(s.name, langB)}</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#374151", marginTop: 4 }}><GameText map={s.name} lang={langA} /></div>
+            <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}><GameText map={s.name} lang={langB} /></div>
           </button>
         ))}
       </div>
