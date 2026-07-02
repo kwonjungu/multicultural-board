@@ -27,11 +27,11 @@ const PLAN = [
   { key: "backdrop-rainbow",   out: "public/stickers/backdrop-rainbow.png",   type: "backdrop", size: 768 },
   { key: "backdrop-night",     out: "public/stickers/backdrop-night.png",     type: "backdrop", size: 768 },
   { key: "backdrop-throne",    out: "public/stickers/backdrop-throne.png",    type: "backdrop", size: 768 },
-  // 오라
-  { key: "aura-sparkle",       out: "public/stickers/aura-sparkle.png",       type: "sticker", size: 512 },
-  { key: "aura-heart",         out: "public/stickers/aura-heart.png",         type: "sticker", size: 512 },
-  { key: "aura-stardust",      out: "public/stickers/aura-stardust.png",      type: "sticker", size: 512 },
-  { key: "aura-royal",         out: "public/stickers/aura-royal.png",         type: "sticker", size: 512 },
+  // 오라 — 링이 중앙을 밀폐하는 경우가 있어 중앙 시드도 함께 flood ("aura" 타입)
+  { key: "aura-sparkle",       out: "public/stickers/aura-sparkle.png",       type: "aura", size: 512 },
+  { key: "aura-heart",         out: "public/stickers/aura-heart.png",         type: "aura", size: 512 },
+  { key: "aura-stardust",      out: "public/stickers/aura-stardust.png",      type: "aura", size: 512 },
+  { key: "aura-royal",         out: "public/stickers/aura-royal.png",         type: "aura", size: 512 },
   // 소지품
   { key: "held-honeypot",      out: "public/stickers/held-honeypot.png",      type: "sticker", size: 360 },
   { key: "held-book",          out: "public/stickers/held-book.png",          type: "sticker", size: 360 },
@@ -48,7 +48,9 @@ const PLAN = [
 ];
 
 // ── 흰 배경 제거: 4변 에지에서 흰색 계열만 flood-fill (apply-batch-images 와 동일) ──
-function removeWhiteBg(data, width, height) {
+// centerSeed=true 면 중앙 픽셀도 시드 — 오라처럼 링이 중앙 흰 영역을 밀폐한 경우
+// (에지 flood 가 못 들어가 캐릭터를 가리는 흰 원이 남는 문제) 해결.
+function removeWhiteBg(data, width, height, centerSeed = false) {
   const TOL = 38;
   const isWhite = (i) => {
     const r = data[i], g = data[i + 1], b = data[i + 2];
@@ -63,6 +65,14 @@ function removeWhiteBg(data, width, height) {
   };
   for (let x = 0; x < width; x++) { seed(x, 0); seed(x, height - 1); }
   for (let y = 0; y < height; y++) { seed(0, y); seed(width - 1, y); }
+  if (centerSeed) {
+    // 중앙 부근 여러 점 시드 — 중앙에 작은 장식이 있어도 근처 흰 픽셀로 진입
+    const cx = Math.floor(width / 2), cy = Math.floor(height / 2);
+    for (const [dx, dy] of [[0,0],[-20,0],[20,0],[0,-20],[0,20],[-40,-40],[40,40]]) {
+      const x = cx + dx, y = cy + dy;
+      if (x >= 0 && x < width && y >= 0 && y < height) seed(x, y);
+    }
+  }
   while (queue.length) {
     const pos = queue.pop();
     if (visited[pos]) continue;
@@ -90,9 +100,9 @@ for (const job of PLAN) {
   await mkdir(dirname(outAbs), { recursive: true });
   const raw = await readFile(srcFile);
 
-  if (job.type === "sticker") {
+  if (job.type === "sticker" || job.type === "aura") {
     const { data, info } = await sharp(raw).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    removeWhiteBg(data, info.width, info.height);
+    removeWhiteBg(data, info.width, info.height, job.type === "aura");
     await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
       .png()
       .trim()

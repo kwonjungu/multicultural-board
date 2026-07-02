@@ -43,11 +43,13 @@ const JOBS = [
   },
   {
     key: "stage-3-pupa",
-    prompt: `A cute bee pupa: translucent golden-amber chrysalis capsule standing upright, the developing baby bee visible inside as a soft silhouette with folded wings and closed eyes, gentle inner glow, subtle wax texture — clearly a real pupa but charming. ${STICKER}`,
+    // v2: die-cut 흰 스티커 테두리 금지 강조
+    prompt: `A cute bee pupa: translucent golden-amber chrysalis capsule standing upright, the developing baby bee visible inside as a soft silhouette with folded wings and closed eyes, gentle inner glow, subtle wax texture — clearly a real pupa but charming. The subject drawn DIRECTLY on the plain background with absolutely NO white die-cut sticker border, NO outline frame around the subject. ${STICKER}`,
   },
   {
     key: "stage-1-egg",
-    prompt: `A tiny glossy pearl-white bee egg, slightly oval, standing upright in a golden hexagonal honeycomb cell base, subtle pearly shimmer, one small sparkle. ${STICKER}`,
+    // v2: die-cut 흰 스티커 테두리 금지 강조
+    prompt: `A tiny glossy pearl-white bee egg, slightly oval, standing upright in a golden hexagonal honeycomb cell base, subtle pearly shimmer, one small sparkle. The subject drawn DIRECTLY on the plain background with absolutely NO white die-cut sticker border, NO outline frame around the subject. ${STICKER}`,
   },
   // ── 🥈 배경 4종 + 왕좌 ──
   {
@@ -81,7 +83,8 @@ const JOBS = [
   },
   {
     key: "aura-stardust",
-    prompt: `Swirling pastel stardust trail forming a gentle spiral frame around an EMPTY center (nothing in the middle), tiny white stars. ${STICKER}`,
+    // v2: 도넛/솔리드 링 방지 — 흩어진 별무리로 열린 프레임
+    prompt: `Scattered pastel stardust wisps and many small twinkling stars loosely arranged in an OPEN circular frame with big gaps between clusters, large empty area in the middle, airy and light, NOT a solid ring, NOT a donut shape, no filled circle. ${STICKER}`,
   },
   {
     key: "aura-royal",
@@ -94,7 +97,8 @@ const JOBS = [
   },
   {
     key: "held-book",
-    prompt: `A tiny open storybook with colorful pages and a star on the cover, sized for a small round mascot to hold. ${STICKER}`,
+    // v2: 벌 캐릭터가 함께 그려지는 것 방지 — 오브젝트 단독
+    prompt: `A tiny open storybook OBJECT ONLY: colorful pages with simple picture doodles, a gold star on the cover, floating alone — absolutely NO character, NO bee, NO animal, NO hands, just the book by itself. ${STICKER}`,
   },
   {
     key: "held-flag",
@@ -103,7 +107,8 @@ const JOBS = [
   // ── 🥉 액세서리 3종 + 망토 ──
   {
     key: "acc-scarf",
-    prompt: `A cozy knitted scarf in red-and-white stripes, curved as if wrapped around a small round neck, front knot visible, front view. ${STICKER}`,
+    // v2: 튜브/링으로 나오는 것 방지 — 뜨개 질감 + 앞으로 늘어진 두 끝단 강조
+    prompt: `A cozy winter knitted scarf in red-and-white stripes with visible chunky knit texture, wrapped once with TWO long tasseled ends hanging down at the front, soft fabric folds, front view, NOT a ring, NOT a tube, NOT a donut. ${STICKER}`,
   },
   {
     key: "acc-glasses",
