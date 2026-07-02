@@ -30,6 +30,7 @@ import {
   subscribeResponseComments,
   setAllowReviewChat,
   subscribeBookAnswers,
+  submitBookAnswer,
   pushStorybookBoard,
   subscribeStorybookBoards,
   appendChatTurn,
@@ -1046,6 +1047,18 @@ function StorybookFreeReader({
 
 // [#1] 친구들의 예전 답변 — 책별 영속 저장(bookAnswers)을 읽어 자유 읽기 화면에 표시.
 //   뷰어 언어와 다른 답변은 언어별로 묶어 한 번에 번역한다.
+// 자유 읽기 새 답변 작성기 입력 모드 — 실제 수업(QuestionCard)과 동일 4종
+type FreeMode = "text" | "voice" | "draw" | "emotion";
+
+function faDataUrlToBlob(dataUrl: string): Blob {
+  const [header, data] = dataUrl.split(",");
+  const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+  const bin = atob(data);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
 function FriendAnswers({
   roomCode, bookId, question, viewerLang, user, myClientId,
 }: {
@@ -1058,6 +1071,13 @@ function FriendAnswers({
   const [draftFor, setDraftFor] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [warn, setWarn] = useState<string | null>(null);
+  // ── ✍ 새 생각 남기기 (자유 읽기 중 새 답변 — 수업과 동일한 4모드 입력) ──
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [mode, setMode] = useState<FreeMode>("text");
+  const [answerDraft, setAnswerDraft] = useState("");
+  const [answerWarn, setAnswerWarn] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const freeDrawRef = useRef<DrawBoardHandle>(null);
 
   useEffect(() => {
     // comments 서브트리는 raw 에 함께 실려온다 (bookAnswers 하위 저장이라
@@ -1065,6 +1085,73 @@ function FriendAnswers({
     const unsub = subscribeBookAnswers(roomCode, bookId, question.id, setAnswers);
     return () => unsub();
   }, [roomCode, bookId, question.id]);
+
+  // 질문이 바뀌면 작성기 초기화
+  useEffect(() => {
+    setComposerOpen(false);
+    setMode("text");
+    setAnswerDraft("");
+    setAnswerWarn(null);
+  }, [question.id]);
+
+  const myAnswer = answers.find((a) => a.clientId === myClientId) ?? null;
+
+  // 새 답변 제출 — 글/말/그림/감정 공통 경로 (bookAnswers 영속 저장)
+  async function submitFreeAnswer(opts?: { kind?: "text" | "drawing" | "emotion"; imageUrl?: string; textOverride?: string }) {
+    if (submitting) return;
+    const text = (opts?.textOverride ?? answerDraft).trim();
+    if (!text && opts?.kind !== "drawing") return;
+    // 안전검사 (챗·댓글과 동일 레이어)
+    if (text) {
+      const pre = checkSafety(text);
+      if (pre.distress) {
+        setAnswerWarn(replyForSafety(viewerLang, "distress"));
+        raiseAlert(roomCode, {
+          clientId: myClientId, studentName: user.myName,
+          timestamp: Date.now(), kind: "distress",
+        }).catch(() => {});
+        setAnswerDraft("");
+        return;
+      }
+      if (pre.blocked) {
+        setAnswerWarn(replyForSafety(viewerLang, "warning"));
+        return;
+      }
+    }
+    setAnswerWarn(null);
+    setSubmitting(true);
+    try {
+      await submitBookAnswer(
+        roomCode, bookId, question.id, myClientId, user.myName, user.myLang,
+        text, opts?.kind || opts?.imageUrl ? { kind: opts?.kind ?? "text", imageUrl: opts?.imageUrl } : { kind: "text" },
+      );
+      setAnswerDraft("");
+      setComposerOpen(false);
+    } catch (err) { console.error("submitBookAnswer failed", err); }
+    setSubmitting(false);
+  }
+
+  // 그림 모드 제출 — 캔버스 업로드 후 drawing 답변으로
+  async function submitFreeDrawing() {
+    if (submitting) return;
+    const dataUrl = freeDrawRef.current?.getDataUrl(0.8);
+    if (!dataUrl) return;
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", faDataUrlToBlob(dataUrl), `draw_${Date.now()}.jpg`);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json() as { url?: string };
+      const imageUrl = data.url || dataUrl; // 업로드 실패 시 dataURL 폴백
+      await submitBookAnswer(
+        roomCode, bookId, question.id, myClientId, user.myName, user.myLang,
+        answerDraft.trim(), { kind: "drawing", imageUrl },
+      );
+      setAnswerDraft("");
+      setComposerOpen(false);
+    } catch (err) { console.error("free drawing submit failed", err); }
+    setSubmitting(false);
+  }
 
   useEffect(() => {
     // 답변 + 댓글 텍스트를 언어별로 묶어 배치 번역 (항목 5: 원문+번역 2줄)
@@ -1136,8 +1223,6 @@ function FriendAnswers({
     setDraft("");
   }
 
-  if (answers.length === 0) return null;
-
   return (
     <div style={{
       background: "#fff", borderRadius: 20, border: "2px solid #FDE68A",
@@ -1147,8 +1232,156 @@ function FriendAnswers({
         💬 {pick(question.text, viewerLang)}
       </div>
       <div style={{ fontSize: 11, fontWeight: 800, color: "#B45309", marginBottom: 10 }}>
-        친구들의 생각 {answers.length}개 — 눌러서 내 생각을 덧붙일 수 있어요
+        {answers.length > 0
+          ? `친구들의 생각 ${answers.length}개 — 내 생각도 남기고, 친구 생각에 댓글도 달아요`
+          : "아직 생각이 없어요 — 첫 번째 생각을 남겨볼까요?"}
       </div>
+
+      {/* ── ✍ 새 생각 남기기 — 수업과 동일한 4모드(그림·글자·말·감정) ── */}
+      {!composerOpen ? (
+        <button
+          onClick={() => { setComposerOpen(true); setAnswerWarn(null); }}
+          style={{
+            width: "100%", minHeight: 46, marginBottom: 10,
+            background: "linear-gradient(135deg, #3B82F6, #2563EB)",
+            color: "#fff", fontSize: 14, fontWeight: 900,
+            border: "none", borderRadius: 14, cursor: "pointer",
+            boxShadow: "0 5px 14px rgba(59,130,246,0.3)", fontFamily: "inherit",
+          }}
+        >✍ {myAnswer ? "내 생각 다시 쓰기" : "새 생각 남기기"}</button>
+      ) : (
+        <div style={{
+          background: "#F8FAFF", border: "2px solid #DBEAFE", borderRadius: 14,
+          padding: "12px 12px 14px", marginBottom: 12,
+        }}>
+          {/* 모드 탭 — 수업(QuestionCard)과 동일 구성 */}
+          <div style={{ display: "flex", gap: 0, marginBottom: 10, background: "#EFF6FF", borderRadius: 12, padding: 3, border: "1px solid #DBEAFE" }}>
+            {([
+              { id: "text" as FreeMode, icon: "✏️", label: "글자" },
+              { id: "voice" as FreeMode, icon: "🎤", label: "말" },
+              { id: "draw" as FreeMode, icon: "🖍", label: "그림" },
+              { id: "emotion" as FreeMode, icon: "💗", label: "감정" },
+            ]).map((tab) => (
+              <button key={tab.id} onClick={() => setMode(tab.id)} style={{
+                flex: 1, padding: "8px 4px", borderRadius: 10,
+                background: mode === tab.id ? "#fff" : "transparent",
+                border: mode === tab.id ? "2px solid #3B82F6" : "2px solid transparent",
+                fontSize: 12.5, fontWeight: 800, color: mode === tab.id ? "#1E40AF" : "#9CA3AF",
+                cursor: "pointer", fontFamily: "inherit",
+              }}>{tab.icon} {tab.label}</button>
+            ))}
+          </div>
+
+          {answerWarn && (
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#B91C1C", marginBottom: 8, lineHeight: 1.4 }}>
+              ⚠ {answerWarn}
+            </div>
+          )}
+
+          {mode === "text" && (
+            <textarea
+              value={answerDraft}
+              onChange={(e) => setAnswerDraft(e.target.value)}
+              placeholder="이 질문에 대한 내 생각을 적어요…"
+              disabled={submitting}
+              rows={3}
+              maxLength={300}
+              style={{
+                width: "100%", padding: "10px 12px", border: "2px solid #DBEAFE", borderRadius: 12,
+                fontSize: 14, fontFamily: "inherit", resize: "vertical", outline: "none",
+                background: "#fff", color: "#1F2937", boxSizing: "border-box", lineHeight: 1.5,
+              }}
+            />
+          )}
+
+          {mode === "voice" && (
+            <div style={{ textAlign: "center", padding: "8px 0" }}>
+              <MicButton
+                lang={viewerLang}
+                disabled={submitting}
+                size={64}
+                onText={(text) => setAnswerDraft((d) => (d ? `${d} ${text}` : text))}
+              />
+              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 8 }}>버튼을 눌러 말해보세요</div>
+              {answerDraft && (
+                <div style={{ marginTop: 8, padding: "8px 12px", background: "#EFF6FF", borderRadius: 10, fontSize: 13, color: "#1E40AF", fontWeight: 600, textAlign: "left" }}>
+                  &ldquo;{answerDraft}&rdquo;
+                </div>
+              )}
+            </div>
+          )}
+
+          {mode === "draw" && (
+            <div>
+              <DrawBoard key={`free-${question.id}`} ref={freeDrawRef} width={720} height={400} accent="#3B82F6" />
+              <input
+                value={answerDraft}
+                onChange={(e) => setAnswerDraft(e.target.value)}
+                placeholder="한 줄 설명을 더해도 좋아요 (선택)"
+                disabled={submitting}
+                maxLength={150}
+                style={{
+                  width: "100%", marginTop: 8, padding: "9px 12px", borderRadius: 12,
+                  border: "2px solid #DBEAFE", fontSize: 14, fontFamily: "inherit",
+                  outline: "none", background: "#fff", color: "#1F2937", boxSizing: "border-box",
+                }}
+              />
+            </div>
+          )}
+
+          {mode === "emotion" && (
+            <EmotionCardDeck
+              lang={viewerLang}
+              quick
+              busy={submitting}
+              onPick={async (emotionId) => {
+                if (submitting) return;
+                const e = emotionById(emotionId);
+                const label = e.label[viewerLang] ?? e.label.ko ?? e.id;
+                // 수업과 동일: 감정 로그 + 하루 1회 스티커 (fire-and-forget)
+                pushEmotion({
+                  roomCode, emotionId: emotionId as EmotionId, intensity: 2,
+                  clientId: myClientId, authorName: user.myName,
+                  context: "storybook", bookId,
+                }).catch(() => {});
+                awardEmotionStickerOncePerDay({
+                  roomCode, clientId: myClientId, studentName: user.myName,
+                }).catch(() => {});
+                await submitFreeAnswer({ kind: "emotion", textOverride: `${e.emoji} ${label}` });
+              }}
+            />
+          )}
+
+          {/* 제출/취소 — 감정 모드는 카드 탭이 곧 제출 */}
+          {mode !== "emotion" && (
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button
+                onClick={() => (mode === "draw" ? submitFreeDrawing() : submitFreeAnswer())}
+                disabled={submitting || (mode !== "draw" && !answerDraft.trim())}
+                style={{
+                  flex: 2, minHeight: 44,
+                  background: submitting || (mode !== "draw" && !answerDraft.trim())
+                    ? "#E5E7EB"
+                    : "linear-gradient(135deg, #3B82F6, #2563EB)",
+                  color: submitting || (mode !== "draw" && !answerDraft.trim()) ? "#9CA3AF" : "#fff",
+                  fontSize: 14, fontWeight: 900, border: "none", borderRadius: 12,
+                  cursor: submitting ? "wait" : "pointer", fontFamily: "inherit",
+                }}
+              >{submitting ? "저장 중…" : "📨 생각 남기기"}</button>
+              <button
+                onClick={() => { setComposerOpen(false); setAnswerDraft(""); setAnswerWarn(null); }}
+                disabled={submitting}
+                style={{
+                  flex: 1, minHeight: 44, background: "#fff",
+                  border: "1.5px solid #E5E7EB", color: "#6B7280",
+                  fontSize: 13, fontWeight: 800, borderRadius: 12,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >취소</button>
+            </div>
+          )}
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {answers.map((a) => {
           const aTrans = trans[a.id];
@@ -1161,10 +1394,25 @@ function FriendAnswers({
               background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12,
               padding: "8px 12px",
             }}>
+              {/* 그림 답변 — 수업 중 그린 그림 그대로 표시 */}
+              {a.imageUrl && (
+                <img
+                  src={a.imageUrl}
+                  alt={`${a.studentName}의 그림`}
+                  style={{
+                    width: "100%", maxHeight: 260, objectFit: "contain",
+                    background: "#fff", borderRadius: 10,
+                    border: "1px solid #FDE68A", marginBottom: a.text ? 6 : 0,
+                    display: "block",
+                  }}
+                />
+              )}
               {/* 메인 = 뷰어 언어(번역 도착 시), 아래 원문 항상 표시 (항목 5) */}
-              <div style={{ fontSize: 14, color: "#1F2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-                {aTrans || a.text}
-              </div>
+              {a.text && (
+                <div style={{ fontSize: 14, color: "#1F2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                  {aTrans || a.text}
+                </div>
+              )}
               {aTrans && aTrans !== a.text && (
                 <div style={{
                   marginTop: 5, padding: "5px 8px",

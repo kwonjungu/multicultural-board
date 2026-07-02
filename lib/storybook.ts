@@ -358,6 +358,37 @@ export function subscribeStorybookBoards(
   return () => { unsub(); };
 }
 
+// 자유 읽기(복습) 중 새 답변 제출 — 세션 responses 를 거치지 않고
+// 영속 경로(bookAnswers)에만 기록한다 (세션이 없어도 동작해야 하므로).
+// update 사용 — 재제출 시 하위 comments(친구 의견) 보존.
+export async function submitBookAnswer(
+  roomCode: string,
+  bookId: string,
+  questionId: string,
+  clientId: string,
+  studentName: string,
+  studentLang: string,
+  text: string,
+  opts?: { kind?: "text" | "drawing" | "emotion"; imageUrl?: string },
+): Promise<void> {
+  const db = getClientDb();
+  const payload: StorybookResponse = {
+    id: clientId,
+    questionId,
+    clientId,
+    studentName,
+    studentLang,
+    text: text.trim(),
+    timestamp: Date.now(),
+  };
+  if (opts?.kind) payload.kind = opts.kind;
+  if (opts?.imageUrl) payload.imageUrl = opts.imageUrl;
+  await update(
+    ref(db, `${bookAnswersPath(roomCode, bookId, questionId)}/${clientId}`),
+    payload as unknown as Record<string, unknown>,
+  );
+}
+
 // [#1] 책별 영속 답변 구독 — 자유 읽기 화면에서 친구들의 예전 답변 표시.
 export function subscribeBookAnswers(
   roomCode: string,

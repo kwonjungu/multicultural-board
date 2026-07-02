@@ -266,112 +266,114 @@ export default function RoomPage() {
     </>
   );
 
-  // 허브 메인 화면
-  if (hubView === "hub") {
-    return (
-      <TutorialProvider roomCode={roomCode} userName={user.myName}>
-        <HomeHub
-          user={user}
-          roomCode={roomCode}
-          onSelect={(v) => setHubView(v)}
-          onLogout={() => setUser(null)}
-          onChangeLang={(l) => setUser({ ...user, myLang: l })}
-          availableLangs={roomLangs}
-        />
-        <HubTutorialBootstrap isTeacher={user.isTeacher} />
-        {overlays}
-      </TutorialProvider>
-    );
-  }
+  // 현재 hubView 의 본문. TutorialProvider 는 아래에서 모든 분기를 공통으로
+  // 감싼다 — 허브 분기 안에만 두면 튜토리얼 navigate 스텝(설계서 항목 11)이
+  // 소통창 등으로 화면을 전환하는 순간 Provider 가 언마운트되어 설명이 끊긴다.
+  const body = (() => {
+    if (hubView === "hub") {
+      return (
+        <>
+          <HomeHub
+            user={user}
+            roomCode={roomCode}
+            onSelect={(v) => setHubView(v)}
+            onLogout={() => setUser(null)}
+            onChangeLang={(l) => setUser({ ...user, myLang: l })}
+            availableLangs={roomLangs}
+          />
+          <HubTutorialBootstrap isTeacher={user.isTeacher} />
+        </>
+      );
+    }
 
-  if (hubView === "games") {
+    if (hubView === "games") {
+      return (
+        <>
+          <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} roomLangs={roomLangs} />
+          <SectionCaption section="games" isTeacher={user.isTeacher} />
+        </>
+      );
+    }
+
+    if (hubView === "vocab") {
+      return (
+        <>
+          <VocabHub
+            user={user}
+            roomCode={roomCode}
+            onBack={() => setHubView("hub")}
+          />
+          <SectionCaption section="vocab" isTeacher={user.isTeacher} />
+        </>
+      );
+    }
+
+    if (hubView === "whiteboard") {
+      return (
+        <>
+          <WhiteboardRoom
+            user={user}
+            roomCode={roomCode}
+            myClientId={myClientId}
+            onBack={() => setHubView("hub")}
+          />
+          <SectionCaption section="whiteboard" isTeacher={user.isTeacher} />
+        </>
+      );
+    }
+
+    if (hubView === "storybook") {
+      return (
+        <>
+          <StorybookRoom
+            user={user}
+            roomCode={roomCode}
+            myClientId={myClientId}
+            onBack={() => setHubView("hub")}
+          />
+          <SectionCaption section="storybook" isTeacher={user.isTeacher} />
+        </>
+      );
+    }
+
+    if (hubView === "dashboard") {
+      return (
+        <>
+          <PraiseHive
+            user={user}
+            roomCode={roomCode}
+            roomConfig={roomConfig}
+            myClientId={user.myName}
+            onBack={() => setHubView("hub")}
+            onOpenGive={(clientId, name) => setGiveModalFor({ clientId, name })}
+            onOpenCosmetics={() => setCosmeticsOpen(true)}
+          />
+          <SectionCaption section="praise" isTeacher={user.isTeacher} />
+        </>
+      );
+    }
+
+    // 기본: 소통창 — 교사가 카드별 칭찬 버튼으로 스티커 지급
     return (
       <>
-        <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} roomLangs={roomLangs} />
-        <SectionCaption section="games" isTeacher={user.isTeacher} />
-        {overlays}
-      </>
-    );
-  }
-
-  if (hubView === "vocab") {
-    return (
-      <>
-        <VocabHub
+        <PadletBoard
           user={user}
           roomCode={roomCode}
-          onBack={() => setHubView("hub")}
-        />
-        <SectionCaption section="vocab" isTeacher={user.isTeacher} />
-        {overlays}
-      </>
-    );
-  }
-
-  if (hubView === "whiteboard") {
-    return (
-      <>
-        <WhiteboardRoom
-          user={user}
-          roomCode={roomCode}
-          myClientId={myClientId}
-          onBack={() => setHubView("hub")}
-        />
-        <SectionCaption section="whiteboard" isTeacher={user.isTeacher} />
-        {overlays}
-      </>
-    );
-  }
-
-  if (hubView === "storybook") {
-    return (
-      <>
-        <StorybookRoom
-          user={user}
-          roomCode={roomCode}
-          myClientId={myClientId}
-          onBack={() => setHubView("hub")}
-        />
-        <SectionCaption section="storybook" isTeacher={user.isTeacher} />
-        {overlays}
-      </>
-    );
-  }
-
-  if (hubView === "dashboard") {
-    return (
-      <>
-        <PraiseHive
-          user={user}
-          roomCode={roomCode}
+          roomLangs={roomLangs}
+          onLogout={() => setHubView("hub")}
           roomConfig={roomConfig}
-          myClientId={user.myName}
-          onBack={() => setHubView("hub")}
-          onOpenGive={(clientId, name) => setGiveModalFor({ clientId, name })}
-          onOpenCosmetics={() => setCosmeticsOpen(true)}
+          myClientId={myClientId}
+          onPraiseStudent={(clientId, name) => setGiveModalFor({ clientId, name })}
         />
-        <SectionCaption section="praise" isTeacher={user.isTeacher} />
-        {overlays}
+        <SectionCaption section="board" isTeacher={user.isTeacher} />
       </>
     );
-  }
+  })();
 
-
-
-  // 기본: 소통창 — 교사가 카드별 칭찬 버튼으로 스티커 지급
   return (
-    <>
-      <PadletBoard
-        user={user}
-        roomCode={roomCode}
-        roomLangs={roomLangs}
-        onLogout={() => setHubView("hub")}
-        roomConfig={roomConfig}
-        myClientId={myClientId}
-        onPraiseStudent={(clientId, name) => setGiveModalFor({ clientId, name })}
-      />
-      <SectionCaption section="board" isTeacher={user.isTeacher} />
+    <TutorialProvider roomCode={roomCode} userName={user.myName}>
+      {body}
       {overlays}
-    </>
+    </TutorialProvider>
   );
 }
