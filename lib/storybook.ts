@@ -3,6 +3,7 @@ import { getClientDb } from "./firebase-client";
 import type {
   StorybookSession,
   StorybookResponse,
+  StorybookResponseComment,
   Storybook,
   StorybookPhase,
   StorybookChatTurn,
@@ -23,8 +24,10 @@ function sessionPath(roomCode: string): string {
 function responsesPath(roomCode: string, questionId: string): string {
   return `rooms/${roomCode}/storybook/responses/${questionId}`;
 }
-function chatPath(roomCode: string, clientId: string): string {
-  return `rooms/${roomCode}/storybook/chat/${clientId}`;
+// 캐릭터별 분리 (설계서 항목 4: 학생 1인이 여러 챗봇과 독립 대화)
+// rooms/{roomCode}/storybook/chat/{clientId}/{characterId}/{turnId}
+function chatPath(roomCode: string, clientId: string, characterId: string): string {
+  return `rooms/${roomCode}/storybook/chat/${clientId}/${characterId}`;
 }
 function alertsPath(roomCode: string): string {
   return `rooms/${roomCode}/storybook/alerts`;
@@ -259,6 +262,15 @@ export async function setActiveCharacter(
   await update(ref(db, sessionPath(roomCode)), { activeCharacterId: characterId });
 }
 
+/** 복습(during) 중 캐릭터 챗봇 허용 토글 — 교사 전용, 기본 OFF (설계서 항목 3) */
+export async function setAllowReviewChat(
+  roomCode: string,
+  allow: boolean,
+): Promise<void> {
+  const db = getClientDb();
+  await update(ref(db, sessionPath(roomCode)), { allowReviewChat: allow });
+}
+
 // === Responses ===
 
 export async function submitResponse(
@@ -289,7 +301,9 @@ export async function submitResponse(
   if (bookId) {
     set(ref(db, `${bookAnswersPath(roomCode, bookId, questionId)}/${clientId}`), payload).catch(() => {});
   }
-  await set(r, payload);
+  // set 이 아니라 update — 하위 comments 서브트리(친구 의견, 설계서 항목 1)를
+  // 재제출 시에도 보존해야 한다.
+  await update(r, payload as unknown as Record<string, unknown>);
   // 그림 응답으로 제출되면 라이브 보드를 "제출됨"으로 표시 (교사 모니터링 종료 신호).
   if (opts?.kind === "drawing") {
     update(ref(db, `${liveBoardsPath(roomCode, questionId)}/${clientId}`), { submitted: true }).catch(() => {});
@@ -361,6 +375,44 @@ export function subscribeBookAnswers(
   return () => { unsub(); };
 }
 
+// === Response comments (복습 중 의견 추가 — 설계서 항목 1) ===
+// rooms/{roomCode}/storybook/responses/{questionId}/{responseId}/comments/{commentId}
+
+export async function appendResponseComment(
+  roomCode: string,
+  questionId: string,
+  responseId: string,
+  comment: Omit<StorybookResponseComment, "id">,
+): Promise<string> {
+  const db = getClientDb();
+  const listRef = ref(db, `${responsesPath(roomCode, questionId)}/${responseId}/comments`);
+  const newRef = push(listRef);
+  const id = newRef.key as string;
+  await set(newRef, stripUndefined({ ...comment, id }));
+  return id;
+}
+
+/** 선택된 응답 1개의 댓글만 구독 — 전체 응답 트리 구독 금지 (트래픽 절약) */
+export function subscribeResponseComments(
+  roomCode: string,
+  questionId: string,
+  responseId: string,
+  cb: (list: StorybookResponseComment[]) => void,
+): () => void {
+  const db = getClientDb();
+  const r = ref(db, `${responsesPath(roomCode, questionId)}/${responseId}/comments`);
+  const unsub = onValue(r, (snap) => {
+    const val = snap.val() as Record<string, StorybookResponseComment> | null;
+    const list = val
+      ? Object.values(val)
+          .filter(Boolean)
+          .sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0))
+      : [];
+    cb(list);
+  });
+  return () => { unsub(); };
+}
+
 export function subscribeResponses(
   roomCode: string,
   questionId: string,
@@ -385,10 +437,11 @@ export function subscribeResponses(
 export async function appendChatTurn(
   roomCode: string,
   clientId: string,
+  characterId: string,
   turn: Omit<StorybookChatTurn, "id">,
 ): Promise<string> {
   const db = getClientDb();
-  const listRef = ref(db, chatPath(roomCode, clientId));
+  const listRef = ref(db, chatPath(roomCode, clientId, characterId));
   const newRef = push(listRef);
   const id = newRef.key as string;
   await set(newRef, stripUndefined({ ...turn, id }));
@@ -398,10 +451,11 @@ export async function appendChatTurn(
 export function subscribeChat(
   roomCode: string,
   clientId: string,
+  characterId: string,
   cb: (turns: StorybookChatTurn[]) => void,
 ): () => void {
   const db = getClientDb();
-  const r = ref(db, chatPath(roomCode, clientId));
+  const r = ref(db, chatPath(roomCode, clientId, characterId));
   const unsub = onValue(r, (snap) => {
     const val = snap.val() as Record<string, StorybookChatTurn> | null;
     const list = val
@@ -414,9 +468,13 @@ export function subscribeChat(
   return () => { unsub(); };
 }
 
-export async function getChatTurnCount(roomCode: string, clientId: string): Promise<number> {
+export async function getChatTurnCount(
+  roomCode: string,
+  clientId: string,
+  characterId: string,
+): Promise<number> {
   const db = getClientDb();
-  const snap = await get(ref(db, chatPath(roomCode, clientId)));
+  const snap = await get(ref(db, chatPath(roomCode, clientId, characterId)));
   const val = snap.val() as Record<string, StorybookChatTurn> | null;
   if (!val) return 0;
   // Count only student turns for the 15-turn limit

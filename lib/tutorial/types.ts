@@ -52,6 +52,18 @@ export type TutorialStep =
       kind: "celebrate";
       lines: DialogueLine[];
       reward?: { emoji: string; label: string };
+    }
+  /**
+   * 섹션 직접 진입 (설계서 항목 11). TutorialBus 로 "tutorial-navigate" 를
+   * 발행하면 화면 소유자(예: RoomPage)가 hubView 를 전환한다.
+   * waitSelector 가 DOM 에 나타나면(또는 6초 타임아웃) 다음 스텝으로 자동 진행.
+   */
+  | {
+      kind: "navigate";
+      /** 목적지 — HubView 값("board"|"games"|"vocab"|"dashboard"|"storybook") 또는 "hub" */
+      to: string;
+      /** 목적지 화면 렌더 확인용 selector. 생략 시 700ms 후 진행. */
+      waitSelector?: string;
     };
 
 export type WaitCondition =

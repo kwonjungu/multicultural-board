@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { tr } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import { MENU_BY_ID, STEPS, STEP_BY_ID } from "./cafeData";
 import type { MenuId, Role, StepId } from "./types";
 
@@ -118,7 +119,7 @@ export default function StepSequencer({
           2/2 · 조리 순서 / Arrange steps
         </div>
         <div style={{ fontSize: 18, fontWeight: 900, marginTop: 2 }}>
-          {menu.emoji} {tr(menu.name, chefLang)}
+          {menu.emoji} <GameText map={menu.name} lang={chefLang} />
         </div>
       </div>
 
@@ -231,7 +232,7 @@ export default function StepSequencer({
               </div>
               <div style={{ fontSize: 22 }}>{s.emoji}</div>
               <div style={{ flex: 1, fontWeight: 700 }}>
-                {tr(s.name, chefLang)}
+                <GameText map={s.name} lang={chefLang} />
               </div>
               <button
                 onClick={(e) => {
@@ -290,7 +291,7 @@ export default function StepSequencer({
             >
               <div style={{ fontSize: 22 }}>{s.emoji}</div>
               <div style={{ fontSize: 11, fontWeight: 700 }}>
-                {tr(s.name, chefLang)}
+                <GameText map={s.name} lang={chefLang} />
               </div>
             </button>
           ))}

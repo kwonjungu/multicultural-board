@@ -192,11 +192,19 @@ export default function VocabRecorder({
     if (!pendingBlob) return;
     setState("uploading");
     setUploadError(null);
+    const params = {
+      roomCode, clientId, wordId, sentenceIdx,
+      blob: pendingBlob, duration: pendingDuration,
+    };
     try {
-      await uploadRecording({
-        roomCode, clientId, wordId, sentenceIdx,
-        blob: pendingBlob, duration: pendingDuration,
-      });
+      try {
+        await uploadRecording(params);
+      } catch (first) {
+        // 일시적 네트워크 오류 대비 1회 자동 재시도 (설계서 항목 8)
+        console.warn("[vocab-recorder] 업로드 1차 실패 — 재시도", first);
+        await new Promise((r) => setTimeout(r, 1200));
+        await uploadRecording(params);
+      }
       // 업로드 성공 → 로컬 임시 상태 정리, 상위에 완료 통지
       setPendingBlob(null);
       if (blobUrl) { URL.revokeObjectURL(blobUrl); setBlobUrl(null); }
@@ -204,9 +212,14 @@ export default function VocabRecorder({
       // 'recorded' 상태는 subscribeRecordings 콜백에서 savedPtr 업데이트로 대체됨
       setState("idle");
     } catch (err) {
-      console.warn("[vocab-recorder] 업로드 실패", err);
-      setUploadError("업로드 실패 — 다시 시도해 주세요");
-      setState("recorded");
+      // 녹음 저장에 최종 실패해도 발음 통과 자체는 인정 —
+      // 업로드 실패가 학습 진행을 막지 않는다 (설계서 항목 8).
+      console.warn("[vocab-recorder] 업로드 최종 실패 — 통과는 인정하고 진행", err);
+      setUploadError("녹음 저장은 실패했지만, 발음 연습은 통과로 인정했어요");
+      setPendingBlob(null);
+      if (blobUrl) { URL.revokeObjectURL(blobUrl); setBlobUrl(null); }
+      onComplete();
+      setState("idle");
     }
   }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GREETINGS, pickN, tr } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import { ProgressBar } from "./CountryGuess";
 import { gt, type LangMap } from "./uiText";
@@ -120,7 +121,7 @@ export default function GreetingRelay({ langA, langB }: { langA: string; langB: 
                 fontSize: 15, fontWeight: 800, color: "#111827",
                 textAlign: "left",
               }}
-            >{tr(opt, cur.answerLang)}</button>
+            ><GameText map={opt} lang={cur.answerLang} /></button>
           );
         })}
       </div>

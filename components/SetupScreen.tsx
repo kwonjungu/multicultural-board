@@ -6,6 +6,7 @@ import { UserConfig, RoomConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import { landmarkFor } from "@/lib/assets";
 import FlyingBees from "./ui/FlyingBees";
+import BeeBanner from "./BeeBanner";
 
 interface Props {
   onDone: (config: UserConfig) => void;
@@ -68,7 +69,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
     <div style={{
       minHeight: "100vh",
       background: "#FCEFB0",
-      display: "flex", alignItems: "center", justifyContent: "center",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", padding: "20px",
       position: "relative", overflow: "hidden",
     }}>
@@ -79,6 +80,9 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
         backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
       }} />
       <FlyingBees />
+
+      {/* 🐝 상단 배너 — 주아체 무지개 (설계서 항목 10) */}
+      <BeeBanner />
 
       <div style={{
         background: "#fff", borderRadius: 32, padding: "clamp(22px, 4vw, 32px) clamp(20px, 4vw, 30px)",

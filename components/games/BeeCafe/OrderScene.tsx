@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { tr } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import { MENU_BY_ID } from "./cafeData";
 import type { MenuId, Role } from "./types";
 
@@ -93,7 +94,7 @@ export default function OrderScene({
           "{phrase}"
         </div>
         <div style={{ fontSize: 13, color: "#6B7280", marginTop: 6 }}>
-          {tr(menu.name, custLang)} ({custLang.toUpperCase()})
+          <GameText map={menu.name} lang={custLang} /> ({custLang.toUpperCase()})
         </div>
       </div>
 

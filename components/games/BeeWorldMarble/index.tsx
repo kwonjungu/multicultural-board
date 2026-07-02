@@ -7,7 +7,8 @@ import {
   reducer,
   type SetupPlayer,
 } from "@/lib/marbleReducer";
-import { JAIL_INDEX } from "@/lib/marbleData";
+import { CHANCES, JAIL_INDEX, TILES } from "@/lib/marbleData";
+import { prefetchGameTexts } from "@/lib/gameI18n";
 import { renderActionPanels } from "./ActionPanel";
 import { Board } from "./Board";
 import { CharacterSetup } from "./CharacterSetup";
@@ -23,6 +24,18 @@ export default function BeeWorldMarble({
   langB: string;
 }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  // 설계서 항목 12: 방 언어 세트에 필요한 게임 텍스트 번역을 시작 시 1회
+  // 배치 프리페치 — 라운드 중 번역 지연 제거. 실패해도 useGameText 가
+  // 개별 재시도하므로 fire-and-forget.
+  useEffect(() => {
+    const maps = [
+      ...TILES.map((tl) => tl.landmark),
+      ...CHANCES.flatMap((c) => [c.title, c.body]),
+    ];
+    prefetchGameTexts(maps, langA).catch(() => {});
+    if (langB !== langA) prefetchGameTexts(maps, langB).catch(() => {});
+  }, [langA, langB]);
 
   // Movement animation: tick every 200ms while moving. Each tick plays a
   // short "move" tone so a multi-tile move is audible.

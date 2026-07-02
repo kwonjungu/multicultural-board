@@ -1,7 +1,8 @@
 "use client";
 
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { TABOO_CARDS, TabooCategory, TabooCard, tr, pickN } from "@/lib/gameData";
+import { TABOO_CARDS, TabooCategory, TabooCard, pickN } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 
 type Phase = "setup" | "play" | "result";
@@ -154,7 +155,7 @@ export default function HoneyTaboo({ langA, langB }: { langA: string; langB: str
             textAlign: "center", fontSize: 34, fontWeight: 900, color: "#1F2937",
             padding: "10px 8px", letterSpacing: 0.5, wordBreak: "keep-all",
           }}>
-            {tr(cur.answer, giverLang)}
+            <GameText map={cur.answer} lang={giverLang} />
           </div>
 
           <div style={{
@@ -172,7 +173,7 @@ export default function HoneyTaboo({ langA, langB }: { langA: string; langB: str
                   padding: "6px 12px", fontSize: 15, fontWeight: 800,
                   textDecoration: "line-through",
                   textDecorationColor: "#DC2626", textDecorationThickness: 2,
-                }}>{tr(t, giverLang)}</span>
+                }}><GameText map={t} lang={giverLang} /></span>
               ))}
             </div>
           </div>
@@ -378,7 +379,7 @@ function ResultList({ title, color, bg, cards, lang }: {
             background: "#fff", color: "#1F2937",
             border: `1.5px solid ${color}66`, borderRadius: 10,
             padding: "4px 10px", fontSize: 13, fontWeight: 700,
-          }}>{tr(c.answer, lang)}</span>
+          }}><GameText map={c.answer} lang={lang} /></span>
         ))}
       </div>
     </div>

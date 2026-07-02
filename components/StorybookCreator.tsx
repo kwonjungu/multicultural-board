@@ -882,16 +882,42 @@ function PageTextEditor({
   );
 }
 
+// 질문 단계(tier) 한글 라벨 — 노출 시점 안내 포함 (설계서 항목 9)
+const TIER_LABEL: Record<QuestionTier, string> = {
+  intro: "도입 (읽기 전)",
+  check: "확인 (페이지 연동)",
+  core: "핵심 (마지막 쪽)",
+  deep: "심화 (마지막 쪽)",
+  concept: "개념 (마지막 쪽)",
+};
+
+export interface QuestionDraft {
+  textKo: string;
+  tier: QuestionTier;
+  pageIdx?: number;
+}
+
 function QuestionEditor({
-  q, onSave, onDelete,
+  q, pageCount, autoEdit, onSave, onDelete,
 }: {
-  q: { id: string; tier: string; text?: Record<string, string> };
-  onSave: (next: string) => void;
+  q: { id: string; tier: QuestionTier; text?: Record<string, string>; pageIdx?: number };
+  pageCount: number;
+  /** 방금 추가된 질문은 바로 편집 모드로 연다 */
+  autoEdit?: boolean;
+  onSave: (next: QuestionDraft) => void;
   onDelete: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(!!autoEdit);
   const [draft, setDraft] = useState(q.text?.ko || "");
-  useEffect(() => { if (!editing) setDraft(q.text?.ko || ""); }, [q.text?.ko, editing]);
+  const [tierDraft, setTierDraft] = useState<QuestionTier>(q.tier);
+  const [pageDraft, setPageDraft] = useState<number | undefined>(q.pageIdx);
+  useEffect(() => {
+    if (!editing) {
+      setDraft(q.text?.ko || "");
+      setTierDraft(q.tier);
+      setPageDraft(q.pageIdx);
+    }
+  }, [q.text?.ko, q.tier, q.pageIdx, editing]);
 
   return (
     <div style={{
@@ -901,13 +927,16 @@ function QuestionEditor({
       <div style={{
         display: "flex", alignItems: "flex-start", gap: 8,
       }}>
-        <span style={{
-          fontSize: 10, fontWeight: 900, color: "#B45309",
-          background: "#FEF3C7", padding: "2px 8px", borderRadius: 999,
-          whiteSpace: "nowrap", marginTop: 2,
-        }}>
-          {q.tier}
-        </span>
+        {!editing && (
+          <span style={{
+            fontSize: 10, fontWeight: 900, color: "#B45309",
+            background: "#FEF3C7", padding: "2px 8px", borderRadius: 999,
+            whiteSpace: "nowrap", marginTop: 2,
+          }}>
+            {TIER_LABEL[q.tier] || q.tier}
+            {q.tier === "check" && q.pageIdx ? ` · ${q.pageIdx}쪽` : ""}
+          </span>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           {editing ? (
             <>
@@ -917,6 +946,7 @@ function QuestionEditor({
                 rows={2}
                 autoFocus
                 maxLength={250}
+                placeholder="질문을 입력하세요 (한국어 — 수업 시 학생 언어로 함께 표시됩니다)"
                 style={{
                   width: "100%",
                   padding: "6px 10px",
@@ -927,8 +957,55 @@ function QuestionEditor({
                   resize: "vertical", outline: "none",
                 }}
               />
-              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                <button onClick={() => { onSave(draft.trim()); setEditing(false); }} style={miniBtnPrimary}>저장</button>
+              {/* 단계 + 노출 페이지 지정 (설계서 항목 9) */}
+              <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+                <select
+                  value={tierDraft}
+                  onChange={(e) => setTierDraft(e.target.value as QuestionTier)}
+                  aria-label="질문 단계"
+                  style={{
+                    padding: "5px 8px", borderRadius: 8,
+                    border: "1.5px solid #FDE68A", background: "#fff",
+                    fontSize: 11, fontWeight: 800, color: "#92400E",
+                    fontFamily: "inherit", outline: "none", cursor: "pointer",
+                  }}
+                >
+                  {(Object.keys(TIER_LABEL) as QuestionTier[]).map((tierOpt) => (
+                    <option key={tierOpt} value={tierOpt}>{TIER_LABEL[tierOpt]}</option>
+                  ))}
+                </select>
+                {tierDraft === "check" && (
+                  <select
+                    value={pageDraft ?? ""}
+                    onChange={(e) => setPageDraft(e.target.value ? Number(e.target.value) : undefined)}
+                    aria-label="노출 페이지"
+                    style={{
+                      padding: "5px 8px", borderRadius: 8,
+                      border: "1.5px solid #FDE68A", background: "#fff",
+                      fontSize: 11, fontWeight: 800, color: "#92400E",
+                      fontFamily: "inherit", outline: "none", cursor: "pointer",
+                    }}
+                  >
+                    <option value="">노출 페이지 선택…</option>
+                    {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>{n}쪽에서 보여주기</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                <button
+                  onClick={() => {
+                    if (!draft.trim()) return;
+                    onSave({
+                      textKo: draft.trim(),
+                      tier: tierDraft,
+                      pageIdx: tierDraft === "check" ? pageDraft : undefined,
+                    });
+                    setEditing(false);
+                  }}
+                  style={miniBtnPrimary}
+                >저장</button>
                 <button onClick={() => { setDraft(q.text?.ko || ""); setEditing(false); }} style={miniBtnGhost}>취소</button>
               </div>
             </>
@@ -939,7 +1016,7 @@ function QuestionEditor({
                 fontSize: 12, fontWeight: 700, color: "#1F2937",
                 lineHeight: 1.4, cursor: "text",
               }}
-            >{q.text?.ko}</div>
+            >{q.text?.ko || <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>비어있음 — 클릭해서 작성</span>}</div>
           )}
         </div>
         {!editing && (
@@ -1101,6 +1178,8 @@ function PreviewPanel({
   const [busyPage, setBusyPage] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(book.title?.ko || "");
+  // 방금 추가한 질문 — 바로 편집 모드로 열기 위함 (설계서 항목 9)
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
   async function saveTitle() {
     const next = { ...book, title: { ...book.title, ko: titleDraft.trim() || book.title?.ko || "" } };
@@ -1122,21 +1201,52 @@ function PreviewPanel({
     try { await updateGeneratedBookField(book.id, { pages: next.pages }); } catch (err) { console.error(err); }
   }
 
-  async function saveQuestionText(qid: string, nextKo: string) {
+  // Firebase set 은 undefined 값을 거부 — 저장 전에 옵션 필드 정리
+  function cleanQuestion(q: StorybookQuestion): StorybookQuestion {
+    const out: StorybookQuestion = { id: q.id, tier: q.tier, text: q.text };
+    if (q.pageIdx !== undefined) out.pageIdx = q.pageIdx;
+    if (q.ibConcept) out.ibConcept = q.ibConcept;
+    if (q.standard) out.standard = q.standard;
+    return out;
+  }
+
+  async function saveQuestion(qid: string, d: QuestionDraft) {
     const next = {
       ...book,
-      questions: book.questions.map((q) =>
-        q.id === qid ? { ...q, text: { ...q.text, ko: nextKo } } : q,
-      ),
+      questions: book.questions.map((q) => {
+        if (q.id !== qid) return cleanQuestion(q);
+        const merged: StorybookQuestion = {
+          ...cleanQuestion(q),
+          tier: d.tier,
+          text: { ...q.text, ko: d.textKo },
+        };
+        // check 가 아니게 되면 페이지 연동 해제, check 면 선택값 반영
+        if (d.tier === "check" && d.pageIdx !== undefined) merged.pageIdx = d.pageIdx;
+        else delete merged.pageIdx;
+        return merged;
+      }),
     };
     onBookChange(next);
+    try { await updateGeneratedBookField(book.id, { questions: next.questions }); } catch (err) { console.error(err); }
+  }
+
+  // 교사 수동 질문 추가 (설계서 항목 9)
+  async function addQuestion() {
+    const q: StorybookQuestion = {
+      id: `q-custom-${Date.now().toString(36)}`,
+      tier: "check",
+      text: { ko: "" },
+    };
+    const next = { ...book, questions: [...book.questions.map(cleanQuestion), q] };
+    onBookChange(next);
+    setJustAddedId(q.id);
     try { await updateGeneratedBookField(book.id, { questions: next.questions }); } catch (err) { console.error(err); }
   }
 
   async function deleteQuestion(qid: string) {
     const next = {
       ...book,
-      questions: book.questions.filter((q) => q.id !== qid),
+      questions: book.questions.filter((q) => q.id !== qid).map(cleanQuestion),
     };
     onBookChange(next);
     try { await updateGeneratedBookField(book.id, { questions: next.questions }); } catch (err) { console.error(err); }
@@ -1384,12 +1494,23 @@ function PreviewPanel({
             <QuestionEditor
               key={q.id}
               q={q}
-              onSave={(next) => saveQuestionText(q.id, next)}
+              pageCount={book.pages.length}
+              autoEdit={q.id === justAddedId}
+              onSave={(next) => { setJustAddedId(null); saveQuestion(q.id, next); }}
               onDelete={() => {
                 if (window.confirm("이 질문을 삭제할까요?")) deleteQuestion(q.id);
               }}
             />
           ))}
+          <button
+            onClick={addQuestion}
+            style={{
+              marginTop: 2, minHeight: 40,
+              background: "#fff", border: "2px dashed #F59E0B",
+              color: "#B45309", fontSize: 13, fontWeight: 900,
+              borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >＋ 질문 추가</button>
         </div>
       </div>
 

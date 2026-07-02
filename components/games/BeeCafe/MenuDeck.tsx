@@ -1,6 +1,7 @@
 "use client";
 
 import { tr } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import { MENU_BY_ID } from "./cafeData";
 import type { MenuId, Role } from "./types";
 
@@ -83,7 +84,7 @@ export default function MenuDeck({
             >
               <div style={{ fontSize: 54 }}>{menu.emoji}</div>
               <div style={{ fontWeight: 900, marginTop: 6 }}>
-                {tr(menu.name, cLang)}
+                <GameText map={menu.name} lang={cLang} />
               </div>
               <div
                 style={{
@@ -92,7 +93,7 @@ export default function MenuDeck({
                   marginTop: 2,
                 }}
               >
-                {tr(menu.name, hLang)} · {menu.origin}
+                <GameText map={menu.name} lang={hLang} /> · {menu.origin}
               </div>
             </button>
           );

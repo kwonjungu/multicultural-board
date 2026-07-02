@@ -2,6 +2,7 @@
 
 import { CSSProperties, useReducer, useRef, useState } from "react";
 import { LangMap, STORY_SYMBOLS, StorySymbol, pickN, tr } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import { LANGUAGES } from "@/lib/constants";
 import BeeMascot from "../BeeMascot";
 
@@ -214,7 +215,7 @@ export default function StoryCubes({ langA, langB }: { langA: string; langB: str
 
       {state.theme && (
         <div style={{ fontSize: 12, fontWeight: 800, color: "#6D28D9", marginBottom: 8, textAlign: "center" }}>
-          📌 {tr(state.theme, currentLang)}
+          📌 <GameText map={state.theme} lang={currentLang} />
         </div>
       )}
 
@@ -242,7 +243,7 @@ export default function StoryCubes({ langA, langB }: { langA: string; langB: str
               {entry && (
                 <div style={{ position: "absolute", top: 4, left: 4, background: entry.by === "A" ? "#3B82F6" : "#EC4899", color: "#fff", borderRadius: 999, width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>{entry.order}</div>
               )}
-              <div style={{ position: "absolute", bottom: 4, left: 4, right: 4, textAlign: "center", fontSize: 10, fontWeight: 800, color: used ? "#9CA3AF" : "#78350F", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tr(sym.label, currentLang)}</div>
+              <div style={{ position: "absolute", bottom: 4, left: 4, right: 4, textAlign: "center", fontSize: 10, fontWeight: 800, color: used ? "#9CA3AF" : "#78350F", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><GameText map={sym.label} lang={currentLang} /></div>
             </button>
           );
         })}
@@ -259,7 +260,7 @@ export default function StoryCubes({ langA, langB }: { langA: string; langB: str
               <div style={{ fontSize: 11, fontWeight: 800, color: "#6B7280" }}>
                 {state.turn === "A" ? "플레이어 A" : "플레이어 B"} · {LANGUAGES[currentLang]?.label ?? currentLang}
               </div>
-              <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937" }}>{tr(selectedTile.label, currentLang)}</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937" }}><GameText map={selectedTile.label} lang={currentLang} /></div>
             </div>
           </div>
 
@@ -348,7 +349,7 @@ function IntroScreen({ langA, langB, onStart }: { langA: string; langB: string; 
               {THEMES.map((t, i) => (
                 <button key={t.key} type="button" onClick={() => setThemeIdx(i)} aria-label={`주제: ${tr(t.label, langA)}`}
                   style={{ padding: "8px 6px", borderRadius: 10, background: themeIdx === i ? "#FCE7F3" : "#F9FAFB", border: themeIdx === i ? "2px solid #EC4899" : "2px solid #E5E7EB", fontSize: 12, fontWeight: 800, color: "#1F2937", cursor: "pointer", textAlign: "center" }}
-                >{tr(t.label, langA)}</button>
+                ><GameText map={t.label} lang={langA} /></button>
               ))}
             </div>
           </div>
@@ -386,7 +387,7 @@ function GalleryScreen({ state, langA, langB, onRestart }: { state: GameState; l
       <div style={{ textAlign: "center", marginBottom: 16 }}>
         <BeeMascot size={90} mood="cheer" />
         <div style={{ fontSize: 22, fontWeight: 900, color: "#1F2937", marginTop: 8 }}>🎉 우리의 이야기</div>
-        {state.theme && <div style={{ fontSize: 13, fontWeight: 800, color: "#6D28D9", marginTop: 4 }}>📌 {tr(state.theme, langA)}</div>}
+        {state.theme && <div style={{ fontSize: 13, fontWeight: 800, color: "#6D28D9", marginTop: 4 }}>📌 <GameText map={state.theme} lang={langA} /></div>}
         <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>{state.entries.length}개의 문장이 모였어요</div>
       </div>
 

@@ -120,7 +120,7 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
       {!ActiveGame ? (
         <>
           {/* Header */}
-          <div style={{
+          <div data-tutorial-id="games-header" style={{
             padding: "18px 16px 12px",
             display: "flex", alignItems: "center", gap: 12,
             flexShrink: 0, position: "relative", zIndex: 2,

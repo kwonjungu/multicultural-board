@@ -26,6 +26,7 @@ import { subscribeSession } from "@/lib/storybook";
 import { subscribeWhiteboardMeta } from "@/lib/whiteboard";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { useBackLayer } from "@/lib/backStack";
+import { TutorialBus } from "@/lib/tutorial/bus";
 import { t } from "@/lib/i18n";
 
 const ALL_LANGS = Object.keys(LANGUAGES);
@@ -39,6 +40,15 @@ export default function RoomPage() {
   const [roomConfig, setRoomConfig] = useState<RoomConfig>({ languages: ALL_LANGS });
   const [langsLoaded, setLangsLoaded] = useState(false);
   const [hubView, setHubView] = useState<HubView | "hub">("hub");
+
+  // 튜토리얼 "섹션 직접 진입" (설계서 항목 11) — TutorialHost 의 navigate
+  // 스텝이 발행하는 전환 이벤트를 받아 hubView 를 바꾼다.
+  useEffect(() => {
+    return TutorialBus.on("tutorial-navigate", (to) => {
+      if (typeof to !== "string") return;
+      setHubView(to as HubView | "hub");
+    });
+  }, []);
   const [giveModalFor, setGiveModalFor] = useState<{ clientId: string; name: string } | null>(null);
   const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
   const [myStickerCount, setMyStickerCount] = useState(0);

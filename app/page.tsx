@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LANGUAGES } from "@/lib/constants";
 import BeeMascot from "@/components/BeeMascot";
+import BeeBanner from "@/components/BeeBanner";
 import FlyingBees from "@/components/ui/FlyingBees";
 import { PATTERN } from "@/lib/assets";
 
@@ -253,7 +254,7 @@ export default function Home() {
     <div style={{
       minHeight: "100vh",
       background: "#FCEFB0",
-      display: "flex", alignItems: "center", justifyContent: "center",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", padding: 20,
       position: "relative", overflow: "hidden",
     }}>
@@ -266,6 +267,9 @@ export default function Home() {
         backgroundRepeat: "no-repeat",
       }} />
       <FlyingBees />
+
+      {/* 🐝 상단 배너 — 주아체 무지개 (설계서 항목 10) */}
+      <BeeBanner />
 
       <div style={{
         background: "#fff", borderRadius: 28, padding: view === "hero" ? "40px 28px 28px" : "22px 28px 28px",

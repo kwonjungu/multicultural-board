@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { COUNTRIES, pickN, tr, type CountryDifficulty } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import { gt, UI, type LangMap } from "./uiText";
 
@@ -310,8 +311,8 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
                 transition: "all 0.2s",
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 800 }}>{tr(c.names, langA)}</div>
-              <div style={{ fontSize: 12, color: "#6B7280" }}>{tr(c.names, langB)}</div>
+              <div style={{ fontSize: 13, fontWeight: 800 }}><GameText map={c.names} lang={langA} /></div>
+              <div style={{ fontSize: 12, color: "#6B7280" }}><GameText map={c.names} lang={langB} /></div>
             </button>
           );
         })}
@@ -336,11 +337,11 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
             <button
               onClick={() => playTts(tr(cur.answer.names, langA), langA)}
               style={pillButton}
-            >🔊 {tr(cur.answer.names, langA)}</button>
+            >🔊 <GameText map={cur.answer.names} lang={langA} /></button>
             <button
               onClick={() => playTts(tr(cur.answer.names, langB), langB)}
               style={pillButton}
-            >🔊 {tr(cur.answer.names, langB)}</button>
+            >🔊 <GameText map={cur.answer.names} lang={langB} /></button>
           </div>
         </div>
       )}

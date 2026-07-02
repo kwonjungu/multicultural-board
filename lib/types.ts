@@ -279,6 +279,19 @@ export interface StorybookSession {
   teacherClientId: string;
   startedAt: number;
   wordQuizEnabled?: boolean;  // [신규] 수업 전 단어 퀴즈(4지선다) 게이트 사용 여부
+  /** 교사 허용 시 복습(during) 중에도 캐릭터 챗봇 사용 가능 — 기본 OFF (설계서 항목 3) */
+  allowReviewChat?: boolean;
+}
+
+/** 응답에 달리는 친구 의견 (복습 중 댓글 — 설계서 항목 1) */
+export interface StorybookResponseComment {
+  id: string;
+  clientId: string;
+  studentName: string;
+  studentLang: string;
+  text: string;
+  timestamp: number;
+  flagged?: boolean;
 }
 
 export interface StorybookResponse {
@@ -293,6 +306,8 @@ export interface StorybookResponse {
   kind?: "text" | "drawing" | "emotion";
   /** 그림 응답일 때 업로드된 이미지 URL. */
   imageUrl?: string;
+  /** 하위 노드로 저장되는 댓글 — subscribeResponses raw 에 섞여 올 수 있음 */
+  comments?: Record<string, StorybookResponseComment>;
 }
 
 // [#6 그림책] 그리는 중 실시간 스냅샷 — 교사 라이브 모니터링용.

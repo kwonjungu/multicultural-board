@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { VOCAB, pickN, tr } from "@/lib/gameData";
+import { VOCAB, pickN } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import { gt, UI, type LangMap } from "./uiText";
 
@@ -91,7 +92,7 @@ export default function WordTower({ langA, langB }: { langA: string; langB: stri
           </div>
           <div style={{ fontSize: 32 }}>{cur.correct.emoji}</div>
           <div style={{ fontSize: 22, fontWeight: 900, marginTop: 6 }}>
-            {tr(cur.correct.translations, cur.askLang)}
+            <GameText map={cur.correct.translations} lang={cur.askLang} />
           </div>
         </div>
         <div style={{ display: "grid", gap: 8 }}>
@@ -113,7 +114,7 @@ export default function WordTower({ langA, langB }: { langA: string; langB: stri
                   cursor: picked === null ? "pointer" : "default",
                   fontSize: 15, fontWeight: 800, color: "#111827", textAlign: "left",
                 }}
-              >{tr(opt.translations, cur.ansLang)}</button>
+              ><GameText map={opt.translations} lang={cur.ansLang} /></button>
             );
           })}
         </div>

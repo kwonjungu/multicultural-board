@@ -1,6 +1,6 @@
 "use client";
 
-import { tr } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import { INGR_BY_ID, MENU_BY_ID, STEP_BY_ID } from "./cafeData";
 import type {
   IngredientId,
@@ -60,10 +60,10 @@ export default function ServeResult({
     >
       <div style={{ fontSize: 64 }}>{menu.emoji}</div>
       <div style={{ fontWeight: 900, fontSize: 20, marginTop: 4 }}>
-        {tr(menu.name, chefLang)}
+        <GameText map={menu.name} lang={chefLang} />
       </div>
       <div style={{ fontSize: 12, color: "#6B7280" }}>
-        {tr(menu.name, custLang)}
+        <GameText map={menu.name} lang={custLang} />
       </div>
 
       <div style={{ fontSize: 44, marginTop: 8 }}>
@@ -105,7 +105,7 @@ export default function ServeResult({
                   fontWeight: 700,
                 }}
               >
-                {ing.emoji} {tr(ing.name, chefLang)} {got ? "✓" : "✗"}
+                {ing.emoji} <GameText map={ing.name} lang={chefLang} /> {got ? "✓" : "✗"}
               </span>
             );
           })}
@@ -124,7 +124,7 @@ export default function ServeResult({
                     fontWeight: 700,
                   }}
                 >
-                  {ing.emoji} {tr(ing.name, chefLang)} ⚠
+                  {ing.emoji} <GameText map={ing.name} lang={chefLang} /> ⚠
                 </span>
               );
             })}
@@ -160,7 +160,7 @@ export default function ServeResult({
                   fontWeight: 700,
                 }}
               >
-                {i + 1}. {s.emoji} {tr(s.name, chefLang)}
+                {i + 1}. {s.emoji} <GameText map={s.name} lang={chefLang} />
               </span>
             );
           })}
@@ -187,7 +187,7 @@ export default function ServeResult({
                   fontWeight: 700,
                 }}
               >
-                {i + 1}. {s.emoji} {tr(s.name, chefLang)}
+                {i + 1}. {s.emoji} <GameText map={s.name} lang={chefLang} />
               </span>
             );
           })}

@@ -307,7 +307,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       position: "relative",
     }}>
       {/* Header */}
-      <div style={{
+      <div data-tutorial-id="vocab-header" style={{
         maxWidth: 760, margin: "0 auto",
         display: "flex", alignItems: "center", gap: 12,
         background: "#fff", borderRadius: 20, padding: "12px 16px",

@@ -11,6 +11,7 @@ import {
   pickN,
   tr,
 } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import { ProgressBar } from "./CountryGuess";
 
@@ -249,7 +250,7 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
                       onError={(e)=>{(e.currentTarget as HTMLImageElement).replaceWith(document.createElement("span"));}} />
                   : <span style={{ fontSize: 32 }}>{it.emoji}</span>;
               })()}
-              <span>{tr(it.names, langA)}</span>
+              <span><GameText map={it.names} lang={langA} /></span>
             </button>
           ))}
         </div>
@@ -277,8 +278,8 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
                   onError={(e)=>{(e.currentTarget as HTMLImageElement).replaceWith(document.createElement("span"));}} />
               : <span>{secret.emoji}</span>;
           })()}
-          <b>{tr(secret.names, langA)}</b>
-          <span>/ {tr(secret.names, langB)}</span>
+          <b><GameText map={secret.names} lang={langA} /></b>
+          <span>/ <GameText map={secret.names} lang={langB} /></span>
         </div>
       )}
       <ProgressBar value={20 - remaining} max={20} score={correct ? 1 : 0} />
@@ -355,7 +356,7 @@ function HintGrid({
                     onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
                   >
                     <span style={{ fontSize: 18 }}>{c.emoji}</span>
-                    <span>{tr(c.label, langA)}</span>
+                    <span><GameText map={c.label} lang={langA} /></span>
                   </button>
                 );
               })}
@@ -406,7 +407,7 @@ function SetupPanel({
                     onError={(e)=>{(e.currentTarget as HTMLImageElement).replaceWith(document.createElement("span"));}} />
                 : <span style={{ fontSize: 32 }}>{it.emoji}</span>;
             })()}
-            <span>{tr(it.names, langB)}</span>
+            <span><GameText map={it.names} lang={langB} /></span>
           </button>
         ))}
       </div>
@@ -445,7 +446,7 @@ function AskModal({
         </div>
         <div style={{ fontSize: 20, fontWeight: 900, color: "#111827", display: "flex", gap: 10, alignItems: "center" }}>
           <span style={{ fontSize: 28 }}>{card.emoji}</span>
-          <span>{tr(card.label, langB)}</span>
+          <span><GameText map={card.label} lang={langB} /></span>
         </div>
         <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 6 }}>
           추천 답: {recommended ? "예" : "아니오"}

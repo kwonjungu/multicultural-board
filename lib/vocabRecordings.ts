@@ -19,8 +19,6 @@
 
 import {
   ref as storageRef,
-  uploadBytes,
-  getDownloadURL,
   deleteObject,
 } from "firebase/storage";
 import {
@@ -60,6 +58,10 @@ function encodeKey(s: string): string {
 
 /**
  * Blob 업로드 → 기존 녹음 있으면 덮어쓰기. 포인터를 RTDB 에 기록하고 URL 반환.
+ *
+ * 업로드는 서버 라우트 /api/upload (Admin SDK) 경유 — 클라이언트 Storage SDK
+ * 직접 업로드가 Storage 보안규칙/CORS 미설정 환경에서 "업로드 실패"를 내던
+ * 문제의 근본 수정. 이미지 업로드(PostModal)와 같은 경로를 공유한다.
  */
 export async function uploadRecording(params: {
   roomCode: string;
@@ -70,19 +72,27 @@ export async function uploadRecording(params: {
   duration: number;
 }): Promise<RecordingPointer> {
   const { roomCode, clientId, wordId, sentenceIdx, blob, duration } = params;
-  const path = storagePathFor(roomCode, clientId, wordId, sentenceIdx);
 
-  const storage = getClientStorage();
-  const objectRef = storageRef(storage, path);
-  const contentType = blob.type || "audio/webm";
-  await uploadBytes(objectRef, blob, { contentType });
-  const url = await getDownloadURL(objectRef);
+  const form = new FormData();
+  form.append("file", new File([blob], "rec.webm", { type: blob.type || "audio/webm" }));
+  form.append("kind", "vocab-recording");
+  form.append("roomCode", roomCode);
+  form.append("clientId", clientId);
+  form.append("wordId", wordId);
+  form.append("sentenceIdx", String(sentenceIdx));
+
+  const res = await fetch("/api/upload", { method: "POST", body: form });
+  if (!res.ok) {
+    const j = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(j?.error || `업로드 실패 (${res.status})`);
+  }
+  const { url, storagePath } = (await res.json()) as { url: string; storagePath?: string };
 
   const pointer: RecordingPointer = {
     audioUrl: url,
     timestamp: Date.now(),
     duration,
-    storagePath: path,
+    storagePath: storagePath || storagePathFor(roomCode, clientId, wordId, sentenceIdx),
   };
   const db = getClientDb();
   await set(dbRef(db, pointerPath(roomCode, clientId, wordId, sentenceIdx)), pointer);

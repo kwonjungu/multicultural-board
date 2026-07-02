@@ -4,6 +4,7 @@ import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { UserConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
+import BeeBanner from "./BeeBanner";
 import RoomManagePanel from "./RoomManagePanel";
 import FontSizeButton from "./FontSizeButton";
 import LangSwitchButton from "./LangSwitchButton";
@@ -123,6 +124,9 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
         maxWidth: 760, margin: "0 auto",
         position: "relative", zIndex: 1,
       }}>
+        {/* 🐝 상단 배너 — 주아체 무지개 (설계서 항목 10) */}
+        <BeeBanner compact />
+
         {/* Header */}
         <div data-tutorial-id="hub-header" style={{
           display: "flex", alignItems: "center", gap: 14, marginBottom: 24,

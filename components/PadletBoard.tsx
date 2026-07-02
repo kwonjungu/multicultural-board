@@ -505,7 +505,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       overflow: "hidden",
     }}>
       {/* ── Header ── */}
-      <header style={{
+      <header data-tutorial-id="board-header" style={{
         minHeight: 72, flexShrink: 0,
         background: "#fff",
         borderBottom: "1px solid #F3EAD0",
@@ -1507,6 +1507,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             setModal({ colId: first.id, colTitle: first.title, colColor: first.color });
           }}
           aria-label="새 글 쓰기"
+          data-tutorial-id="board-fab"
           style={{
             position: "fixed", right: "clamp(16px, 3vw, 28px)", bottom: "clamp(16px, 3vw, 28px)",
             width: 68, height: 68, borderRadius: "50%", border: "none",
@@ -1530,6 +1531,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           onClick={() => setEmotionOpen(true)}
           aria-label="내 감정 표현하기"
           title="내 감정 표현하기"
+          data-tutorial-id="board-emotion-fab"
           style={{
             position: "fixed",
             right: "clamp(16px, 3vw, 28px)",

@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { EMOTIONS, EmotionItem, pickN, tr } from "@/lib/gameData";
+import { EMOTIONS, EmotionItem, pickN } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import { ProgressBar } from "./CountryGuess";
 import { gt, type LangMap } from "./uiText";
@@ -80,11 +81,12 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
           {/* key 로 라운드마다 리마운트 — imgOk(onError) 상태가 다음 문제로 새어가지 않게 */}
           <EmotionImage key={cur.answer.imageKey} item={cur.answer} />
         </div>
+        {/* 설계서 항목 12: 미보유 언어는 ko→번역 캐시 (영어 폴백 제거) */}
         <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.5 }}>
-          {tr(cur.answer.situation, langA)}
+          <GameText map={cur.answer.situation} lang={langA} />
         </div>
         <div style={{ fontSize: 13, color: "#6B7280", marginTop: 8, lineHeight: 1.5 }}>
-          {tr(cur.answer.situation, langB)}
+          <GameText map={cur.answer.situation} lang={langB} />
         </div>
       </div>
 

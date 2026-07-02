@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, CSSProperties } from "react";
 import { WYR_CARDS, WYRCard, WYRCategory, tr, pickN } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 
 type Vote = "A" | "B" | null;
@@ -409,14 +410,14 @@ function OptionHero({
         marginTop: 4, lineHeight: 1.25,
         overflow: "hidden", textOverflow: "ellipsis",
       }}>
-        {tr(opt.label, langA)}
+        <GameText map={opt.label} lang={langA} />
       </div>
       <div style={{
         fontSize: 11, color: `${textCol}AA`, fontWeight: 700,
         marginTop: 2, lineHeight: 1.25,
         overflow: "hidden", textOverflow: "ellipsis",
       }}>
-        {tr(opt.label, langB)}
+        <GameText map={opt.label} lang={langB} />
       </div>
     </div>
   );
@@ -596,7 +597,7 @@ function VoteCell({
             maxWidth: "100%",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
-            {tr(opt.label, lang)}
+            <GameText map={opt.label} lang={lang} />
           </span>
         </>
       )}
@@ -675,10 +676,10 @@ function RevealPanel({
             💬 이야기해봐
           </div>
           <div style={{ fontSize: 15, fontWeight: 800, color: "#1F2937", lineHeight: 1.5 }}>
-            {tr(card.followUp, langA)}
+            <GameText map={card.followUp} lang={langA} />
           </div>
           <div style={{ fontSize: 13, color: "#6B7280", marginTop: 4, lineHeight: 1.5 }}>
-            {tr(card.followUp, langB)}
+            <GameText map={card.followUp} lang={langB} />
           </div>
         </div>
       </div>

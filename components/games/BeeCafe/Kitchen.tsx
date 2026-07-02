@@ -1,6 +1,7 @@
 "use client";
 
 import { tr } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import { INGREDIENTS, MENU_BY_ID } from "./cafeData";
 import type { IngredientId, MenuId, Role } from "./types";
 
@@ -36,7 +37,7 @@ export default function Kitchen({
           1/2 · 재료 고르기 / Pick ingredients
         </div>
         <div style={{ fontSize: 18, fontWeight: 900, marginTop: 2 }}>
-          {menu.emoji} {tr(menu.name, chefLang)}
+          {menu.emoji} <GameText map={menu.name} lang={chefLang} />
         </div>
         <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
           선택됨 / Selected: <b>{picked.length}</b>
@@ -80,7 +81,7 @@ export default function Kitchen({
                   wordBreak: "keep-all",
                 }}
               >
-                {tr(ing.name, chefLang)}
+                <GameText map={ing.name} lang={chefLang} />
               </div>
             </button>
           );
