@@ -250,6 +250,7 @@ export function subscribeCosmetics(
       hat: (val?.hat as StudentCosmetics["hat"]) ?? null,
       pet: (val?.pet as StudentCosmetics["pet"]) ?? null,
       trophy: (val?.trophy as StudentCosmetics["trophy"]) ?? null,
+      petPos: (val?.petPos as StudentCosmetics["petPos"]) ?? "right",
     };
     cb(c);
   });
@@ -272,6 +273,7 @@ export function subscribeAllCosmetics(
         hat: (v?.hat as StudentCosmetics["hat"]) ?? null,
         pet: (v?.pet as StudentCosmetics["pet"]) ?? null,
         trophy: (v?.trophy as StudentCosmetics["trophy"]) ?? null,
+        petPos: (v?.petPos as StudentCosmetics["petPos"]) ?? "right",
       };
     }
     cb(out);
@@ -285,7 +287,9 @@ export async function setCosmetics(
   c: StudentCosmetics,
 ): Promise<void> {
   const db = getClientDb();
-  await set(ref(db, `${basePath(roomCode)}/cosmetics/${studentClientId}`), c);
+  // Firebase set 은 undefined 거부 — 옵션 필드 기본값 보정
+  const clean: StudentCosmetics = { ...c, petPos: c.petPos ?? "right" };
+  await set(ref(db, `${basePath(roomCode)}/cosmetics/${studentClientId}`), clean);
 }
 
 // === Season reset ===

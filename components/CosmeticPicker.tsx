@@ -35,6 +35,7 @@ const DEFAULT_COSMETICS: StudentCosmetics = {
   hat: null,
   pet: null,
   trophy: null,
+  petPos: "right",
 };
 
 type ItemKind = "skin" | "hat" | "pet" | "trophy";
@@ -248,7 +249,10 @@ export default function CosmeticPicker({
                   alt=""
                   aria-hidden="true"
                   style={{
-                    position: "absolute", left: 6, bottom: 6,
+                    position: "absolute", bottom: 6,
+                    ...(draft.petPos === "left"
+                      ? { left: 6, transform: "scaleX(-1)" }
+                      : { right: 6 }),
                     width: 54, height: 54, objectFit: "contain",
                     filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.15))",
                   }}
@@ -351,6 +355,36 @@ export default function CosmeticPicker({
                 );
               })}
             </Row>
+            {/* 펫 위치 선택 — 코스메틱 확장 Phase 1 */}
+            {draft.pet && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8, marginTop: 10,
+                padding: "8px 12px", background: "#FFFBEB",
+                border: "1px solid #FDE68A", borderRadius: 12,
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#92400E", flex: 1 }}>
+                  펫 위치
+                </span>
+                {(["left", "right"] as const).map((pos) => {
+                  const on = (draft.petPos ?? "right") === pos;
+                  return (
+                    <button
+                      key={pos}
+                      onClick={() => setDraft((d) => ({ ...d, petPos: pos }))}
+                      aria-pressed={on}
+                      style={{
+                        minHeight: 38, padding: "6px 16px", borderRadius: 10,
+                        border: `2px solid ${on ? "#F59E0B" : "#E5E7EB"}`,
+                        background: on ? "#FEF3C7" : "#fff",
+                        color: on ? "#B45309" : "#9CA3AF",
+                        fontSize: 13, fontWeight: 900, cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >{pos === "left" ? "◀ 왼쪽" : "오른쪽 ▶"}</button>
+                  );
+                })}
+              </div>
+            )}
           </Section>
 
           {/* Trophies section */}

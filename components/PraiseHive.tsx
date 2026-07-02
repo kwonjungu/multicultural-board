@@ -554,8 +554,10 @@ function MyHiveTab({
               aria-hidden="true"
               style={{
                 position: "absolute",
-                right: -30,
                 bottom: -12,
+                ...(cosmetics.petPos === "left"
+                  ? { left: -30, transform: "scaleX(-1)" }
+                  : { right: -30 }),
                 width: 96,
                 height: 96,
                 zIndex: 2,
@@ -968,7 +970,12 @@ function RaceTab({
                       <img
                         src={`/stickers/pet-${e.cosmetics.pet}.png`}
                         alt="" aria-hidden="true"
-                        style={{ position: "absolute", right: -10, bottom: -6, width: 38, height: 38, zIndex: 2 }}
+                        style={{
+                          position: "absolute", bottom: -6, width: 38, height: 38, zIndex: 2,
+                          ...(e.cosmetics.petPos === "left"
+                            ? { left: -10, transform: "scaleX(-1)" }
+                            : { right: -10 }),
+                        }}
                       />
                     )}
                   </div>
@@ -2398,7 +2405,12 @@ function GalleryPopover({
             <img
               src={`/stickers/pet-${target.cosmetics.pet}.png`}
               alt="" aria-hidden="true"
-              style={{ position: "absolute", right: -20, bottom: -8, width: 64, height: 64, zIndex: 2 }}
+              style={{
+                position: "absolute", bottom: -8, width: 64, height: 64, zIndex: 2,
+                ...(target.cosmetics.petPos === "left"
+                  ? { left: -20, transform: "scaleX(-1)" }
+                  : { right: -20 }),
+              }}
             />
           )}
         </div>

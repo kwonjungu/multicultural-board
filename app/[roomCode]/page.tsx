@@ -49,6 +49,51 @@ export default function RoomPage() {
       setHubView(to as HubView | "hub");
     });
   }, []);
+
+  // 📢 교사 "모두 부르기" — 소통창의 버튼이 rooms/{room}/summon 에 ts 를 쓰면
+  // 학생들이 뭘 하고 있든 "그 시점에 1회"만 소통창으로 끌려온다.
+  // 이후엔 자유 — 계속 강제가 아님. 새로고침으로 재소환되지 않게 신선도 20초.
+  const summonHandledRef = useRef(0);
+  useEffect(() => {
+    if (!user || user.isTeacher) return;
+    const db = getClientDb();
+    const r = ref(db, `rooms/${roomCode}/summon`);
+    const unsub = onValue(r, (snap) => {
+      const val = snap.val() as { target?: string; ts?: number } | null;
+      if (!val?.ts) return;
+      if (val.ts <= summonHandledRef.current) return;      // 이미 처리한 신호
+      if (Date.now() - val.ts > 20_000) {                  // 오래된 신호(새 입장/새로고침)
+        summonHandledRef.current = val.ts;
+        return;
+      }
+      summonHandledRef.current = val.ts;
+      // 그림책 수업 강제 동기화가 우선
+      if (storybookActiveRef.current) return;
+      setHubView((val.target as HubView | "hub") || "board");
+    });
+    return () => unsub();
+  }, [roomCode, user]);
+
+  // 💭 의견 나누기 세션이 "켜지는 순간" 학생을 소통창으로 1회 데려온다
+  // (DiscussionSession 오버레이는 소통창 안에서 activeSession 구독으로 자동 표시).
+  // 첫 fire(입장 시 이미 진행 중)는 기록만 — '켜지는 순간'에만 반응.
+  const prevDiscussionRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!user || user.isTeacher) return;
+    const db = getClientDb();
+    const r = ref(db, `rooms/${roomCode}/activeSession`);
+    const unsub = onValue(r, (snap) => {
+      const id = (snap.val() as string | null) ?? null;
+      const prev = prevDiscussionRef.current;
+      prevDiscussionRef.current = id;
+      if (prev === undefined) return;          // 첫 fire — 기준선만 기록
+      if (prev === null && id) {               // 없음 → 생김 = 켜지는 순간
+        if (storybookActiveRef.current) return;
+        setHubView("board");
+      }
+    });
+    return () => unsub();
+  }, [roomCode, user]);
   const [giveModalFor, setGiveModalFor] = useState<{ clientId: string; name: string } | null>(null);
   const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
   const [myStickerCount, setMyStickerCount] = useState(0);

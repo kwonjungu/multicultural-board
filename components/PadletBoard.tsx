@@ -654,6 +654,30 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 📊 PPTX 번역
               </button>
 
+              {/* 📢 모두 부르기 — 학생들이 어느 화면에 있든 1회 소통창으로 (이후 자유) */}
+              <button
+                onClick={() => {
+                  const db = getClientDb();
+                  set(ref(db, `rooms/${roomCode}/summon`), { target: "board", ts: Date.now() })
+                    .then(() => { setEmotionToast("📢 모두 불렀어요 — 학생 화면이 소통창으로 이동합니다"); setTimeout(() => setEmotionToast(null), 2600); })
+                    .catch(() => { setEmotionToast("호출에 실패했어요. 다시 눌러주세요."); setTimeout(() => setEmotionToast(null), 2600); });
+                }}
+                title="학생들을 소통창으로 1회 데려옵니다 (이후 이동 자유)"
+                style={{
+                  background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+                  border: "none", color: "#fff",
+                  borderRadius: 16, padding: "10px 16px",
+                  fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 56,
+                  boxShadow: "0 6px 18px rgba(99,102,241,0.35)",
+                  transition: "transform 0.12s",
+                }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                📢 모두 부르기
+              </button>
+
               {/* Manage button */}
               <button
                 onClick={() => {

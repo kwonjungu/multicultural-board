@@ -201,6 +201,8 @@ export interface StudentCosmetics {
   hat: HatId;
   pet: PetId;
   trophy: TrophyId;
+  /** 펫 위치 — 기본 "right"(우하단). 코스메틱 확장 Phase 1. */
+  petPos?: "right" | "left";
 }
 
 // === Storybook ("그림책으로 공부하기") system ===
