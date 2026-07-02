@@ -8,6 +8,7 @@ import { LANGUAGES } from "@/lib/constants";
 import SetupScreen from "@/components/SetupScreen";
 import PadletBoard from "@/components/PadletBoard";
 import HomeHub, { HubView } from "@/components/HomeHub";
+import { TutorialBus } from "@/lib/tutorial/bus";
 import GameRoom from "@/components/GameRoom";
 import InterpreterDrawer from "@/components/InterpreterDrawer";
 import PraiseHive from "@/components/PraiseHive";
@@ -36,6 +37,15 @@ export default function RoomPage() {
   const [roomConfig, setRoomConfig] = useState<RoomConfig>({ languages: ALL_LANGS });
   const [langsLoaded, setLangsLoaded] = useState(false);
   const [hubView, setHubView] = useState<HubView | "hub">("hub");
+
+  // 튜토리얼 "섹션 직접 진입" (설계서 항목 11) — TutorialHost 의 navigate
+  // 스텝이 발행하는 전환 이벤트를 받아 hubView 를 바꾼다.
+  useEffect(() => {
+    return TutorialBus.on("tutorial-navigate", (to) => {
+      if (typeof to !== "string") return;
+      setHubView(to as HubView | "hub");
+    });
+  }, []);
   const [interpreterOpen, setInterpreterOpen] = useState(false);
   const [giveModalFor, setGiveModalFor] = useState<{ clientId: string; name: string } | null>(null);
   const [cosmeticsOpen, setCosmeticsOpen] = useState(false);

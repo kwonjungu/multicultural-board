@@ -102,6 +102,28 @@ export default function TutorialHost({
     setReward(step.reward ?? null);
   }, [step]);
 
+  // Navigate step (설계서 항목 11) — 섹션 전환 이벤트 발행 후 목적지 렌더를
+  // 폴링으로 대기하고 자동 진행. 6초 타임아웃 시에도 진행(무한 대기 방지).
+  useEffect(() => {
+    if (!step || step.kind !== "navigate") return;
+    TutorialBus.emit("tutorial-navigate", step.to);
+    const started = Date.now();
+    const sel = step.waitSelector;
+    const iv = window.setInterval(() => {
+      const found = sel
+        ? !!document.querySelector(sel)
+        : Date.now() - started > 700;
+      const timeout = Date.now() - started > 6000;
+      if (found || timeout) {
+        window.clearInterval(iv);
+        // 레이아웃 안정화 여유 — 스포트라이트 좌표가 흔들리지 않게
+        window.setTimeout(() => { if (!unmountedRef.current) advance(); }, sel ? 350 : 0);
+      }
+    }, 150);
+    return () => window.clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepIdx]);
+
   function advance() {
     if (unmountedRef.current) return;
     if (stepIdx >= scenario.steps.length - 1) {
@@ -249,6 +271,7 @@ function pickExpression(step: TutorialStep): BeeExpression {
   if (step.kind === "speak")      return step.expression ?? "welcome";
   if (step.kind === "highlight")  return step.expression ?? "cheer";
   if (step.kind === "await")      return step.expression ?? "think";
+  if (step.kind === "navigate")   return "cheer";
   return "celebrate";
 }
 

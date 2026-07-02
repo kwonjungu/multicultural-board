@@ -48,8 +48,49 @@ export const mainHubStudentScenario: TutorialScenario = {
       lines: [
         { text: "첫 번째는 소통창! 🧡" },
         { text: "네가 한국어로 글을 쓰면, 다른 나라 친구들 화면엔 자기 나라말로 짠 하고 바뀌어.", expression: "celebrate" },
-        { text: "친구 글에 좋아요도 눌러주고, 칭찬 스티커도 받아봐~", expression: "welcome" },
+        { text: "말로만 하면 심심하지? 직접 들어가서 보여줄게! 따라와~", expression: "welcome" },
       ],
+    },
+    // ── 소통창 직접 진입 (설계서 항목 11) ──
+    {
+      kind: "navigate",
+      to: "board",
+      waitSelector: '[data-tutorial-id="board-header"]',
+    },
+    {
+      kind: "highlight",
+      target: '[data-tutorial-id="board-header"]',
+      side: "bottom",
+      expression: "celebrate",
+      lines: [
+        { text: "짠! 여기가 진짜 소통창 안이야 🏠" },
+        { text: "친구들 글이 주제별 컬럼에 모여 있어. 전부 네 언어로 자동 번역돼!", expression: "cheer" },
+      ],
+    },
+    {
+      kind: "highlight",
+      target: '[data-tutorial-id="board-fab"]',
+      side: "left",
+      expression: "cheer",
+      lines: [
+        { text: "이 ✏️ 버튼을 누르면 글을 쓸 수 있어!" },
+        { text: "글·사진·그림·유튜브까지 다 올릴 수 있지~", expression: "celebrate" },
+      ],
+    },
+    {
+      kind: "highlight",
+      target: '[data-tutorial-id="board-emotion-fab"]',
+      side: "left",
+      expression: "welcome",
+      lines: [
+        { text: "그리고 이 💗 버튼! 오늘 기분을 카드로 보낼 수 있어." },
+        { text: "기분을 보내면 호기심 스티커도 받아~ 자, 다시 나가볼까?", expression: "cheer" },
+      ],
+    },
+    {
+      kind: "navigate",
+      to: "hub",
+      waitSelector: '[data-tutorial-id="hub-section-interpreter"]',
     },
     {
       kind: "highlight",
@@ -140,8 +181,39 @@ export const mainHubTeacherScenario: TutorialScenario = {
       lines: [
         { text: "첫 번째는 **소통창**입니다. 🧡" },
         { text: "학생이 글을 올리면 **반 언어 전체로 자동 번역**되어 표시돼요.", expression: "welcome" },
-        { text: "카드의 칭찬 버튼으로 학생에게 **스티커**를 보낼 수 있고, 주제 컬럼도 추가하실 수 있어요.", expression: "celebrate" },
+        { text: "직접 들어가서 핵심 기능을 보여드릴게요!", expression: "celebrate" },
       ],
+    },
+    // ── 소통창 직접 진입 (설계서 항목 11) ──
+    {
+      kind: "navigate",
+      to: "board",
+      waitSelector: '[data-tutorial-id="board-header"]',
+    },
+    {
+      kind: "highlight",
+      target: '[data-tutorial-id="board-header"]',
+      side: "bottom",
+      expression: "celebrate",
+      lines: [
+        { text: "소통창 내부입니다. 상단 도구 모음에 **QR 입장·승인·내보내기·의견 나누기·게임·관리**가 모여 있어요." },
+        { text: "컬럼 위 **⚙ 버튼**으로 이름·색·순서를 바꾸고, **컬럼 제목을 더블클릭**하면 삭제할 수 있어요.", expression: "cheer" },
+      ],
+    },
+    {
+      kind: "highlight",
+      target: '[data-tutorial-id="board-fab"]',
+      side: "left",
+      expression: "cheer",
+      lines: [
+        { text: "✏️ 글쓰기 버튼 — 학생과 같은 방식으로 선생님도 게시할 수 있어요." },
+        { text: "학생 카드의 **칭찬 버튼**으로 스티커를 바로 보낼 수 있습니다. 다시 허브로 돌아갈게요!", expression: "welcome" },
+      ],
+    },
+    {
+      kind: "navigate",
+      to: "hub",
+      waitSelector: '[data-tutorial-id="hub-section-interpreter"]',
     },
     {
       kind: "highlight",
