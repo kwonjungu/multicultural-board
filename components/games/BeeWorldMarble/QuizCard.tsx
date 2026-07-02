@@ -31,6 +31,29 @@ interface QuizData {
 
 const EMOJI_POOL = ["😊","😢","😠","😨","😳","🤗","😴","😮","🥰","😭","🏆","🤝","😟","💔"];
 
+// 발문 템플릿 — 뷰어/친구 언어로 각각 표시 (영어 하드코딩 제거, 설계서 항목 12)
+const T_FLAG: LangMap = {
+  ko: "이 나라의 국기를 골라요",
+  en: "Pick this country's flag",
+  vi: "Chọn quốc kỳ của nước này",
+  zh: "选出这个国家的国旗",
+  ja: "この国の国旗をえらぼう",
+  fil: "Piliin ang bandila ng bansang ito",
+  th: "เลือกธงชาติของประเทศนี้",
+  ru: "Выбери флаг этой страны",
+};
+const T_GREET: Record<string, (name: string) => string> = {
+  ko: (n) => `${n} 에서는 뭐라고 인사할까요?`,
+  en: (n) => `How do people greet in ${n}?`,
+  vi: (n) => `Ở ${n} người ta chào thế nào?`,
+  zh: (n) => `在${n}人们怎么打招呼？`,
+  ja: (n) => `${n} では なんて あいさつする？`,
+  fil: (n) => `Paano bumati sa ${n}?`,
+};
+function greetPrompt(name: string, lang: string): string {
+  return (T_GREET[lang] || T_GREET.ko)(name);
+}
+
 // Pick the quiz kind with weighted roll (flag 0.5 / greet 0.3 / emotion 0.2).
 function pickKind(): QuizKind {
   const r = Math.random();
@@ -46,6 +69,7 @@ function findCountry(code: string): CountryItem | undefined {
 function buildQuiz(
   tileIdx: number,
   viewerLang: string,
+  friendLang: string,
 ): QuizData {
   const tile = TILES[tileIdx];
   const kind = pickKind();
@@ -62,8 +86,8 @@ function buildQuiz(
       const answerIdx = picks.findIndex((c) => c.code === target.code);
       return {
         kind,
-        prompt: "이 나라의 국기를 골라요",
-        promptSecondary: "Pick this country's flag",
+        prompt: tr(T_FLAG, viewerLang, "ko"),
+        promptSecondary: tr(T_FLAG, friendLang, "ko"),
         choices: picks.map((c) => ({ label: c.flag, key: c.code })),
         answerIdx,
       };
@@ -86,8 +110,8 @@ function buildQuiz(
       const answerIdx = picks.indexOf(right);
       return {
         kind,
-        prompt: `${target.flag} ${tr(target.names, viewerLang)} 에서는 뭐라고 인사할까요?`,
-        promptSecondary: `What's the greeting in ${tr(target.names, "en")}?`,
+        prompt: `${target.flag} ${greetPrompt(tr(target.names, viewerLang), viewerLang)}`,
+        promptSecondary: greetPrompt(tr(target.names, friendLang), friendLang),
         choices: picks.map((p, i) => ({ label: p, key: `g-${i}` })),
         answerIdx,
       };
@@ -104,8 +128,8 @@ function buildQuiz(
   const answerIdx = picks.indexOf(emo.emoji);
   return {
     kind: "emotion",
-    prompt: tr(emo.situation, viewerLang),
-    promptSecondary: tr(emo.situation, "en"),
+    prompt: tr(emo.situation, viewerLang, "ko"),
+    promptSecondary: tr(emo.situation, friendLang, "ko"),
     choices: picks.map((p, i) => ({ label: p, key: `e-${i}` })),
     answerIdx,
   };
@@ -147,8 +171,8 @@ export function QuizCard({ tileIdx, langA, langB, onAnswer }: QuizCardProps) {
   const answeredRef = useRef(false);
 
   const q = useMemo(
-    () => buildQuiz(tileIdx, langA),
-    // regenerate only when tile changes; langA is the viewer
+    () => buildQuiz(tileIdx, langA, langB),
+    // regenerate only when tile changes; langA/langB are stable per game
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tileIdx],
   );
