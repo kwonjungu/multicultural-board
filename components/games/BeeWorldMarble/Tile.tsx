@@ -1,7 +1,7 @@
 "use client";
 
 import { CSSProperties, useState } from "react";
-import { tr } from "@/lib/gameData";
+import { useGameText } from "@/lib/gameI18n";
 import {
   COLOR_GROUP_BG,
   COUNTRY_LANDMARK_IMG,
@@ -85,10 +85,13 @@ export function Tile({
   const cityImg = isCity && tile.image && !cityImgFail ? tile.image : undefined;
   const landmarkImg = cityImg ?? countryImg;
 
-  const primaryLabel = tile.landmark ? tr(tile.landmark, viewerLang) : "";
+  // 설계서 항목 12: 미보유 언어는 영어 폴백 대신 ko→번역 캐시로 채운다
+  const primaryText = useGameText(tile.landmark, viewerLang);
+  const friendText = useGameText(tile.landmark, friendLang);
+  const primaryLabel = tile.landmark ? primaryText : "";
   const secondaryLabel =
-    tile.landmark && friendLang !== viewerLang
-      ? tr(tile.landmark, friendLang)
+    tile.landmark && friendLang !== viewerLang && friendText !== primaryText
+      ? friendText
       : "";
 
   const style: CSSProperties = {

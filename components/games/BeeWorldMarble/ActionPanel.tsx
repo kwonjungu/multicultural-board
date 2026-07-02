@@ -1,7 +1,7 @@
 "use client";
 
 import { CSSProperties, Dispatch, ReactNode } from "react";
-import { tr } from "@/lib/gameData";
+import { GameText } from "@/lib/gameI18n";
 import { CHANCES, TILES } from "@/lib/marbleData";
 import { MAX_ROUNDS, totalAssets, type Action, type GameState } from "@/lib/marbleReducer";
 import { ChanceCard } from "./ChanceCard";
@@ -136,10 +136,10 @@ export function ActionPanel({
       <CenterCard>
         <div style={iconRow}>🏘️</div>
         <div style={titleStyle}>
-          {tile.landmark ? tr(tile.landmark, langA) : "도시"}
+          {tile.landmark ? <GameText map={tile.landmark} lang={langA} /> : "도시"}
         </div>
         {langA !== langB && tile.landmark && (
-          <div style={subtitleStyle}>{tr(tile.landmark, langB)}</div>
+          <div style={subtitleStyle}><GameText map={tile.landmark} lang={langB} /></div>
         )}
         <div style={priceStyle}>💰 {price}</div>
         <div style={buttonRow}>
@@ -187,7 +187,7 @@ export function ActionPanel({
         <div style={iconRow}>💸</div>
         <div style={titleStyle}>통행료 {phase.amount}</div>
         <div style={subtitleStyle}>
-          {tile.landmark ? tr(tile.landmark, langA) : ""}
+          {tile.landmark ? <GameText map={tile.landmark} lang={langA} /> : ""}
         </div>
         <button
           type="button"

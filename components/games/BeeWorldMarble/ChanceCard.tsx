@@ -1,7 +1,7 @@
 "use client";
 
 import { CSSProperties } from "react";
-import { tr } from "@/lib/gameData";
+import { useGameText } from "@/lib/gameI18n";
 import type { ChanceCard as ChanceCardData } from "@/lib/marbleData";
 
 export interface ChanceCardProps {
@@ -12,10 +12,11 @@ export interface ChanceCardProps {
 }
 
 export function ChanceCard({ card, langA, langB, onDone }: ChanceCardProps) {
-  const titleA = tr(card.title, langA);
-  const titleB = tr(card.title, langB);
-  const bodyA = tr(card.body, langA);
-  const bodyB = tr(card.body, langB);
+  // 설계서 항목 12: 미보유 언어는 ko→번역 캐시 (영어 폴백 제거)
+  const titleA = useGameText(card.title, langA);
+  const titleB = useGameText(card.title, langB);
+  const bodyA = useGameText(card.body, langA);
+  const bodyB = useGameText(card.body, langB);
 
   const wrap: CSSProperties = {
     background: "linear-gradient(160deg, #FEF3C7 0%, #FCD34D 100%)",
