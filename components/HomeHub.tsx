@@ -299,15 +299,12 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
           }}>
             <div style={{
               fontFamily: "'Jua', 'Noto Sans KR', sans-serif",
-              fontSize: "clamp(20px, 4.6vw, 34px)",
+              fontSize: "clamp(22px, 5vw, 38px)",
               color: "#92400E", lineHeight: 1.2,
               textShadow: "0 1px 0 rgba(255,255,255,0.8), 0 3px 8px rgba(180,83,9,0.25)",
               wordBreak: "keep-all",
             }}>
               소통하는<br />우리
-            </div>
-            <div style={{ fontSize: "clamp(9px, 1.8vw, 12px)", fontWeight: 800, color: "#B45309", marginTop: 4, opacity: 0.85 }}>
-              🐝 {t("hubTagline", lang)}
             </div>
           </div>
 
