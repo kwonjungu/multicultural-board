@@ -2,7 +2,7 @@
 // Test: nextThreshold(0)=2, nextThreshold(8)=15, nextThreshold(15)=null
 // Test: progressInStage(5)=(current:1,total:4,percent:25)
 
-import type { Stage, SkinId, HatId, PetId, TrophyId } from "./types";
+import type { Stage, SkinId, HatId, PetId, TrophyId, BackdropId, AuraId } from "./types";
 
 // Stage thresholds: [min, max] inclusive. queen has no upper bound.
 export const STAGE_THRESHOLDS: Record<Stage, { min: number; max: number | null }> = {
@@ -124,13 +124,36 @@ export function unlockedSkins(stage: Stage): SkinId[] {
   return out;
 }
 
-// pupa+: top. bee+: +cap,ribbon. queen+: +crown.
+// pupa+: top. bee+: +cap,ribbon. queen+: +crown + 전용 왕관 3종(오버레이 렌더).
 export function unlockedHats(stage: Stage): NonNullable<HatId>[] {
   const r = rank(stage);
   const out: NonNullable<HatId>[] = [];
   if (r >= rank("pupa"))  out.push("top");
   if (r >= rank("bee"))   out.push("cap", "party");
-  if (r >= rank("queen")) out.push("crown");
+  if (r >= rank("queen")) out.push("crown", "crown-rose", "crown-sapphire", "crown-honey");
+  return out;
+}
+
+/** 합성본 없이 anchors 기반 오버레이로만 렌더하는 신규 모자 (여왕벌 왕관 3종) */
+export const OVERLAY_HATS = new Set<NonNullable<HatId>>([
+  "crown-rose", "crown-sapphire", "crown-honey",
+]);
+
+// 배경: pupa+ 4종, queen 에서 왕좌 추가. Phase 3.
+export function unlockedBackdrops(stage: Stage): NonNullable<BackdropId>[] {
+  const r = rank(stage);
+  const out: NonNullable<BackdropId>[] = [];
+  if (r >= rank("pupa"))  out.push("flower", "hive", "rainbow", "night");
+  if (r >= rank("queen")) out.push("throne");
+  return out;
+}
+
+// 오라: bee+ 3종, queen 에서 로열 추가. Phase 3.
+export function unlockedAuras(stage: Stage): NonNullable<AuraId>[] {
+  const r = rank(stage);
+  const out: NonNullable<AuraId>[] = [];
+  if (r >= rank("bee"))   out.push("sparkle", "heart", "stardust");
+  if (r >= rank("queen")) out.push("royal");
   return out;
 }
 

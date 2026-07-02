@@ -12,6 +12,8 @@ import type {
   Stage,
   SkinId,
   HatId,
+  BackdropId,
+  AuraId,
 } from "@/lib/types";
 import {
   stageOf,
@@ -21,6 +23,7 @@ import {
   stageImageWithSkinAndHat,
   nextThreshold,
   progressInStage,
+  OVERLAY_HATS,
 } from "@/lib/stage";
 import {
   subscribeStudentStickers,
@@ -157,6 +160,9 @@ function daysSince(ts: number): number {
 /** Character image with multi-step fallback chain:
  *  skin+hat composite → skin-only → classic+hat composite → plain stage.
  *  각 404 시 onError 로 다음 후보 시도. 최종 폴백까지 실패하면 emoji 숨김.
+ *
+ *  신규 왕관(OVERLAY_HATS — 여왕벌 전용 3종)은 합성본이 없으므로
+ *  본체(skin) 위에 anchors.json 좌표로 모자 PNG 를 오버레이한다.
  */
 function CharacterImage({
   stage,
@@ -167,32 +173,100 @@ function CharacterImage({
   skin: SkinId;
   hat: HatId;
 }) {
-  // 후보 URL 배열 (순서대로 시도). classic & !hat 은 [stageImage] 하나만.
+  const overlayHat = hat && OVERLAY_HATS.has(hat) ? hat : null;
+  // 후보 URL 배열 (순서대로 시도). 오버레이 모자는 합성 체인에서 제외.
   const candidates: string[] = [];
-  if (hat) {
+  if (hat && !overlayHat) {
     candidates.push(stageImageWithSkinAndHat(stage, skin, hat));
     if (skin !== "classic") candidates.push(stageImageWithHat(stage, hat));
   }
   if (skin !== "classic") candidates.push(stageImageWithSkin(stage, skin));
   candidates.push(stageImage(stage));
   const [idx, setIdx] = useState(0);
+  const [hatFail, setHatFail] = useState(false);
   const src = candidates[Math.min(idx, candidates.length - 1)];
+
+  // 오버레이 모자 배치 — anchors 는 % 좌표, 부모가 정사각 박스이므로 % 로 계산
+  const anchor = ANCHORS[STAGE_ANCHOR_KEY[stage]] ?? FALLBACK_ANCHOR;
+  const hatW = anchor.hatScalePct;                       // 박스 폭 대비 %
+  const hatLeft = anchor.headXPct - hatW / 2;
+  const hatTop = anchor.headTopYPct - hatW * 0.85;       // 바닥이 머리에 15% 침투
+
   return (
-    <img
-      src={src}
-      alt=""
-      aria-hidden="true"
-      onError={() => setIdx((i) => i + 1)}
-      style={{
-        position: "absolute",
-        inset: 0,
-        width: "100%",
-        height: "100%",
-        animation: "heroBeeFloat 3s ease-in-out infinite",
-        filter: "drop-shadow(0 8px 18px rgba(245,158,11,0.4))",
-        zIndex: 1,
-      }}
-    />
+    <>
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        onError={() => setIdx((i) => i + 1)}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          animation: "heroBeeFloat 3s ease-in-out infinite",
+          filter: "drop-shadow(0 8px 18px rgba(245,158,11,0.4))",
+          zIndex: 1,
+        }}
+      />
+      {overlayHat && !hatFail && (
+        <img
+          src={`/stickers/hat-${overlayHat}.png`}
+          alt=""
+          aria-hidden="true"
+          onError={() => setHatFail(true)}
+          style={{
+            position: "absolute",
+            left: `${hatLeft}%`,
+            top: `${hatTop}%`,
+            width: `${hatW}%`,
+            height: `${hatW}%`,
+            objectFit: "contain",
+            animation: "heroBeeFloat 3s ease-in-out infinite",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.2))",
+            zIndex: 2,
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/** 배경 + 오라 오버레이 — 캐릭터 박스(정사각, position:relative) 안에서 사용.
+ *  backdrop 은 캐릭터 뒤(z0, 라운드 클립), aura 는 캐릭터 앞(z3, 포인터 통과). */
+function CosmeticFrame({ backdrop, aura }: { backdrop?: BackdropId; aura?: AuraId }) {
+  return (
+    <>
+      {backdrop && (
+        <img
+          src={`/stickers/backdrop-${backdrop}.png`}
+          alt=""
+          aria-hidden="true"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          style={{
+            position: "absolute", inset: "-4%",
+            width: "108%", height: "108%",
+            objectFit: "cover", borderRadius: "14%",
+            zIndex: 0,
+          }}
+        />
+      )}
+      {aura && (
+        <img
+          src={`/stickers/aura-${aura}.png`}
+          alt=""
+          aria-hidden="true"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          style={{
+            position: "absolute", inset: "-8%",
+            width: "116%", height: "116%",
+            objectFit: "contain",
+            zIndex: 3, pointerEvents: "none",
+            animation: "heroBeeFloat 4s ease-in-out infinite reverse",
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -521,6 +595,8 @@ function MyHiveTab({
               }}
             />
           )}
+          {/* 배경(뒤) + 오라(앞) — Phase 3 */}
+          <CosmeticFrame backdrop={cosmetics.backdrop} aura={cosmetics.aura} />
           {/* Main character fills the wrapper — 다단계 폴백:
               skin+hat 합성 → skin 단독 → stage 기본 */}
           <CharacterImage
@@ -958,6 +1034,7 @@ function RaceTab({
                   onMouseLeave={(ev) => (ev.currentTarget.style.transform = "scale(1)")}
                 >
                   <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto" }}>
+                    <CosmeticFrame backdrop={e.cosmetics.backdrop} aura={e.cosmetics.aura} />
                     <CharacterImage stage={st} skin={e.cosmetics.skin} hat={e.cosmetics.hat} />
                     {e.cosmetics.trophy && (
                       <img
@@ -2393,6 +2470,7 @@ function GalleryPopover({
 
         {/* 캐릭터 — 현재 꾸밈 상태 그대로 */}
         <div style={{ position: "relative", width: 170, height: 170, margin: "4px auto 0" }}>
+          <CosmeticFrame backdrop={target.cosmetics.backdrop} aura={target.cosmetics.aura} />
           <CharacterImage stage={st} skin={target.cosmetics.skin} hat={target.cosmetics.hat} />
           {target.cosmetics.trophy && (
             <img

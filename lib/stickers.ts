@@ -251,6 +251,8 @@ export function subscribeCosmetics(
       pet: (val?.pet as StudentCosmetics["pet"]) ?? null,
       trophy: (val?.trophy as StudentCosmetics["trophy"]) ?? null,
       petPos: (val?.petPos as StudentCosmetics["petPos"]) ?? "right",
+      backdrop: (val?.backdrop as StudentCosmetics["backdrop"]) ?? null,
+      aura: (val?.aura as StudentCosmetics["aura"]) ?? null,
     };
     cb(c);
   });
@@ -274,6 +276,8 @@ export function subscribeAllCosmetics(
         pet: (v?.pet as StudentCosmetics["pet"]) ?? null,
         trophy: (v?.trophy as StudentCosmetics["trophy"]) ?? null,
         petPos: (v?.petPos as StudentCosmetics["petPos"]) ?? "right",
+        backdrop: (v?.backdrop as StudentCosmetics["backdrop"]) ?? null,
+        aura: (v?.aura as StudentCosmetics["aura"]) ?? null,
       };
     }
     cb(out);
@@ -288,7 +292,12 @@ export async function setCosmetics(
 ): Promise<void> {
   const db = getClientDb();
   // Firebase set 은 undefined 거부 — 옵션 필드 기본값 보정
-  const clean: StudentCosmetics = { ...c, petPos: c.petPos ?? "right" };
+  const clean: StudentCosmetics = {
+    ...c,
+    petPos: c.petPos ?? "right",
+    backdrop: c.backdrop ?? null,
+    aura: c.aura ?? null,
+  };
   await set(ref(db, `${basePath(roomCode)}/cosmetics/${studentClientId}`), clean);
 }
 

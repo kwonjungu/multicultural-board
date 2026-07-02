@@ -162,9 +162,16 @@ export interface PresenceEntry {
 export type StickerType = "helpful" | "brave" | "creative" | "cooperative" | "persistent" | "curious";
 export type Stage = "egg" | "larva" | "pupa" | "bee" | "queen";
 export type SkinId = "classic" | "orange" | "green" | "sky" | "pink" | "purple";
-export type HatId = "top" | "cap" | "party" | "crown" | null;
+// crown-* 3종은 여왕벌 전용 신규 왕관 — 합성본 없이 anchors 오버레이로 렌더
+export type HatId =
+  | "top" | "cap" | "party" | "crown"
+  | "crown-rose" | "crown-sapphire" | "crown-honey"
+  | null;
 export type PetId = "dog" | "cat" | "rabbit" | "butterfly" | null;
 export type TrophyId = "gold" | "star" | null;
+// 코스메틱 확장 Phase 3-4 (런타임 오버레이 — 합성본 불필요)
+export type BackdropId = "flower" | "hive" | "rainbow" | "night" | "throne" | null;
+export type AuraId = "sparkle" | "heart" | "stardust" | "royal" | null;
 
 export type StickerSource = "teacher" | "mission";
 
@@ -203,6 +210,10 @@ export interface StudentCosmetics {
   trophy: TrophyId;
   /** 펫 위치 — 기본 "right"(우하단). 코스메틱 확장 Phase 1. */
   petPos?: "right" | "left";
+  /** 배경(캐릭터 뒤 풀사이즈). throne 은 여왕벌 전용. Phase 3. */
+  backdrop?: BackdropId;
+  /** 오라(캐릭터를 감싸는 이펙트 프레임). royal 은 여왕벌 전용. Phase 3. */
+  aura?: AuraId;
 }
 
 // === Storybook ("그림책으로 공부하기") system ===

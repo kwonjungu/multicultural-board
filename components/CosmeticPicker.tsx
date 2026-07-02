@@ -11,8 +11,10 @@ import {
   unlockedHats,
   unlockedPets,
   unlockedTrophies,
+  unlockedBackdrops,
+  unlockedAuras,
 } from "@/lib/stage";
-import type { StudentCosmetics, SkinId, HatId, PetId, TrophyId } from "@/lib/types";
+import type { StudentCosmetics, SkinId, HatId, PetId, TrophyId, BackdropId, AuraId } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -26,9 +28,14 @@ interface Props {
 }
 
 const ALL_SKINS: SkinId[] = ["classic", "orange", "green", "sky", "pink", "purple"];
-const ALL_HATS: NonNullable<HatId>[] = ["top", "cap", "party", "crown"];
+const ALL_HATS: NonNullable<HatId>[] = [
+  "top", "cap", "party", "crown",
+  "crown-rose", "crown-sapphire", "crown-honey", // 👑 여왕벌 전용
+];
 const ALL_PETS: NonNullable<PetId>[] = ["dog", "cat", "rabbit", "butterfly"];
 const ALL_TROPHIES: NonNullable<TrophyId>[] = ["gold", "star"];
+const ALL_BACKDROPS: NonNullable<BackdropId>[] = ["flower", "hive", "rainbow", "night", "throne"];
+const ALL_AURAS: NonNullable<AuraId>[] = ["sparkle", "heart", "stardust", "royal"];
 
 const DEFAULT_COSMETICS: StudentCosmetics = {
   skin: "classic",
@@ -36,6 +43,8 @@ const DEFAULT_COSMETICS: StudentCosmetics = {
   pet: null,
   trophy: null,
   petPos: "right",
+  backdrop: null,
+  aura: null,
 };
 
 type ItemKind = "skin" | "hat" | "pet" | "trophy";
@@ -64,6 +73,8 @@ export default function CosmeticPicker({
   const uHats = useMemo(() => new Set<NonNullable<HatId>>(unlockedHats(stage)), [stage]);
   const uPets = useMemo(() => new Set<NonNullable<PetId>>(unlockedPets(stage)), [stage]);
   const uTrophies = useMemo(() => new Set<NonNullable<TrophyId>>(unlockedTrophies(stage)), [stage]);
+  const uBackdrops = useMemo(() => new Set<NonNullable<BackdropId>>(unlockedBackdrops(stage)), [stage]);
+  const uAuras = useMemo(() => new Set<NonNullable<AuraId>>(unlockedAuras(stage)), [stage]);
 
   // Subscribe to cosmetics while open.
   // BUG FIX: Firebase onValue can fire multiple times (cache → server roundtrip
@@ -231,6 +242,16 @@ export default function CosmeticPicker({
                 boxShadow: "0 4px 12px rgba(245,158,11,0.18)",
               }}
             >
+              {/* 배경 (캐릭터 뒤, Phase 3) */}
+              {draft.backdrop && (
+                <img
+                  src={`/stickers/backdrop-${draft.backdrop}.png`}
+                  alt=""
+                  aria-hidden="true"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              )}
               {/* Stage base (skin 이 적용된 재채색 버전). 파일 없으면 classic 으로 폴백. */}
               <img
                 src={stageSrc}
@@ -242,6 +263,19 @@ export default function CosmeticPicker({
                   objectFit: "contain",
                 }}
               />
+              {/* 오라 (캐릭터 앞, Phase 3) */}
+              {draft.aura && (
+                <img
+                  src={`/stickers/aura-${draft.aura}.png`}
+                  alt=""
+                  aria-hidden="true"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  style={{
+                    position: "absolute", inset: "-6%", width: "112%", height: "112%",
+                    objectFit: "contain", pointerEvents: "none", zIndex: 4,
+                  }}
+                />
+              )}
               {/* Pet (bottom-left) */}
               {draft.pet && (
                 <img
@@ -286,6 +320,56 @@ export default function CosmeticPicker({
               )}
             </div>
           </div>
+
+          {/* 🖼 배경 section — Phase 3 (pupa+, 왕좌는 queen 전용) */}
+          <Section title="🖼 배경">
+            <Row>
+              <NoneTile
+                active={!draft.backdrop}
+                onClick={() => setDraft((d) => ({ ...d, backdrop: null }))}
+                label={t("cosmeticNone", lang)}
+              />
+              {ALL_BACKDROPS.map((id) => {
+                const unlocked = uBackdrops.has(id);
+                const active = draft.backdrop === id;
+                return (
+                  <Tile
+                    key={`backdrop-${id}`}
+                    active={active}
+                    unlocked={unlocked}
+                    onClick={() => unlocked && setDraft((d) => ({ ...d, backdrop: id }))}
+                    lockedHint={id === "throne" ? "👑 여왕벌 전용" : t("cosmeticLocked", lang)}
+                    imageSrc={`/stickers/backdrop-${id}.png`}
+                  />
+                );
+              })}
+            </Row>
+          </Section>
+
+          {/* ✨ 오라 section — Phase 3 (bee+, 로열은 queen 전용) */}
+          <Section title="✨ 오라 (반짝 효과)">
+            <Row>
+              <NoneTile
+                active={!draft.aura}
+                onClick={() => setDraft((d) => ({ ...d, aura: null }))}
+                label={t("cosmeticNone", lang)}
+              />
+              {ALL_AURAS.map((id) => {
+                const unlocked = uAuras.has(id);
+                const active = draft.aura === id;
+                return (
+                  <Tile
+                    key={`aura-${id}`}
+                    active={active}
+                    unlocked={unlocked}
+                    onClick={() => unlocked && setDraft((d) => ({ ...d, aura: id }))}
+                    lockedHint={id === "royal" ? "👑 여왕벌 전용" : t("cosmeticLocked", lang)}
+                    imageSrc={`/stickers/aura-${id}.png`}
+                  />
+                );
+              })}
+            </Row>
+          </Section>
 
           {/* Skins section — 현재 단계 캐릭터에 색만 입힌 프리뷰로 표시 */}
           <Section title={t("cosmeticSkins", lang)}>
