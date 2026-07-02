@@ -95,6 +95,7 @@ export interface BookListEntry {
   visible?: boolean;           // [신규] 학생 자유 읽기 공개 여부 (기본=숨김)
   wordQuizEnabled?: boolean;   // [신규] 책별 단어 퀴즈 기본 사용 여부
   hasVocab?: boolean;          // [신규] 단어 퀴즈 가능 여부(어휘 4개 이상)
+  chatEnabled?: boolean;       // 자유 읽기(복습) 중 캐릭터 챗봇 허용 (설계서 항목 3)
 }
 
 export async function listGeneratedBooks(): Promise<BookListEntry[]> {
@@ -115,19 +116,21 @@ export async function listGeneratedBooks(): Promise<BookListEntry[]> {
       visible: b.visible ?? false,
       wordQuizEnabled: b.wordQuizEnabled ?? false,
       hasVocab: (b.vocab?.length ?? 0) >= 4,
+      chatEnabled: b.chatEnabled ?? false,
     }))
     .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 }
 
-/** [신규] 책의 공개 여부 / 단어 퀴즈 토글을 즉시 갱신. */
+/** [신규] 책의 공개 여부 / 단어 퀴즈 / 복습 챗봇 토글을 즉시 갱신. */
 export async function setBookFlags(
   bookId: string,
-  flags: { visible?: boolean; wordQuizEnabled?: boolean },
+  flags: { visible?: boolean; wordQuizEnabled?: boolean; chatEnabled?: boolean },
 ): Promise<void> {
   const db = getClientDb();
   const updates: Record<string, boolean> = {};
   if (typeof flags.visible === "boolean") updates.visible = flags.visible;
   if (typeof flags.wordQuizEnabled === "boolean") updates.wordQuizEnabled = flags.wordQuizEnabled;
+  if (typeof flags.chatEnabled === "boolean") updates.chatEnabled = flags.chatEnabled;
   if (Object.keys(updates).length === 0) return;
   await update(ref(db, `generated_books/${bookId}`), updates);
 }

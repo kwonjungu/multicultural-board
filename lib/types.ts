@@ -268,6 +268,8 @@ export interface Storybook {
   vocab?: StorybookVocabWord[];           // [신규] 단어 퀴즈용 어휘 세트
   visible?: boolean;                      // [신규] 학생 자유 읽기 공개 여부 (기본=숨김)
   wordQuizEnabled?: boolean;              // [신규] 책별 단어 퀴즈 기본 사용 여부
+  /** 자유 읽기(복습) 중 캐릭터 챗봇 허용 — 교사가 책별로 ON (설계서 항목 3, 기본 OFF) */
+  chatEnabled?: boolean;
 }
 
 export interface StorybookSession {

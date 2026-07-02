@@ -167,7 +167,7 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
       );
     }
     // [신규] 학생: 수업이 없으면 교사가 공개한 책을 자유롭게 읽을 수 있다.
-    return <StudentFreeLibrary lang={lang} viewerLang={lang} roomCode={roomCode} onBack={onBack} />;
+    return <StudentFreeLibrary lang={lang} viewerLang={lang} roomCode={roomCode} user={user} myClientId={myClientId} onBack={onBack} />;
   }
 
   // ── Loading book ─────────────────────────────────────────
@@ -359,7 +359,7 @@ function TeacherSetup({
   }
 
   // [신규] 책별 공개/퀴즈 토글 — 낙관적 갱신 후 Firebase 저장.
-  async function toggleFlag(id: string, key: "visible" | "wordQuizEnabled") {
+  async function toggleFlag(id: string, key: "visible" | "wordQuizEnabled" | "chatEnabled") {
     const cur = generated.find((b) => b.id === id);
     if (!cur) return;
     const nextVal = !cur[key];
@@ -578,6 +578,14 @@ function TeacherSetup({
                         offLabel={b.hasVocab ? "📝 퀴즈 OFF" : "📝 어휘없음"}
                         title="단어 퀴즈를 켜면 읽기 전 4지선다를 먼저 풀어요"
                       />
+                      {/* 복습(자유 읽기) 중 캐릭터 챗봇 허용 — 기본 OFF (설계서 항목 3) */}
+                      <FlagChip
+                        active={!!b.chatEnabled}
+                        onClick={() => toggleFlag(b.id, "chatEnabled")}
+                        onLabel="🐝 챗봇 ON"
+                        offLabel="🐝 챗봇 OFF"
+                        title="켜면 학생이 복습(자유 읽기) 중에 등장인물 챗봇과 대화할 수 있어요"
+                      />
                     </div>
                   )}
                 </div>
@@ -713,8 +721,8 @@ function FlagChip({
 // ============================================================
 
 function StudentFreeLibrary({
-  lang, viewerLang, roomCode, onBack,
-}: { lang: string; viewerLang: string; roomCode: string; onBack: () => void }) {
+  lang, viewerLang, roomCode, user, myClientId, onBack,
+}: { lang: string; viewerLang: string; roomCode: string; user: UserConfig; myClientId: string; onBack: () => void }) {
   const [books, setBooks] = useState<BookListEntry[] | null>(null);
   const [openBook, setOpenBook] = useState<Storybook | null>(null);
   const [loadingBook, setLoadingBook] = useState(false);
@@ -750,6 +758,8 @@ function StudentFreeLibrary({
         book={openBook}
         viewerLang={viewerLang}
         roomCode={roomCode}
+        user={user}
+        myClientId={myClientId}
         onBack={() => setOpenBook(null)}
       />
     );
@@ -845,13 +855,21 @@ function StudentFreeLibrary({
 // [신규] 자유 리더 — 학생이 스스로 페이지를 넘기며 읽고 듣는다 (질문/핫시팅 없음).
 // 책에 단어 퀴즈가 켜져 있고 어휘가 4개 이상이면 읽기 전에 퀴즈를 먼저 푼다(규칙).
 function StorybookFreeReader({
-  book, viewerLang, roomCode, onBack,
-}: { book: Storybook; viewerLang: string; roomCode: string; onBack: () => void }) {
+  book, viewerLang, roomCode, user, myClientId, onBack,
+}: { book: Storybook; viewerLang: string; roomCode: string; user: UserConfig; myClientId: string; onBack: () => void }) {
   const quizFirst = !!book.wordQuizEnabled && (book.vocab?.length ?? 0) >= 4;
   const [quizDone, setQuizDone] = useState(false);
   // 0 = 표지, 1..N = 페이지
   const [page, setPage] = useState(0);
   const [speaking, setSpeaking] = useState(false);
+  // 복습 중 캐릭터 챗봇 (설계서 항목 3+4) — 교사가 책별 🐝 챗봇 ON 시에만.
+  // ← 뒤로가기로 다른 캐릭터 재선택 가능 (챗 로그는 캐릭터별 분리 저장).
+  const chatAllowed = !!book.chatEnabled && (book.characters?.length ?? 0) > 0;
+  const [reviewChatOpen, setReviewChatOpen] = useState(false);
+  const [reviewCharId, setReviewCharId] = useState<string | null>(null);
+  const reviewChar = reviewCharId
+    ? book.characters.find((c) => c.id === reviewCharId) ?? null
+    : null;
 
   if (quizFirst && !quizDone) {
     return (
@@ -937,6 +955,21 @@ function StorybookFreeReader({
           />
         ))}
 
+        {/* ── 🐝 복습 중 캐릭터에게 물어보기 (교사가 책별 챗봇 ON 시에만) ── */}
+        {chatAllowed && (
+          <button
+            onClick={() => setReviewChatOpen(true)}
+            style={{
+              width: "100%", minHeight: 52, marginTop: 14,
+              background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
+              color: "#fff", fontSize: 15, fontWeight: 900,
+              border: "none", borderRadius: 16, cursor: "pointer",
+              boxShadow: "0 6px 18px rgba(245,158,11,0.35)",
+              letterSpacing: -0.2, fontFamily: "inherit",
+            }}
+          >🐝 등장인물에게 물어보기 — 궁금한 걸 질문해요!</button>
+        )}
+
         {/* nav */}
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
           <button
@@ -961,6 +994,50 @@ function StorybookFreeReader({
           >{page >= total ? "끝!" : onCover ? "읽기 시작 ▶" : "다음 ▶"}</button>
         </div>
       </div>
+
+      {/* ── 챗봇 오버레이: 캐릭터 선택 → 대화 → ← 로 다른 캐릭터 (항목 3+4) ── */}
+      {chatAllowed && reviewChatOpen && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) { setReviewChatOpen(false); setReviewCharId(null); } }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 600,
+            background: "rgba(17,24,39,0.55)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 14, animation: "fadeIn 0.2s",
+          }}
+        >
+          <div style={{ width: "min(680px, 100%)", maxHeight: "92vh", overflowY: "auto", position: "relative" }}>
+            <button
+              onClick={() => { setReviewChatOpen(false); setReviewCharId(null); }}
+              aria-label="닫기"
+              style={{
+                position: "sticky", top: 0, left: "100%", zIndex: 2,
+                width: 38, height: 38, borderRadius: 12, marginBottom: 6,
+                background: "#fff", border: "2px solid #FDE68A",
+                fontSize: 15, fontWeight: 900, color: "#92400E", cursor: "pointer",
+                display: "block",
+              }}
+            >✕</button>
+            {reviewChar ? (
+              <CharacterChat
+                lang={viewerLang}
+                roomCode={roomCode}
+                myClientId={myClientId}
+                user={user}
+                book={book}
+                character={reviewChar}
+                onBack={() => setReviewCharId(null)}
+              />
+            ) : (
+              <CharacterPicker
+                lang={viewerLang}
+                book={book}
+                onPick={(id) => setReviewCharId(id)}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
