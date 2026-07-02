@@ -24,6 +24,9 @@ interface SectionMeta {
   badge?: string;
 }
 
+// ⭐ 소통의 별 — 화이트보드는 소통창/그림책으로 편입되어 타일에서 제외.
+// 배열 순서 = 별 꼭짓점 배치(12시부터 시계방향 72°씩):
+// 소통창(12시) → 그림책(2시) → 단어(5시) → 칭찬(7시) → 게임(10시)
 const SECTIONS: SectionMeta[] = [
   {
     id: "board",
@@ -36,34 +39,14 @@ const SECTIONS: SectionMeta[] = [
     accent: "#B45309",
   },
   {
-    id: "whiteboard",
-    titleKey: "hubSectionWhiteboard",
-    sub: "Whiteboard",
-    descKey: "hubSectionWhiteboardDesc",
-    mascot: "/mascot/bee-think.png",
-    color: "#3B82F6",
-    bg: "linear-gradient(135deg, #DBEAFE, #BFDBFE)",
-    accent: "#1D4ED8",
-  },
-  {
-    id: "games",
-    titleKey: "hubSectionGames",
-    sub: "Games",
-    descKey: "hubSectionGamesDesc",
-    mascot: "/mascot/bee-celebrate.png",
-    color: "#FB7185",
-    bg: "linear-gradient(135deg, #FFE4E6, #FECDD3)",
-    accent: "#BE123C",
-  },
-  {
-    id: "dashboard",
-    titleKey: "hubSectionStickers",
-    sub: "Praise Hive",
-    descKey: "hubSectionStickersDesc",
-    mascot: "/mascot/bee-student.png",
-    color: "#10B981",
-    bg: "linear-gradient(135deg, #D1FAE5, #A7F3D0)",
-    accent: "#065F46",
+    id: "storybook",
+    titleKey: "hubSectionStorybook",
+    sub: "Storybook",
+    descKey: "hubSectionStorybookDesc",
+    mascot: "/mascot/bee-welcome.png",
+    color: "#F97316",
+    bg: "linear-gradient(135deg, #FFF7ED, #FED7AA)",
+    accent: "#C2410C",
   },
   {
     id: "vocab",
@@ -76,16 +59,45 @@ const SECTIONS: SectionMeta[] = [
     accent: "#6D28D9",
   },
   {
-    id: "storybook",
-    titleKey: "hubSectionStorybook",
-    sub: "Storybook",
-    descKey: "hubSectionStorybookDesc",
-    mascot: "/mascot/bee-welcome.png",
-    color: "#F59E0B",
-    bg: "linear-gradient(135deg, #FFF7ED, #FED7AA)",
-    accent: "#C2410C",
+    id: "dashboard",
+    titleKey: "hubSectionStickers",
+    sub: "Praise Hive",
+    descKey: "hubSectionStickersDesc",
+    mascot: "/mascot/bee-student.png",
+    color: "#10B981",
+    bg: "linear-gradient(135deg, #D1FAE5, #A7F3D0)",
+    accent: "#065F46",
+  },
+  {
+    id: "games",
+    titleKey: "hubSectionGames",
+    sub: "Games",
+    descKey: "hubSectionGamesDesc",
+    mascot: "/mascot/bee-celebrate.png",
+    color: "#FB7185",
+    bg: "linear-gradient(135deg, #FFE4E6, #FECDD3)",
+    accent: "#BE123C",
   },
 ];
+
+// 별 꼭짓점 각도(도) — 12시(-90°)부터 시계방향 72° 간격
+const STAR_ANGLES = [-90, -18, 54, 126, 198];
+// 컨테이너(정사각, viewBox 100) 기준 기하
+const STAR_CX = 50;
+const STAR_CY = 52;          // 상단 원 라벨 여유를 위해 살짝 아래
+const STAR_R_OUTER = 38;     // 별 꼭짓점 반경 = 원 버튼 중심
+const STAR_R_INNER = STAR_R_OUTER * 0.382; // 정통 오각성 내경비
+
+/** 오각성(★) 실루엣 폴리곤 points (viewBox 100 기준) */
+function starPolygonPoints(): string {
+  const pts: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? STAR_R_OUTER : STAR_R_INNER;
+    const ang = ((-90 + i * 36) * Math.PI) / 180;
+    pts.push(`${(STAR_CX + r * Math.cos(ang)).toFixed(2)},${(STAR_CY + r * Math.sin(ang)).toFixed(2)}`);
+  }
+  return pts.join(" ");
+}
 
 interface Props {
   user: UserConfig;
@@ -244,106 +256,133 @@ export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLa
           <p style={{ margin: "6px 0 0", fontSize: 14, color: "#92400E", fontWeight: 700 }}>
             {t("hubPrompt", lang)}
           </p>
-          <p style={{
-            margin: "8px auto 0", maxWidth: 360,
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "6px 14px", borderRadius: 999,
-            background: "rgba(255,255,255,0.75)", border: "2px solid #FDE68A",
-            fontSize: 12, fontWeight: 800, color: "#B45309",
-          }}>
-            🐝 {t("hubTagline", lang)}
-          </p>
+          {/* 태그라인은 소통의 별 중앙("소통하는 우리" 아래)으로 이동 */}
         </div>
 
-        {/* 4 sections grid */}
+        {/* ⭐ 소통의 별 — 5개 섹션이 별 꼭짓점의 원, 중앙에 "소통하는 우리" */}
         <div style={{
-          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14,
+          position: "relative",
+          width: "min(94vw, 620px)",
+          aspectRatio: "1",
+          margin: "0 auto",
         }}>
-          {SECTIONS.map((s) => {
-            const locked = false;
+          {/* 별 실루엣 */}
+          <svg
+            viewBox="0 0 100 100"
+            aria-hidden="true"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          >
+            <defs>
+              <linearGradient id="starGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#FEF3C7" stopOpacity="0.95" />
+                <stop offset="55%" stopColor="#FDE68A" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#FBBF24" stopOpacity="0.85" />
+              </linearGradient>
+            </defs>
+            <polygon
+              points={starPolygonPoints()}
+              fill="url(#starGrad)"
+              stroke="#F59E0B"
+              strokeWidth="1.4"
+              strokeLinejoin="round"
+              style={{ filter: "drop-shadow(0 4px 6px rgba(180,83,9,0.25))" }}
+            />
+          </svg>
+
+          {/* 중앙 — 소통하는 우리 */}
+          <div style={{
+            position: "absolute",
+            left: `${STAR_CX}%`, top: `${STAR_CY}%`,
+            transform: "translate(-50%, -50%)",
+            textAlign: "center", pointerEvents: "none",
+            width: "36%",
+          }}>
+            <div style={{
+              fontFamily: "'Jua', 'Noto Sans KR', sans-serif",
+              fontSize: "clamp(20px, 4.6vw, 34px)",
+              color: "#92400E", lineHeight: 1.2,
+              textShadow: "0 1px 0 rgba(255,255,255,0.8), 0 3px 8px rgba(180,83,9,0.25)",
+              wordBreak: "keep-all",
+            }}>
+              소통하는<br />우리
+            </div>
+            <div style={{ fontSize: "clamp(9px, 1.8vw, 12px)", fontWeight: 800, color: "#B45309", marginTop: 4, opacity: 0.85 }}>
+              🐝 {t("hubTagline", lang)}
+            </div>
+          </div>
+
+          {/* 꼭짓점 원형 버튼 5개 */}
+          {SECTIONS.map((s, i) => {
+            const ang = (STAR_ANGLES[i] * Math.PI) / 180;
+            const x = STAR_CX + STAR_R_OUTER * Math.cos(ang);
+            const y = STAR_CY + STAR_R_OUTER * Math.sin(ang);
             return (
               <button
                 key={s.id}
                 data-tutorial-id={`hub-section-${s.id}`}
-                onClick={() => !locked && onSelect(s.id)}
-                disabled={locked}
+                onClick={() => onSelect(s.id)}
                 aria-label={`${t(s.titleKey, lang)} 열기`}
+                title={t(s.descKey, lang)}
                 style={{
-                  position: "relative",
+                  position: "absolute",
+                  left: `${x}%`, top: `${y}%`,
+                  transform: "translate(-50%, -50%)",
+                  width: "27%", aspectRatio: "1",
+                  borderRadius: "50%",
                   background: s.bg,
-                  border: `3px solid ${s.color}55`,
-                  borderRadius: 26,
-                  padding: "20px 20px 22px",
-                  textAlign: "left",
-                  cursor: locked ? "default" : "pointer",
-                  opacity: locked ? 0.78 : 1,
-                  boxShadow: locked
-                    ? "0 4px 10px rgba(0,0,0,0.04)"
-                    : `0 12px 28px ${s.color}33`,
-                  transition: "transform 0.15s, box-shadow 0.15s",
-                  minHeight: 180,
-                  display: "flex", flexDirection: "column", gap: 8,
+                  border: `3px solid ${s.color}`,
+                  boxShadow: `0 10px 24px ${s.color}44, inset 0 -4px 0 ${s.color}22`,
+                  cursor: "pointer",
+                  display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center",
+                  gap: 2, padding: "4%",
                   fontFamily: "inherit",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                  zIndex: 2,
                 }}
-                onMouseDown={(e) => !locked && (e.currentTarget.style.transform = "scale(0.97)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "translate(-50%, -50%) scale(0.94)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "translate(-50%, -50%) scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "translate(-50%, -50%) scale(1)")}
+                onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 14px 30px ${s.color}66, inset 0 -4px 0 ${s.color}22`)}
               >
-                {/* Top: mascot */}
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 2 }}>
-                  <img
-                    src={s.mascot}
-                    alt=""
-                    aria-hidden="true"
-                    style={{
-                      width: 112, height: 112, display: "block",
-                      filter: `drop-shadow(0 6px 14px ${s.color}55)`,
-                      animation: locked ? undefined : "heroBeeFloat 3s ease-in-out infinite",
-                    }}
-                  />
-                </div>
-
-                {/* Title + sub */}
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-                    {t(s.titleKey, lang)}
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 900, color: s.accent, letterSpacing: 1, marginTop: 2 }}>
-                    {s.sub}
-                  </div>
-                </div>
-
-                {/* Description */}
+                <img
+                  src={s.mascot}
+                  alt=""
+                  aria-hidden="true"
+                  style={{
+                    width: "58%", height: "58%", objectFit: "contain",
+                    filter: `drop-shadow(0 4px 8px ${s.color}55)`,
+                    animation: "heroBeeFloat 3s ease-in-out infinite",
+                  }}
+                />
                 <div style={{
-                  textAlign: "center", fontSize: 13, color: s.accent, fontWeight: 700,
-                  marginTop: "auto", lineHeight: 1.5,
+                  fontSize: "clamp(11px, 2.3vw, 16px)",
+                  fontWeight: 900, color: "#1F2937",
+                  letterSpacing: -0.3, lineHeight: 1.15,
+                  textAlign: "center", wordBreak: "keep-all",
                 }}>
-                  {t(s.descKey, lang)}
+                  {t(s.titleKey, lang)}
                 </div>
-
-                {/* Badge */}
-                {s.badge && (
-                  <div style={{
-                    position: "absolute", top: 14, right: 14,
-                    fontSize: 10, fontWeight: 900, color: "#fff",
-                    background: locked ? "#9CA3AF" : s.color,
-                    padding: "3px 8px", borderRadius: 999, letterSpacing: 0.5,
-                    boxShadow: locked ? "none" : `0 2px 6px ${s.color}66`,
-                  }}>{s.badge}</div>
-                )}
-
-                {locked && (
-                  <div style={{
-                    position: "absolute", bottom: 14, right: 14,
-                    fontSize: 10, fontWeight: 900, color: "#6B7280",
-                    background: "#F3F4F6", padding: "3px 8px", borderRadius: 999,
-                    letterSpacing: 0.5,
-                  }}>{t("hubSoon", lang)}</div>
-                )}
               </button>
             );
           })}
         </div>
+
+        {/* 교사 전용 — 화이트보드(타일에서 편입 제외, 기능은 유지) */}
+        {user.isTeacher && (
+          <div style={{ textAlign: "center", marginTop: 6 }}>
+            <button
+              onClick={() => onSelect("whiteboard")}
+              style={{
+                padding: "8px 18px", borderRadius: 999,
+                background: "rgba(255,255,255,0.85)", border: "2px solid #BFDBFE",
+                color: "#1D4ED8", fontSize: 13, fontWeight: 800,
+                cursor: "pointer", fontFamily: "inherit",
+                boxShadow: "0 4px 12px rgba(59,130,246,0.15)",
+              }}
+            >🖊 화이트보드 열기 <span style={{ fontSize: 10, opacity: 0.7 }}>(켜면 학생 화면이 자동으로 따라와요)</span></button>
+          </div>
+        )}
       </div>
 
       {/* 입장 QR 모달 — 교사용 */}
