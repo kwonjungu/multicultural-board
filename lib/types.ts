@@ -8,6 +8,8 @@ export interface RoomConfig {
   rosterMode?: boolean;
   roster?: string[];
   approvalMode?: boolean;
+  /** 교사 입장 암호. 미설정(기본)이면 방 번호와 동일. 관리 패널에서 변경/초기화. */
+  teacherPin?: string;
 }
 
 export interface CardData {

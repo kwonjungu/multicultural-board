@@ -48,6 +48,7 @@ import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { readChatStream } from "@/lib/chatStreamClient";
 import MicButton from "./MicButton";
 import DrawBoard, { type DrawBoardHandle } from "./DrawBoard";
+import ImageLightbox from "./ImageLightbox";
 import { speak as speakText } from "@/lib/ttsMulti";
 import StorybookCreator from "./StorybookCreator";
 import StorybookWordQuiz from "./StorybookWordQuiz";
@@ -1050,6 +1051,12 @@ function StorybookFreeReader({
 // 자유 읽기 새 답변 작성기 입력 모드 — 실제 수업(QuestionCard)과 동일 4종
 type FreeMode = "text" | "voice" | "draw" | "emotion";
 
+// 친구들의 생각 카드 색 — 의견 나누기(DiscussionSession)와 동일한 파스텔 로테이션
+const FA_CARD_COLORS = [
+  "#FEF3C7", "#DBEAFE", "#FCE7F3", "#D1FAE5", "#EDE9FE",
+  "#FEE2E2", "#FFEDD5", "#E0F2FE", "#F3E8FF", "#FEF9C3",
+];
+
 function faDataUrlToBlob(dataUrl: string): Blob {
   const [header, data] = dataUrl.split(",");
   const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
@@ -1078,6 +1085,8 @@ function FriendAnswers({
   const [answerWarn, setAnswerWarn] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const freeDrawRef = useRef<DrawBoardHandle>(null);
+  // 친구 그림 클릭 확대
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   useEffect(() => {
     // comments 서브트리는 raw 에 함께 실려온다 (bookAnswers 하위 저장이라
@@ -1382,146 +1391,169 @@ function FriendAnswers({
           )}
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {answers.map((a) => {
-          const aTrans = trans[a.id];
-          const comments = Object.values(a.comments ?? {})
-            .filter(Boolean)
-            .sort((x, y) => (x.timestamp ?? 0) - (y.timestamp ?? 0));
-          const open = draftFor === a.id;
-          return (
-            <div key={a.id} style={{
-              background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12,
-              padding: "8px 12px",
-            }}>
-              {/* 그림 답변 — 수업 중 그린 그림 그대로 표시 */}
-              {a.imageUrl && (
-                <img
-                  src={a.imageUrl}
-                  alt={`${a.studentName}의 그림`}
-                  style={{
-                    width: "100%", maxHeight: 260, objectFit: "contain",
-                    background: "#fff", borderRadius: 10,
-                    border: "1px solid #FDE68A", marginBottom: a.text ? 6 : 0,
-                    display: "block",
-                  }}
-                />
-              )}
-              {/* 메인 = 뷰어 언어(번역 도착 시), 아래 원문 항상 표시 (항목 5) */}
-              {a.text && (
-                <div style={{ fontSize: 14, color: "#1F2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-                  {aTrans || a.text}
-                </div>
-              )}
-              {aTrans && aTrans !== a.text && (
-                <div style={{
-                  marginTop: 5, padding: "5px 8px",
-                  background: "rgba(255,255,255,0.7)", borderRadius: 8,
-                  borderLeft: "3px solid rgba(245,158,11,0.5)",
-                  fontSize: 12, color: "#4B5563", lineHeight: 1.45, whiteSpace: "pre-wrap",
-                }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, color: "#92400E", marginRight: 4 }}>
-                    📜 원문 · {(a.studentLang || "").toUpperCase()}
-                  </span>
-                  {a.text}
-                </div>
-              )}
-              <div style={{ fontSize: 10, fontWeight: 800, color: "#92400E", marginTop: 4 }}>
-                — {a.studentName}
-              </div>
-
-              {/* ── 💬 친구 의견 댓글 (설계서 항목 1, 영속) ── */}
-              {comments.length > 0 && (
-                <div style={{
-                  marginTop: 8, paddingTop: 8, borderTop: "1px dashed #FDE68A",
+      {/* ── 친구들의 생각 — 의견 나누기(소통판)와 같은 파스텔 포스트잇 그리드 ── */}
+      {answers.length > 0 && (
+        <div style={{
+          background: "linear-gradient(180deg, #E8F5FF 0%, #F0F7E8 100%)",
+          borderRadius: 16, padding: "12px 10px",
+          border: "1px solid #D1FAE5",
+        }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+            gap: 10, alignItems: "start",
+          }}>
+            {answers.map((a, ai) => {
+              const cardBg = FA_CARD_COLORS[ai % FA_CARD_COLORS.length];
+              const aTrans = trans[a.id];
+              const comments = Object.values(a.comments ?? {})
+                .filter(Boolean)
+                .sort((x, y) => (x.timestamp ?? 0) - (y.timestamp ?? 0));
+              const open = draftFor === a.id;
+              return (
+                <div key={a.id} style={{
+                  background: cardBg, borderRadius: 14,
+                  padding: "10px 11px 9px",
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  boxShadow: "0 5px 12px rgba(0,0,0,0.1)",
                   display: "flex", flexDirection: "column", gap: 5,
                 }}>
-                  {comments.map((c) => {
-                    const cTrans = trans[c.id];
-                    return (
-                      <div key={c.id} style={{
-                        background: "#fff", border: "1px solid #FEF3C7",
-                        borderRadius: 9, padding: "6px 9px",
-                      }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
-                          {cTrans || c.text}
-                        </div>
-                        {cTrans && cTrans !== c.text && (
-                          <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2, lineHeight: 1.4 }}>
-                            📜 {c.text}
-                          </div>
-                        )}
-                        <div style={{ fontSize: 9.5, fontWeight: 800, color: "#B45309", marginTop: 2 }}>
-                          ↳ {c.studentName}{c.clientId === myClientId ? " (나)" : ""}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {open ? (
-                <div style={{ marginTop: 8 }}>
-                  {warn && (
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#B91C1C", marginBottom: 5, lineHeight: 1.4 }}>
-                      ⚠ {warn}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <input
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleAddComment(a.id); }}
-                      placeholder="내 생각을 덧붙여요…"
-                      maxLength={150}
-                      autoFocus
+                  {/* 그림 답변 — 수업 중 그린 그림 그대로 표시, 클릭하면 크게 */}
+                  {a.imageUrl && (
+                    <img
+                      src={a.imageUrl}
+                      alt={`${a.studentName}의 그림`}
+                      onClick={() => setZoomSrc(a.imageUrl!)}
+                      title="크게 보기"
                       style={{
-                        flex: 1, minHeight: 38, padding: "6px 10px", borderRadius: 10,
-                        border: "1.5px solid #FDE68A", fontSize: 13, fontWeight: 600,
-                        color: "#1F2937", background: "#fff",
-                        outline: "none", fontFamily: "inherit",
+                        width: "100%", borderRadius: 10,
+                        background: "#fff",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        display: "block", cursor: "zoom-in",
                       }}
                     />
+                  )}
+                  {/* 메인 = 뷰어 언어(번역 도착 시), 아래 원문 항상 표시 (항목 5) */}
+                  {a.text && (
+                    <div style={{ fontSize: 13.5, color: "#111827", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                      {aTrans || a.text}
+                    </div>
+                  )}
+                  {aTrans && aTrans !== a.text && (
+                    <div style={{
+                      padding: "4px 7px",
+                      background: "rgba(255,255,255,0.65)", borderRadius: 8,
+                      borderLeft: "3px solid rgba(245,158,11,0.5)",
+                      fontSize: 11.5, color: "#4B5563", lineHeight: 1.45, whiteSpace: "pre-wrap",
+                    }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: "#92400E", marginRight: 4 }}>
+                        📜 {(a.studentLang || "").toUpperCase()}
+                      </span>
+                      {a.text}
+                    </div>
+                  )}
+                  <div style={{
+                    fontSize: 10, fontWeight: 800, color: "#6B7280",
+                    borderTop: "1px dashed rgba(0,0,0,0.12)", paddingTop: 4,
+                  }}>
+                    — {a.studentName}{a.clientId === myClientId ? " (나)" : ""}
+                  </div>
+
+                  {/* ── 💬 친구 의견 댓글 (설계서 항목 1, 영속) ── */}
+                  {comments.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {comments.map((c) => {
+                        const cTrans = trans[c.id];
+                        return (
+                          <div key={c.id} style={{
+                            background: "rgba(255,255,255,0.75)",
+                            borderRadius: 8, padding: "5px 8px",
+                          }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                              {cTrans || c.text}
+                            </div>
+                            {cTrans && cTrans !== c.text && (
+                              <div style={{ fontSize: 10.5, color: "#6B7280", marginTop: 2, lineHeight: 1.4 }}>
+                                📜 {c.text}
+                              </div>
+                            )}
+                            <div style={{ fontSize: 9, fontWeight: 800, color: "#B45309", marginTop: 2 }}>
+                              ↳ {c.studentName}{c.clientId === myClientId ? " (나)" : ""}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {open ? (
+                    <div>
+                      {warn && (
+                        <div style={{ fontSize: 11, fontWeight: 800, color: "#B91C1C", marginBottom: 5, lineHeight: 1.4 }}>
+                          ⚠ {warn}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 5 }}>
+                        <input
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleAddComment(a.id); }}
+                          placeholder="내 생각을 덧붙여요…"
+                          maxLength={150}
+                          autoFocus
+                          style={{
+                            flex: 1, minWidth: 0, minHeight: 36, padding: "6px 9px", borderRadius: 9,
+                            border: "1.5px solid rgba(0,0,0,0.12)", fontSize: 12.5, fontWeight: 600,
+                            color: "#1F2937", background: "#fff",
+                            outline: "none", fontFamily: "inherit",
+                          }}
+                        />
+                        <button
+                          onClick={() => handleAddComment(a.id)}
+                          disabled={!draft.trim()}
+                          style={{
+                            minWidth: 44, borderRadius: 9, border: "none",
+                            background: draft.trim()
+                              ? "linear-gradient(135deg, #F59E0B, #D97706)"
+                              : "rgba(0,0,0,0.08)",
+                            color: draft.trim() ? "#fff" : "#9CA3AF",
+                            fontSize: 12, fontWeight: 900,
+                            cursor: draft.trim() ? "pointer" : "default",
+                            fontFamily: "inherit",
+                          }}
+                        >등록</button>
+                        <button
+                          onClick={() => { setDraftFor(null); setDraft(""); setWarn(null); }}
+                          aria-label="닫기"
+                          style={{
+                            minWidth: 32, borderRadius: 9, border: "1px solid rgba(0,0,0,0.1)",
+                            background: "#fff", color: "#9CA3AF", fontSize: 12, fontWeight: 900,
+                            cursor: "pointer", fontFamily: "inherit",
+                          }}
+                        >✕</button>
+                      </div>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => handleAddComment(a.id)}
-                      disabled={!draft.trim()}
+                      onClick={() => { setDraftFor(a.id); setDraft(""); setWarn(null); }}
                       style={{
-                        minWidth: 54, borderRadius: 10, border: "none",
-                        background: draft.trim()
-                          ? "linear-gradient(135deg, #F59E0B, #D97706)"
-                          : "#F3F4F6",
-                        color: draft.trim() ? "#fff" : "#9CA3AF",
-                        fontSize: 13, fontWeight: 900,
-                        cursor: draft.trim() ? "pointer" : "default",
-                        fontFamily: "inherit",
-                      }}
-                    >등록</button>
-                    <button
-                      onClick={() => { setDraftFor(null); setDraft(""); setWarn(null); }}
-                      aria-label="닫기"
-                      style={{
-                        minWidth: 38, borderRadius: 10, border: "1.5px solid #E5E7EB",
-                        background: "#fff", color: "#9CA3AF", fontSize: 13, fontWeight: 900,
+                        alignSelf: "flex-start",
+                        padding: "4px 11px", borderRadius: 999,
+                        background: "rgba(255,255,255,0.8)", border: "1.5px dashed #F59E0B",
+                        color: "#B45309", fontSize: 11, fontWeight: 900,
                         cursor: "pointer", fontFamily: "inherit",
                       }}
-                    >✕</button>
-                  </div>
+                    >💬 댓글 달기{comments.length > 0 ? ` (${comments.length})` : ""}</button>
+                  )}
                 </div>
-              ) : (
-                <button
-                  onClick={() => { setDraftFor(a.id); setDraft(""); setWarn(null); }}
-                  style={{
-                    marginTop: 6, padding: "5px 12px", borderRadius: 999,
-                    background: "#fff", border: "1.5px dashed #F59E0B",
-                    color: "#B45309", fontSize: 11.5, fontWeight: 900,
-                    cursor: "pointer", fontFamily: "inherit",
-                  }}
-                >💬 내 생각 남기기</button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 그림 클릭 확대 */}
+      <ImageLightbox src={zoomSrc} onClose={() => setZoomSrc(null)} />
     </div>
   );
 }
@@ -2285,6 +2317,9 @@ function QuestionCard({
     if (r) ensureTranslation(r);
   }, [selectedFruit, responses, ensureTranslation]);
 
+  // 친구 그림 응답 클릭 확대 (fruit 모달)
+  const [fruitZoom, setFruitZoom] = useState<string | null>(null);
+
   // ── 응답 댓글: 복습 중 의견 추가 (설계서 항목 1) ──
   // 영속 경로(bookAnswers) 하위에 저장 — 세션이 끝나도 자유 읽기(복습)에서 유지.
   const bookIdForComments = book?.id ?? null;
@@ -2882,12 +2917,30 @@ function QuestionCard({
                     )}
                   </div>
 
-                  <div style={{
-                    fontSize: 16, fontWeight: 600, color: "#1F2937",
-                    lineHeight: 1.6, whiteSpace: "pre-wrap",
-                  }}>
-                    {displayText}
-                  </div>
+                  {/* 그림 응답 — 클릭하면 크게 보기 */}
+                  {r.imageUrl && (
+                    <img
+                      src={r.imageUrl}
+                      alt={`${r.studentName}의 그림`}
+                      onClick={() => setFruitZoom(r.imageUrl!)}
+                      title="크게 보기"
+                      style={{
+                        width: "100%", maxHeight: 300, objectFit: "contain",
+                        background: "#fff", borderRadius: 10,
+                        border: "1px solid rgba(0,0,0,0.1)",
+                        display: "block", cursor: "zoom-in",
+                        marginBottom: displayText ? 8 : 0,
+                      }}
+                    />
+                  )}
+                  {displayText && (
+                    <div style={{
+                      fontSize: 16, fontWeight: 600, color: "#1F2937",
+                      lineHeight: 1.6, whiteSpace: "pre-wrap",
+                    }}>
+                      {displayText}
+                    </div>
+                  )}
 
                   {/* 원문 — 번역이 메인일 때 항상 함께 표시 (숨김 없음, 항목 5) */}
                   {needsTranslation && translated && (
@@ -3003,6 +3056,9 @@ function QuestionCard({
           })()}
         </div>
       )}
+
+      {/* 그림 응답 클릭 확대 */}
+      <ImageLightbox src={fruitZoom} onClose={() => setFruitZoom(null)} />
 
       <style jsx global>{`
         @keyframes charBounceIn {

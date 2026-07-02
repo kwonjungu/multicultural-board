@@ -6,6 +6,7 @@ import { getClientDb } from "@/lib/firebase-client";
 import { CardData, CommentData, TranscriptData } from "@/lib/types";
 import { LANGUAGES, CARD_PALETTES } from "@/lib/constants";
 import { t } from "@/lib/i18n";
+import ImageLightbox from "./ImageLightbox";
 
 const TTS_LANG_MAP: Record<string, string> = {
   ko: "ko-KR", en: "en-US", vi: "vi-VN", zh: "zh-CN", fil: "fil-PH",
@@ -165,6 +166,8 @@ export default function PadletCard({
 }: Props) {
   const p = CARD_PALETTES[card.paletteIdx % CARD_PALETTES.length];
   const [open, setOpen] = useState(false);
+  // 이미지/그림 클릭 확대 (공용 라이트박스)
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
   const [now, setNow] = useState(Date.now());
   const cardType = card.cardType || "text";
@@ -562,15 +565,18 @@ export default function PadletCard({
           )}
         </div>
 
-        {/* ── Image / Drawing ── */}
+        {/* ── Image / Drawing — 클릭하면 크게 보기 ── */}
         {(cardType === "image" || cardType === "drawing") && card.imageUrl && !imgError && (
           <img
             src={card.imageUrl}
             alt={cardType}
             onError={() => setImgError(true)}
-            style={{ width: "100%", borderRadius: 10, display: "block" }}
+            onClick={() => setZoomSrc(card.imageUrl!)}
+            title="크게 보기"
+            style={{ width: "100%", borderRadius: 10, display: "block", cursor: "zoom-in" }}
           />
         )}
+        <ImageLightbox src={zoomSrc} alt={`${card.authorName}의 ${cardType === "drawing" ? "그림" : "사진"}`} onClose={() => setZoomSrc(null)} />
         {(cardType === "image" || cardType === "drawing") && imgError && (
           <div style={{ padding: "24px", textAlign: "center", color: "#9CA3AF", fontSize: 12, background: "#F9FAFB", borderRadius: 10 }}>
             이미지를 불러올 수 없습니다

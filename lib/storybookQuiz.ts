@@ -47,6 +47,30 @@ function questionFor(word: string, lang: string): string {
   return fn(word);
 }
 
+/**
+ * 길이 편향 교정 — AI 가 정답 뜻풀이를 오답보다 길게 쓰는 경향이 있어,
+ * "제일 긴 게 정답"이라는 메타 힌트가 생긴다. 정답이 오답 최장보다
+ * 뚜렷이 길면(1.3배+ & +6자+) 정답을 첫 절/문장까지만 잘라 길이를 맞춘다.
+ * (구두점 경계에서만 자르므로 뜻은 보존 — 자를 수 없으면 원문 유지)
+ */
+function trimAnswerBias(answer: string, distractors: string[]): string {
+  const maxD = Math.max(0, ...distractors.map((d) => d.length));
+  if (maxD === 0) return answer;
+  if (answer.length <= maxD * 1.3 || answer.length - maxD <= 6) return answer;
+  // 구두점(문장/절 경계) 후보 위치 중, 오답 최장에 가장 가까운 지점으로 컷
+  const cutPoints: number[] = [];
+  for (const m of answer.matchAll(/[.。!?,，·;:]|(?:이에요|예요|해요|어요|아요|이다|한다)\s/g)) {
+    const end = (m.index ?? 0) + m[0].trimEnd().length;
+    if (end >= 6) cutPoints.push(end);
+  }
+  // 목표: maxD 근처(±40%) 길이가 되는 가장 긴 컷
+  const target = cutPoints.filter((p) => p <= maxD * 1.4 && p < answer.length);
+  if (target.length === 0) return answer;
+  const cut = Math.max(...target);
+  const trimmed = answer.slice(0, cut).replace(/[,，;:]$/, "").trim();
+  return trimmed.length >= 6 ? trimmed : answer;
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -99,8 +123,11 @@ export function buildStorybookQuiz(
     // 그래도 4개를 못 채우면 이 문항은 제외 (엣지: 어휘 풀이 너무 빈약)
     if (distractors.length < CHOICES - 1) continue;
 
+    // 길이 편향 교정 — "제일 긴 보기 = 정답" 힌트 제거 (기존 생성 책에도 적용)
+    const answerLabel = trimAnswerBias(answer, distractors);
+
     const choices: SbQuizChoice[] = shuffle([
-      { label: answer, correct: true },
+      { label: answerLabel, correct: true },
       ...distractors.map((d) => ({ label: d, correct: false })),
     ]);
 

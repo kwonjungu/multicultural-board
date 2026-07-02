@@ -28,6 +28,9 @@ export default function RoomManagePanel({ roomCode, lang }: Props) {
   const [config, setConfig] = useState<RoomConfig>({ languages: [] });
   const [rosterText, setRosterText] = useState("");
   const [rosterSeeded, setRosterSeeded] = useState(false);
+  // 교사 암호 변경 UI
+  const [pinDraft, setPinDraft] = useState("");
+  const [pinMsg, setPinMsg] = useState<string | null>(null);
 
   const teacherLangs = config.languages || [];
 
@@ -77,6 +80,27 @@ export default function RoomManagePanel({ roomCode, lang }: Props) {
   function toggleConfig(key: "qrEntry" | "approvalMode" | "rosterMode") {
     const db = getClientDb();
     set(ref(db, `rooms/${roomCode}/config/${key}`), !config[key]);
+  }
+
+  // ── 교사 암호 (기본 = 방 번호) ──
+  function saveTeacherPin() {
+    const pin = pinDraft.trim();
+    if (pin.length < 4) {
+      setPinMsg("암호는 4자 이상으로 해주세요.");
+      return;
+    }
+    const db = getClientDb();
+    set(ref(db, `rooms/${roomCode}/config/teacherPin`), pin)
+      .then(() => { setPinMsg("✅ 교사 암호를 바꿨어요. 다음 입장부터 적용됩니다."); setPinDraft(""); })
+      .catch(() => setPinMsg("저장에 실패했어요. 다시 시도해 주세요."));
+  }
+
+  function resetTeacherPin() {
+    if (!confirm(`교사 암호를 초기화할까요?\n초기화하면 기본값(방 번호 ${roomCode})으로 돌아갑니다.`)) return;
+    const db = getClientDb();
+    set(ref(db, `rooms/${roomCode}/config/teacherPin`), null)
+      .then(() => { setPinMsg(`✅ 초기화 완료 — 이제 교사 암호는 방 번호(${roomCode})입니다.`); setPinDraft(""); })
+      .catch(() => setPinMsg("초기화에 실패했어요. 다시 시도해 주세요."));
   }
 
   function saveRoster() {
@@ -165,6 +189,68 @@ export default function RoomManagePanel({ roomCode, lang }: Props) {
                 boxShadow: "0 4px 14px rgba(245,158,11,0.35)",
               }}
             >저장</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── 교사 암호 — 변경 + 초기화(기본 = 방 번호) ── */}
+      <div style={{ borderTop: "1px dashed #E5E7EB", paddingTop: 18, marginBottom: 20 }}>
+        <div style={{ ...sectionLabel, marginBottom: 6 }}>교사 암호</div>
+        <div style={{ fontSize: 11.5, fontWeight: 600, color: "#6B7280", marginBottom: 10, lineHeight: 1.5 }}>
+          교사로 입장할 때 입력하는 암호예요. 현재:{" "}
+          <b style={{ color: config.teacherPin ? "#B45309" : "#6B7280" }}>
+            {config.teacherPin ? "변경된 암호 사용 중" : `기본값 (방 번호 ${roomCode})`}
+          </b>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="text"
+            value={pinDraft}
+            onChange={(e) => { setPinDraft(e.target.value); setPinMsg(null); }}
+            onKeyDown={(e) => e.key === "Enter" && saveTeacherPin()}
+            placeholder="새 교사 암호 (4자 이상)"
+            maxLength={20}
+            style={{
+              flex: 1, minWidth: 0, padding: "10px 14px", borderRadius: 11,
+              border: "1.5px solid #E5E7EB", fontSize: 14, color: "#111827",
+              background: "#F9FAFB", outline: "none",
+            }}
+            onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; }}
+            onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
+          />
+          <button
+            onClick={saveTeacherPin}
+            disabled={pinDraft.trim().length < 4}
+            style={{
+              padding: "10px 18px", borderRadius: 11, border: "none",
+              background: pinDraft.trim().length >= 4 ? BRAND_GRADIENT : "#F3F4F6",
+              color: pinDraft.trim().length >= 4 ? "#fff" : "#D1D5DB",
+              fontWeight: 800, fontSize: 13,
+              cursor: pinDraft.trim().length >= 4 ? "pointer" : "not-allowed",
+              whiteSpace: "nowrap",
+            }}
+          >변경</button>
+          <button
+            onClick={resetTeacherPin}
+            disabled={!config.teacherPin}
+            title={config.teacherPin ? "기본값(방 번호)으로 초기화" : "이미 기본값입니다"}
+            style={{
+              padding: "10px 14px", borderRadius: 11,
+              border: `1.5px solid ${config.teacherPin ? "#FCA5A5" : "#E5E7EB"}`,
+              background: "#fff",
+              color: config.teacherPin ? "#B91C1C" : "#D1D5DB",
+              fontWeight: 800, fontSize: 13,
+              cursor: config.teacherPin ? "pointer" : "not-allowed",
+              whiteSpace: "nowrap",
+            }}
+          >초기화</button>
+        </div>
+        {pinMsg && (
+          <div style={{
+            marginTop: 8, fontSize: 12, fontWeight: 700,
+            color: pinMsg.startsWith("✅") ? "#059669" : "#B91C1C",
+          }}>
+            {pinMsg}
           </div>
         )}
       </div>

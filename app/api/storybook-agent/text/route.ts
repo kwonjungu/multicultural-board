@@ -175,7 +175,7 @@ Distractor rules (CRITICAL — prevent multiple correct answers):
 1. Each wrong definition must be CLEARLY wrong for this word — a child who knows the word must be able to rule it out.
 2. Do NOT write a near-synonym or a definition that could also fit the correct word. Avoid same-meaning paraphrases.
 3. Make the three wrong definitions describe DIFFERENT, unrelated things (different category) so none of them is accidentally also correct.
-4. Keep every definition equally short and simple so the wrong ones are not obviously "the odd long one".`;
+4. LENGTH PARITY (STRICT): every definition — the correct glossKo AND all three distractorsKo — must be 8-20 Korean characters, and the length gap between the longest and shortest of the four must be at most 6 characters. NEVER make the correct definition the longest one; children quickly learn to pick "the long answer". If needed, shorten the correct definition rather than lengthening the wrong ones.`;
 }
 
 function buildCritiqueSystemPrompt(): string {

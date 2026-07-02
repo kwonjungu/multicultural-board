@@ -49,7 +49,9 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
   function confirmRole() {
     if (!role) return;
     if (role === "teacher") {
-      if (teacherCode !== roomCode) { setCodeError(true); return; }
+      // 교사 암호: 관리 패널에서 변경한 teacherPin 이 있으면 그것, 없으면 기본(방 번호)
+      const expected = roomConfig.teacherPin || roomCode;
+      if (teacherCode !== expected) { setCodeError(true); return; }
       // 교사는 이름 입력 단계를 건너뛰고 기본 이름으로 바로 허브 진입
       onDone({
         myLang,

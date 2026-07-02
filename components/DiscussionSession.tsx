@@ -15,6 +15,7 @@ import { BRAND_GRADIENT, LANGUAGES } from "@/lib/constants";
 import { SessionMeta, SessionResponse, SessionReply, PresenceEntry } from "@/lib/types";
 import MicButton from "./MicButton";
 import DrawBoard, { type DrawBoardHandle } from "./DrawBoard";
+import ImageLightbox from "./ImageLightbox";
 
 // dataURL → Blob (그림 업로드용). StorybookRoom 패턴 복사.
 function dataUrlToBlob(dataUrl: string): Blob {
@@ -730,6 +731,8 @@ function ResponseCard({
 
   const [showComposer, setShowComposer] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
+  // 친구 그림 클릭 확대
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
   // roomCode 는 basePath = rooms/{roomCode}/sessions/{sessionId} 에서 추출
@@ -812,9 +815,11 @@ function ResponseCard({
         <img
           src={resp.imageUrl}
           alt={`${resp.authorName} 그림`}
+          onClick={() => setZoomSrc(resp.imageUrl!)}
+          title="크게 보기"
           style={{
             width: "100%", borderRadius: 10, background: "#fff",
-            border: "1px solid rgba(0,0,0,0.08)", display: "block",
+            border: "1px solid rgba(0,0,0,0.08)", display: "block", cursor: "zoom-in",
           }}
         />
       ) : (
@@ -831,6 +836,8 @@ function ResponseCard({
       }}>
         — {resp.authorName}
       </div>
+
+      <ImageLightbox src={zoomSrc} alt={`${resp.authorName}의 그림`} onClose={() => setZoomSrc(null)} />
 
       {/* 반응 이모지 행 */}
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
