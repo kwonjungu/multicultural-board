@@ -3,7 +3,13 @@
     "app/api/pptx-translate/route.ts": {
       "maxDuration": 120
     },
+    "app/api/hwpx-translate/route.ts": {
+      "maxDuration": 120
+    },
     "app/api/worksheet/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/worksheet-analyze/route.ts": {
       "maxDuration": 120
     },
     "app/api/storybook-agent/text/route.ts": {

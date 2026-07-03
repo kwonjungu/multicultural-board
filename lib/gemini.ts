@@ -202,6 +202,58 @@ function autoClose(text: string): string {
   return out;
 }
 
+// === Vision: 이미지 + 프롬프트 → 텍스트 (활동지 OCR 용) ===
+// Gemini 2.5 Flash 는 Groq 의 llama-4-scout 보다 한국어 OCR·레이아웃 인식이
+// 훨씬 정확하다. OpenAI 호환 엔드포인트가 data URL image_url 을 지원한다.
+
+export interface VisionOptions {
+  system?: string;
+  prompt: string;
+  imageUrl: string;          // data:image/...;base64,... 또는 https URL
+  temperature?: number;
+  maxTokens?: number;
+  json?: boolean;            // true 면 response_format: json_object
+}
+
+export async function visionCompletion(
+  opts: VisionOptions,
+): Promise<{ content: string; model: string }> {
+  const client = geminiTextClient(); // GEMINI_API_KEY 없으면 여기서 throw → 호출부가 폴백
+  let lastErr: unknown = null;
+  for (const model of GEMINI_TEXT_MODELS) {
+    try {
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [
+          ...(opts.system ? [{ role: "system" as const, content: opts.system }] : []),
+          {
+            role: "user" as const,
+            content: [
+              { type: "image_url" as const, image_url: { url: opts.imageUrl } },
+              { type: "text" as const, text: opts.prompt },
+            ],
+          },
+        ],
+        temperature: opts.temperature ?? 0.1,
+        max_tokens: opts.maxTokens ?? 8192,
+        ...(opts.json ? { response_format: { type: "json_object" as const } } : {}),
+      });
+      const content = completion.choices[0]?.message?.content?.trim() || "";
+      if (!content) {
+        lastErr = new Error(`empty vision reply from ${model}`);
+        continue;
+      }
+      return { content, model };
+    } catch (err) {
+      lastErr = err;
+      const status = (err as { status?: number })?.status;
+      if (status === 429 || status === 400 || status === 404 || status === 503) continue;
+      break;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("visionCompletion failed");
+}
+
 // === Image: REST call, returns base64 PNG ===
 
 interface GenerateImageResult {

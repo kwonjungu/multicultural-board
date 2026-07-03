@@ -1,27 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LANGUAGES } from "@/lib/constants";
-import { translateBatch } from "@/lib/groq-translate";
+import { translateSegments } from "@/lib/segment-translate";
+import {
+  decodeXml, encodeXml, expansionP90, mergePptxRuns, pptxFontForLang, visualWidth,
+} from "@/lib/xmlI18n";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
-
-// ─── XML helpers ───────────────────────────────────────────────────
-function decodeXml(s: string): string {
-  return s
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'");
-}
-function encodeXml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
 
 // ─── Layout helpers ────────────────────────────────────────────────
 function enableNormAutofit(xml: string): string {
@@ -34,24 +18,6 @@ function enableNormAutofit(xml: string): string {
     "$1<a:normAutofit/>"
   );
   return xml;
-}
-
-const CJK = new Set(["zh", "ja", "ko"]);
-
-function visualWidth(text: string, lang: string): number {
-  if (!CJK.has(lang)) return text.replace(/\s/g, "").length;
-  let w = 0;
-  for (const ch of text.replace(/\s/g, "")) {
-    const cp = ch.codePointAt(0) ?? 0;
-    const isCJKChar =
-      (cp >= 0x1100 && cp <= 0x11FF) ||
-      (cp >= 0x2E80 && cp <= 0x9FFF) ||
-      (cp >= 0xAC00 && cp <= 0xD7FF) ||
-      (cp >= 0xF900 && cp <= 0xFAFF) ||
-      (cp >= 0xFF00 && cp <= 0xFFEF);
-    w += isCJKChar ? 2 : 1;
-  }
-  return w || 1;
 }
 
 // ─── Run-level text fit (글자크기 + 자간) ──────────────────────────
@@ -89,14 +55,12 @@ function reducePptxLineSpacing(xml: string, p90: number): string {
   );
 }
 
-// ─── 폰트 일괄 교체 (함초롱바탕으로 통일, 글꼴 깨짐 방지) ───────────
-const TARGET_FONT = "함초롱바탕";
-
-function replacePptxFonts(xml: string): string {
+// ─── 폰트 일괄 교체 (대상 언어 스크립트에 맞는 폰트로 통일) ─────────
+function replacePptxFonts(xml: string, targetFont: string): string {
   // + 시작 = 테마 폰트 참조 → 유지, 명시적 폰트명만 교체
-  xml = xml.replace(/<a:latin\s+typeface="(?!\+)[^"]*"\s*\/>/g, `<a:latin typeface="${TARGET_FONT}"/>`);
-  xml = xml.replace(/<a:cs\s+typeface="(?!\+)[^"]*"\s*\/>/g,    `<a:cs typeface="${TARGET_FONT}"/>`);
-  xml = xml.replace(/<a:ea\s+typeface="(?!\+)[^"]*"\s*\/>/g,    `<a:ea typeface="${TARGET_FONT}"/>`);
+  xml = xml.replace(/<a:latin\s+typeface="(?!\+)[^"]*"\s*\/>/g, `<a:latin typeface="${targetFont}"/>`);
+  xml = xml.replace(/<a:cs\s+typeface="(?!\+)[^"]*"\s*\/>/g,    `<a:cs typeface="${targetFont}"/>`);
+  xml = xml.replace(/<a:ea\s+typeface="(?!\+)[^"]*"\s*\/>/g,    `<a:ea typeface="${targetFont}"/>`);
   return xml;
 }
 
@@ -120,11 +84,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "슬라이드를 찾을 수 없습니다" }, { status: 400 });
     }
 
-    // ── Extract unique text segments ────────────────────────────────
+    // ── 0) run 병합 — 맞춤법 검사 등으로 쪼개진 문장 조각을 합쳐
+    //     문장 단위 번역이 되게 한다 (번역 품질의 핵심)
+    const mergedXmls: Record<string, string> = {};
+    for (const [path, xml] of Object.entries(slideXmls)) {
+      mergedXmls[path] = mergePptxRuns(xml);
+    }
+
+    // ── 1) Extract unique text segments ─────────────────────────────
     const RE = /<a:t(\s[^>]*)?>([\s\S]*?)<\/a:t>/g;
     const unique: Set<string> = new Set();
 
-    for (const xml of Object.values(slideXmls)) {
+    for (const xml of Object.values(mergedXmls)) {
       let m: RegExpExecArray | null;
       RE.lastIndex = 0;
       while ((m = RE.exec(xml)) !== null) {
@@ -139,35 +110,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "번역할 텍스트가 없습니다" }, { status: 400 });
     }
 
-    // ── Translate ───────────────────────────────────────────────────
-    const fromName = LANGUAGES[fromLang]?.name || fromLang;
-    const toName   = LANGUAGES[toLang]?.name   || toLang;
-    const translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
+    // ── 2) Translate: LibreTranslate 우선 + Groq 폴백 (HWPX 와 동일 파이프라인) ──
+    const translated = await translateSegments(segments, fromLang, toLang, "pptx");
 
     const map = new Map<string, string>();
     segments.forEach((src, i) => map.set(src, translated[i] || src));
 
-    // ── Doc-wide p90 expansion ratio (줄 간격 기준) ─────────────────
-    const docRatios: number[] = [];
-    map.forEach((tgt, src) => {
-      if (src.trim().length < 3) return;
-      const r = visualWidth(tgt, toLang) / visualWidth(src, fromLang);
-      if (r > 0 && isFinite(r)) docRatios.push(r);
-    });
-    docRatios.sort((a, b) => a - b);
-    const docP90 = docRatios.length > 0
-      ? docRatios[Math.min(Math.floor(docRatios.length * 0.9), docRatios.length - 1)]
-      : 1.0;
+    // ── 3) Doc-wide p90 expansion ratio (줄 간격 기준) ──────────────
+    const docP90 = expansionP90(
+      segments.map((src, i) => ({ src, tgt: translated[i] || src })),
+      fromLang, toLang, 3,
+    );
 
-    // ── Rewrite each slide XML ──────────────────────────────────────
+    // ── 4) Rewrite each slide XML ───────────────────────────────────
     const RPR_T_RE =
       /(<a:rPr\b[^>]*\bsz="(\d+)"[^>]*\/>)(\s*)(<a:t(?:\s[^>]*)?>)([\s\S]*?)(<\/a:t>)/g;
 
+    const targetFont = pptxFontForLang(toLang);
     const translatedXmls: Record<string, string> = {};
 
-    for (const [path, origXml] of Object.entries(slideXmls)) {
+    for (const [path, origXml] of Object.entries(mergedXmls)) {
       let xml = enableNormAutofit(origXml);
-      xml = replacePptxFonts(xml);                // 폰트 교체
+      xml = replacePptxFonts(xml, targetFont);    // 폰트 교체
       xml = reducePptxLineSpacing(xml, docP90);   // 줄 간격 축소
 
       // Run-level: 글자 크기 + 자간 조정

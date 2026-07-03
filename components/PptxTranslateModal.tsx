@@ -53,12 +53,19 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
         setStatusMsg("📊 슬라이드 분석 중...");
         const slideXmls: Record<string, string> = {};
         const paths: string[] = [];
-        zip.forEach((p) => { if (/^ppt\/slides\/slide\d+\.xml$/i.test(p)) paths.push(p); });
+        // 본문 슬라이드 + 발표자 노트 + SmartArt(다이어그램) 텍스트까지 수집
+        zip.forEach((p) => {
+          if (
+            /^ppt\/slides\/slide\d+\.xml$/i.test(p) ||
+            /^ppt\/notesSlides\/notesSlide\d+\.xml$/i.test(p) ||
+            /^ppt\/diagrams\/(?:data|drawing)\d*\.xml$/i.test(p)
+          ) paths.push(p);
+        });
         for (const p of paths) {
           const f = zip.file(p);
           if (f) slideXmls[p] = await f.async("string");
         }
-        if (paths.length === 0) throw new Error("슬라이드를 찾을 수 없습니다");
+        if (!paths.some((p) => /^ppt\/slides\//i.test(p))) throw new Error("슬라이드를 찾을 수 없습니다");
 
         setStatusMsg("🌐 슬라이드 번역 중...");
         const res = await fetch("/api/pptx-translate", {
@@ -334,7 +341,7 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
             </div>
             <div style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 14 }}>
               {result.segments > 0 ? `${result.segments}개 텍스트 조각 번역 · ` : ""}
-              {result.kind === "pptx" ? "PowerPoint" : "한글(HWPX)"} · Groq Llama
+              {result.kind === "pptx" ? "PowerPoint" : "한글(HWPX)"} · AI 번역
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button

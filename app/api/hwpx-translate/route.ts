@@ -1,44 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LANGUAGES } from "@/lib/constants";
-import { translateBatch } from "@/lib/groq-translate";
-import { translateWithLibreTranslate, isLtSupported } from "@/lib/libretranslate";
+import { translateSegments } from "@/lib/segment-translate";
+import {
+  decodeXml, encodeXml, expansionP90, hwpxFontForLang, mergeHwpxRuns,
+} from "@/lib/xmlI18n";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-// ─── XML helpers ───────────────────────────────────────────────────
-function decodeXml(s: string): string {
-  return s
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
-}
-function encodeXml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-}
-
 // HWPX 텍스트 요소: <hp:t>text</hp:t>
 const RE = /<([\w]+:)t(\s[^>]*)?>([^<]*)<\/\1t>/g;
-
-// ─── 시각적 너비 계산 (CJK 2칸) ─────────────────────────────────────
-const CJK = new Set(["zh", "ja", "ko"]);
-
-function visualWidth(text: string, lang: string): number {
-  if (!CJK.has(lang)) return text.replace(/\s/g, "").length;
-  let w = 0;
-  for (const ch of text.replace(/\s/g, "")) {
-    const cp = ch.codePointAt(0) ?? 0;
-    const isCJKChar =
-      (cp >= 0x1100 && cp <= 0x11FF) ||
-      (cp >= 0x2E80 && cp <= 0x9FFF) ||
-      (cp >= 0xAC00 && cp <= 0xD7FF) ||
-      (cp >= 0xF900 && cp <= 0xFAFF) ||
-      (cp >= 0xFF00 && cp <= 0xFFEF);
-    w += isCJKChar ? 2 : 1;
-  }
-  return w || 1;
-}
 
 // ─── header.xml charPr 폰트 크기 스케일 ─────────────────────────────
 function scaleHeaderFonts(headerXml: string, scale: number): string {
@@ -70,27 +40,29 @@ function scaleParaLineSpacing(xml: string, scale: number): string {
   );
 }
 
-// ─── 폰트 일괄 교체 (함초롱바탕으로 통일, 글꼴 깨짐 방지) ───────────
-const TARGET_FONT = "함초롱바탕";
-
+// ─── 폰트 일괄 교체 (대상 언어 스크립트에 맞는 폰트로 통일) ─────────
 // HWPX charPr 폰트 속성명 목록 (버전별 다름)
 const HWPX_FONT_ATTRS = [
-  "hangulFont", "latinFont", "hanjFont", "otherFont",
+  "hangulFont", "latinFont", "hanjaFont", "hanjFont", "otherFont",
   "symbolFont", "userFont",
 ];
 
-function replaceHwpxFonts(xml: string): string {
+function replaceHwpxFonts(xml: string, targetFont: string): string {
   // charPr 직접 속성 방식
   for (const attr of HWPX_FONT_ATTRS) {
     xml = xml.replace(
       new RegExp(`\\b${attr}="[^"]*"`, "g"),
-      `${attr}="${TARGET_FONT}"`
+      `${attr}="${targetFont}"`
     );
   }
-  // header.xml <...:font name="..."> 방식 (폰트 테이블)
+  // header.xml 폰트 테이블: <hh:font id="0" face="..."> (표준) / name="..." (변형)
+  xml = xml.replace(
+    /(<(?:[\w]+:)?font\b[^>]*?\bface=")[^"]*(")/g,
+    `$1${targetFont}$2`
+  );
   xml = xml.replace(
     /(<(?:[\w]+:)?font\b[^>]*?\bname=")[^"]*(")/g,
-    `$1${TARGET_FONT}$2`
+    `$1${targetFont}$2`
   );
   return xml;
 }
@@ -115,9 +87,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "섹션 파일을 찾을 수 없습니다" }, { status: 400 });
     }
 
-    // ── Extract unique text segments ──────────────────────────────
+    // ── 0) run 병합 — 한 문장이 여러 <hp:t> 로 쪼개진 것을 합쳐
+    //     문장 단위 번역이 되게 한다 (번역 품질의 핵심)
+    const mergedXmls: Record<string, string> = {};
+    for (const [path, xml] of Object.entries(sectionXmls)) {
+      mergedXmls[path] = mergeHwpxRuns(xml);
+    }
+
+    // ── 1) Extract unique text segments ───────────────────────────
     const unique = new Set<string>();
-    for (const xml of Object.values(sectionXmls)) {
+    for (const xml of Object.values(mergedXmls)) {
       RE.lastIndex = 0;
       let m: RegExpExecArray | null;
       while ((m = RE.exec(xml)) !== null) {
@@ -132,61 +111,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "번역할 텍스트가 없습니다" }, { status: 400 });
     }
 
-    // ── Translate: LibreTranslate 우선, 미지원·실패 시 Groq 폴백 ──
-    const fromName = LANGUAGES[fromLang]?.name || fromLang;
-    const toName   = LANGUAGES[toLang]?.name   || toLang;
-
-    let translated: string[];
-    const ltConfigured = !!process.env.LIBRETRANSLATE_URL;
-
-    if (ltConfigured && isLtSupported(fromLang, toLang)) {
-      try {
-        translated = await translateWithLibreTranslate(segments, fromLang, toLang);
-        console.log(`[hwpx] LibreTranslate OK (${segments.length} segs)`);
-      } catch (ltErr) {
-        console.warn("[hwpx] LibreTranslate failed, falling back to Groq:", (ltErr as Error).message);
-        translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
-      }
-    } else {
-      if (ltConfigured) console.log(`[hwpx] lang pair ${fromLang}→${toLang} not LT-supported, using Groq`);
-      translated = await translateBatch(segments, fromLang, toLang, fromName, toName);
-    }
+    // ── 2) Translate: LibreTranslate 우선, 미지원·실패 시 Groq 폴백 ──
+    const translated = await translateSegments(segments, fromLang, toLang, "hwpx");
 
     const map = new Map<string, string>();
     segments.forEach((src, i) => map.set(src, translated[i] || src));
 
-    // ── p90 확장 비율 계산 → 폰트 크기·줄 간격 스케일 결정 ──────────
+    // ── 3) p90 확장 비율 → 폰트 크기·줄 간격 스케일 결정 ────────────
+    const p90 = expansionP90(
+      segments.map((src, i) => ({ src, tgt: translated[i] || src })),
+      fromLang, toLang,
+    );
     let sectionFontScale: number | undefined;
+    if (p90 > 1.1) {
+      sectionFontScale = Math.max(0.55, (1 / p90) * 0.85);
+    }
+
+    // ── 4) header.xml: 폰트 교체 + (확장 시) 크기 축소 ──────────────
+    const targetFont = hwpxFontForLang(toLang);
     let translatedHeaderXml: string | undefined;
-
-    console.log(`[hwpx] headerXml received: ${headerXml ? `yes (${headerXml.length} chars)` : "no"}`);
-    {
-      const ratios: number[] = [];
-      for (let i = 0; i < segments.length; i++) {
-        const src = segments[i];
-        const tgt = translated[i] || src;
-        if (src.trim().length < 5) continue;
-        const ratio = visualWidth(tgt, toLang) / visualWidth(src, fromLang);
-        if (ratio > 0 && isFinite(ratio)) ratios.push(ratio);
-      }
-      if (ratios.length > 0) {
-        ratios.sort((a, b) => a - b);
-        const p90 = ratios[Math.min(Math.floor(ratios.length * 0.9), ratios.length - 1)];
-        if (p90 > 1.1) {
-          sectionFontScale = Math.max(0.55, (1 / p90) * 0.85);
-          if (headerXml) translatedHeaderXml = scaleHeaderFonts(headerXml, sectionFontScale);
-        }
-      }
-    }
-
-    // 항상 폰트 교체 (header)
     if (headerXml) {
-      translatedHeaderXml = replaceHwpxFonts(translatedHeaderXml ?? headerXml);
+      translatedHeaderXml = replaceHwpxFonts(headerXml, targetFont);
+      if (sectionFontScale !== undefined) {
+        translatedHeaderXml = scaleHeaderFonts(translatedHeaderXml, sectionFontScale);
+      }
     }
 
-    // ── Rewrite section XMLs ──────────────────────────────────────
+    // ── 5) Rewrite section XMLs ────────────────────────────────────
     const translatedXmls: Record<string, string> = {};
-    for (const [path, origXml] of Object.entries(sectionXmls)) {
+    for (const [path, origXml] of Object.entries(mergedXmls)) {
       RE.lastIndex = 0;
       let newXml = origXml.replace(
         RE,
@@ -198,8 +151,7 @@ export async function POST(req: NextRequest) {
         }
       );
 
-      // 폰트 교체
-      newXml = replaceHwpxFonts(newXml);
+      newXml = replaceHwpxFonts(newXml, targetFont);
 
       // 글자 크기 + 줄 간격 스케일 (확장 시에만)
       if (sectionFontScale !== undefined && sectionFontScale < 1.0) {

@@ -72,21 +72,38 @@ export async function translateBatch(
   fromName: string,
   toName: string,
 ): Promise<string[]> {
-  const BATCH = 50;
+  // 배치를 개수뿐 아니라 글자 수로도 제한한다 — 긴 세그먼트 50개를 한 번에
+  // 보내면 출력이 max_tokens 에서 잘려 뒷부분이 통째로 미번역되던 문제 방지.
+  const MAX_ITEMS = 40;
+  const MAX_CHARS = 3200;
   const results: string[] = texts.slice();
 
   const needsTranslation = texts
     .map((t, i) => ({ t, i }))
     .filter(({ t }) => !isUntranslatable(t));
 
-  for (let i = 0; i < needsTranslation.length; i += BATCH) {
-    const batchItems = needsTranslation.slice(i, i + BATCH);
-    const chunk = batchItems.map(({ t }) => t);
+  let batch: Array<{ t: string; i: number }> = [];
+  let batchChars = 0;
+  const flush = async () => {
+    if (batch.length === 0) return;
+    const items = batch;
+    batch = [];
+    batchChars = 0;
+    const chunk = items.map(({ t }) => t);
     const translated = await translateChunkWithFallback(chunk, fromName, toName);
-    batchItems.forEach(({ i: origIdx }, j) => {
+    items.forEach(({ i: origIdx }, j) => {
       results[origIdx] = translated[j] ?? texts[origIdx];
     });
+  };
+
+  for (const item of needsTranslation) {
+    if (batch.length >= MAX_ITEMS || (batch.length > 0 && batchChars + item.t.length > MAX_CHARS)) {
+      await flush();
+    }
+    batch.push(item);
+    batchChars += item.t.length;
   }
+  await flush();
 
   return results;
 }
@@ -98,6 +115,9 @@ async function translateChunkWithFallback(
 ): Promise<string[]> {
   const prompt = buildPrompt(chunk, fromName, toName);
   const systemMsg = buildSystemPrompt();
+  // 출력 토큰 예산: 원문 글자 수 기반 (비라틴 스크립트는 토큰 팽창이 심함)
+  const chunkChars = chunk.reduce((sum, t) => sum + t.length, 0);
+  const maxTokens = Math.min(8000, Math.max(1500, chunkChars * 3));
 
   return withGroqKeyFallback(async (groq) => {
     let bestResult: string[] | null = null;
@@ -111,7 +131,7 @@ async function translateChunkWithFallback(
             { role: "system", content: systemMsg },
             { role: "user", content: prompt },
           ],
-          max_tokens: 4000,
+          max_tokens: maxTokens,
           temperature: 0.1,
           ...(JSON_MODE_MODELS.has(model)
             ? { response_format: { type: "json_object" as const } }
@@ -122,6 +142,12 @@ async function translateChunkWithFallback(
           .replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
 
         const parsed = parseTranslationResponse(raw, chunk.length);
+        // 개수 불일치 = 항목이 밀렸거나 잘렸다는 뜻 → 이 응답은 통째로 폐기.
+        // 억지로 인덱스를 맞추면 엉뚱한 문장이 엉뚱한 자리에 들어간다.
+        if (parsed === null) {
+          console.warn(`[translate] ${model} response misaligned/truncated — trying next model…`);
+          continue;
+        }
 
         // 경미한 오염은 정리 후 통과
         const cleaned = parsed.map((t) => cleanTranslation(t || ""));
@@ -194,27 +220,29 @@ ${JSON.stringify({ items: chunk })}`;
 /**
  * LLM 응답 파싱 — JSON mode 대응.
  * 기대 포맷: {"out": [...]}  또는 바로 배열 [...]
+ * 파싱 실패 또는 개수 부족(잘림/누락)이면 null — 호출부가 다음 모델로 넘어간다.
+ * 개수 초과는 앞에서부터 자른다 (모델이 예시 항목을 덧붙이는 경우).
  */
-function parseTranslationResponse(raw: string, expectedLen: number): string[] {
-  if (!raw) return new Array(expectedLen).fill("");
+function parseTranslationResponse(raw: string, expectedLen: number): string[] | null {
+  if (!raw) return null;
 
+  let arr: unknown[] | null = null;
   try {
     const json = JSON.parse(raw);
     if (Array.isArray(json)) {
-      return json.map((x) => String(x ?? ""));
-    }
-    if (json && typeof json === "object") {
-      const arr = (json as Record<string, unknown>).out
+      arr = json;
+    } else if (json && typeof json === "object") {
+      const candidate = (json as Record<string, unknown>).out
         ?? (json as Record<string, unknown>).translations
         ?? (json as Record<string, unknown>).result;
-      if (Array.isArray(arr)) {
-        return arr.map((x) => String(x ?? ""));
-      }
+      if (Array.isArray(candidate)) arr = candidate;
     }
   } catch {
-    // JSON fail — raw fallback
+    return null;
   }
-  return new Array(expectedLen).fill("");
+
+  if (!arr || arr.length < expectedLen) return null;
+  return arr.slice(0, expectedLen).map((x) => String(x ?? ""));
 }
 
 /**
@@ -242,7 +270,7 @@ ${text}`;
             { role: "system", content: systemMsg },
             { role: "user", content: userMsg },
           ],
-          max_tokens: 3000,
+          max_tokens: Math.min(8000, Math.max(3000, text.length * 2)),
           temperature: 0.1,
         });
         const result = completion.choices[0]?.message?.content?.trim();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withGroqKeyFallback } from "@/lib/groq-client";
+import { visionCompletion } from "@/lib/gemini";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -88,8 +89,24 @@ export async function POST(req: NextRequest) {
 }
 
 async function runVision(imageUrl: string, userPrompt: string) {
+  // 1) Gemini 2.5 Flash — 한국어 OCR 정확도가 Groq scout 보다 훨씬 높다.
+  //    키 미설정·한도 초과 시 조용히 Groq 으로 폴백.
+  try {
+    const { content, model } = await visionCompletion({
+      system: OCR_SYSTEM,
+      prompt: userPrompt,
+      imageUrl,
+      maxTokens: 8192,
+      temperature: 0.15,
+    });
+    if (content) return { content, model, fallback: false };
+  } catch (err) {
+    console.warn("[worksheet-analyze] Gemini vision 실패 → Groq 폴백:", (err as Error).message);
+  }
+
+  // 2) Groq 비전 모델 (폴백)
   let usedModel = "";
-  let fallback = false;
+  let fallback = true;
 
   const content = await withGroqKeyFallback(async (groq) => {
     let inner = "";
