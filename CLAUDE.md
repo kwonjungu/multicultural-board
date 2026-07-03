@@ -69,6 +69,24 @@
 
 ## 🛡 가드레일 (반복하지 말아야 할 함정)
 
+- **문서 번역(XML)의 공용 유틸은 `lib/xmlI18n.ts` 만 사용.** (1) decodeXml 은
+  `&amp;` 를 반드시 마지막에 풀어야 한다 — 먼저 풀면 이중 이스케이프가 깨져
+  재조립 XML 이 손상된다. (2) 번역 전에 mergePptxRuns / mergeHwpxRuns 로
+  "서식 동일 + 사이 공백뿐" 인접 run 을 합쳐야 문장 단위 번역이 된다 (조각
+  번역이 품질 저하의 최대 원인이었음). (3) 한컴 기본 폰트명은 **함초롬바탕**
+  (함초롱 아님 — 오타면 교체 무효). 대상 언어별 폰트는 pptxFontForLang /
+  hwpxFontForLang 맵으로만 정한다 (태국어·아랍어 등에 한국어 폰트 강제 금지).
+
+- **활동지 사진 번역은 OCR 과 번역을 분리한다.** 비전 모델(Gemini 2.5 Flash
+  우선 → Groq scout 폴백)에는 블록+좌표 추출만 시키고, 번역은
+  `lib/segment-translate.ts` (LibreTranslate→Groq 품질검증) 파이프라인으로.
+  비전 한 방에 OCR+좌표+번역을 다 시키면 셋 다 망가진다. 좌표는
+  `sanitizeOcrBlocks` 로 반드시 검증(0~1 클램프, % 변환, 픽셀 응답 폐기).
+
+- **Groq 배치 번역 응답의 개수가 요청과 다르면 그 응답은 통째로 폐기하고
+  다음 모델로.** 억지로 인덱스를 맞추면 엉뚱한 문장이 엉뚱한 자리에 들어간다
+  (`parseTranslationResponse` 가 null 반환하는 이유).
+
 - **Web Audio 효과음은 `lib/gameSfx.ts` 의 공유 싱글턴 컨텍스트만 사용.**
   "톤마다 `new AudioContext()`" 패턴은 컨텍스트를 닫지 않아 누적되고,
   브라우저가 탭당 개수를 제한해 장시간 플레이 시 소리가 통째로 멈춘다.
