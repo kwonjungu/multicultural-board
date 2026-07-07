@@ -1922,7 +1922,7 @@ function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
               fontWeight: 400, // Jua is a single-weight display font
               color: "#fff",
               letterSpacing: -0.5,
-              lineHeight: 1.15,
+              lineHeight: lang === "ja" ? 1.9 : 1.15,
               textShadow:
                 "0 2px 0 rgba(180,83,9,0.55), 0 4px 14px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.5)",
               wordBreak: "keep-all",
