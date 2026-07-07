@@ -304,6 +304,8 @@ export interface StorybookSession {
   wordQuizEnabled?: boolean;  // [신규] 수업 전 단어 퀴즈(4지선다) 게이트 사용 여부
   /** 교사 허용 시 복습(during) 중에도 캐릭터 챗봇 사용 가능 — 기본 OFF (설계서 항목 3) */
   allowReviewChat?: boolean;
+  /** [항목 7] 교사가 자동 읽기 중일 때 true — 학생 화면에 배지를 표시. */
+  autoReading?: boolean;
 }
 
 /** 응답에 달리는 친구 의견 (복습 중 댓글 — 설계서 항목 1) */

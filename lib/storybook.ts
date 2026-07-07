@@ -274,6 +274,12 @@ export async function setAllowReviewChat(
   await update(ref(db, sessionPath(roomCode)), { allowReviewChat: allow });
 }
 
+/** [항목 7] 자동 읽기 진행 중 표시 — 교사가 켜면 학생 화면에 배지가 뜬다. */
+export async function setAutoReading(roomCode: string, on: boolean): Promise<void> {
+  const db = getClientDb();
+  await update(ref(db, sessionPath(roomCode)), { autoReading: on });
+}
+
 // === Responses ===
 
 export async function submitResponse(
