@@ -310,10 +310,14 @@ async function generateImageOnce(
   prompt: string,
   key: string,
   timeoutMs: number,
+  referenceImages?: Array<{ base64: string; mimeType: string }>,
 ): Promise<GenerateImageResult> {
   const url = `${GEMINI_REST_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
+  const refParts = (referenceImages ?? []).map((r) => ({
+    inlineData: { data: r.base64, mimeType: r.mimeType },
+  }));
   const body = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [{ role: "user", parts: [...refParts, { text: prompt }] }],
     generationConfig: { responseModalities: ["IMAGE"] },
   };
 
@@ -365,6 +369,12 @@ export interface GenerateImageOptions {
   maxAttempts?: number;
   /** 전체 예산 — 남은 예산이 부족하면 재시도를 포기한다. 기본 50s (route maxDuration 60s 내). */
   totalBudgetMs?: number;
+  /**
+   * [캐릭터 통일성] 프롬프트 앞에 첨부할 참조 이미지 (캐릭터 초상 등).
+   * Nano Banana 는 이미지+텍스트 혼합 입력을 지원 — 참조가 있으면
+   * "이 캐릭터 그대로 새 장면을 그려라" 방식의 조건부 생성이 된다.
+   */
+  referenceImages?: Array<{ base64: string; mimeType: string }>;
 }
 
 /**
@@ -397,7 +407,7 @@ export async function generateImage(
 
     const key = keys[attempt % keys.length];
     try {
-      return await generateImageOnce(prompt, key, Math.min(attemptTimeoutMs, remaining));
+      return await generateImageOnce(prompt, key, Math.min(attemptTimeoutMs, remaining), opts.referenceImages);
     } catch (err) {
       const e = err instanceof GeminiImageError
         ? err
