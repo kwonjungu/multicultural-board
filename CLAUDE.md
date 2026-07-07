@@ -63,6 +63,22 @@
 >   (listening·mc4-image·mc4) 듀오링고식 릴레이. 단어카드 학습은 그대로 유지하고 그 옆에
 >   추가. VocabTest 재사용(lessonId="daily-challenge"로 결과 stars 기록, 스킬트리 무영향).
 >   #7(약점 단어 자동 복습)의 핵심 선정 로직을 챌린지 형태로 선반영함.
+> - ✅ (2026-07-07 라운드, feat/storybook-round-2026-07) 그림책 **캐릭터 통일성 3중 잠금**:
+>   (a) 텍스트 에이전트가 캐릭터별 canonical 외형 `designEn` 생성 → 코드가 모든 표지·페이지
+>   프롬프트에 기계 주입, (b) **캐릭터 초상 선생성 → referenceUrls 로 Nano Banana 참조 전달**
+>   (개당 1.5MB 캡, 최대 3장), (c) `verifyCharacterMatch` 비전 자기검증 + 불일치 1회 재생성.
+>   미리보기 "🎨 캐릭터 기준 전체 다시 그리기" 버튼. 기존 책(designEn 없음)은 참조 없이 우아한 퇴화.
+> - ✅ `lib/ttsMulti.ts` `speak()` 가 이제 **재생 완료까지 대기** (Web Speech 경로도 end/error
+>   await — 자동 읽기의 기반, 기존 .finally 호출부는 오히려 정확해짐). 교사 자동 읽기:
+>   `session.autoReading` 플래그 + DuringPhase 루프(ko 더빙, 완주 후 1.5s 간격 자동 넘김).
+> - ✅ 일본어 후리가나 — `/api/furigana`(Groq, **원문 복원 검증 실패 시 폐기**) + RTDB
+>   `furigana_cache/{hash}` 영구 캐시. 순수 로직은 `lib/furiganaCore.ts` 분리 (node --test 가
+>   JSX 파싱 불가 — React 부분은 furigana.tsx).
+> - ✅ 그림책 챗봇 답변 언어 — `langGuard.resolveReplyLang(text, lang)`: 학생이 **실제로 쓴**
+>   언어 따름 (한글 2자+ & 비율 0.7+ & 라틴<한글일 때만 ko). `replyForSafety` 는 모국어 유지.
+> - ✅ 단어 퀴즈 예문(`vocab.example` + 본문 문장 폴백, 어간 1글자 과매칭 가드), 자유 읽기
+>   끝내기→책장 버튼, 소통창 글추가 버튼 컬럼 상단 이동(+`addBelowHint` 15개 언어 "위" 로 수정),
+>   튜터 꿀비 visualViewport 대응(키보드 인셋만큼 패널 상승).
 
 ---
 
