@@ -148,3 +148,19 @@ export function targetScriptRatio(text: string, lang: string | string[]): number
   }
   return total === 0 ? 1 : inTarget / total;
 }
+
+/**
+ * 4) 답변 언어 결정 — 학생이 "실제로 쓴" 언어를 따른다.
+ *    프로필 언어가 외국어라도 학생이 한국어로 물으면 한국어로 답해야 한다
+ *    (교실 공용어 학습 지원 + 교사의 학생 모드 점검). 판정은 보수적으로:
+ *    한글이 2자 이상이고, 라틴 문자가 한글보다 많지 않고,
+ *    스크립트 문자 중 한글 비율이 70% 이상일 때만 ko.
+ */
+export function resolveReplyLang(studentText: string, studentLang: string): string {
+  if (studentLang === "ko") return "ko";
+  const hangulCount = (studentText.match(/[가-힣]/g) || []).length;
+  if (hangulCount < 2) return studentLang;
+  const latinCount = (studentText.match(/[A-Za-z]/g) || []).length;
+  if (latinCount > hangulCount) return studentLang;
+  return targetScriptRatio(studentText, "ko") >= 0.7 ? "ko" : studentLang;
+}

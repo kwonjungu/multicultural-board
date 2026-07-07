@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { streamChatResponse, sseSingleFinal } from "@/lib/groq-stream";
-import { sanitizeReply } from "@/lib/langGuard";
+import { sanitizeReply, resolveReplyLang } from "@/lib/langGuard";
 import type { StorybookCharacter } from "@/lib/types";
 
 // 스트리밍 응답이라 정적 최적화 대상에서 제외
@@ -163,11 +163,14 @@ export async function POST(req: NextRequest) {
     return sseSingleFinal(replyForSafety(body.studentLang, "block"), "block");
   }
 
+  // [항목 13] 학생이 실제로 쓴 언어로 답한다 — 프로필 언어 강제가 아니라.
+  const replyLang = resolveReplyLang(body.studentText, body.studentLang);
+
   // === Layer 2: call Groq with hardened system prompt ===
   const systemPrompt = buildSystemPrompt({
     character: body.character,
     bookTitle: body.bookTitle,
-    studentLang: body.studentLang,
+    studentLang: replyLang,
   });
 
   // Truncate history to last 12 messages to keep prompt small
@@ -183,14 +186,14 @@ export async function POST(req: NextRequest) {
   return streamChatResponse({
     messages,
     models: GROQ_MODELS,
-    lang: body.studentLang,
+    lang: replyLang,
     temperature: 0.6,
     maxTokens: 180,
     finalize: (full) => {
       // #8 전 언어 외국어 토큰 제거 → (ko) 명사절 의문형 교정 → 질문형 종결 강제
-      let cleaned = sanitizeReply(full, body.studentLang);
-      if (body.studentLang === "ko") cleaned = fixKoreanRegister(cleaned);
-      return enforceQuestionEnding(cleaned, body.studentLang);
+      let cleaned = sanitizeReply(full, replyLang);
+      if (replyLang === "ko") cleaned = fixKoreanRegister(cleaned);
+      return enforceQuestionEnding(cleaned, replyLang);
     },
   });
 }
