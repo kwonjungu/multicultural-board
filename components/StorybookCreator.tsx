@@ -67,6 +67,7 @@ interface TextAgentBook {
     nameKo: string;
     avatarEmoji: string;
     avatarImagePrompt?: string;
+    designEn?: string;
     personality: string;
     speechStyle: string;
     bookContext: string;
@@ -77,6 +78,7 @@ interface TextAgentBook {
     illustrationEmoji: string;
     illustrationHueHint: string;
     imagePrompt: string;
+    characterIds?: string[];
   }>;
   questions: Array<{
     id: string;
@@ -107,12 +109,14 @@ function agentToStorybook(
       bgGradient: HUE[p.illustrationHueHint] || HUE.warm,
     },
     imagePrompt: p.imagePrompt,
+    characterIds: p.characterIds,
   }));
   const characters: StorybookCharacter[] = src.characters.map((c) => ({
     id: c.id,
     name: src.characterNames[c.id] || { ko: c.nameKo },
     avatarEmoji: c.avatarEmoji,
     avatarImagePrompt: c.avatarImagePrompt,
+    designEn: c.designEn,
     personality: c.personality,
     speechStyle: c.speechStyle,
     bookContext: c.bookContext,

@@ -237,6 +237,8 @@ export interface StorybookPage {
   text: Record<string, string>;   // lang -> text
   illustration: StorybookIllustration;
   imagePrompt?: string;       // For future regenerate
+  /** [캐릭터 통일성] 이 장면에 등장하는 캐릭터 id — 참조 이미지 선택에 사용 */
+  characterIds?: string[];
 }
 
 export interface StorybookQuestion {
@@ -258,6 +260,8 @@ export interface StorybookCharacter {
   speechStyle: string;
   bookContext: string;
   systemPromptExtra?: string; // additional hardening
+  /** [캐릭터 통일성] canonical 외형 서술 (영어 1문장) — 모든 이미지 프롬프트에 주입 */
+  designEn?: string;
 }
 
 // [신규] 그림책 단어 퀴즈 — 동화 생성 시 추출한 핵심·어려운 낱말.
@@ -269,6 +273,8 @@ export interface StorybookVocabWord {
   distractors: Record<string, string[]>;  // lang -> 오답 3개
   pageIdx: number;                        // 처음 등장 페이지
   difficulty: "easy" | "mid" | "hard";
+  /** [퀴즈 예문] 낱말이 실제로 쓰인 책 문장 (lang -> 문장) */
+  example?: Record<string, string>;
 }
 
 export interface Storybook {

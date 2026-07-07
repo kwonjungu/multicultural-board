@@ -42,6 +42,7 @@ interface DraftBook {
     nameKo: string;
     avatarEmoji: string;
     avatarImagePrompt: string;  // English prompt for character portrait (clean bg)
+    designEn?: string;          // canonical appearance sentence (English)
     personality: string;
     speechStyle: string;
     bookContext: string;
@@ -52,6 +53,7 @@ interface DraftBook {
     illustrationEmoji: string;   // 1-3 emoji
     illustrationHueHint: string; // "warm" | "cool" | "night" | "spring"
     imagePrompt: string;         // English, art style included
+    characterIds?: string[];     // ids of characters visible in this scene
   }>;
   questions: Array<{
     id: string;
@@ -67,6 +69,7 @@ interface DraftBook {
     lemmaKo: string;       // ko 기본형(원형)
     glossKo: string;       // 1~2학년용 짧은 뜻풀이 (ko)
     distractorsKo: string[]; // 그럴듯한 오답 뜻풀이 3개 (ko)
+    exampleKo?: string;    // 이 낱말이 실제로 나오는 책 문장 (ko)
     pageIdx: number;       // 처음 등장 페이지
     difficulty: "easy" | "mid" | "hard";
   }>;
@@ -87,6 +90,7 @@ interface TextAgentResponse {
       word: Record<string, string>;
       gloss: Record<string, string>;
       distractors: Record<string, string[]>;
+      example?: Record<string, string>;
       pageIdx: number;
       difficulty: "easy" | "mid" | "hard";
     }>;
@@ -123,6 +127,7 @@ You MUST reply with valid JSON matching this schema (all text in Korean unless t
       "nameKo": string,
       "avatarEmoji": string (1 emoji),
       "avatarImagePrompt": string (English, PORTRAIT-ONLY prompt: a character portrait with clean solid pastel background, no scene, no other characters, just the subject centered. Include art style and colors matching the book. The same character must be visually consistent with how they appear in the pages.),
+      "designEn": string (English, ONE canonical appearance sentence: species/kind, body colors, face features, and ONE signature clothing item or accessory. Example: "A small round honeybee with a golden-yellow fuzzy body, brown stripes, big sparkly black eyes, tiny white wings, wearing a red neck scarf." Every page prompt MUST describe this character using EXACTLY these traits.),
       "personality": string (Korean, 1-2 sentences, used by chatbot system prompt),
       "speechStyle": string (Korean, describes speech quirks and give an example),
       "bookContext": string (Korean, summary of this character's arc in the book)
@@ -134,7 +139,8 @@ You MUST reply with valid JSON matching this schema (all text in Korean unless t
       "textKo": string (Korean, follows the LENGTH specification below),
       "illustrationEmoji": string (1-4 emoji representing the scene),
       "illustrationHueHint": "warm" | "cool" | "night" | "spring" | "sunset" | "garden",
-      "imagePrompt": string (English, describes the scene in detail for an image generator. Include art style: "soft watercolor children's book illustration, warm colors, cute cartoon")
+      "imagePrompt": string (English, describes the scene in detail for an image generator. Include art style: "soft watercolor children's book illustration, warm colors, cute cartoon"),
+      "characterIds": [string] (ids of the characters VISIBLY present in this scene's illustration; use [] if none)
     }, ... exactly N pages where N is the requested count
   ],
   "questions": [
@@ -150,6 +156,7 @@ You MUST reply with valid JSON matching this schema (all text in Korean unless t
       "lemmaKo": string (the word in its DICTIONARY/BASE form — verbs/adjectives as 기본형, e.g. "모으다" not "모았어요"),
       "glossKo": string (a SHORT kid-friendly definition for ages 7-9, one phrase, NOT using the word itself),
       "distractorsKo": [string, string, string] (THREE plausible-but-WRONG definitions — see distractor rules),
+      "exampleKo": string (ONE short sentence copied or minimally shortened from the page texts where this word appears — the word must appear in the sentence in its inflected form; max 40 Korean characters),
       "pageIdx": number (the page where the word first appears),
       "difficulty": "easy" | "mid" | "hard"
     }, ... pick 6-8 words (max 10) that are the most FREQUENT and/or DIFFICULT content words in the book
@@ -167,6 +174,8 @@ Rules:
 - Character speechStyle should include an example phrase in quotes so the downstream chatbot stays consistent.
 - Use kebab-case ids like "q-intro-1", "q-check-2", "q-core-1", "char-buzz".
 - The cover prompt must visually match page 1's style to keep the art consistent.
+- Every page imagePrompt that shows a character MUST repeat that character's designEn traits verbatim (colors, features, signature item). Never introduce alternative looks.
+- avatarImagePrompt must be a FULL-BODY character sheet: front view, standing, neutral pose, whole body visible, clean solid pastel background — it will be used as the visual reference for all other images.
 
 === Vocabulary extraction (for the pre-reading word quiz) ===
 Pick 6-8 (max 10) KEY or DIFFICULT content words (nouns/verbs/adjectives) that actually appear in the page texts. Prefer words that are frequent in the book OR hard for a 1st-2nd grader. Exclude particles, endings, and trivial words.
@@ -199,19 +208,20 @@ function buildReviseSystemPrompt(): string {
 function buildPerLangTranslatePrompt(targetLang: string): string {
   return `You translate a Korean children's picture book into ${targetLang}.
 
-Input JSON: { titleKo, pages[{idx,textKo}], characters[{id,nameKo}], questions[{id,textKo}], vocab[{id,lemmaKo,glossKo,distractorsKo}] }.
+Input JSON: { titleKo, pages[{idx,textKo}], characters[{id,nameKo}], questions[{id,textKo}], vocab[{id,lemmaKo,glossKo,distractorsKo,exampleKo}] }.
 Output JSON exactly in this shape:
 {
   "title": string,
   "pages": { "<idx as string>": string },
   "characters": { "<id>": string },
   "questions": { "<id>": string },
-  "vocab": { "<id>": { "word": string, "gloss": string, "distractors": [string, string, string] } }
+  "vocab": { "<id>": { "word": string, "gloss": string, "distractors": [string, string, string], "example": string } }
 }
 
 Rules:
 - Translate into ${targetLang}. Natural, age-appropriate for 7-9 year-old.
 - For vocab: "word" = the word itself translated, "gloss"/"distractors" = the short definitions translated. Keep distractors clearly wrong (do not turn any into a correct definition).
+- "example" = exampleKo translated naturally; keep it ONE short sentence containing the translated word.
 - Preserve emojis and punctuation.
 - Do not explain. Only JSON.`;
 }
@@ -284,11 +294,12 @@ export async function POST(req: NextRequest) {
       pages: {} as Record<string, Record<string, string>>,
       characters: {} as Record<string, Record<string, string>>,
       questions: {} as Record<string, Record<string, string>>,
-      // [신규] vocab: id -> { word/gloss: lang->str, distractors: lang->str[] }
+      // [신규] vocab: id -> { word/gloss: lang->str, distractors: lang->str[], example: lang->str }
       vocab: {} as Record<string, {
         word: Record<string, string>;
         gloss: Record<string, string>;
         distractors: Record<string, string[]>;
+        example: Record<string, string>;
       }>,
     };
     const nonKo = targetLangs.filter((l) => l !== "ko");
@@ -300,7 +311,7 @@ export async function POST(req: NextRequest) {
         characters: final.characters.map((c) => ({ id: c.id, nameKo: c.nameKo })),
         questions: final.questions.map((q) => ({ id: q.id, textKo: q.textKo })),
         vocab: vocabList.map((v) => ({
-          id: v.id, lemmaKo: v.lemmaKo, glossKo: v.glossKo, distractorsKo: v.distractorsKo,
+          id: v.id, lemmaKo: v.lemmaKo, glossKo: v.glossKo, distractorsKo: v.distractorsKo, exampleKo: v.exampleKo,
         })),
       };
       interface PerLangResult {
@@ -308,7 +319,7 @@ export async function POST(req: NextRequest) {
         pages: Record<string, string>;
         characters: Record<string, string>;
         questions: Record<string, string>;
-        vocab?: Record<string, { word?: string; gloss?: string; distractors?: string[] }>;
+        vocab?: Record<string, { word?: string; gloss?: string; distractors?: string[]; example?: string }>;
       }
       const perLang = await Promise.all(
         nonKo.map(async (lang) => {
@@ -347,10 +358,11 @@ export async function POST(req: NextRequest) {
         }
         if (value.vocab) {
           for (const [id, v] of Object.entries(value.vocab)) {
-            const slot = translations.vocab[id] || { word: {}, gloss: {}, distractors: {} };
+            const slot = translations.vocab[id] || { word: {}, gloss: {}, distractors: {}, example: {} };
             if (v.word) slot.word[lang] = v.word;
             if (v.gloss) slot.gloss[lang] = v.gloss;
             if (Array.isArray(v.distractors)) slot.distractors[lang] = v.distractors;
+            if (v.example) slot.example[lang] = v.example;
             translations.vocab[id] = slot;
           }
         }
@@ -386,13 +398,17 @@ export async function POST(req: NextRequest) {
 
     // [신규] vocabWords 조립 — ko 기본값 + 번역 병합. 4지선다에 바로 쓸 형태.
     const vocabWords = (final.vocab || []).map((v) => {
-      const t = translations.vocab[v.id] || { word: {}, gloss: {}, distractors: {} };
+      const t = translations.vocab[v.id] || { word: {}, gloss: {}, distractors: {}, example: {} };
+      // example: ko from draft + per-lang from translations (omit if absent)
+      const exampleMap: Record<string, string> = { ...t.example };
+      if (v.exampleKo) exampleMap.ko = v.exampleKo;
       return {
         id: v.id,
         lemma: v.lemmaKo,
         word: { ...t.word, ko: v.lemmaKo },
         gloss: { ...t.gloss, ko: v.glossKo },
         distractors: { ...t.distractors, ko: v.distractorsKo },
+        ...(Object.keys(exampleMap).length > 0 ? { example: exampleMap } : {}),
         pageIdx: typeof v.pageIdx === "number" ? v.pageIdx : 1,
         difficulty: v.difficulty || "mid" as const,
       };
