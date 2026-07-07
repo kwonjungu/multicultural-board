@@ -105,3 +105,16 @@ test("본문에도 낱말이 없으면 example 은 비운다 (undefined)", () =>
   const quiz = buildStorybookQuiz(SAMPLE, "ko", [] as never);
   assert.ok(quiz.every((q) => q.example === undefined));
 });
+
+test("어간 축약형이 1글자면 본문 매칭에 쓰지 않는다 (과매칭 방지)", () => {
+  const vocab = [
+    vw("w1", "모으다", "여기저기서 가져와 한데 합치다", ["바위", "구름", "신발"]),
+    vw("w2", "날개", "하늘을 나는 몸의 부분", ["바퀴", "지붕", "연필"]),
+    vw("w3", "꽃밭", "꽃이 많이 핀 곳", ["교실", "냉장고", "주머니"]),
+    vw("w4", "친구", "함께 노는 사람", ["돌멩이", "우산", "달력"]),
+  ];
+  const pages = [{ idx: 1, text: { ko: "붕붕이가 모자를 썼어요." }, illustration: { emoji: "🐝", bgGradient: "" } }];
+  const quiz = buildStorybookQuiz(vocab, "ko", pages as never);
+  const q1 = quiz.find((q) => q.wordId === "w1");
+  assert.equal(q1?.example, undefined);
+});

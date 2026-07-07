@@ -116,8 +116,14 @@ function exampleFor(
   // ko 활용형 대응: 기본형에서 "-다" 를 뗀 어간으로 재시도 (모으다 → 모으/모았)
   const stem = w.lemma.endsWith("다") && w.lemma.length >= 3 ? w.lemma.slice(0, -1) : "";
   if (stem) {
-    const stemHit = sentences.find((s) => s.includes(stem) || s.includes(stem.slice(0, -1)));
+    const stemHit = sentences.find((s) => s.includes(stem));
     if (stemHit) return stemHit;
+    // 축약형(어간의 마지막 글자 제거) 추가 매칭은 2글자 이상일 때만 (1글자면 과매칭)
+    const shortened = stem.slice(0, -1);
+    if (shortened.length >= 2) {
+      const shortenedHit = sentences.find((s) => s.includes(shortened));
+      if (shortenedHit) return shortenedHit;
+    }
   }
   return undefined;
 }
