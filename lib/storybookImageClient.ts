@@ -9,6 +9,8 @@ export interface StorybookImageRequest {
   pageIdx?: number;       // 0 = cover, 1+ = pages
   characterId?: string;   // set for character portraits
   prompt: string;
+  /** [캐릭터 통일성] 캐릭터 초상 URL — 서버가 내려받아 참조 이미지로 첨부 (최대 3) */
+  referenceUrls?: string[];
   /** true 면 서버 캐시를 무시하고 새로 생성 (미리보기 "다시 그리기") */
   force?: boolean;
 }

@@ -14,6 +14,8 @@ interface ImageAgentRequest {
   characterId?: string;   // If set, this is a character portrait (clean bg, subject only)
   prompt: string;         // English art-style prompt
   styleReferenceUrl?: string;  // Optional: previous page to keep style consistent (future)
+  /** [캐릭터 통일성] 캐릭터 초상 URL — 서버가 내려받아 참조 이미지로 첨부 (최대 3) */
+  referenceUrls?: string[];
   /** true 면 캐시를 무시하고 새로 생성 (미리보기 "다시 그리기" 용) */
   force?: boolean;
 }
@@ -38,8 +40,8 @@ const CACHE_TTL_MS = 10 * 60_000;
 const urlCache = new Map<string, { url: string; at: number }>();
 const inflight = new Map<string, Promise<string>>();
 
-function cacheKey(bookId: string, target: string, prompt: string): string {
-  return createHash("sha1").update(`${bookId}|${target}|${prompt}`).digest("hex");
+function cacheKey(bookId: string, target: string, prompt: string, refs: string[]): string {
+  return createHash("sha1").update(`${bookId}|${target}|${prompt}|${refs.join(",")}`).digest("hex");
 }
 
 function statusForReason(reason: GeminiImageFailReason | "upload"): number {
@@ -79,7 +81,8 @@ export async function POST(req: NextRequest) {
   }
 
   const target = hasChar ? `c:${body.characterId}` : `p:${body.pageIdx}`;
-  const key = cacheKey(body.bookId, target, body.prompt);
+  const refs = (body.referenceUrls ?? []).slice(0, 3);
+  const key = cacheKey(body.bookId, target, body.prompt, refs);
 
   // 캐시 히트 — 같은 프롬프트로 방금 만든 이미지가 있으면 그대로 반환.
   if (!body.force) {
@@ -122,6 +125,23 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/** 참조 URL(자체 Firebase Storage)을 내려받아 base64 로. 실패한 것은 조용히 제외. */
+async function fetchReferenceImages(
+  urls: string[],
+): Promise<Array<{ base64: string; mimeType: string }>> {
+  const out: Array<{ base64: string; mimeType: string }> = [];
+  for (const u of urls.slice(0, 3)) {
+    try {
+      const res = await fetch(u);
+      if (!res.ok) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length === 0 || buf.length > 4 * 1024 * 1024) continue; // 4MB 가드
+      out.push({ base64: buf.toString("base64"), mimeType: res.headers.get("content-type") || "image/png" });
+    } catch { /* skip */ }
+  }
+  return out;
+}
+
 async function generateAndUpload(
   body: ImageAgentRequest,
   hasChar: boolean,
@@ -134,10 +154,15 @@ async function generateAndUpload(
   const portraitGuard = hasChar
     ? " The character alone on a clean solid pastel-cream background. No scene, no other characters, no props, no text, just the character centered."
     : "";
-  const fullPrompt = `${body.prompt}\n\nStyle: ${baseStyleGuard}${portraitGuard}`;
+  const refs = await fetchReferenceImages(body.referenceUrls ?? []);
+  // 참조가 있으면 "첨부된 캐릭터를 그대로" 를 최상단에 강제 — 문장 중간에 넣으면 무시됨.
+  const refGuard = refs.length > 0
+    ? "CHARACTER REFERENCE (STRICT): The attached image(s) show the exact character design(s) of this book. Redraw the SAME character(s) — identical species, body shape, colors, face, and clothing/accessories — placed into the scene described below. Do NOT invent a different-looking character.\n\n"
+    : "";
+  const fullPrompt = `${refGuard}${body.prompt}\n\nStyle: ${baseStyleGuard}${portraitGuard}`;
 
   // 재시도(백오프+키 폴백)는 generateImage 내부에서 처리 — 총 50s 예산.
-  const img = await generateImage(fullPrompt);
+  const img = await generateImage(fullPrompt, { referenceImages: refs });
   let buffer: Buffer = Buffer.from(img.base64, "base64");
 
   // === Character portrait post-processing ===
