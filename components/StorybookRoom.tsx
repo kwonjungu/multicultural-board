@@ -1053,16 +1053,27 @@ function StorybookFreeReader({
               cursor: onCover ? "default" : "pointer",
             }}
           >◀ 이전</button>
-          <button
-            onClick={() => setPage((p) => Math.min(total, p + 1))}
-            disabled={page >= total}
-            style={{
-              flex: 2, padding: "14px 16px", borderRadius: 14,
-              background: page >= total ? "#F3F4F6" : "linear-gradient(135deg, #F59E0B, #D97706)",
-              border: "none", color: page >= total ? "#9CA3AF" : "#fff", fontWeight: 900, fontSize: 15,
-              cursor: page >= total ? "default" : "pointer",
-            }}
-          >{page >= total ? "끝!" : onCover ? "읽기 시작 ▶" : "다음 ▶"}</button>
+          {page >= total ? (
+            <button
+              onClick={onBack}
+              style={{
+                flex: 2, padding: "14px 16px", borderRadius: 14,
+                background: "linear-gradient(135deg, #10B981, #059669)",
+                border: "none", color: "#fff", fontWeight: 900, fontSize: 15,
+                cursor: "pointer", boxShadow: "0 4px 12px rgba(16,185,129,0.3)",
+              }}
+            >📚 다 읽었어요! 책장으로</button>
+          ) : (
+            <button
+              onClick={() => setPage((p) => Math.min(total, p + 1))}
+              style={{
+                flex: 2, padding: "14px 16px", borderRadius: 14,
+                background: "linear-gradient(135deg, #F59E0B, #D97706)",
+                border: "none", color: "#fff", fontWeight: 900, fontSize: 15,
+                cursor: "pointer",
+              }}
+            >{onCover ? "읽기 시작 ▶" : "다음 ▶"}</button>
+          )}
         </div>
       </div>
 
