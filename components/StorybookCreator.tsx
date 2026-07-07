@@ -351,8 +351,10 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
       const charTasks: ImgTask[] = storybook.characters
         .filter((c) => c.avatarImagePrompt)
         .map((c) => ({ kind: "char" as const, characterId: c.id, prompt: c.avatarImagePrompt! }));
-      setProgress((p) => ({ ...p, message: "🧸 등장인물을 먼저 그리고 있어요…" }));
-      await runPool(charTasks);
+      if (charTasks.length > 0) {
+        setProgress((p) => ({ ...p, message: "🧸 등장인물을 먼저 그리고 있어요…" }));
+        await runPool(charTasks);
+      }
 
       // ── Phase B: 표지 + 페이지 — 캐릭터 초상을 참조로 전달 ──
       // (charUrls 는 Phase A await 완료 후이므로 stale-closure 위험 없음)
@@ -1235,8 +1237,9 @@ function PreviewPanel({
     if (redrawing) return;
     if (!window.confirm("표지와 모든 페이지를 현재 캐릭터 그림 기준으로 다시 그릴까요? (수 분 소요)")) return;
     const targets = [0, ...book.pages.map((p) => p.idx)];
-    for (const idx of targets) {
-      setRedrawing(`${targets.indexOf(idx) + 1}/${targets.length} 그리는 중…`);
+    for (let i = 0; i < targets.length; i++) {
+      const idx = targets[i];
+      setRedrawing(`${i + 1}/${targets.length} 그리는 중…`);
       const prompt = idx === 0
         ? (book.cover.imagePrompt || "")
         : (book.pages.find((p) => p.idx === idx)?.imagePrompt || "");
