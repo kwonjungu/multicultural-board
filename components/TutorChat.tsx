@@ -17,6 +17,35 @@ interface TutorMsg {
   content: string;
 }
 
+/** 소프트 키보드/브라우저 UI 로 줄어든 실제 가시 영역. 미지원 브라우저는 window 크기. */
+function useVisualViewport(): { height: number; bottomInset: number } {
+  const [vp, setVp] = useState({ height: 0, bottomInset: 0 });
+  useEffect(() => {
+    const update = () => {
+      const vv = window.visualViewport;
+      if (vv) {
+        setVp({
+          height: Math.round(vv.height),
+          bottomInset: Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)),
+        });
+      } else {
+        setVp({ height: window.innerHeight, bottomInset: 0 });
+      }
+    };
+    update();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+  return vp;
+}
+
 // 위젯 자체 라벨 — i18n.ts 에 키를 늘리는 대신 자체 보관 (위젯 전용 3종)
 const L_TITLE: Record<string, string> = {
   ko: "AI 튜터 꿀비", en: "Kkulbi the AI Tutor", vi: "Gia sư AI Kkulbi",
@@ -77,6 +106,7 @@ export default function TutorChat({
   const [streamText, setStreamText] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef(false);
+  const vp = useVisualViewport();
 
   // 세션 내 대화 복원 (탭 단위)
   useEffect(() => {
@@ -169,7 +199,7 @@ export default function TutorChat({
           style={{
             // zIndex 는 전체화면 뷰(게임룸 460·토론 450·모달 400)보다 낮게 —
             // 그 위에 떠서 게임 버튼 탭을 가로채던 버그의 재발 방지
-            position: "fixed", bottom: 84, right: 18, zIndex: 300,
+            position: "fixed", bottom: 84 + vp.bottomInset, right: 18, zIndex: 300,
             width: 60, height: 60, borderRadius: "50%",
             border: "3px solid #FDE68A",
             background: "linear-gradient(135deg, #F59E0B, #D97706)",
@@ -192,14 +222,15 @@ export default function TutorChat({
       {/* 챗 패널 */}
       {open && (
         <div style={{
-          position: "fixed", bottom: 16, right: 12, zIndex: 320,
+          position: "fixed", bottom: 16 + vp.bottomInset, right: 12, zIndex: 320,
           width: "min(380px, calc(100vw - 24px))",
-          height: "min(540px, calc(100vh - 90px))",
+          height: vp.height > 0 ? `min(540px, ${Math.max(vp.height - 32, 260)}px)` : "min(540px, calc(100dvh - 90px))",
           background: "#fff",
           borderRadius: 20, border: "3px solid #FDE68A",
           boxShadow: "0 16px 40px rgba(0,0,0,0.28)",
           display: "flex", flexDirection: "column", overflow: "hidden",
           fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
+          transition: "bottom 0.15s ease-out",
         }}>
           {/* 헤더 */}
           <div style={{
@@ -259,6 +290,7 @@ export default function TutorChat({
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+              onFocus={() => setTimeout(() => scrollRef.current && (scrollRef.current.scrollTop = scrollRef.current.scrollHeight), 250)}
               placeholder={pickL(L_PLACEHOLDER, lang)}
               disabled={busy}
               maxLength={200}
