@@ -191,7 +191,14 @@ export async function speak(text: string, langShort: string): Promise<void> {
         u.rate = tuning.rate;
         u.pitch = tuning.pitch;
         u.volume = tuning.volume;
-        synth.speak(u);
+        // 재생 완료까지 대기 — 자동 읽기(연속 재생)와 speaking 표시의 기준.
+        // cancelSpeak() 호출 시에도 end/error 가 발화되어 resolve 된다.
+        await new Promise<void>((resolve) => {
+          const done = () => resolve();
+          u.addEventListener("end", done, { once: true });
+          u.addEventListener("error", done, { once: true });
+          synth.speak(u);
+        });
         return;
       }
     }

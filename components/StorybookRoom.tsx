@@ -29,6 +29,7 @@ import {
   appendResponseComment,
   subscribeResponseComments,
   setAllowReviewChat,
+  setAutoReading,
   subscribeBookAnswers,
   submitBookAnswer,
   pushStorybookBoard,
@@ -51,7 +52,7 @@ import { readChatStream } from "@/lib/chatStreamClient";
 import MicButton from "./MicButton";
 import DrawBoard, { type DrawBoardHandle } from "./DrawBoard";
 import ImageLightbox from "./ImageLightbox";
-import { speak as speakText } from "@/lib/ttsMulti";
+import { speak as speakText, cancelSpeak } from "@/lib/ttsMulti";
 import StorybookCreator from "./StorybookCreator";
 import StorybookWordQuiz from "./StorybookWordQuiz";
 import { useBackLayer } from "@/lib/backStack";
@@ -1973,13 +1974,49 @@ function DuringPhase({
     ? book.characters.find((c) => c.id === reviewCharId) ?? null
     : null;
 
+  // ── [항목 7] 자동 읽기: 교사 기기가 한국어 더빙으로 낭독하며 페이지를 넘긴다.
+  // 학생 기기는 기존 setPage 구독으로 함께 넘어간다 (교실 스피커 = 교사 기기).
+  const [autoReading, setAutoReadingLocal] = useState(false);
+  const autoAbortRef = useRef(false);
+
+  async function startAutoRead() {
+    if (autoReading) return;
+    autoAbortRef.current = false;
+    setAutoReadingLocal(true);
+    setAutoReading(roomCode, true).catch(() => {});
+    try {
+      for (let i = pageIdx; i <= book.pages.length; i++) {
+        if (autoAbortRef.current) break;
+        await setPage(roomCode, i);
+        const p = book.pages.find((pp) => pp.idx === i);
+        const text = p?.text?.ko || "";
+        if (text) await speakText(text, "ko");       // 완주 대기 (Task 10 Step 1)
+        if (autoAbortRef.current) break;
+        await new Promise((r) => setTimeout(r, 1500)); // 페이지 사이 숨 고르기
+      }
+    } finally {
+      setAutoReadingLocal(false);
+      setAutoReading(roomCode, false).catch(() => {});
+    }
+  }
+
+  function stopAutoRead() {
+    autoAbortRef.current = true;
+    cancelSpeak();
+    setAutoReadingLocal(false);
+    setAutoReading(roomCode, false).catch(() => {});
+  }
+
+  // 언마운트/phase 이탈 시 정리
+  useEffect(() => () => { autoAbortRef.current = true; cancelSpeak(); }, []);
+
   if (!page) {
     return <div>Page {pageIdx} not found</div>;
   }
 
   return (
     <>
-      <PageCard lang={lang} page={page} total={book.pages.length} />
+      <PageCard lang={lang} page={page} total={book.pages.length} autoReading={!isTeacher && !!session.autoReading} />
 
       {currentQ && (
         <QuestionCard
@@ -2003,6 +2040,9 @@ function DuringPhase({
           activeQuestionId={session.currentQuestionId}
           allowReviewChat={!!session.allowReviewChat}
           onGotoAfter={() => setPhase(roomCode, "after")}
+          autoReading={autoReading}
+          onStartAutoRead={startAutoRead}
+          onStopAutoRead={stopAutoRead}
         />
       )}
 
@@ -2068,11 +2108,12 @@ function DuringPhase({
 }
 
 function PageCard({
-  lang, page, total,
+  lang, page, total, autoReading,
 }: {
   lang: string;
   page: StorybookPage;
   total: number;
+  autoReading?: boolean;
 }) {
   return (
     <div
@@ -2119,6 +2160,14 @@ function PageCard({
         }}>
           {tFmt("sbPageOf", lang, { cur: page.idx, total })}
         </div>
+        {autoReading && (
+          <div style={{
+            position: "absolute", top: 14, left: 16,
+            fontSize: 12, fontWeight: 900, color: "#1D4ED8",
+            background: "#DBEAFE", padding: "5px 12px", borderRadius: 999,
+            border: "1.5px solid #93C5FD", animation: "pulse 1.2s ease-in-out infinite",
+          }}>🔊 선생님이 읽어주는 중</div>
+        )}
       </div>
 
       {/* Text panel — bilingual for non-Korean students */}
@@ -3252,6 +3301,7 @@ function TeacherControls({
 
 function TeacherPageControls({
   lang, roomCode, pageIdx, totalPages, questions, activeQuestionId, allowReviewChat, onGotoAfter,
+  autoReading, onStartAutoRead, onStopAutoRead,
 }: {
   lang: string;
   roomCode: string;
@@ -3262,6 +3312,9 @@ function TeacherPageControls({
   /** 복습 중 캐릭터 챗봇 허용 여부 (설계서 항목 3, 기본 OFF) */
   allowReviewChat: boolean;
   onGotoAfter: () => void;
+  autoReading: boolean;
+  onStartAutoRead: () => void;
+  onStopAutoRead: () => void;
 }) {
   const prevDisabled = pageIdx <= 1;
   const isLast = pageIdx >= totalPages;
@@ -3277,42 +3330,56 @@ function TeacherPageControls({
         marginBottom: 14,
       }}
     >
+      <button
+        onClick={autoReading ? onStopAutoRead : onStartAutoRead}
+        style={{
+          width: "100%", minHeight: 52, marginBottom: 10,
+          background: autoReading
+            ? "linear-gradient(135deg, #EF4444, #DC2626)"
+            : "linear-gradient(135deg, #3B82F6, #2563EB)",
+          color: "#fff", border: "none", borderRadius: 14,
+          fontSize: 15, fontWeight: 900, cursor: "pointer",
+          boxShadow: "0 4px 12px rgba(59,130,246,0.3)", fontFamily: "inherit",
+        }}
+      >{autoReading ? "⏹ 자동 읽기 멈추기" : "▶️ 자동 읽기 — 끝까지 읽어주며 넘겨요"}</button>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <button
           onClick={() => setPage(roomCode, Math.max(1, pageIdx - 1))}
-          disabled={prevDisabled}
+          disabled={prevDisabled || autoReading}
           style={{
             flex: 1, minHeight: 48,
-            background: prevDisabled ? "#F3F4F6" : "#fff",
-            color: prevDisabled ? "#9CA3AF" : "#92400E",
-            border: `2px solid ${prevDisabled ? "#E5E7EB" : "#FDE68A"}`,
+            background: (prevDisabled || autoReading) ? "#F3F4F6" : "#fff",
+            color: (prevDisabled || autoReading) ? "#9CA3AF" : "#92400E",
+            border: `2px solid ${(prevDisabled || autoReading) ? "#E5E7EB" : "#FDE68A"}`,
             borderRadius: 14, fontSize: 14, fontWeight: 900,
-            cursor: prevDisabled ? "not-allowed" : "pointer",
+            cursor: (prevDisabled || autoReading) ? "not-allowed" : "pointer",
           }}
         >{t("sbPrevPage", lang)}</button>
         {!isLast && (
           <button
             onClick={() => setPage(roomCode, pageIdx + 1)}
+            disabled={autoReading}
             style={{
               flex: 1, minHeight: 48,
-              background: "linear-gradient(135deg, #F59E0B, #D97706)",
-              color: "#fff", border: "none",
+              background: autoReading ? "#F3F4F6" : "linear-gradient(135deg, #F59E0B, #D97706)",
+              color: autoReading ? "#9CA3AF" : "#fff", border: "none",
               borderRadius: 14, fontSize: 14, fontWeight: 900,
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(245,158,11,0.3)",
+              cursor: autoReading ? "not-allowed" : "pointer",
+              boxShadow: autoReading ? "none" : "0 4px 12px rgba(245,158,11,0.3)",
             }}
           >{t("sbNextPage", lang)}</button>
         )}
         {isLast && (
           <button
             onClick={onGotoAfter}
+            disabled={autoReading}
             style={{
               flex: 1, minHeight: 48,
-              background: "linear-gradient(135deg, #10B981, #059669)",
-              color: "#fff", border: "none",
+              background: autoReading ? "#F3F4F6" : "linear-gradient(135deg, #10B981, #059669)",
+              color: autoReading ? "#9CA3AF" : "#fff", border: "none",
               borderRadius: 14, fontSize: 14, fontWeight: 900,
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(16,185,129,0.3)",
+              cursor: autoReading ? "not-allowed" : "pointer",
+              boxShadow: autoReading ? "none" : "0 4px 12px rgba(16,185,129,0.3)",
             }}
           >{t("sbPhaseNextAfter", lang)}</button>
         )}
