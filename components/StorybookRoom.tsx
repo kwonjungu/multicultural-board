@@ -59,6 +59,7 @@ import EmotionCardDeck from "./EmotionCardDeck";
 import { pushEmotion, emotionById, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
 import { t, tFmt } from "@/lib/i18n";
 import { Fruit, FRUIT_KINDS } from "./DiscussionSession";
+import { useFurigana, RubyText } from "@/lib/furigana";
 
 interface Props {
   user: UserConfig;
@@ -1852,6 +1853,8 @@ function BeforePhase({
 
 function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
   const title = pick(book.title, lang);
+  // [항목 5] 일본어 뷰어: 표지 제목 후리가나 (훅 규칙: 조건부 호출 금지 → 인자로 제어)
+  const titleRubySegs = useFurigana(lang === "ja" ? title : null, lang === "ja");
   return (
     <div
       style={{
@@ -1926,7 +1929,7 @@ function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
               padding: "0 6px",
             }}
           >
-            {title}
+            <RubyText segs={titleRubySegs} fallback={title} />
           </div>
           <div style={{
             marginTop: 8,
@@ -2148,6 +2151,8 @@ function BilingualText({
   size: "page" | "question";
 }) {
   const { primary, secondary } = bilingual(map, lang);
+  // [항목 5] 일본어 뷰어: 한자 위 후리가나 (훅 규칙: 조건부 호출 금지 → 인자로 제어)
+  const rubySegs = useFurigana(lang === "ja" ? primary : null, lang === "ja");
   const primarySize = size === "page" ? 20 : 18;
   const secondarySize = size === "page" ? 16 : 15;
   const padding = size === "page" ? "20px 22px 22px" : "0";
@@ -2156,9 +2161,9 @@ function BilingualText({
     <div style={{ padding, position: "relative" }}>
       <div style={{
         fontSize: primarySize, fontWeight: 700, color: "#1F2937",
-        letterSpacing: -0.2, lineHeight: 1.55,
+        letterSpacing: -0.2, lineHeight: lang === "ja" ? 1.9 : 1.55,
       }}>
-        {primary}
+        {lang === "ja" ? <RubyText segs={rubySegs} fallback={primary} /> : primary}
       </div>
       {secondary && (
         <div style={{
