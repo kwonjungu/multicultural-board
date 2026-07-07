@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateImage, GeminiImageError, GeminiImageFailReason } from "@/lib/gemini";
+import { generateImage, verifyCharacterMatch, GeminiImageError, GeminiImageFailReason } from "@/lib/gemini";
 import { getAdminApp } from "@/lib/firebase-admin";
 import { getStorage } from "firebase-admin/storage";
 import { createHash, randomUUID } from "crypto";
@@ -162,7 +162,20 @@ async function generateAndUpload(
   const fullPrompt = `${refGuard}${body.prompt}\n\nStyle: ${baseStyleGuard}${portraitGuard}`;
 
   // 재시도(백오프+키 폴백)는 generateImage 내부에서 처리 — 총 50s 예산.
-  const img = await generateImage(fullPrompt, { referenceImages: refs });
+  let img = await generateImage(fullPrompt, { referenceImages: refs });
+
+  // [강력 고정] 참조 기반 페이지·표지는 캐릭터 일치를 비전으로 자기검증.
+  // 불일치면 1회만 다시 그린다 (그 이상은 예산 초과 — 60s maxDuration).
+  if (!hasChar && refs.length > 0) {
+    const ok = await verifyCharacterMatch(refs[0], { base64: img.base64, mimeType: img.mimeType || "image/png" });
+    if (!ok) {
+      console.warn("character mismatch — regenerating once", body.bookId, body.pageIdx);
+      try {
+        img = await generateImage(fullPrompt, { referenceImages: refs, maxAttempts: 1 });
+      } catch { /* 재생성 실패 시 원본 유지 */ }
+    }
+  }
+
   let buffer: Buffer = Buffer.from(img.base64, "base64");
 
   // === Character portrait post-processing ===

@@ -426,3 +426,43 @@ export async function generateImage(
   }
   throw lastErr ?? new GeminiImageError("unknown", "generateImage failed");
 }
+
+/**
+ * [캐릭터 통일성] 생성 이미지 속 캐릭터가 참조 캐릭터와 같은 디자인인지 판정.
+ * 실패(네트워크/파싱)는 true 반환 — 검증 불가로 이미지를 버리지 않는다 (보수적).
+ */
+export async function verifyCharacterMatch(
+  ref: { base64: string; mimeType: string },
+  gen: { base64: string; mimeType: string },
+): Promise<boolean> {
+  const keys = getGeminiApiKeys();
+  if (keys.length === 0) return true;
+  const url = `${GEMINI_REST_BASE}/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(keys[0])}`;
+  const body = {
+    contents: [{
+      role: "user",
+      parts: [
+        { inlineData: { data: ref.base64, mimeType: ref.mimeType } },
+        { inlineData: { data: gen.base64, mimeType: gen.mimeType } },
+        { text: "Image 1 is the reference character design of a children's picture book. Does Image 2 depict the SAME character (same species, colors, face, clothing/accessories — pose and scene may differ)? Answer with exactly one word: YES or NO." },
+      ],
+    }],
+  };
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15_000);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return true;
+    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const text = (data?.candidates?.[0]?.content?.parts ?? []).map((p) => p.text || "").join(" ");
+    return !/\bNO\b/i.test(text.trim());
+  } catch {
+    return true;
+  }
+}
