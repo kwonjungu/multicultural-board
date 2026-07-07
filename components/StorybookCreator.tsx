@@ -221,31 +221,14 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
         message: "🎨 표지·페이지·등장인물 이미지를 그리고 있어요…",
       }));
 
-      // Step 2: generate cover + pages + character portraits in parallel
+      // Step 2: generate character portraits first (Phase A), then cover + pages with references (Phase B)
       type ImgTask =
-        | { kind: "cover"; prompt: string }
-        | { kind: "page"; idx: number; prompt: string }
+        | { kind: "cover"; prompt: string; referenceUrls?: string[] }
+        | { kind: "page"; idx: number; prompt: string; referenceUrls?: string[] }
         | { kind: "char"; characterId: string; prompt: string };
 
-      const tasks: ImgTask[] = [
-        {
-          kind: "cover",
-          prompt: textData.book.coverImagePrompt
-            || `Book cover illustration: "${storybook.title?.ko}". Cute cartoon, soft watercolor, warm palette.`,
-        },
-        ...storybook.pages.map((p) => ({
-          kind: "page" as const,
-          idx: p.idx,
-          prompt: p.imagePrompt || `A children's book illustration of: ${p.illustration.emoji}`,
-        })),
-        ...storybook.characters
-          .filter((c) => c.avatarImagePrompt)
-          .map((c) => ({
-            kind: "char" as const,
-            characterId: c.id,
-            prompt: c.avatarImagePrompt!,
-          })),
-      ];
+      // Phase A 결과 — Phase B 참조용 (plain object, 클로저 캡처 안전)
+      const charUrls: Record<string, string> = {};
 
       /**
        * Run one image task, THROWING on any failure so the retry pool can
@@ -254,11 +237,14 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
        * progress would tick forward, and the page was left with no imageUrl.
        */
       const runOne = async (task: ImgTask) => {
-        const reqBody: { bookId: string; prompt: string; pageIdx?: number; characterId?: string } =
+        const reqBody: { bookId: string; prompt: string; pageIdx?: number; characterId?: string; referenceUrls?: string[] } =
           { bookId, prompt: task.prompt };
         if (task.kind === "cover") reqBody.pageIdx = 0;
         else if (task.kind === "page") reqBody.pageIdx = task.idx;
         else reqBody.characterId = task.characterId;
+        if (task.kind !== "char" && (task as { referenceUrls?: string[] }).referenceUrls?.length) {
+          reqBody.referenceUrls = (task as { referenceUrls?: string[] }).referenceUrls;
+        }
 
         // 서버가 내부 재시도+키 폴백을 이미 수행 — 여기서는 풀(worker) 재시도가
         // 바깥 레벨을 담당하므로 helper 자체 재시도는 0.
@@ -287,6 +273,7 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
             };
           });
         } else {
+          charUrls[task.characterId] = data.url!;
           await updateGeneratedBookCharacterAvatar(bookId, task.characterId, data.url);
           setBook((prev) => {
             if (!prev) return prev;
@@ -308,41 +295,83 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
       const failures: ImgTask[] = [];
       const POOL = 3;
       const MAX_ATTEMPTS = 3;
-      let cursor = 0;
-      const worker = async () => {
-        while (cursor < tasks.length) {
-          const i = cursor++;
-          const task = tasks[i];
-          let attempt = 0;
-          let lastErr: unknown = null;
-          while (attempt < MAX_ATTEMPTS) {
-            try {
-              await runOne(task);
-              lastErr = null;
-              break;
-            } catch (err) {
-              lastErr = err;
-              attempt++;
-              // 서버가 "재시도 무의미" 라고 알려준 실패(프롬프트 거부 등)는 즉시 포기.
-              if ((err as { retryable?: boolean })?.retryable === false) break;
-              if (attempt < MAX_ATTEMPTS) {
-                const delay = 800 * Math.pow(2, attempt - 1) + Math.random() * 400;
-                await new Promise((r) => setTimeout(r, delay));
+      const runPool = async (poolTasks: ImgTask[]) => {
+        let cursor = 0;
+        const worker = async () => {
+          while (cursor < poolTasks.length) {
+            const i = cursor++;
+            const task = poolTasks[i];
+            let attempt = 0;
+            let lastErr: unknown = null;
+            while (attempt < MAX_ATTEMPTS) {
+              try {
+                await runOne(task);
+                lastErr = null;
+                break;
+              } catch (err) {
+                lastErr = err;
+                attempt++;
+                // 서버가 "재시도 무의미" 라고 알려준 실패(프롬프트 거부 등)는 즉시 포기.
+                if ((err as { retryable?: boolean })?.retryable === false) break;
+                if (attempt < MAX_ATTEMPTS) {
+                  const delay = 800 * Math.pow(2, attempt - 1) + Math.random() * 400;
+                  await new Promise((r) => setTimeout(r, delay));
+                }
               }
             }
+            if (lastErr) {
+              console.warn("image gen gave up after retries", task, lastErr);
+              failures.push(task);
+            }
+            setProgress((p) => ({
+              ...p,
+              imageDoneCount: p.imageDoneCount + 1,
+              message: `🎨 이미지를 그리고 있어요… (${p.imageDoneCount + 1}/${p.imageTotal})`,
+            }));
           }
-          if (lastErr) {
-            console.warn("image gen gave up after retries", task, lastErr);
-            failures.push(task);
-          }
-          setProgress((p) => ({
-            ...p,
-            imageDoneCount: p.imageDoneCount + 1,
-            message: `🎨 이미지를 그리고 있어요… (${p.imageDoneCount + 1}/${p.imageTotal})`,
-          }));
-        }
+        };
+        await Promise.all(Array.from({ length: Math.min(POOL, poolTasks.length) }, () => worker()));
+      }
+
+      // 장면 캐릭터 id → 참조 URL (없으면 전체 캐릭터, 최대 3)
+      const refsFor = (ids?: string[]): string[] => {
+        const pool = ids && ids.length > 0 ? ids : storybook.characters.map((c) => c.id);
+        return pool.map((id) => charUrls[id]).filter(Boolean).slice(0, 3);
       };
-      await Promise.all(Array.from({ length: POOL }, worker));
+      // canonical 외형 서술을 프롬프트에 기계 주입 (LLM 재량에 맡기지 않음)
+      const designFor = (ids?: string[]): string => {
+        const pool = ids && ids.length > 0
+          ? storybook.characters.filter((c) => ids.includes(c.id))
+          : storybook.characters;
+        const lines = pool.map((c) => c.designEn).filter(Boolean) as string[];
+        return lines.length > 0 ? `\n\nCharacter design (must match exactly): ${lines.join(" / ")}` : "";
+      };
+
+      // ── Phase A: 등장인물 초상(캐릭터 시트) 먼저 ──
+      const charTasks: ImgTask[] = storybook.characters
+        .filter((c) => c.avatarImagePrompt)
+        .map((c) => ({ kind: "char" as const, characterId: c.id, prompt: c.avatarImagePrompt! }));
+      setProgress((p) => ({ ...p, message: "🧸 등장인물을 먼저 그리고 있어요…" }));
+      await runPool(charTasks);
+
+      // ── Phase B: 표지 + 페이지 — 캐릭터 초상을 참조로 전달 ──
+      // (charUrls 는 Phase A await 완료 후이므로 stale-closure 위험 없음)
+      const sceneTasks: ImgTask[] = [
+        {
+          kind: "cover" as const,
+          prompt: (textData.book.coverImagePrompt
+            || `Book cover illustration: "${storybook.title?.ko}". Cute cartoon, soft watercolor, warm palette.`) + designFor(),
+          referenceUrls: refsFor(),
+        },
+        ...storybook.pages.map((p) => ({
+          kind: "page" as const,
+          idx: p.idx,
+          prompt: (p.imagePrompt || `A children's book illustration of: ${p.illustration.emoji}`) + designFor(p.characterIds),
+          referenceUrls: refsFor(p.characterIds),
+        })),
+      ];
+      setProgress((p) => ({ ...p, message: "🎨 표지와 페이지를 캐릭터에 맞춰 그리고 있어요…" }));
+      await runPool(sceneTasks);
 
       if (failures.length > 0) {
         setProgress((p) => ({
@@ -408,8 +437,15 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
               try {
                 // force: 같은 프롬프트여도 서버 캐시를 건너뛰고 새로 그린다.
                 // 실패 시 helper 가 1회 자동 재시도 후에만 포기.
+                const refs = (pageIdx === 0
+                  ? book.characters
+                  : book.characters.filter((c) => {
+                      const pg = book.pages.find((p) => p.idx === pageIdx);
+                      return !pg?.characterIds?.length || pg.characterIds.includes(c.id);
+                    })
+                ).map((c) => c.avatarUrl).filter(Boolean).slice(0, 3) as string[];
                 const data = await requestStorybookImage(
-                  { bookId: book.id, pageIdx, prompt, force: true },
+                  { bookId: book.id, pageIdx, prompt, force: true, referenceUrls: refs },
                   1,
                 );
                 if (data.ok && data.url) {
@@ -1193,6 +1229,21 @@ function PreviewPanel({
   const [titleDraft, setTitleDraft] = useState(book.title?.ko || "");
   // 방금 추가한 질문 — 바로 편집 모드로 열기 위함 (설계서 항목 9)
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const [redrawing, setRedrawing] = useState<string | null>(null);
+
+  async function redrawAllWithCharacters() {
+    if (redrawing) return;
+    if (!window.confirm("표지와 모든 페이지를 현재 캐릭터 그림 기준으로 다시 그릴까요? (수 분 소요)")) return;
+    const targets = [0, ...book.pages.map((p) => p.idx)];
+    for (const idx of targets) {
+      setRedrawing(`${targets.indexOf(idx) + 1}/${targets.length} 그리는 중…`);
+      const prompt = idx === 0
+        ? (book.cover.imagePrompt || "")
+        : (book.pages.find((p) => p.idx === idx)?.imagePrompt || "");
+      try { await onRegenerateImage(idx, prompt); } catch (err) { console.warn("redraw failed", idx, err); }
+    }
+    setRedrawing(null);
+  }
 
   async function saveTitle() {
     const next = { ...book, title: { ...book.title, ko: titleDraft.trim() || book.title?.ko || "" } };
@@ -1370,6 +1421,14 @@ function PreviewPanel({
         )}
         <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginTop: 8, textAlign: "center" }}>
           {book.pages.length}장 · 질문 {book.questions.length}개 · 등장인물 {book.characters.length}명
+        </div>
+        <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
+          <button onClick={redrawAllWithCharacters} disabled={!!redrawing}
+            style={{ padding: "10px 14px", borderRadius: 12, border: "2px solid #FDE68A",
+                     background: redrawing ? "#F3F4F6" : "#fff", color: "#92400E",
+                     fontWeight: 900, fontSize: 13, cursor: redrawing ? "wait" : "pointer", fontFamily: "inherit" }}>
+            🎨 {redrawing || "캐릭터 기준 전체 다시 그리기"}
+          </button>
         </div>
       </div>
 
