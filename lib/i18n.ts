@@ -56,11 +56,11 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     id: "No posts yet", ar: "No posts yet", my: "No posts yet",
   },
   addBelowHint: {
-    ko: "아래 버튼으로 추가해보세요", en: "Add with the button below", vi: "Add with the button below",
-    zh: "Add with the button below", fil: "Add with the button below", ja: "Add with the button below",
-    th: "Add with the button below", km: "Add with the button below", mn: "Add with the button below",
-    ru: "Add with the button below", uz: "Add with the button below", hi: "Add with the button below",
-    id: "Add with the button below", ar: "Add with the button below", my: "Add with the button below",
+    ko: "위의 ＋ 버튼을 눌러요", en: "Press the ＋ button above", vi: "Nhấn nút ＋ ở trên",
+    zh: "按上面的 ＋ 按钮", fil: "Pindutin ang ＋ button sa itaas", ja: "上の ＋ ボタンを押して",
+    th: "กดปุ่ม ＋ ข้างบน", km: "ចុចប៊ូតុង ＋ ខាងលើ", mn: "Дээрх ＋ товчийг дар",
+    ru: "Нажми кнопку ＋ выше", uz: "Yuqoridagi ＋ tugmasini bosing", hi: "ऊपर का ＋ बटन दबाएँ",
+    id: "Tekan tombol ＋ di atas", ar: "اضغط على زر ＋ أعلاه", my: "အပေါ်ရှိ ＋ ခလုတ်ကိုနှိပ်ပါ",
   },
   enterName: {
     ko: "이름을 입력하세요", en: "Enter your name", vi: "Enter your name",

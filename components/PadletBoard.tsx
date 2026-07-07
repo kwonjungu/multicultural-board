@@ -893,6 +893,29 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                 </div>
               )}
 
+              {/* ── 글추가 버튼 — 컬럼 관리 팝오버 아래, 카드 목록 위 ── */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setModal({ colId: col.id, colTitle: col.title, colColor: col.color });
+                }}
+                style={{
+                  flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  background: col.color + "14",
+                  border: "none",
+                  borderBottom: "1px solid #FEF3C7",
+                  padding: "12px 0", cursor: "pointer",
+                  color: col.color,
+                  fontWeight: 900, fontSize: 14,
+                  transition: "background 0.15s",
+                  userSelect: "none",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = col.color + "26"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = col.color + "14"; }}
+              >
+                <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 700 }}>＋</span> {t("addHere", lang)}
+              </button>
+
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px 6px", background: "#FFFEF7", scrollbarWidth: "thin", scrollbarColor: "#FDE68A transparent" }}>
                 {colCards.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "44px 16px", color: "#D1D5DB" }}>
@@ -930,32 +953,6 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   ))
                 )}
               </div>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setModal({ colId: col.id, colTitle: col.title, colColor: col.color });
-                }}
-                style={{
-                  flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  background: "#fff",
-                  border: "none",
-                  borderTop: "1px solid #FEF3C7",
-                  padding: "13px 0", cursor: "pointer",
-                  color: col.color,
-                  fontWeight: 800, fontSize: 13,
-                  transition: "background 0.15s, color 0.15s",
-                  userSelect: "none",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = col.color + "0D";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = "#fff";
-                }}
-              >
-                <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>+</span> {t("addHere", lang)}
-              </button>
             </div>
           );
         })}
