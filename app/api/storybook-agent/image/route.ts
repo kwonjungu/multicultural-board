@@ -135,7 +135,7 @@ async function fetchReferenceImages(
       const res = await fetch(u);
       if (!res.ok) continue;
       const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length === 0 || buf.length > 4 * 1024 * 1024) continue; // 4MB 가드
+      if (buf.length === 0 || buf.length > 1.5 * 1024 * 1024) continue; // 1.5MB 가드 — 3장 base64 인라인 시 요청 크기 제한
       out.push({ base64: buf.toString("base64"), mimeType: res.headers.get("content-type") || "image/png" });
     } catch { /* skip */ }
   }
