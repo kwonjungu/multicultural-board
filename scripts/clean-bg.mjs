@@ -34,6 +34,9 @@ const TARGETS = [
   "public/stickers/stage-hats",
   "public/stickers/skins",
   "public/stickers/skin-hats",
+  // 배치 생성 게임 에셋 (gen-batch-assets.mjs)
+  "public/game-assets/emotions",
+  "public/game-assets/twentyq",
   "public/mascot",
   "public/landmarks",
   "public/icons",

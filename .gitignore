@@ -56,3 +56,5 @@ output_cards/
 
 # 이미지 배치 생성 임시 출력
 .image-batch-out/
+
+scripts/.asset_batch_job.json

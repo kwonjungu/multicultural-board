@@ -44,6 +44,23 @@ const ITEM_IMAGES: Record<string, string> = {
   "f-tea": "/spotit/tea.png",
   "f-banana": "/halligalli/banana.png",
   "f-pho": "/game-assets/puzzle/pho.png",
+  // 배치 생성분 (scripts/gen-batch-assets.mjs → public/game-assets/twentyq/)
+  "f-ramen": "/game-assets/twentyq/f-ramen.png",
+  "f-kimchi": "/game-assets/twentyq/f-kimchi.png",
+  "f-pizza": "/game-assets/twentyq/f-pizza.png",
+  "f-sushi": "/game-assets/twentyq/f-sushi.png",
+  "f-curry": "/game-assets/twentyq/f-curry.png",
+  "f-ice": "/game-assets/twentyq/f-ice.png",
+  "p-teacher": "/game-assets/twentyq/p-teacher.png",
+  "p-doctor": "/game-assets/twentyq/p-doctor.png",
+  "p-chef": "/game-assets/twentyq/p-chef.png",
+  "p-police": "/game-assets/twentyq/p-police.png",
+  "p-firefighter": "/game-assets/twentyq/p-firefighter.png",
+  "p-farmer": "/game-assets/twentyq/p-farmer.png",
+  "p-driver": "/game-assets/twentyq/p-driver.png",
+  "p-nurse": "/game-assets/twentyq/p-nurse.png",
+  "p-artist": "/game-assets/twentyq/p-artist.png",
+  "p-singer": "/game-assets/twentyq/p-singer.png",
 };
 
 // PNG 우선 + 이모지 폴백 아이템 그림 (404 시 게임이 깨지지 않게).

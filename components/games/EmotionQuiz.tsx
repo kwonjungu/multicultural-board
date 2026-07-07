@@ -6,6 +6,7 @@ import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import { ProgressBar } from "./CountryGuess";
 import { gt, type LangMap } from "./uiText";
+import EmotionGlyph from "./EmotionGlyph";
 
 const SITUATION: LangMap = {
   ko: "상황", en: "Situation", vi: "Tình huống", zh: "情境", fil: "Sitwasyon",
@@ -109,8 +110,10 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
                 border: `2px solid ${border}`, background: bg,
                 fontSize: 44, cursor: picked ? "default" : "pointer",
                 transition: "all 0.2s",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                padding: 6,
               }}
-            >{em}</button>
+            ><EmotionGlyph key={em} emoji={em} size={64} /></button>
           );
         })}
       </div>

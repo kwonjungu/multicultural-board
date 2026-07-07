@@ -11,6 +11,7 @@ import {
   type LangMap,
 } from "@/lib/gameData";
 import { TILES } from "@/lib/marbleData";
+import EmotionGlyph from "../EmotionGlyph";
 
 export interface QuizCardProps {
   tileIdx: number;
@@ -292,7 +293,13 @@ export function QuizCard({ tileIdx, langA, langB, onAnswer }: QuizCardProps) {
                 wordBreak: "break-word",
               }}
             >
-              {q.kind === "flag" ? <FlagChoice code={c.key} emoji={c.label} /> : c.label}
+              {q.kind === "flag" ? (
+                <FlagChoice code={c.key} emoji={c.label} />
+              ) : q.kind === "emotion" ? (
+                <EmotionGlyph key={c.label} emoji={c.label} size={48} />
+              ) : (
+                c.label
+              )}
             </button>
           );
         })}
