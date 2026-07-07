@@ -40,12 +40,15 @@ export default function VocabWriteSheet({ words, onClose, studentName }: Props) 
       <style>{`
         @media print {
           @page { size: A4; margin: 14mm; }
-          html, body { background: #fff !important; }
+          html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
           body * { visibility: hidden !important; }
           .vws-overlay, .vws-overlay * { visibility: visible !important; }
           .vws-overlay {
-            position: static !important;
-            inset: auto !important;
+            /* absolute(문서 최상단 고정)여야 한다 — static 으로 풀면 숨겨진(공간은
+               차지하는) 허브 콘텐츠 뒤로 밀려 빈 페이지가 앞에 붙는다. */
+            position: absolute !important;
+            top: 0 !important; left: 0 !important; right: auto !important; bottom: auto !important;
+            width: 100% !important;
             background: #fff !important;
             overflow: visible !important;
           }

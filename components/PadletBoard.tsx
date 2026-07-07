@@ -587,6 +587,37 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           {/* Teacher-only buttons */}
           {isTeacher && (
             <>
+              {/* 게시 전 교사 승인 토글 — 관리 패널과 같은 설정을 헤더에서 바로 조작 (config onValue 구독으로 자동 동기화) */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                background: "#FFFBEB", border: "2px solid #FDE68A",
+                borderRadius: 16, padding: "0 14px", minHeight: 56,
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#92400E", whiteSpace: "nowrap" }}>
+                  {t("approvalMode", lang)}
+                </span>
+                <button
+                  onClick={() => {
+                    const db = getClientDb();
+                    set(ref(db, `rooms/${roomCode}/config/approvalMode`), !roomConfigState.approvalMode);
+                  }}
+                  aria-label={t("approvalMode", lang)}
+                  aria-pressed={!!roomConfigState.approvalMode}
+                  title="켜면 학생 게시물이 교사 승인 후에 표시됩니다"
+                  style={{
+                    width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
+                    background: roomConfigState.approvalMode ? "#F59E0B" : "#E5E7EB",
+                    position: "relative", transition: "background 0.2s", flexShrink: 0, padding: 0,
+                  }}
+                >
+                  <div style={{
+                    position: "absolute", top: 3, left: roomConfigState.approvalMode ? 25 : 3,
+                    width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                    transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                  }} />
+                </button>
+              </div>
+
               {/* QR button */}
               <button
                 onClick={() => setShowQR(true)}

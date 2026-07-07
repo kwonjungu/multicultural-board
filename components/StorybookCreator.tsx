@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { Storybook, StorybookPage, StorybookCharacter, StorybookQuestion, StorybookVocabWord, QuestionTier, IbConcept } from "@/lib/types";
 import { saveGeneratedBook, updateGeneratedBookPageImage, updateGeneratedBookField, updateGeneratedBookCharacterAvatar } from "@/lib/storybook";
+import { requestStorybookImage } from "@/lib/storybookImageClient";
 
 interface Props {
   teacherName: string;
@@ -249,19 +250,21 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
        * progress would tick forward, and the page was left with no imageUrl.
        */
       const runOne = async (task: ImgTask) => {
-        const reqBody: Record<string, unknown> = { bookId, prompt: task.prompt };
+        const reqBody: { bookId: string; prompt: string; pageIdx?: number; characterId?: string } =
+          { bookId, prompt: task.prompt };
         if (task.kind === "cover") reqBody.pageIdx = 0;
         else if (task.kind === "page") reqBody.pageIdx = task.idx;
         else reqBody.characterId = task.characterId;
 
-        const res = await fetch("/api/storybook-agent/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(reqBody),
-        });
-        if (!res.ok) throw new Error(`image gen ${res.status} for ${JSON.stringify(task)}`);
-        const data = await res.json() as { ok: boolean; url?: string; error?: string };
-        if (!data.ok || !data.url) throw new Error(data.error || "no url");
+        // 서버가 내부 재시도+키 폴백을 이미 수행 — 여기서는 풀(worker) 재시도가
+        // 바깥 레벨을 담당하므로 helper 자체 재시도는 0.
+        const data = await requestStorybookImage(reqBody, 0);
+        if (!data.ok || !data.url) {
+          const err = new Error(`${data.error || "no url"} (${data.reason || "?"}) for ${JSON.stringify(task)}`);
+          // retryable=false(프롬프트 거부·키 미설정)는 풀 재시도도 무의미 — 즉시 포기 신호.
+          (err as Error & { retryable?: boolean }).retryable = data.retryable !== false;
+          throw err;
+        }
 
         if (task.kind === "cover") {
           await updateGeneratedBookPageImage(bookId, 0, data.url);
@@ -316,6 +319,8 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
             } catch (err) {
               lastErr = err;
               attempt++;
+              // 서버가 "재시도 무의미" 라고 알려준 실패(프롬프트 거부 등)는 즉시 포기.
+              if ((err as { retryable?: boolean })?.retryable === false) break;
               if (attempt < MAX_ATTEMPTS) {
                 const delay = 800 * Math.pow(2, attempt - 1) + Math.random() * 400;
                 await new Promise((r) => setTimeout(r, delay));
@@ -397,16 +402,12 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
             onAccept={() => onCreated(book.id)}
             onRegenerateImage={async (pageIdx, prompt) => {
               try {
-                const res = await fetch("/api/storybook-agent/image", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    bookId: book.id,
-                    pageIdx,
-                    prompt,
-                  }),
-                });
-                const data = await res.json() as { ok: boolean; url?: string };
+                // force: 같은 프롬프트여도 서버 캐시를 건너뛰고 새로 그린다.
+                // 실패 시 helper 가 1회 자동 재시도 후에만 포기.
+                const data = await requestStorybookImage(
+                  { bookId: book.id, pageIdx, prompt, force: true },
+                  1,
+                );
                 if (data.ok && data.url) {
                   await updateGeneratedBookPageImage(book.id, pageIdx, data.url);
                   setBook((prev) => {
@@ -423,9 +424,17 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
                       ),
                     };
                   });
+                } else {
+                  // 실패를 조용히 삼키면 교사는 아무 반응 없는 버튼으로 오해한다.
+                  window.alert(
+                    data.retryable === false
+                      ? "이미지 생성이 거부되었어요. 프롬프트를 조금 바꿔서 다시 시도해 주세요."
+                      : "이미지 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
+                  );
                 }
               } catch (err) {
                 console.error("regenerate image failed", err);
+                window.alert("이미지 생성에 실패했어요. 잠시 후 다시 시도해 주세요.");
               }
             }}
           />

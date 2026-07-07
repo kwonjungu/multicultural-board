@@ -98,6 +98,7 @@ const WORLD_BG =
 const GAMES: GameMeta[] = [
   // #4 상단 4개 — 완성도 높고 저학년 친화 (지정 순서: 지구본·윷놀이·할리갈리·문화퍼즐)
   { id: "globe",    icon: "🌍", iconImg: "/game-icons/globe.png",     name: "다문화 지구본", sub: "공부하기·나라 찾기", color: "#3730A3", bg: "#E0E7FF", playBg: WORLD_BG, cmp: GlobeQuest },
+  { id: "marble",   icon: "🎲", iconImg: "/marble/tiles/start.png", name: "꿀벌 월드 마블",     sub: "세계 여행 보드게임", color: "#D97706", bg: "#FEF3C7", cmp: BeeWorldMarble },
   { id: "yut",      icon: "🪵", iconImg: "/game-icons/yut.png",      name: "꿀벌 윷놀이",   sub: "우리 전통 놀이",    color: "#B45309", bg: "#FEF3C7", cmp: HoneyYut },
   { id: "halligalli", icon: "🔔", iconImg: "/game-icons/halligalli.png", name: "할리갈리",           sub: "과일 5개 종 울려!", color: "#DC2626", bg: "#FEE2E2", cmp: HalliGalli },
   { id: "puzzle",    icon: "🧩", iconImg: "/game-icons/puzzle.png",   name: "문화 퍼즐",          sub: "조각 맞추기",       color: "#F472B6", bg: "#FCE7F3", cmp: CulturePuzzle },
@@ -115,7 +116,6 @@ const GAMES: GameMeta[] = [
   { id: "taboo",     icon: "🚫", iconImg: "/game-icons/taboo.png",    name: "꿀벌 금칙어",         sub: "단어 설명 놀이",    color: "#E11D48", bg: "#FFE4E6", cmp: HoneyTaboo },
   { id: "wyr",       icon: "🎲", iconImg: "/game-icons/wyr.png",      name: "이거 저거 고르기",   sub: "둘 중 뭐가 좋아?",  color: "#F97316", bg: "#FFEDD5", cmp: WouldYouRather },
   { id: "spotit",    icon: "🕵️", iconImg: "/game-icons/spotit.png",   name: "꿀벌 스팟잇",         sub: "같은 그림 먼저!",   color: "#F59E0B", bg: "#FEF3C7", cmp: SpotIt },
-  { id: "marble",    icon: "🎲", iconImg: "/marble/tiles/start.png", name: "꿀벌 월드 마블",     sub: "세계 여행 보드게임", color: "#D97706", bg: "#FEF3C7", cmp: BeeWorldMarble },
   { id: "story", icon: "📖", iconImg: "/game-icons/story.png", name: "이야기 주사위", sub: "한 문장씩 이어가기", color: "#A78BFA", bg: "#EDE9FE", cmp: StoryCubes },
   { id: "treasure", icon: "🗺", iconImg: "/game-icons/treasure.png", name: "꿀벌 보물사냥", sub: "힌트로 찾아내기", color: "#14B8A6", bg: "#CCFBF1", playBg: WORLD_BG, cmp: BeeTreasureHunt },
   { id: "cafe",     icon: "🍳", iconImg: "/game-icons/cafe.png",     name: "꿀벌 카페",     sub: "함께 요리해요",     color: "#F97316", bg: "#FFEDD5", cmp: BeeCafe },
@@ -343,9 +343,9 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs }:
                   </div>
                   <div style={{
                     position: "absolute", top: 10, right: 10,
-                    fontSize: 10, fontWeight: 900, color: "#fff",
-                    background: g.color, padding: "3px 9px", borderRadius: 999,
-                    letterSpacing: 0.5, boxShadow: `0 2px 6px ${g.color}66`,
+                    fontSize: 14, fontWeight: 900, color: "#fff",
+                    background: g.color, padding: "6px 14px", borderRadius: 999,
+                    letterSpacing: 0.5, boxShadow: `0 3px 8px ${g.color}66`,
                   }}>PLAY ▶</div>
                 </button>
               ))}

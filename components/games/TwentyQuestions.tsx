@@ -31,16 +31,38 @@ const GROUP_LABEL: Record<HintGroup, { ko: string; en: string; emoji: string }> 
   misc:   { ko: "기타",  en: "Other",   emoji: "✨" },
 };
 
-function landmarkFor(item: TwentyQItem): string | null {
-  if (item.category !== "country") return null;
-  const map: Record<string, string> = {
-    "c-kr": "/landmarks/korea.png", "c-vn": "/landmarks/vietnam.png",
-    "c-cn": "/landmarks/china.png", "c-jp": "/landmarks/japan.png",
-    "c-th": "/landmarks/thailand.png", "c-ph": "/landmarks/philippines.png",
-    "c-us": "/landmarks/usa.png", "c-ru": "/landmarks/russia.png",
-    "c-id": "/landmarks/indonesia.png", "c-in": "/landmarks/india.png",
-  };
-  return map[item.id] ?? null;
+// 아이템별 PNG (있는 것만). 없거나 로드 실패 시 이모지 폴백 (ItemArt).
+const ITEM_IMAGES: Record<string, string> = {
+  // country → landmarks
+  "c-kr": "/landmarks/korea.png", "c-vn": "/landmarks/vietnam.png",
+  "c-cn": "/landmarks/china.png", "c-jp": "/landmarks/japan.png",
+  "c-th": "/landmarks/thailand.png", "c-ph": "/landmarks/philippines.png",
+  "c-us": "/landmarks/usa.png", "c-ru": "/landmarks/russia.png",
+  "c-id": "/landmarks/indonesia.png", "c-in": "/landmarks/india.png",
+  // food → 기존 에셋 재사용
+  "f-rice": "/spotit/rice.png",
+  "f-tea": "/spotit/tea.png",
+  "f-banana": "/halligalli/banana.png",
+  "f-pho": "/game-assets/puzzle/pho.png",
+};
+
+// PNG 우선 + 이모지 폴백 아이템 그림 (404 시 게임이 깨지지 않게).
+function ItemArt({ item, size = 52 }: { item: TwentyQItem; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const src = ITEM_IMAGES[item.id];
+  if (!src || failed) {
+    return <span style={{ fontSize: Math.round(size * 0.62), lineHeight: 1 }} aria-hidden="true">{item.emoji}</span>;
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      onError={() => setFailed(true)}
+      draggable={false}
+      style={{ width: size, height: size, objectFit: "contain" }}
+    />
+  );
 }
 
 export default function TwentyQuestions({ langA, langB }: { langA: string; langB: string }) {
@@ -243,13 +265,7 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
               onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
               onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
             >
-              {(() => {
-                const lm = landmarkFor(it);
-                return lm
-                  ? <img src={lm} alt="" aria-hidden="true" style={{ width: 52, height: 52, objectFit: "contain" }}
-                      onError={(e)=>{(e.currentTarget as HTMLImageElement).replaceWith(document.createElement("span"));}} />
-                  : <span style={{ fontSize: 32 }}>{it.emoji}</span>;
-              })()}
+              <ItemArt item={it} />
               <span><GameText map={it.names} lang={langA} /></span>
             </button>
           ))}
@@ -271,13 +287,8 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
       {secret && (
         <div style={{ fontSize: 18, color: "#374151", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
           <span>정답은</span>
-          {(() => {
-            const lm = landmarkFor(secret);
-            return lm
-              ? <img src={lm} alt="" aria-hidden="true" style={{ width: 52, height: 52, objectFit: "contain" }}
-                  onError={(e)=>{(e.currentTarget as HTMLImageElement).replaceWith(document.createElement("span"));}} />
-              : <span>{secret.emoji}</span>;
-          })()}
+          <ItemArt item={secret} />
+
           <b><GameText map={secret.names} lang={langA} /></b>
           <span>/ <GameText map={secret.names} lang={langB} /></span>
         </div>
@@ -400,13 +411,7 @@ function SetupPanel({
             onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
           >
-            {(() => {
-              const lm = landmarkFor(it);
-              return lm
-                ? <img src={lm} alt="" aria-hidden="true" style={{ width: 52, height: 52, objectFit: "contain" }}
-                    onError={(e)=>{(e.currentTarget as HTMLImageElement).replaceWith(document.createElement("span"));}} />
-                : <span style={{ fontSize: 32 }}>{it.emoji}</span>;
-            })()}
+            <ItemArt item={it} />
             <span><GameText map={it.names} lang={langB} /></span>
           </button>
         ))}

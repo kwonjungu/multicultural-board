@@ -20,8 +20,18 @@ export const GEMINI_TEXT_MODELS = [
 // Image generation model (Gemini 2.5 Flash Image aka "Nano Banana")
 export const GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
 
+// Gemini 다중 API 키 폴백 — lib/groq-client.ts 의 getGroqApiKeys 와 동일 패턴.
+// 환경변수 (우선순위 순): GEMINI_API_KEY → GEMINI_API_KEY_BACKUP → GEMINI_API_KEY_BACKUP2
+export function getGeminiApiKeys(): string[] {
+  return [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_BACKUP,
+    process.env.GEMINI_API_KEY_BACKUP2,
+  ].filter((k): k is string => !!k && k !== "placeholder");
+}
+
 function requireKey(): string {
-  const k = process.env.GEMINI_API_KEY;
+  const k = getGeminiApiKeys()[0];
   if (!k) throw new Error("GEMINI_API_KEY not set");
   return k;
 }
@@ -261,37 +271,70 @@ interface GenerateImageResult {
   mimeType: string;
 }
 
-/**
- * Call Gemini image generation (Nano Banana). Returns base64-encoded PNG.
- * The API returns inline image data in the candidates' content parts.
- */
-export async function generateImage(
-  prompt: string,
-): Promise<GenerateImageResult> {
-  const key = requireKey();
-  const url = `${GEMINI_REST_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
+/** 구조화된 이미지 생성 실패 사유 — API 라우트가 클라이언트에 그대로 전달한다. */
+export type GeminiImageFailReason =
+  | "config"        // 키 미설정 등 — 재시도 무의미
+  | "auth"          // 401/403 — 키 문제, 다른 키로만 회복 가능
+  | "rate_limited"  // 429 — 잠시 후/다른 키로 재시도 가능
+  | "blocked"       // 400 — 프롬프트 거부/잘못된 요청, 같은 프롬프트 재시도 무의미
+  | "timeout"       // 호출 타임아웃 — 재시도 가능
+  | "server"        // 5xx — 재시도 가능
+  | "no_image"      // 200인데 inline 이미지 없음(텍스트만 반환 등) — 재시도 가능
+  | "unknown";
 
+export class GeminiImageError extends Error {
+  reason: GeminiImageFailReason;
+  status?: number;
+  /** true 면 같은 요청을 잠시 후 다시 보내볼 가치가 있다. */
+  retryable: boolean;
+  constructor(reason: GeminiImageFailReason, message: string, status?: number) {
+    super(message);
+    this.name = "GeminiImageError";
+    this.reason = reason;
+    this.status = status;
+    this.retryable = reason === "rate_limited" || reason === "timeout"
+      || reason === "server" || reason === "no_image" || reason === "unknown";
+  }
+}
+
+function classifyImageHttpError(status: number, bodyText: string): GeminiImageError {
+  const msg = `Gemini image API ${status}: ${bodyText.slice(0, 240)}`;
+  if (status === 429) return new GeminiImageError("rate_limited", msg, status);
+  if (status === 401 || status === 403) return new GeminiImageError("auth", msg, status);
+  if (status === 400 || status === 404) return new GeminiImageError("blocked", msg, status);
+  if (status >= 500) return new GeminiImageError("server", msg, status);
+  return new GeminiImageError("unknown", msg, status);
+}
+
+async function generateImageOnce(
+  prompt: string,
+  key: string,
+  timeoutMs: number,
+): Promise<GenerateImageResult> {
+  const url = `${GEMINI_REST_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
   const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: prompt }],
-      },
-    ],
-    generationConfig: {
-      responseModalities: ["IMAGE"],
-    },
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { responseModalities: ["IMAGE"] },
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    if ((err as Error)?.name === "TimeoutError" || (err as Error)?.name === "AbortError") {
+      throw new GeminiImageError("timeout", `Gemini image call timed out after ${timeoutMs}ms`);
+    }
+    throw new GeminiImageError("server", `Gemini image fetch failed: ${(err as Error)?.message ?? err}`);
+  }
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini image API ${res.status}: ${errText.slice(0, 240)}`);
+    const errText = await res.text().catch(() => "");
+    throw classifyImageHttpError(res.status, errText);
   }
   const data = await res.json() as {
     candidates?: Array<{
@@ -311,5 +354,65 @@ export async function generateImage(
       };
     }
   }
-  throw new Error("Gemini image API returned no inline image data");
+  // 200 이지만 이미지가 없는 케이스(가끔 텍스트만 반환) — 재시도로 대부분 회복된다.
+  throw new GeminiImageError("no_image", "Gemini image API returned no inline image data");
+}
+
+export interface GenerateImageOptions {
+  /** 호출당 상한. Nano Banana 는 보통 10~30s. 기본 35s. */
+  attemptTimeoutMs?: number;
+  /** 재시도 포함 총 시도 횟수. 기본 3 (원 시도 + 재시도 2회). */
+  maxAttempts?: number;
+  /** 전체 예산 — 남은 예산이 부족하면 재시도를 포기한다. 기본 50s (route maxDuration 60s 내). */
+  totalBudgetMs?: number;
+}
+
+/**
+ * Call Gemini image generation (Nano Banana). Returns base64-encoded PNG.
+ *
+ * 견고화 (이모지 폴백 잦은 문제의 서버측 대책):
+ *  - 호출당 타임아웃 (기본 35s) — 매달린 호출이 함수 예산을 다 먹는 것 방지
+ *  - 429/5xx/timeout/no_image 시 짧은 지수 백오프(0.5s→1s)로 최대 2회 재시도
+ *  - 시도마다 키 로테이션 (GEMINI_API_KEY_BACKUP*) — groq-client 의 키 폴백과 동일 정책
+ *  - 실패는 GeminiImageError(reason/retryable) 로 구조화해 던진다
+ */
+export async function generateImage(
+  prompt: string,
+  opts: GenerateImageOptions = {},
+): Promise<GenerateImageResult> {
+  const keys = getGeminiApiKeys();
+  if (keys.length === 0) {
+    throw new GeminiImageError("config", "GEMINI_API_KEY not set");
+  }
+  const attemptTimeoutMs = opts.attemptTimeoutMs ?? 35_000;
+  const maxAttempts = opts.maxAttempts ?? 3;
+  const totalBudgetMs = opts.totalBudgetMs ?? 50_000;
+  const startedAt = Date.now();
+
+  let lastErr: GeminiImageError | null = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // 남은 예산 내에서만 시도 — 최소 8s 는 있어야 의미 있는 호출이 된다.
+    const remaining = totalBudgetMs - (Date.now() - startedAt);
+    if (remaining < 8_000) break;
+
+    const key = keys[attempt % keys.length];
+    try {
+      return await generateImageOnce(prompt, key, Math.min(attemptTimeoutMs, remaining));
+    } catch (err) {
+      const e = err instanceof GeminiImageError
+        ? err
+        : new GeminiImageError("unknown", (err as Error)?.message ?? String(err));
+      lastErr = e;
+      // auth 는 다른 키가 있을 때만 계속, blocked/config 는 즉시 포기.
+      const rotatable = e.reason === "auth" && keys.length > 1;
+      if (!e.retryable && !rotatable) throw e;
+      if (attempt < maxAttempts - 1) {
+        console.warn(`[gemini-image] attempt ${attempt + 1} failed (${e.reason}${e.status ? ` ${e.status}` : ""}), retrying…`);
+        // 짧은 지수 백오프 (0.5s → 1s + 지터). 총 지연 수 초 이내.
+        const delay = 500 * Math.pow(2, attempt) + Math.random() * 300;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastErr ?? new GeminiImageError("unknown", "generateImage failed");
 }

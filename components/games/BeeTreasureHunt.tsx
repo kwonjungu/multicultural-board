@@ -218,6 +218,22 @@ export default function BeeTreasureHunt({ langA, langB }: { langA: string; langB
 // Setup / Hide / Seek / Result views
 // ============================================================
 
+// 장면 선택 썸네일 — PNG 우선, 로드 실패 시 이모지 폴백
+function SceneThumb({ scene }: { scene: TreasureScene }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <div style={{ fontSize: 30 }}>{scene.emoji}</div>;
+  return (
+    <img
+      src={scene.image}
+      alt=""
+      aria-hidden="true"
+      onError={() => setFailed(true)}
+      draggable={false}
+      style={{ width: "100%", height: 54, objectFit: "cover", borderRadius: 10 }}
+    />
+  );
+}
+
 function SetupView(p: {
   langA: string; langB: string; state: GameState;
   onPickScene: (k: SceneKey) => void;
@@ -240,7 +256,7 @@ function SetupView(p: {
               border: state.scene === s.key ? "3px solid #F59E0B" : "2px solid #E5E7EB",
               background: state.scene === s.key ? "#FFFBEB" : "#FFFFFF",
             }}>
-            <div style={{ fontSize: 30 }}>{s.emoji}</div>
+            <SceneThumb scene={s} />
             <div style={{ fontSize: 12, fontWeight: 800, color: "#374151", marginTop: 4 }}><GameText map={s.name} lang={langA} /></div>
             <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}><GameText map={s.name} lang={langB} /></div>
           </button>

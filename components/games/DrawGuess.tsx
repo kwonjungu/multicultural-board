@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useEffect, KeyboardEvent } from "react";
 import { VOCAB, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
+import VocabImage from "./VocabImage";
 import { gt, UI, type LangMap } from "./uiText";
 
 const DG: Record<string, LangMap> = {
@@ -233,7 +234,10 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
           <div style={{ fontSize: 14, fontWeight: 800, color: feedback === "correct" ? "#065F46" : "#92400E", marginBottom: 6 }}>
             {feedback === "correct" ? `🎉 ${gt(UI.correct, langA)}` : gt(DG.theAnswerIs, langA)}
           </div>
-          <div style={{ fontSize: 32 }}>{cur.emoji}</div>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            {/* key 로 라운드마다 리마운트 — onError 폴백 상태가 다음 단어로 새어가지 않게 */}
+            <VocabImage key={cur.key} vocabKey={cur.key} emoji={cur.emoji} size={64} />
+          </div>
           <div style={{ fontSize: 17, fontWeight: 900, marginTop: 6 }}>{answerA}</div>
           <div style={{ fontSize: 14, color: "#6B7280", marginTop: 2 }}>{answerB}</div>
           <button

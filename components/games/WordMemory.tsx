@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { VOCAB, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
+import VocabImage from "./VocabImage";
 import { gt, UI, type LangMap } from "./uiText";
 
 const WM: Record<string, LangMap> = {
@@ -24,9 +25,26 @@ const WM: Record<string, LangMap> = {
 type Card = {
   id: string;
   pairKey: string;
-  text: string;
+  emoji: string;
+  word: string;
   lang: string;
 };
+
+// 카드 뒷면 — 꿀벌 PNG 우선, 실패 시 이모지 폴백
+function CardBack() {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <span aria-hidden="true">🐝</span>;
+  return (
+    <img
+      src="/spotit/bee.png"
+      alt=""
+      aria-hidden="true"
+      onError={() => setFailed(true)}
+      draggable={false}
+      style={{ width: 36, height: 36, objectFit: "contain" }}
+    />
+  );
+}
 
 export default function WordMemory({ langA, langB }: { langA: string; langB: string }) {
   const pairCount = 8; // 16 cards total
@@ -38,8 +56,8 @@ export default function WordMemory({ langA, langB }: { langA: string; langB: str
     const picked = pickN(VOCAB, pairCount);
     const cs: Card[] = [];
     picked.forEach((v) => {
-      cs.push({ id: `${v.key}-a`, pairKey: v.key, text: `${v.emoji} ${tr(v.translations, langA)}`, lang: langA });
-      cs.push({ id: `${v.key}-b`, pairKey: v.key, text: `${v.emoji} ${tr(v.translations, langB)}`, lang: langB });
+      cs.push({ id: `${v.key}-a`, pairKey: v.key, emoji: v.emoji, word: tr(v.translations, langA), lang: langA });
+      cs.push({ id: `${v.key}-b`, pairKey: v.key, emoji: v.emoji, word: tr(v.translations, langB), lang: langB });
     });
     return cs.sort(() => Math.random() - 0.5);
   }, [langA, langB]);
@@ -57,9 +75,7 @@ export default function WordMemory({ langA, langB }: { langA: string; langB: str
   }, [flipped, cards]);
 
   function playTts(text: string, lang: string) {
-    // strip emoji prefix
-    const clean = text.replace(/^[^A-Za-z가-힣-龥ぁ-んァ-ン一-龥...]+\s*/, "");
-    const url = `/api/tts?text=${encodeURIComponent(clean || text)}&lang=${lang}`;
+    const url = `/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`;
     new Audio(url).play().catch(() => {});
   }
 
@@ -68,7 +84,7 @@ export default function WordMemory({ langA, langB }: { langA: string; langB: str
     if (flipped.includes(c.id)) return;
     if (flipped.length >= 2) return;
     setFlipped((f) => [...f, c.id]);
-    playTts(c.text, c.lang);
+    playTts(c.word, c.lang);
   }
 
   const allMatched = matched.size === pairCount;
@@ -120,7 +136,14 @@ export default function WordMemory({ langA, langB }: { langA: string; langB: str
                 wordBreak: "keep-all", overflow: "hidden",
               }}
             >
-              {isFlipped ? c.text : "🐝"}
+              {isFlipped ? (
+                <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <VocabImage vocabKey={c.pairKey} emoji={c.emoji} size={36} />
+                  <span>{c.word}</span>
+                </span>
+              ) : (
+                <CardBack />
+              )}
             </button>
           );
         })}

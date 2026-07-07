@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { VOCAB, pickN } from "@/lib/gameData";
 import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
+import VocabImage from "./VocabImage";
 import { gt, UI, type LangMap } from "./uiText";
 
 const WT_HEIGHT: LangMap = {
@@ -90,7 +91,10 @@ export default function WordTower({ langA, langB }: { langA: string; langB: stri
           <div style={{ fontSize: 11, color: "#F59E0B", fontWeight: 800, letterSpacing: 1, marginBottom: 6 }}>
             {cur.askLang.toUpperCase()} → {cur.ansLang.toUpperCase()}
           </div>
-          <div style={{ fontSize: 32 }}>{cur.correct.emoji}</div>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            {/* key 로 라운드마다 리마운트 — onError 폴백 상태가 다음 단어로 새어가지 않게 */}
+            <VocabImage key={cur.correct.key} vocabKey={cur.correct.key} emoji={cur.correct.emoji} size={64} />
+          </div>
           <div style={{ fontSize: 22, fontWeight: 900, marginTop: 6 }}>
             <GameText map={cur.correct.translations} lang={cur.askLang} />
           </div>

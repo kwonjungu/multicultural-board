@@ -292,11 +292,37 @@ export function QuizCard({ tileIdx, langA, langB, onAnswer }: QuizCardProps) {
                 wordBreak: "break-word",
               }}
             >
-              {c.label}
+              {q.kind === "flag" ? <FlagChoice code={c.key} emoji={c.label} /> : c.label}
             </button>
           );
         })}
       </div>
     </div>
+  );
+}
+
+// 국기 선택지 — flagcdn 실물 국기 이미지 우선, 로드 실패 시 국기 이모지 폴백.
+// (CountryGuess 와 동일한 오픈 라이선스 CDN. 선택지 key 가 ISO 국가코드.)
+function FlagChoice({ code, emoji }: { code: string; emoji: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <span aria-hidden="true">{emoji}</span>;
+  const cc = code.toLowerCase();
+  return (
+    <img
+      src={`https://flagcdn.com/w80/${cc}.png`}
+      srcSet={`https://flagcdn.com/w160/${cc}.png 2x`}
+      alt=""
+      aria-hidden="true"
+      onError={() => setFailed(true)}
+      draggable={false}
+      style={{
+        width: 64,
+        height: 42,
+        objectFit: "cover",
+        borderRadius: 6,
+        border: "1px solid rgba(0,0,0,0.12)",
+        verticalAlign: "middle",
+      }}
+    />
   );
 }

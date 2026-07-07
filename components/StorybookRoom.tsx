@@ -41,8 +41,10 @@ import {
   listGeneratedBooks,
   deleteGeneratedBook,
   setBookFlags,
+  updateGeneratedBookCharacterAvatar,
   type BookListEntry,
 } from "@/lib/storybook";
+import { requestStorybookImage } from "@/lib/storybookImageClient";
 import { exportStorybookToPptx } from "@/lib/storybookPptx";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { readChatStream } from "@/lib/chatStreamClient";
@@ -148,6 +150,70 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
       .finally(() => { if (!cancel) setBookLoading(false); });
     return () => { cancel = true; };
   }, [session?.bookId]);
+
+  // [아바타 self-heal] 생성 당시 이미지가 실패한 캐릭터(avatarUrl 없음 +
+  // avatarImagePrompt 있음)를 발견하면 백그라운드로 다시 그린다. 이게 없으면
+  // 핫시팅 챗은 영구히 이모지 폴백으로 남는다. 교사는 어느 단계에서든 즉시,
+  // 학생은 챗 단계(after)에서만 트리거 — 반 전체가 초반에 동시 호출하는 것 방지
+  // (서버는 같은 프롬프트 요청을 캐시·병합하므로 남는 중복도 1회 생성으로 수렴).
+  const healedBookRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!book?.id) return;
+    if (!isTeacher && session?.phase !== "after") return;
+    if (healedBookRef.current === book.id) return;
+    const missing = (book.characters || []).filter((c) => !c.avatarUrl && c.avatarImagePrompt);
+    if (missing.length === 0) return;
+    healedBookRef.current = book.id;
+    const bookId = book.id;
+    let cancel = false;
+    (async () => {
+      // 생성 전에 Firebase 를 한 번 다시 읽는다 — 교사(또는 먼저 든 학생)의
+      // self-heal 이 이미 채워놨으면 그 URL 만 반영하고 생성 호출을 건너뛴다.
+      let toHeal = missing;
+      try {
+        const fresh = await loadBook(bookId);
+        if (cancel) return;
+        const freshById = new Map(
+          (fresh.characters || []).map((c) => [c.id, c] as const));
+        const recovered = missing.filter((c) => freshById.get(c.id)?.avatarUrl);
+        if (recovered.length > 0) {
+          setBook((prev) => {
+            if (!prev || prev.id !== bookId) return prev;
+            return {
+              ...prev,
+              characters: prev.characters.map((pc) => {
+                const freshUrl = freshById.get(pc.id)?.avatarUrl;
+                return freshUrl && !pc.avatarUrl ? { ...pc, avatarUrl: freshUrl } : pc;
+              }),
+            };
+          });
+        }
+        toHeal = missing.filter((c) => !freshById.get(c.id)?.avatarUrl);
+      } catch { /* 읽기 실패 시 원래 목록으로 진행 */ }
+
+      for (const c of toHeal) {
+        // helper 가 재시도 1회 포함 — 그래도 실패하면 이번 세션은 이모지 폴백 유지.
+        const res = await requestStorybookImage(
+          { bookId, characterId: c.id, prompt: c.avatarImagePrompt! },
+        ).catch(() => null);
+        if (cancel || !res?.ok || !res.url) continue;
+        const url = res.url;
+        // 다음 세션을 위해 영구 저장 (실패해도 로컬 표시는 진행)
+        updateGeneratedBookCharacterAvatar(bookId, c.id, url).catch((err) =>
+          console.warn("avatar self-heal persist failed", err));
+        if (cancel) return;
+        setBook((prev) => {
+          if (!prev || prev.id !== bookId) return prev;
+          return {
+            ...prev,
+            characters: prev.characters.map((pc) =>
+              pc.id === c.id ? { ...pc, avatarUrl: url } : pc),
+          };
+        });
+      }
+    })();
+    return () => { cancel = true; };
+  }, [book, isTeacher, session?.phase]);
 
   const handleStart = useCallback(async (bookId: string, opts?: { wordQuizEnabled?: boolean }) => {
     await startSession(roomCode, bookId, myClientId, opts);

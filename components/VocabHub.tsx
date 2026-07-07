@@ -30,6 +30,7 @@ import VocabCard from "./VocabCard";
 import VocabNotebook from "./VocabNotebook";
 import VocabTest from "./VocabTest";
 import VocabWriteSheet from "./VocabWriteSheet";
+import DictationSheetModal from "./DictationSheetModal";
 import TeacherVocabDashboard from "./TeacherVocabDashboard";
 
 const PURPLE = "#8B5CF6";
@@ -90,6 +91,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   const [expressions, setExpressions] = useState<ExpressionEntry[]>([]);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [showWriteSheet, setShowWriteSheet] = useState(false);
+  const [showDictation, setShowDictation] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeLearner(roomCode, user.myName, setLearner);
@@ -471,38 +473,77 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
             }}>도전 →</div>
           </button>
 
-          {/* 📄 단어 쓰기 학습지 — 손글씨 연습용 인쇄 시트 (보조 버튼) */}
-          <button
-            onClick={() => setShowWriteSheet(true)}
-            style={{
-              maxWidth: 760, width: "100%", margin: "0 auto 14px",
-              display: "flex", alignItems: "center", gap: 12, textAlign: "left",
-              background: "#fff",
-              border: "2px solid " + PURPLE + "44",
-              borderRadius: 16, padding: "12px 16px",
-              cursor: "pointer", fontFamily: "inherit",
-              boxShadow: "0 4px 12px rgba(139, 92, 246, 0.12)",
-              transition: "transform 0.15s",
-            }}
-            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
-            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          >
-            <div style={{ fontSize: 30, flexShrink: 0 }}>📄</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2 }}>
-                쓰기 학습지 만들기
+          {/* 🖨 오프라인 학습지 — 2분화: 단어 쓰기(모두) / 받아쓰기 테마별(교사 전용) */}
+          <div style={{
+            maxWidth: 760, width: "100%", margin: "0 auto 14px",
+            display: "grid",
+            gridTemplateColumns: isTeacher ? "1fr 1fr" : "1fr",
+            gap: 10,
+          }}>
+            <button
+              onClick={() => setShowWriteSheet(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 12, textAlign: "left",
+                background: "#fff",
+                border: "2px solid " + PURPLE + "44",
+                borderRadius: 16, padding: "12px 16px",
+                cursor: "pointer", fontFamily: "inherit",
+                boxShadow: "0 4px 12px rgba(139, 92, 246, 0.12)",
+                transition: "transform 0.15s",
+              }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
+              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              <div style={{ fontSize: 30, flexShrink: 0 }}>📄</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2 }}>
+                  쓰기 학습지 만들기
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2 }}>
+                  🖨 핵심 단어를 손으로 따라 쓰는 인쇄용 연습지
+                </div>
               </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2 }}>
-                🖨 핵심 단어를 손으로 따라 쓰는 인쇄용 연습지
-              </div>
-            </div>
-            <div style={{
-              background: PURPLE_LIGHT, color: PURPLE_DARK,
-              fontSize: 13, fontWeight: 900, padding: "8px 14px", borderRadius: 12,
-              flexShrink: 0,
-            }}>만들기 →</div>
-          </button>
+              <div style={{
+                background: PURPLE_LIGHT, color: PURPLE_DARK,
+                fontSize: 13, fontWeight: 900, padding: "8px 14px", borderRadius: 12,
+                flexShrink: 0,
+              }}>만들기 →</div>
+            </button>
+
+            {isTeacher && (
+              <button
+                onClick={() => setShowDictation(true)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12, textAlign: "left",
+                  background: "#fff",
+                  border: "2px solid #F9731644",
+                  borderRadius: 16, padding: "12px 16px",
+                  cursor: "pointer", fontFamily: "inherit",
+                  boxShadow: "0 4px 12px rgba(249, 115, 22, 0.12)",
+                  transition: "transform 0.15s",
+                }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                <div style={{ fontSize: 30, flexShrink: 0 }}>✏️</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2 }}>
+                    받아쓰기 학습지 <span style={{ fontSize: 10, fontWeight: 900, color: "#C2410C", background: "#FFF7ED", padding: "2px 6px", borderRadius: 999, verticalAlign: "middle" }}>교사</span>
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2 }}>
+                    🖨 테마별 15챕터 + 오답노트 · 받침 단어 따라 쓰기
+                  </div>
+                </div>
+                <div style={{
+                  background: "#FFF7ED", color: "#C2410C",
+                  fontSize: 13, fontWeight: 900, padding: "8px 14px", borderRadius: 12,
+                  flexShrink: 0,
+                }}>열기 →</div>
+              </button>
+            )}
+          </div>
           </>
         );
       })()}
@@ -979,6 +1020,11 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           onClose={() => setShowWriteSheet(false)}
           studentName={user.myName}
         />
+      )}
+
+      {/* 받아쓰기 학습지 (교사 전용) — 테마별 15챕터 + 오답노트 */}
+      {showDictation && isTeacher && (
+        <DictationSheetModal onClose={() => setShowDictation(false)} />
       )}
 
       {/* Test modal */}
