@@ -83,3 +83,25 @@ test("정답 위치가 항상 0..3 범위이고 correct 플래그와 일치한�
     }
   }
 });
+
+test("example 필드가 있으면 문항에 예문이 실린다", () => {
+  const withEx = SAMPLE.map((w) => ({ ...w, example: { ko: `우리는 ${w.lemma}를 보았어요.` } }));
+  const quiz = buildStorybookQuiz(withEx, "ko");
+  assert.ok(quiz.every((q) => q.example && q.example.includes("보았어요")));
+});
+
+test("example 이 없으면 페이지 본문에서 낱말이 든 문장을 찾는다", () => {
+  const pages = [{
+    idx: 1,
+    text: { ko: "아침이 밝았어요. 붕붕이는 꿀을 모았어요. 참 신났어요." },
+    illustration: { emoji: "🐝", bgGradient: "" },
+  }];
+  const quiz = buildStorybookQuiz(SAMPLE, "ko", pages as never);
+  const q1 = quiz.find((q) => q.wordId === "w1"); // 꿀
+  assert.ok(q1?.example?.includes("꿀"));
+});
+
+test("본문에도 낱말이 없으면 example 은 비운다 (undefined)", () => {
+  const quiz = buildStorybookQuiz(SAMPLE, "ko", [] as never);
+  assert.ok(quiz.every((q) => q.example === undefined));
+});

@@ -24,8 +24,8 @@ export default function StorybookWordQuiz({
 }) {
   // 세션 동안 문항을 한 번만 생성 (셔플 고정)
   const quiz = useMemo<SbQuizItem[]>(
-    () => buildStorybookQuiz(book.vocab, viewerLang),
-    [book.vocab, viewerLang],
+    () => buildStorybookQuiz(book.vocab, viewerLang, book.pages),
+    [book.vocab, book.pages, viewerLang],
   );
 
   const [idx, setIdx] = useState(0);
@@ -109,6 +109,16 @@ export default function StorybookWordQuiz({
       }}>
         {item.question}
       </div>
+
+      {item.example && (
+        <div style={{
+          fontSize: 14, fontWeight: 700, color: "#6D28D9", lineHeight: 1.5,
+          textAlign: "center", marginBottom: 14, padding: "10px 12px",
+          background: "#FAF5FF", border: "1.5px dashed #DDD6FE", borderRadius: 12,
+        }}>
+          📖 {item.example}
+        </div>
+      )}
 
       {/* choices */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

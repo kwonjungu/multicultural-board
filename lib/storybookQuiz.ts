@@ -8,7 +8,7 @@
 // 셔플 가드레일: 표시 순서 = 채점 순서 (단일 배열 + correct 플래그).
 // VocabTest 규칙(표시·채점 일치)을 따른다.
 
-import type { StorybookVocabWord } from "./types";
+import type { StorybookVocabWord, StorybookPage } from "./types";
 
 export interface SbQuizChoice {
   label: string;
@@ -20,6 +20,7 @@ export interface SbQuizItem {
   wordId: string;
   promptLang: string;
   question: string;                 // 학생 언어 발문
+  example?: string;                 // 예문 (있으면 표시)
   choices: SbQuizChoice[];          // 길이 4, 셔플 완료
 }
 
@@ -84,14 +85,53 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+// 문장 분리 — lookbehind 미사용 (구형 iOS Safari 호환). 구두점 포함 문장 목록.
+function splitSentences(text: string): string[] {
+  const out: string[] = [];
+  const re = /[^.!?。！？\n]+[.!?。！？]?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const s = m[0].trim();
+    if (s) out.push(s);
+    if (m.index === re.lastIndex) re.lastIndex++;
+  }
+  return out;
+}
+
+/** 예문 결정: 책 데이터(example) → 페이지 본문에서 낱말 포함 문장 → 어간(기본형-다) 매칭 → 없음 */
+function exampleFor(
+  w: StorybookVocabWord,
+  viewerLang: string,
+  pages: StorybookPage[] | undefined,
+): string | undefined {
+  const stored = pick(w.example, viewerLang);
+  if (stored) return stored;
+  const page = pages?.find((p) => p.idx === w.pageIdx);
+  const text = page?.text?.[viewerLang] || page?.text?.ko || "";
+  if (!text) return undefined;
+  const wordForm = pick(w.word, viewerLang) || w.lemma;
+  const sentences = splitSentences(text);
+  const hit = sentences.find((s) => s.includes(wordForm));
+  if (hit) return hit;
+  // ko 활용형 대응: 기본형에서 "-다" 를 뗀 어간으로 재시도 (모으다 → 모으/모았)
+  const stem = w.lemma.endsWith("다") && w.lemma.length >= 3 ? w.lemma.slice(0, -1) : "";
+  if (stem) {
+    const stemHit = sentences.find((s) => s.includes(stem) || s.includes(stem.slice(0, -1)));
+    if (stemHit) return stemHit;
+  }
+  return undefined;
+}
+
 /**
  * vocab 으로부터 4지선다 문항 세트 생성.
  * @param vocab 추출 어휘 세트
  * @param viewerLang 학생 보기 언어
+ * @param pages 그림책 페이지 목록 (예문 폴백 탐색용, 선택)
  */
 export function buildStorybookQuiz(
   vocab: StorybookVocabWord[] | undefined,
   viewerLang: string,
+  pages?: StorybookPage[],
 ): SbQuizItem[] {
   if (!vocab || vocab.length < MIN_VOCAB) return [];
 
@@ -140,6 +180,7 @@ export function buildStorybookQuiz(
       wordId: w.id,
       promptLang: viewerLang,
       question: questionFor(wordLabel, viewerLang),
+      example: exampleFor(w, viewerLang, pages),
       choices,
     });
   }
