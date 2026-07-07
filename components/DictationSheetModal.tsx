@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   DICTATION_CHAPTERS,
   DICTATION_CHEERS,
@@ -28,7 +29,9 @@ export default function DictationSheetModal({ onClose }: Props) {
   // null = 선택 화면, "note" = 오답노트, 숫자 = 챕터
   const [selected, setSelected] = useState<DictationChapter | "note" | null>(null);
 
-  return (
+  // portal 로 body 직속 렌더 — 숨겨진 앱 화면의 높이 때문에 학습지 앞뒤로
+  // 빈 페이지가 인쇄되는 문제를 원천 차단 (VocabWriteSheet 와 동일 패턴).
+  return createPortal(
     <div
       className="dict-overlay"
       style={{
@@ -45,12 +48,12 @@ export default function DictationSheetModal({ onClose }: Props) {
         @media print {
           @page { size: A4; margin: 12mm; }
           html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
-          body * { visibility: hidden !important; }
-          .dict-overlay, .dict-overlay * { visibility: visible !important; }
+          /* 오버레이는 portal 로 body 직속 — 나머지 앱 화면은 통째로 제거해
+             앞뒤 빈 페이지 없이 학습지만 출력된다. */
+          body > *:not(.dict-overlay) { display: none !important; }
           .dict-overlay {
-            position: absolute !important;
-            top: 0 !important; left: 0 !important; right: auto !important; bottom: auto !important;
-            width: 100% !important;
+            position: static !important;
+            inset: auto !important;
             background: #fff !important;
             overflow: visible !important;
           }
@@ -199,7 +202,8 @@ export default function DictationSheetModal({ onClose }: Props) {
           )}
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
