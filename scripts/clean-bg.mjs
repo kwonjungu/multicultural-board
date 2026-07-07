@@ -22,10 +22,18 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DRY = process.argv.includes("--dry");
+// --only=dirA,dirB — TARGETS 중 경로 끝이 일치하는 폴더만 처리 (이미 정리된
+// 폴더를 재실행해 6px 패딩이 다시 얹히는 것을 방지).
+const ONLY = process.argv.find((a) => a.startsWith("--only="))?.slice(7).split(",").filter(Boolean);
 
 // Folders to clean. Patterns are tileable and MUST stay intact.
 const TARGETS = [
   "public/stickers",
+  // 합성 캐릭터 하위 폴더 — walkFolder 는 재귀하지 않으므로 명시해야 처리된다.
+  // (Gemini 합성본이 체커보드(가짜 투명)를 구워 내보내 배경 코스메틱을 가리던 원인)
+  "public/stickers/stage-hats",
+  "public/stickers/skins",
+  "public/stickers/skin-hats",
   "public/mascot",
   "public/landmarks",
   "public/icons",
@@ -220,6 +228,7 @@ async function walkFolder(rel) {
 async function main() {
   const summary = { total: 0, cleaned: 0, skipped: 0 };
   for (const dir of TARGETS) {
+    if (ONLY && !ONLY.some((o) => dir.endsWith(o))) continue;
     const files = await walkFolder(dir);
     for (const f of files) {
       summary.total++;

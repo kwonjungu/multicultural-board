@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { ref, onValue, off, set } from "firebase/database";
+import { ref, onValue, off, set, update } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { COLUMNS_DEFAULT, LANGUAGES, BRAND_GRADIENT } from "@/lib/constants";
 import { RoomConfig } from "@/lib/types";
@@ -106,6 +106,22 @@ export default function RoomManagePanel({ roomCode, lang }: Props) {
   function saveRoster() {
     const db = getClientDb();
     const names = rosterText.split("\n").map((s) => s.trim()).filter(Boolean);
+    // 명렬표에서 빠진 이름은 칭찬판 데이터(스티커·코스메틱·전시장)도 함께 삭제 —
+    // 칭찬판은 학생 "이름"을 키로 저장하므로 이름 삭제 = 해당 버킷 삭제.
+    const removed = (config.roster ?? []).filter((n) => !names.includes(n));
+    if (removed.length > 0) {
+      const ok = confirm(
+        `명렬표에서 빠진 ${removed.length}명의 칭찬 기록(스티커·꾸미기·전시장)도 함께 삭제됩니다.\n\n${removed.join(", ")}\n\n계속할까요?`,
+      );
+      if (!ok) return;
+      const deletes: Record<string, null> = {};
+      for (const name of removed) {
+        deletes[`rooms/${roomCode}/stickers/individual/${name}`] = null;
+        deletes[`rooms/${roomCode}/stickers/cosmetics/${name}`] = null;
+        deletes[`rooms/${roomCode}/gallery/${name}`] = null;
+      }
+      update(ref(db), deletes).catch((err) => console.error("roster cleanup failed", err));
+    }
     set(ref(db, `rooms/${roomCode}/config/roster`), names);
   }
 

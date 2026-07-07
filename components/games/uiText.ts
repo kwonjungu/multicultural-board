@@ -7,8 +7,15 @@
 
 export type LangMap = Partial<Record<string, string>>;
 
+// 외국어로 표시될 때는 한국어 원문을 병기한다 — 다문화 학생의 한국어 적응을
+// 돕는 도구이므로 게임 UI 라벨에서도 한국어를 항상 함께 노출 (lib/i18n.ts 와 동일 정책).
+// 게임 콘텐츠(단어·문항, lib/gameData tr())는 게임성이 깨지므로 병기하지 않는다.
 export function gt(map: LangMap, lang: string): string {
-  return map[lang] ?? map.en ?? map.ko ?? Object.values(map)[0] ?? "";
+  const raw = map[lang] ?? map.en ?? map.ko ?? Object.values(map)[0] ?? "";
+  if (lang === "ko") return raw;
+  const ko = (map.ko ?? "").trim();
+  if (!ko || raw.trim() === ko || raw.includes(ko)) return raw;
+  return `${raw} (${ko})`;
 }
 
 export const UI: Record<string, LangMap> = {

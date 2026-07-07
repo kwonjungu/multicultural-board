@@ -1905,8 +1905,24 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
   },
 };
 
+// 외국어 UI 문구에는 한국어 원문을 병기한다 — 다문화 학생의 한국어 적응 지원
+// 도구이므로, 뷰어 언어가 외국어여도 항상 한국어를 함께 노출한다.
+// (t() 출력은 표시 전용 — TTS·비교 로직에 쓰이지 않음을 확인함)
+const KO_DECOR_RE = /[→⟳]/g;
+
+function withKo(raw: string, ko: string | undefined, lang: string): string {
+  if (lang === "ko" || !ko) return raw;
+  const koClean = ko.replace(KO_DECOR_RE, "").trim();
+  const rawClean = raw.replace(KO_DECOR_RE, "").trim();
+  // 이미 한국어가 포함돼 있거나(병기 완료) 번역이 없어 ko 그대로면 중복 병기 금지
+  if (!koClean || rawClean === koClean || raw.includes(koClean)) return raw;
+  return `${raw} (${koClean})`;
+}
+
 export function t(key: string, lang: string): string {
-  return UI_TEXT[key]?.[lang] || UI_TEXT[key]?.["en"] || UI_TEXT[key]?.["ko"] || key;
+  const map = UI_TEXT[key];
+  const raw = map?.[lang] || map?.["en"] || map?.["ko"] || key;
+  return withKo(raw, map?.["ko"], lang);
 }
 
 // Simple {placeholder} substitution for parametric strings

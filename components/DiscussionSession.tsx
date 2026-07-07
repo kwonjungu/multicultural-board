@@ -924,13 +924,14 @@ function ResponseCard({
 }
 
 // ═════════════════════════════ 🍎 Fruit shapes (v2 reveal) ═════════════════════════════
-type FruitKind = {
+// FRUIT_KINDS / Fruit 는 그림책 "친구들의 생각" 보드(StorybookRoom)에서도 재사용 — 시각 통일.
+export type FruitKind = {
   id: string; bg: string; edge: string; shine: string; stem: string; leaf: string;
   w: number; h: number;
   path: (s: { bg: string; edge: string; stem: string }) => React.ReactElement;
 };
 
-const FRUIT_KINDS: FruitKind[] = [
+export const FRUIT_KINDS: FruitKind[] = [
   { id: "apple",  bg: "#EF4444", edge: "#B91C1C", shine: "#FCA5A5", stem: "#78350F", leaf: "#16A34A",
     w: 72, h: 78,
     path: (s) => <ellipse cx="36" cy="42" rx="30" ry="30" fill={s.bg}/>,
@@ -980,7 +981,7 @@ const FRUIT_KINDS: FruitKind[] = [
   },
 ];
 
-function Fruit({ kind, scale = 1 }: { kind: FruitKind; scale?: number }) {
+export function Fruit({ kind, scale = 1 }: { kind: FruitKind; scale?: number }) {
   const { w, h, bg, edge, shine, stem, leaf, path } = kind;
   const W = w * scale, H = h * scale;
   return (

@@ -31,6 +31,48 @@ import { t } from "@/lib/i18n";
 
 const ALL_LANGS = Object.keys(LANGUAGES);
 
+/** 교사 전용 칭찬 바로가기 — 꿀벌집 PNG(/praise/hive-button.png)가 있으면 그걸,
+ *  없으면 기존 🍯 원형 버튼으로 폴백. (에셋은 별도 생성해 public/praise/ 에 배치) */
+function HiveButton({ onClick }: { onClick: () => void }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      aria-label="칭찬 스티커 주기"
+      title="칭찬 스티커 주기"
+      style={{
+        position: "fixed", bottom: 228, right: 18, zIndex: 300,
+        width: 64, height: 64, padding: 0, cursor: "pointer",
+        ...(imgFailed
+          ? {
+              borderRadius: "50%",
+              border: "3px solid #FDE68A",
+              background: "linear-gradient(135deg, #F59E0B, #D97706)",
+              boxShadow: "0 8px 20px rgba(180,83,9,0.4)",
+              fontSize: 30,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }
+          : { border: "none", background: "transparent" }),
+      }}
+    >
+      {imgFailed ? (
+        "🍯"
+      ) : (
+        <img
+          src="/praise/hive-button.png"
+          alt=""
+          aria-hidden="true"
+          onError={() => setImgFailed(true)}
+          style={{
+            width: "100%", height: "100%", objectFit: "contain",
+            filter: "drop-shadow(0 8px 20px rgba(180,83,9,0.4))",
+          }}
+        />
+      )}
+    </button>
+  );
+}
+
 export default function RoomPage() {
   const params = useParams();
   const roomCode = params.roomCode as string;
@@ -291,22 +333,10 @@ export default function RoomPage() {
         availableLangs={roomLangs}
         hidden={hubView === "games"}
       />
-      {/* 교사 전용 — 칭찬 스티커 주는 화면 바로가기. 번역 위젯(InterpreterFab) 바로 위에 상시 표시. */}
+      {/* 교사 전용 — 칭찬 스티커 주는 화면 바로가기. 번역 위젯(InterpreterFab) 바로 위에 상시 표시.
+          /praise/hive-button.png 가 있으면 꿀벌집 UI, 없으면 기존 🍯 원형 버튼으로 폴백. */}
       {user.isTeacher && hubView !== "games" && hubView !== "dashboard" && (
-        <button
-          onClick={() => setHubView("dashboard")}
-          aria-label="칭찬 스티커 주기"
-          title="칭찬 스티커 주기"
-          style={{
-            position: "fixed", bottom: 228, right: 18, zIndex: 300,
-            width: 60, height: 60, borderRadius: "50%",
-            border: "3px solid #FDE68A",
-            background: "linear-gradient(135deg, #F59E0B, #D97706)",
-            boxShadow: "0 8px 20px rgba(180,83,9,0.4)",
-            fontSize: 30, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >🍯</button>
+        <HiveButton onClick={() => setHubView("dashboard")} />
       )}
     </>
   );
@@ -334,7 +364,12 @@ export default function RoomPage() {
     if (hubView === "games") {
       return (
         <>
-          <GameRoom myLang={user.myLang} onClose={() => setHubView("hub")} roomLangs={roomLangs} />
+          <GameRoom
+            myLang={user.myLang}
+            onClose={() => setHubView("hub")}
+            onChangeMyLang={(l) => setUser({ ...user, myLang: l })}
+            roomLangs={roomLangs}
+          />
           <SectionCaption section="games" isTeacher={user.isTeacher} />
         </>
       );

@@ -56,6 +56,7 @@ import { useBackLayer } from "@/lib/backStack";
 import EmotionCardDeck from "./EmotionCardDeck";
 import { pushEmotion, emotionById, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
 import { t, tFmt } from "@/lib/i18n";
+import { Fruit, FRUIT_KINDS } from "./DiscussionSession";
 
 interface Props {
   user: UserConfig;
@@ -1391,10 +1392,10 @@ function FriendAnswers({
           )}
         </div>
       )}
-      {/* ── 친구들의 생각 — 의견 나누기(소통판)와 같은 파스텔 포스트잇 그리드 ── */}
+      {/* ── 친구들의 생각 — 의견 나누기(소통판)와 동일한 과일나무 배경 + 과일 장식 그리드 ── */}
       {answers.length > 0 && (
         <div style={{
-          background: "linear-gradient(180deg, #E8F5FF 0%, #F0F7E8 100%)",
+          background: "linear-gradient(rgba(232,245,255,0.78), rgba(240,247,232,0.82)), url('/discussion/tree-bg.png') center / cover no-repeat",
           borderRadius: 16, padding: "12px 10px",
           border: "1px solid #D1FAE5",
         }}>
@@ -1417,7 +1418,12 @@ function FriendAnswers({
                   border: "1px solid rgba(0,0,0,0.06)",
                   boxShadow: "0 5px 12px rgba(0,0,0,0.1)",
                   display: "flex", flexDirection: "column", gap: 5,
+                  position: "relative",
                 }}>
+                  {/* 🍎 소통판 의견 나누기와 같은 과일 장식 — 카드마다 로테이션 */}
+                  <div aria-hidden="true" style={{ position: "absolute", top: -12, right: -4, pointerEvents: "none", zIndex: 1 }}>
+                    <Fruit kind={FRUIT_KINDS[ai % FRUIT_KINDS.length]} scale={0.36} />
+                  </div>
                   {/* 그림 답변 — 수업 중 그린 그림 그대로 표시, 클릭하면 크게 */}
                   {a.imageUrl && (
                     <img

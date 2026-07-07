@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { LANGUAGES } from "@/lib/constants";
 import { useBackLayer } from "@/lib/backStack";
+import { GameText, prefetchGameTexts } from "@/lib/gameI18n";
+import { gt, type LangMap } from "./games/uiText";
 import BeeMascot from "./BeeMascot";
 import CountryGuess from "./games/CountryGuess";
 import WordMemory from "./games/WordMemory";
@@ -40,6 +42,53 @@ type GameMeta = {
   bg: string;                  // 게임 선택 카드 배경(단색)
   playBg?: string;             // 플레이 화면 배경(없으면 bg). 세계 명소 테마 게임에 사용.
   cmp: React.ComponentType<{ langA: string; langB: string }>;
+};
+
+// [게임룸 셸 i18n] 헤더·언어 카드·목록 안내 문구. 게임 이름/부제는 GameText
+// (ko 원문 → 번역 API 캐시) 로 처리하므로 여기엔 고정 UI 문구만 둔다.
+const GR: Record<string, LangMap> = {
+  title: {
+    ko: "꿀벌 게임룸", en: "Bee Game Room", vi: "Phòng trò chơi Ong", zh: "蜜蜂游戏室",
+    fil: "Game Room ng Bubuyog", ja: "ミツバチゲームルーム", th: "ห้องเกมผึ้ง", id: "Ruang Main Lebah",
+    ru: "Игровая комната пчёл", hi: "मधुमक्खी गेम रूम", ar: "غرفة ألعاب النحل",
+    mn: "Зөгийн тоглоомын өрөө", uz: "Asalari o'yin xonasi", km: "បន្ទប់ល្បែងឃ្មុំ", my: "ပျားဂိမ်းခန်း",
+  },
+  subtitle: {
+    ko: "친구랑 같이 놀면서 친해져요", en: "Play together and make friends",
+    vi: "Cùng chơi và kết bạn nhé", zh: "一起玩，成为好朋友", fil: "Maglaro at magkaibigan",
+    ja: "ともだちとあそんでなかよくなろう", th: "เล่นด้วยกันให้สนิทกันนะ", id: "Main bersama dan berteman",
+    ru: "Играй и заводи друзей", hi: "साथ खेलो, दोस्त बनो", ar: "العبوا معًا وكوّنوا صداقات",
+  },
+  friendLangHeader: {
+    ko: "함께 놀 친구의 언어", en: "Your friend's language", vi: "Ngôn ngữ của bạn cùng chơi",
+    zh: "一起玩的朋友的语言", fil: "Wika ng kalaro mo", ja: "いっしょにあそぶともだちのことば",
+    th: "ภาษาของเพื่อนที่เล่นด้วย", id: "Bahasa teman mainmu", ru: "Язык твоего друга",
+    hi: "दोस्त की भाषा", ar: "لغة صديقك",
+  },
+  me: {
+    ko: "나", en: "Me", vi: "Tôi", zh: "我", fil: "Ako", ja: "わたし", th: "ฉัน",
+    id: "Aku", ru: "Я", hi: "मैं", ar: "أنا", mn: "Би", uz: "Men", km: "ខ្ញុំ", my: "ကျွန်တော်",
+  },
+  friend: {
+    ko: "친구", en: "Friend", vi: "Bạn", zh: "朋友", fil: "Kaibigan", ja: "ともだち", th: "เพื่อน",
+    id: "Teman", ru: "Друг", hi: "दोस्त", ar: "صديق", mn: "Найз", uz: "Do'st", km: "មិត្ត", my: "သူငယ်ချင်း",
+  },
+  teachEachOther: {
+    ko: "서로 알려줘", en: "Teach each other", vi: "Dạy cho nhau nhé", zh: "互相教一教",
+    fil: "Turuan ang isa't isa", ja: "おしえあおう", th: "สอนกันและกัน", id: "Saling ajari",
+    ru: "Учите друг друга", hi: "एक-दूसरे को सिखाओ", ar: "علّما بعضكما",
+  },
+  whichGame: {
+    ko: "어떤 놀이를 할까?", en: "Which game shall we play?", vi: "Chơi trò nào đây?",
+    zh: "玩什么游戏呢?", fil: "Anong laro ang gusto mo?", ja: "どのあそびにする?",
+    th: "จะเล่นเกมไหนดี?", id: "Main game yang mana?", ru: "Во что сыграем?",
+    hi: "कौन सा खेल खेलें?", ar: "أي لعبة نلعب؟",
+  },
+  gamesReady: {
+    ko: "개 준비됨", en: "games ready", vi: "trò chơi sẵn sàng", zh: "个游戏",
+    fil: "laro", ja: "こじゅんびOK", th: "เกมพร้อมแล้ว", id: "game siap",
+    ru: "игр готово", hi: "खेल तैयार", ar: "لعبة جاهزة",
+  },
 };
 
 // 세계 명소 배경 — 여행/문화 테마 게임 플레이 화면용. 크림 오버레이로 가독성 유지.
@@ -91,15 +140,26 @@ function GameIcon({ icon, iconImg, size }: { icon: string; iconImg?: string; siz
 
 const DEFAULT_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
 
-export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: string; onClose: () => void; roomLangs?: string[] }) {
+export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs }: {
+  myLang: string;
+  onClose: () => void;
+  /** "나" 카드에서 내 언어를 바꿀 때 호출 — 상위에서 UserConfig.myLang 갱신(localStorage 저장). */
+  onChangeMyLang?: (lang: string) => void;
+  roomLangs?: string[];
+}) {
   const friendLangCodes = roomLangs && roomLangs.length > 0 ? roomLangs : DEFAULT_LANG_CODES;
   const defaultFriend = friendLangCodes.find((c) => c !== (myLang || "ko")) || "en";
   const [friendLang, setFriendLang] = useState<string>(defaultFriend);
-  const [showLangPick, setShowLangPick] = useState(false);
+  const [showLangPick, setShowLangPick] = useState<"me" | "friend" | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
 
   const viewerLang = myLang || "ko";
   const ActiveGame = GAMES.find((g) => g.id === gameId);
+
+  // 게임 이름/부제 번역 프리페치 — 뷰어 언어가 사전에 없는 언어여도 목록이 바로 번역돼 보이게.
+  useEffect(() => {
+    prefetchGameTexts(GAMES.flatMap((g) => [{ ko: g.name }, { ko: g.sub }]), viewerLang);
+  }, [viewerLang]);
 
   // 뒤로 가기: 게임 플레이 중이면 게임 목록으로 (허브로 바로 나가지 않음).
   useBackLayer(gameId !== null, () => setGameId(null));
@@ -135,10 +195,10 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
             >←</button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", display: "flex", alignItems: "center", gap: 6 }}>
-                🎮 꿀벌 게임룸
+                🎮 {gt(GR.title, viewerLang)}
               </div>
               <div style={{ fontSize: 12, color: "#78350F", fontWeight: 700, marginTop: 2 }}>
-                친구랑 같이 놀면서 친해져요
+                {gt(GR.subtitle, viewerLang)}
               </div>
             </div>
             <img
@@ -158,37 +218,43 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
               boxShadow: "0 10px 28px rgba(180,83,9,0.15)",
             }}>
               <div style={{ fontSize: 12, fontWeight: 900, color: "#92400E", letterSpacing: 1, marginBottom: 12 }}>
-                👫 함께 놀 친구의 언어
+                👫 {gt(GR.friendLangHeader, viewerLang)}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {/* 나 */}
-                <div style={{
-                  flex: 1, padding: "14px 10px", borderRadius: 18,
-                  background: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
-                  border: "2px solid #FBBF24", textAlign: "center",
-                }}>
-                  <div style={{ fontSize: 10, fontWeight: 900, color: "#92400E", letterSpacing: 1 }}>나</div>
+                {/* 나 — 누르면 내 언어도 바로 바꿀 수 있다 (게임룸 번역이 안 바뀐다는 혼동 방지) */}
+                <button
+                  onClick={() => setShowLangPick((v) => (v === "me" ? null : "me"))}
+                  style={{
+                    flex: 1, padding: "14px 10px", borderRadius: 18,
+                    background: showLangPick === "me" ? "linear-gradient(135deg, #FDE68A, #FCD34D)" : "linear-gradient(135deg, #FEF3C7, #FDE68A)",
+                    border: `2px solid ${showLangPick === "me" ? "#D97706" : "#FBBF24"}`,
+                    textAlign: "center", cursor: "pointer",
+                  }}
+                >
+                  <div style={{ fontSize: 10, fontWeight: 900, color: "#92400E", letterSpacing: 1 }}>
+                    {gt(GR.me, viewerLang)} {showLangPick === "me" ? "▴" : "▾"}
+                  </div>
                   <div style={{ fontSize: 36, marginTop: 4 }}>{LANGUAGES[viewerLang]?.flag}</div>
                   <div style={{ fontSize: 14, fontWeight: 900, color: "#1F2937", marginTop: 2 }}>
                     {LANGUAGES[viewerLang]?.label}
                   </div>
-                </div>
+                </button>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                   <div style={{ fontSize: 20 }}>⇄</div>
-                  <div style={{ fontSize: 10, fontWeight: 900, color: "#92400E", whiteSpace: "nowrap" }}>서로 알려줘</div>
+                  <div style={{ fontSize: 10, fontWeight: 900, color: "#92400E", whiteSpace: "nowrap" }}>{gt(GR.teachEachOther, viewerLang)}</div>
                 </div>
                 {/* 친구 */}
                 <button
-                  onClick={() => setShowLangPick((v) => !v)}
+                  onClick={() => setShowLangPick((v) => (v === "friend" ? null : "friend"))}
                   style={{
                     flex: 1, padding: "14px 10px", borderRadius: 18,
-                    background: showLangPick ? "linear-gradient(135deg, #DBEAFE, #BFDBFE)" : "linear-gradient(135deg, #E0E7FF, #DBEAFE)",
-                    border: `2px solid ${showLangPick ? "#3B82F6" : "#60A5FA"}`,
+                    background: showLangPick === "friend" ? "linear-gradient(135deg, #DBEAFE, #BFDBFE)" : "linear-gradient(135deg, #E0E7FF, #DBEAFE)",
+                    border: `2px solid ${showLangPick === "friend" ? "#3B82F6" : "#60A5FA"}`,
                     textAlign: "center", cursor: "pointer",
                   }}
                 >
                   <div style={{ fontSize: 10, fontWeight: 900, color: "#1E40AF", letterSpacing: 1 }}>
-                    친구 {showLangPick ? "▴" : "▾"}
+                    {gt(GR.friend, viewerLang)} {showLangPick === "friend" ? "▴" : "▾"}
                   </div>
                   <div style={{ fontSize: 36, marginTop: 4 }}>{LANGUAGES[friendLang]?.flag}</div>
                   <div style={{ fontSize: 14, fontWeight: 900, color: "#1F2937", marginTop: 2 }}>
@@ -202,16 +268,23 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
                   marginTop: 12, display: "grid",
                   gridTemplateColumns: "repeat(4, 1fr)", gap: 6,
                 }}>
-                  {availableFriendLangs.map((c) => {
-                    const active = c === friendLang;
+                  {(showLangPick === "me" ? Object.keys(LANGUAGES) : availableFriendLangs).map((c) => {
+                    const isMe = showLangPick === "me";
+                    const active = c === (isMe ? viewerLang : friendLang);
+                    const activeBg = isMe ? "#F59E0B" : "#3B82F6";
+                    const activeBorder = isMe ? "#B45309" : "#1E40AF";
                     return (
                       <button
                         key={c}
-                        onClick={() => { setFriendLang(c); setShowLangPick(false); }}
+                        onClick={() => {
+                          if (isMe) onChangeMyLang?.(c);
+                          else setFriendLang(c);
+                          setShowLangPick(null);
+                        }}
                         style={{
                           padding: "10px 4px", borderRadius: 12,
-                          background: active ? "#3B82F6" : "#F3F4F6",
-                          border: active ? "2px solid #1E40AF" : "2px solid transparent",
+                          background: active ? activeBg : "#F3F4F6",
+                          border: active ? `2px solid ${activeBorder}` : "2px solid transparent",
                           color: active ? "#fff" : "#1F2937",
                           fontSize: 11, fontWeight: 800, cursor: "pointer",
                           display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
@@ -233,8 +306,10 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
               fontSize: 14, fontWeight: 900, color: "#78350F", marginBottom: 10,
               display: "flex", alignItems: "center", gap: 6,
             }}>
-              🎯 어떤 놀이를 할까?
-              <span style={{ color: "#92400E", fontSize: 12, fontWeight: 700 }}>· {GAMES.length}개 준비됨</span>
+              🎯 {gt(GR.whichGame, viewerLang)}
+              <span style={{ color: "#92400E", fontSize: 12, fontWeight: 700 }}>
+                · {viewerLang === "ko" ? `${GAMES.length}개 준비됨` : `${GAMES.length} ${gt(GR.gamesReady, viewerLang)}`}
+              </span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {GAMES.map((g) => (
@@ -257,8 +332,15 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
                   onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                 >
                   <GameIcon icon={g.icon} iconImg={g.iconImg} size={42} />
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937", marginTop: 6 }}>{g.name}</div>
-                  <div style={{ fontSize: 12, color: g.color, fontWeight: 800 }}>{g.sub}</div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937", marginTop: 6 }}>
+                    <GameText map={{ ko: g.name }} lang={viewerLang} />
+                    {viewerLang !== "ko" && (
+                      <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6B7280" }}>{g.name}</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: g.color, fontWeight: 800 }}>
+                    <GameText map={{ ko: g.sub }} lang={viewerLang} />
+                  </div>
                   <div style={{
                     position: "absolute", top: 10, right: 10,
                     fontSize: 10, fontWeight: 900, color: "#fff",
@@ -289,7 +371,10 @@ export default function GameRoom({ myLang, onClose, roomLangs }: { myLang: strin
             >←</button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937", display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 22 }}>{ActiveGame.icon}</span> {ActiveGame.name}
+                <span style={{ fontSize: 22 }}>{ActiveGame.icon}</span> <GameText map={{ ko: ActiveGame.name }} lang={viewerLang} />
+                {viewerLang !== "ko" && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#6B7280" }}>· {ActiveGame.name}</span>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, fontSize: 12, fontWeight: 700, color: "#6B7280" }}>
                 <span>{LANGUAGES[viewerLang]?.flag} {LANGUAGES[viewerLang]?.label}</span>

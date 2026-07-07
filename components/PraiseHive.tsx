@@ -442,7 +442,7 @@ export default function PraiseHive({
           />
         )}
         {tab === "race" && (
-          <RaceTab lang={lang} roomCode={roomCode} user={user} myClientId={myClientId} />
+          <RaceTab lang={lang} roomCode={roomCode} user={user} myClientId={myClientId} roomConfig={roomConfig} />
         )}
         {tab === "team" && <TeamTab lang={lang} roomCode={roomCode} />}
         {tab === "manage" && user.isTeacher && (
@@ -926,11 +926,13 @@ function RaceTab({
   roomCode,
   user,
   myClientId,
+  roomConfig,
 }: {
   lang: string;
   roomCode: string;
   user: UserConfig;
   myClientId: string;
+  roomConfig: RoomConfig;
 }) {
   const [counts, setCounts] = useState<Record<string, number>>({});
   // 전시장 (설계서 항목 7): 전원 코스메틱 + 좋아요/댓글 데이터
@@ -954,17 +956,24 @@ function RaceTab({
   }, [roomCode]);
 
   const entries = useMemo(() => {
-    // 스티커를 받았거나(counts) 꾸미기를 한(cosmetics) 학생 전원 표시
-    const ids = new Set([...Object.keys(counts), ...Object.keys(allCosmetics)]);
-    const arr = Array.from(ids).map((id) => ({
+    // 스티커를 받았거나(counts) 꾸미기를 한(cosmetics) 학생 표시.
+    // 명렬표(roster)가 설정돼 있으면 그 이름만 노출 — 자동 생성/스팸 계정 차단.
+    // (스티커·코스메틱 버킷은 학생 "이름"을 pseudo-clientId 로 쓰므로 이름 비교로 충분)
+    const roster = roomConfig.roster ?? [];
+    const rosterSet = new Set(roster);
+    let ids = Array.from(new Set([...Object.keys(counts), ...Object.keys(allCosmetics)]));
+    if (roster.length > 0) ids = ids.filter((id) => rosterSet.has(id));
+    const arr = ids.map((id) => ({
       id,
       count: counts[id] ?? 0,
-      name: id === myClientId ? user.myName : `${t("phStudentPrefix", lang)} #${shortId(id)}`,
+      // 명렬표에 있는 이름은 실명 그대로 (키 자체가 이름) — "학생 #xxxxxx" 익명화는
+      // 명렬표 미설정 방의 진짜 clientId 키에만 적용
+      name: id === myClientId ? user.myName : rosterSet.has(id) ? id : `${t("phStudentPrefix", lang)} #${shortId(id)}`,
       cosmetics: allCosmetics[id] ?? DEFAULT_COSMETICS,
     }));
     arr.sort((a, b) => b.count - a.count);
     return arr;
-  }, [counts, allCosmetics, myClientId, user.myName, lang]);
+  }, [counts, allCosmetics, myClientId, user.myName, lang, roomConfig.roster]);
 
   const focusEntry = galleryFocus ? entries.find((e) => e.id === galleryFocus) ?? null : null;
 
