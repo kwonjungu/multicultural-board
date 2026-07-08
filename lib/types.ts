@@ -162,7 +162,8 @@ export interface PresenceEntry {
 export type StickerType = "helpful" | "brave" | "creative" | "cooperative" | "persistent" | "curious";
 export type Stage = "egg" | "larva" | "pupa" | "bee" | "queen";
 export type SkinId = "classic" | "orange" | "green" | "sky" | "pink" | "purple";
-// crown-* 3종은 여왕벌 전용 신규 왕관 — 합성본 없이 anchors 오버레이로 렌더
+// crown-* 3종은 여왕벌 전용 신규 왕관 — 기본 모자처럼 합성본으로 렌더
+// (stage-hats/skin-hats, scripts/gen-queen-crown-composites.mjs 로 생성)
 export type HatId =
   | "top" | "cap" | "party" | "crown"
   | "crown-rose" | "crown-sapphire" | "crown-honey"

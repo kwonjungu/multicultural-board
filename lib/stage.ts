@@ -91,13 +91,16 @@ export function stageImageWithSkin(stage: Stage, skin: SkinId): string {
   return `/stickers/skins/${stageKey(stage)}-${skin}.png`;
 }
 
-// 모자 합성본 경로. Gemini edit 으로 미리 합성된 이미지(더 자연스러움).
+// 모자 합성본 경로. 미리 합성된 이미지(더 자연스러움).
+// 기본 4종은 Gemini edit, 여왕벌 왕관 3종(crown-rose/sapphire/honey)은
+// scripts/gen-queen-crown-composites.mjs 로 로컬 합성.
 // classic + hat 조합에만 합성본이 존재. 스킨 + 모자 조합은 호출부에서 별도 처리.
 export function stageImageWithHat(stage: Stage, hat: NonNullable<HatId>): string {
   return `/stickers/stage-hats/${stageKey(stage)}-${hat}.png`;
 }
 
 // Skin + Hat 합성본. skin_hats 배치로 5색 × 5스테이지 × 4모자 = 100장 생성.
+// 여왕벌 전용 왕관 3종은 5색 × queen 15장 추가 (gen-queen-crown-composites.mjs).
 // classic 스킨은 기존 stage-hats 폴더 사용.
 export function stageImageWithSkinAndHat(
   stage: Stage,
@@ -124,7 +127,7 @@ export function unlockedSkins(stage: Stage): SkinId[] {
   return out;
 }
 
-// pupa+: top. bee+: +cap,ribbon. queen+: +crown + 전용 왕관 3종(오버레이 렌더).
+// pupa+: top. bee+: +cap,ribbon. queen+: +crown + 전용 왕관 3종.
 export function unlockedHats(stage: Stage): NonNullable<HatId>[] {
   const r = rank(stage);
   const out: NonNullable<HatId>[] = [];
@@ -133,11 +136,6 @@ export function unlockedHats(stage: Stage): NonNullable<HatId>[] {
   if (r >= rank("queen")) out.push("crown", "crown-rose", "crown-sapphire", "crown-honey");
   return out;
 }
-
-/** 합성본 없이 anchors 기반 오버레이로만 렌더하는 신규 모자 (여왕벌 왕관 3종) */
-export const OVERLAY_HATS = new Set<NonNullable<HatId>>([
-  "crown-rose", "crown-sapphire", "crown-honey",
-]);
 
 // 배경: pupa+ 4종, queen 에서 왕좌 추가. Phase 3.
 export function unlockedBackdrops(stage: Stage): NonNullable<BackdropId>[] {

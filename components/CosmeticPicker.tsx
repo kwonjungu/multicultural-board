@@ -5,7 +5,6 @@ import { t } from "@/lib/i18n";
 import { subscribeCosmetics, setCosmetics } from "@/lib/stickers";
 import {
   stageOf,
-  stageImage,
   stageImageWithSkin,
   unlockedSkins,
   unlockedHats,
@@ -14,6 +13,7 @@ import {
   unlockedBackdrops,
   unlockedAuras,
 } from "@/lib/stage";
+import { CharacterImage, CosmeticFrame } from "./CharacterComposite";
 import type { StudentCosmetics, SkinId, HatId, PetId, TrophyId, BackdropId, AuraId } from "@/lib/types";
 
 interface Props {
@@ -138,12 +138,6 @@ export default function CosmeticPicker({
     });
   }
 
-  // === Preview composition ===
-  // Skin 은 같은 stage 캐릭터의 색 변형이므로 stage base 이미지 자체를 교체.
-  // classic 이면 기존 stageImage, 아니면 stage-{n}-{stage}-{skin}.png.
-  const stageSrc = stageImageWithSkin(stage, draft.skin);
-  const stageSrcBase = stageImage(stage);
-
   return (
     <>
       {/* Dim overlay */}
@@ -230,90 +224,43 @@ export default function CosmeticPicker({
             }}>
               ✨ {t("cosmeticPreview", lang)}
             </div>
+            {/* 전시장(RaceTab 카드)·나의 꿀벌집과 동일한 합성 렌더 —
+                CharacterComposite 공유 컴포넌트 사용. 모자는 합성본 체인으로
+                처리되므로 별도 좌표 계산 없음 (미리보기 = 실제 화면). */}
             <div
               style={{
                 position: "relative",
                 width: 180, height: 180,
-                background: "#fff",
-                borderRadius: 20,
-                border: "2px solid #FCD34D",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                overflow: "hidden",
-                boxShadow: "0 4px 12px rgba(245,158,11,0.18)",
+                margin: "10px 22px 14px",
               }}
             >
-              {/* 배경 (캐릭터 뒤, Phase 3) */}
-              {draft.backdrop && (
-                <img
-                  src={`/stickers/backdrop-${draft.backdrop}.png`}
-                  alt=""
-                  aria-hidden="true"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              )}
-              {/* Stage base (skin 이 적용된 재채색 버전). 파일 없으면 classic 으로 폴백. */}
-              <img
-                src={stageSrc}
-                alt=""
-                aria-hidden="true"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = stageSrcBase; }}
-                style={{
-                  position: "absolute", inset: 0, width: "100%", height: "100%",
-                  objectFit: "contain",
-                }}
-              />
-              {/* 오라 (캐릭터 앞, Phase 3) */}
-              {draft.aura && (
-                <img
-                  src={`/stickers/aura-${draft.aura}.png`}
-                  alt=""
-                  aria-hidden="true"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  style={{
-                    position: "absolute", inset: "-6%", width: "112%", height: "112%",
-                    objectFit: "contain", pointerEvents: "none", zIndex: 4,
-                  }}
-                />
-              )}
-              {/* Pet (bottom-left) */}
-              {draft.pet && (
-                <img
-                  src={assetPath("pet", draft.pet)}
-                  alt=""
-                  aria-hidden="true"
-                  style={{
-                    position: "absolute", bottom: 6,
-                    ...(draft.petPos === "left"
-                      ? { left: 6, transform: "scaleX(-1)" }
-                      : { right: 6 }),
-                    width: 54, height: 54, objectFit: "contain",
-                    filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.15))",
-                  }}
-                />
-              )}
-              {/* Hat (top-center) */}
-              {draft.hat && (
-                <img
-                  src={assetPath("hat", draft.hat)}
-                  alt=""
-                  aria-hidden="true"
-                  style={{
-                    position: "absolute", top: 4, left: "50%", transform: "translateX(-50%)",
-                    width: 80, height: 64, objectFit: "contain",
-                    filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.18))",
-                  }}
-                />
-              )}
-              {/* Trophy (bottom-right) */}
+              <CosmeticFrame backdrop={draft.backdrop} aura={draft.aura} />
+              <CharacterImage stage={stage} skin={draft.skin} hat={draft.hat} />
+              {/* Trophy (bottom-left, slightly outside box) */}
               {draft.trophy && (
                 <img
                   src={assetPath("trophy", draft.trophy)}
                   alt=""
                   aria-hidden="true"
                   style={{
-                    position: "absolute", right: 6, bottom: 6,
-                    width: 54, height: 54, objectFit: "contain",
+                    position: "absolute", left: -16, bottom: -6,
+                    width: 58, height: 58, objectFit: "contain", zIndex: 2,
+                    filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.15))",
+                  }}
+                />
+              )}
+              {/* Pet (좌/우 선택, slightly outside box) */}
+              {draft.pet && (
+                <img
+                  src={assetPath("pet", draft.pet)}
+                  alt=""
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute", bottom: -10,
+                    ...(draft.petPos === "left"
+                      ? { left: -18, transform: "scaleX(-1)" }
+                      : { right: -18 }),
+                    width: 68, height: 68, objectFit: "contain", zIndex: 2,
                     filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.15))",
                   }}
                 />

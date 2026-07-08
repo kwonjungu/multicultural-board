@@ -10,21 +10,14 @@ import type {
   StickerGoal,
   StudentCosmetics,
   Stage,
-  SkinId,
-  HatId,
-  BackdropId,
-  AuraId,
 } from "@/lib/types";
 import {
   stageOf,
   stageImage,
-  stageImageWithSkin,
-  stageImageWithHat,
-  stageImageWithSkinAndHat,
   nextThreshold,
   progressInStage,
-  OVERLAY_HATS,
 } from "@/lib/stage";
+import { CharacterImage, CosmeticFrame } from "./CharacterComposite";
 import {
   subscribeStudentStickers,
   subscribeTeamStickers,
@@ -47,7 +40,6 @@ import {
 import { checkSafety } from "@/lib/chatSafety";
 import { HONEY } from "@/lib/constants";
 import { t, tFmt } from "@/lib/i18n";
-import anchorsData from "@/public/stickers/anchors.json";
 
 // ============================================================
 // Praise Hive (칭찬 꿀벌집) — 4-tab student/teacher dashboard.
@@ -124,24 +116,6 @@ const STAGE_LABEL_KEY: Record<Stage, string> = {
   queen: "phStageQueen",
 };
 
-// Head anchors loaded from /public/stickers/anchors.json.
-// Key: "stage-{id}" (egg/larva/pupa/bee/queen) or "skin-{id}".
-interface CharAnchor {
-  headXPct: number;
-  headTopYPct: number;
-  hatScalePct: number;
-}
-const ANCHORS = anchorsData as unknown as Record<string, CharAnchor>;
-const FALLBACK_ANCHOR: CharAnchor = { headXPct: 50, headTopYPct: 18, hatScalePct: 38 };
-
-const STAGE_ANCHOR_KEY: Record<Stage, string> = {
-  egg: "stage-1-egg",
-  larva: "stage-2-larva",
-  pupa: "stage-3-pupa",
-  bee: "stage-4-bee",
-  queen: "stage-5-queen",
-};
-
 // ---- helpers ----
 
 function shortId(id: string): string {
@@ -157,118 +131,8 @@ function daysSince(ts: number): number {
   return Math.max(0, Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24)));
 }
 
-/** Character image with multi-step fallback chain:
- *  skin+hat composite → skin-only → classic+hat composite → plain stage.
- *  각 404 시 onError 로 다음 후보 시도. 최종 폴백까지 실패하면 emoji 숨김.
- *
- *  신규 왕관(OVERLAY_HATS — 여왕벌 전용 3종)은 합성본이 없으므로
- *  본체(skin) 위에 anchors.json 좌표로 모자 PNG 를 오버레이한다.
- */
-function CharacterImage({
-  stage,
-  skin,
-  hat,
-}: {
-  stage: Stage;
-  skin: SkinId;
-  hat: HatId;
-}) {
-  const overlayHat = hat && OVERLAY_HATS.has(hat) ? hat : null;
-  // 후보 URL 배열 (순서대로 시도). 오버레이 모자는 합성 체인에서 제외.
-  const candidates: string[] = [];
-  if (hat && !overlayHat) {
-    candidates.push(stageImageWithSkinAndHat(stage, skin, hat));
-    if (skin !== "classic") candidates.push(stageImageWithHat(stage, hat));
-  }
-  if (skin !== "classic") candidates.push(stageImageWithSkin(stage, skin));
-  candidates.push(stageImage(stage));
-  const [idx, setIdx] = useState(0);
-  const [hatFail, setHatFail] = useState(false);
-  const src = candidates[Math.min(idx, candidates.length - 1)];
-
-  // 오버레이 모자 배치 — anchors 는 % 좌표, 부모가 정사각 박스이므로 % 로 계산
-  const anchor = ANCHORS[STAGE_ANCHOR_KEY[stage]] ?? FALLBACK_ANCHOR;
-  const hatW = anchor.hatScalePct;                       // 박스 폭 대비 %
-  const hatLeft = anchor.headXPct - hatW / 2;
-  const hatTop = anchor.headTopYPct - hatW * 0.85;       // 바닥이 머리에 15% 침투
-
-  return (
-    <>
-      <img
-        src={src}
-        alt=""
-        aria-hidden="true"
-        onError={() => setIdx((i) => i + 1)}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          animation: "heroBeeFloat 3s ease-in-out infinite",
-          filter: "drop-shadow(0 8px 18px rgba(245,158,11,0.4))",
-          zIndex: 1,
-        }}
-      />
-      {overlayHat && !hatFail && (
-        <img
-          src={`/stickers/hat-${overlayHat}.png`}
-          alt=""
-          aria-hidden="true"
-          onError={() => setHatFail(true)}
-          style={{
-            position: "absolute",
-            left: `${hatLeft}%`,
-            top: `${hatTop}%`,
-            width: `${hatW}%`,
-            height: `${hatW}%`,
-            objectFit: "contain",
-            animation: "heroBeeFloat 3s ease-in-out infinite",
-            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.2))",
-            zIndex: 2,
-          }}
-        />
-      )}
-    </>
-  );
-}
-
-/** 배경 + 오라 오버레이 — 캐릭터 박스(정사각, position:relative) 안에서 사용.
- *  backdrop 은 캐릭터 뒤(z0, 라운드 클립), aura 는 캐릭터 앞(z3, 포인터 통과). */
-function CosmeticFrame({ backdrop, aura }: { backdrop?: BackdropId; aura?: AuraId }) {
-  return (
-    <>
-      {backdrop && (
-        <img
-          src={`/stickers/backdrop-${backdrop}.png`}
-          alt=""
-          aria-hidden="true"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          style={{
-            position: "absolute", inset: "-4%",
-            width: "108%", height: "108%",
-            objectFit: "cover", borderRadius: "14%",
-            zIndex: 0,
-          }}
-        />
-      )}
-      {aura && (
-        <img
-          src={`/stickers/aura-${aura}.png`}
-          alt=""
-          aria-hidden="true"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          style={{
-            position: "absolute", inset: "-8%",
-            width: "116%", height: "116%",
-            objectFit: "contain",
-            zIndex: 3, pointerEvents: "none",
-            animation: "heroBeeFloat 4s ease-in-out infinite reverse",
-          }}
-        />
-      )}
-    </>
-  );
-}
+// CharacterImage / CosmeticFrame 은 ./CharacterComposite 로 이동 —
+// 꾸미기 창(CosmeticPicker) 미리보기와 렌더 로직을 공유하기 위함.
 
 // ============================================================
 // Top-level component
@@ -508,30 +372,8 @@ function MyHiveTab({
       ? "bee"
       : "queen";
 
-  // 이미지 합성 우선순위:
-  //  1) skin+hat 조합: /stickers/skin-hats/ (100장, classic 포함 full coverage via stage-hats fallback)
-  //  2) skin 만: stage+skin 재채색본
-  //  3) 모자만: classic+hat 합성본
-  //  4) 기본: stage 원본
-  // useCompositeHat: 합성본 이미지 (skin+hat 또는 classic+hat) 사용 가능 여부
-  const useCompositeHat = cosmetics.hat !== null;
-  const charImg = useCompositeHat && cosmetics.hat
-    ? stageImageWithSkinAndHat(stage, cosmetics.skin, cosmetics.hat)
-    : stageImageWithSkin(stage, cosmetics.skin);
-  const anchorKey = STAGE_ANCHOR_KEY[stage];
-  const anchor = ANCHORS[anchorKey] ?? FALLBACK_ANCHOR;
-
   // Character box size (px). Keep square.
   const CHAR_BOX = 240;
-
-  // Hat placement (px, relative to CHAR_BOX).
-  // Hat bottom sinks 15% into the head so it visually rests on top.
-  const hatW = (anchor.hatScalePct / 100) * CHAR_BOX;
-  const hatH = hatW;
-  const hatCenterX = (anchor.headXPct / 100) * CHAR_BOX;
-  const hatBottomY = (anchor.headTopYPct / 100) * CHAR_BOX + hatH * 0.15;
-  const hatLeft = hatCenterX - hatW / 2;
-  const hatTop = hatBottomY - hatH;
 
   // My sticker type counts (for per-type stats)
   const myTypeCounts: Record<StickerType, number> = {
@@ -604,24 +446,6 @@ function MyHiveTab({
             skin={cosmetics.skin}
             hat={cosmetics.hat}
           />
-          {/* Hat overlay: 사용 안 함 — CharacterImage 가 합성본/폴백 전부 처리. */}
-          {false && cosmetics.hat && !useCompositeHat && (
-            <img
-              src={`/stickers/hat-${cosmetics.hat}.png`}
-              alt=""
-              aria-hidden="true"
-              style={{
-                position: "absolute",
-                left: hatLeft,
-                top: hatTop,
-                width: hatW,
-                height: hatH,
-                zIndex: 3,
-                animation: "heroBeeFloat 3s ease-in-out infinite",
-                filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.2))",
-              }}
-            />
-          )}
           {/* Pet (bottom-right, slightly outside box) */}
           {cosmetics.pet && (
             <img

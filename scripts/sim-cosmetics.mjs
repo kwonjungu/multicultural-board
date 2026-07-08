@@ -1,7 +1,7 @@
 // Cosmetic combination simulator — verifies all skin×hat×stage paths resolve.
-// Covers: 6 skins × 5 hats (including null) × 5 stages = 150 combos (+ 50 random
-// secondary draws for 200 total "virtual renders"). Fails if any referenced PNG
-// is missing or the composite path logic picks the wrong file.
+// Covers: 6 skins × 5 hats (including null) × 5 stages = 150 combos, 여왕벌은
+// 전용 왕관 3종 추가 (+18 combos) (+ 50 random secondary draws). Fails if any
+// referenced PNG is missing or the composite path logic picks the wrong file.
 
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -11,6 +11,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const SKINS = ["classic", "orange", "green", "sky", "pink", "purple"];
 const HATS  = [null, "top", "cap", "party", "crown"];
+// 여왕벌 전용 왕관 — queen 단계에서만 선택 가능 (합성본도 queen 만 존재)
+const QUEEN_HATS = ["crown-rose", "crown-sapphire", "crown-honey"];
 const STAGES = [
   { id: "egg",   key: "stage-1-egg" },
   { id: "larva", key: "stage-2-larva" },
@@ -32,11 +34,15 @@ function stageImageWithSkin(stage, skin) {
 function stageImageWithHat(stage, hat) {
   return `/stickers/stage-hats/${stage.key}-${hat}.png`;
 }
+function stageImageWithSkinAndHat(stage, skin, hat) {
+  if (skin === "classic") return stageImageWithHat(stage, hat);
+  return `/stickers/skin-hats/${stage.key}-${skin}-${hat}.png`;
+}
 
+// CharacterComposite.CharacterImage 의 1순위 후보와 동일해야 한다.
 function resolveCharImg(stage, skin, hat) {
-  const useComposite = skin === "classic" && hat !== null;
-  return useComposite
-    ? stageImageWithHat(stage, hat)
+  return hat !== null
+    ? stageImageWithSkinAndHat(stage, skin, hat)
     : stageImageWithSkin(stage, skin);
 }
 
@@ -49,23 +55,21 @@ let total = 0;
 let pass = 0;
 const fails = [];
 
-// Full matrix — 150 combos
+// Full matrix — 150 + 18(queen 전용 왕관) combos
 for (const stage of STAGES) {
+  const hats = stage.id === "queen" ? [...HATS, ...QUEEN_HATS] : HATS;
   for (const skin of SKINS) {
-    for (const hat of HATS) {
+    for (const hat of hats) {
       total++;
       const charImg = resolveCharImg(stage, skin, hat);
       if (!checkFile(charImg)) {
         fails.push({ stage: stage.id, skin, hat, missing: charImg });
         continue;
       }
-      // Hat overlay only rendered when not using composite
-      if (hat && skin !== "classic") {
-        const hatPng = `/stickers/hat-${hat}.png`;
-        if (!checkFile(hatPng)) {
-          fails.push({ stage: stage.id, skin, hat, missing: hatPng });
-          continue;
-        }
+      // 선택 타일 썸네일용 모자 단품 PNG 도 존재해야 함
+      if (hat && !checkFile(`/stickers/hat-${hat}.png`)) {
+        fails.push({ stage: stage.id, skin, hat, missing: `/stickers/hat-${hat}.png` });
+        continue;
       }
       pass++;
     }

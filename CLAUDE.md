@@ -229,6 +229,16 @@ Leitner 박스 1~5 + `nextDueAt`. `filterDue(list)` 가 지금 복습 대상 추
   도출한다.** 예전에 inline `CHAR_ANCHOR` 객체로 박았다가 에셋 추가마다 코드를
   수정해야 했음.
 
+- **모자는 합성본이 1순위, anchors 오버레이는 최후 폴백.** 캐릭터 합성 렌더는
+  `components/CharacterComposite.tsx` 한 곳에만 둔다 (PraiseHive·CosmeticPicker
+  공유 — 미리보기와 실제 화면이 어긋났던 원인이 각자 렌더였음). 여왕벌 왕관
+  3종(crown-rose/sapphire/honey) 합성본은 Gemini 가 아니라
+  `scripts/gen-queen-crown-composites.mjs` (sharp 로컬 합성)로 생성 — 배경이
+  안 구워지므로 clean-bg 불필요. 왕관을 키우거나 자리를 바꿀 땐 이 스크립트의
+  CROWNS 좌표만 수정 후 재실행 (상단 잘림 제약 주석 참조). Gemini 합성본은
+  내용 불량일 수 있음 — 신규 생성 시 눈으로 검수 (stage-5-queen-crown.png 에
+  왕관이 통째로 빠져 있던 사례).
+
 ## CSS / 기하 계산
 
 - **clip-path 타일링(육각형 등) 에서는 `Math.round` / `Math.floor` 금지.**
