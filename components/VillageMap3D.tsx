@@ -18,7 +18,7 @@
 //   · 탭 raycast → onSelect(clientId) → BeeVillage 의 기존 DOM 팝오버.
 //     3D 안에 UI 를 만들지 않는다 (3D 는 무대, UI 는 DOM).
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { decoV2ById } from "@/lib/village";
@@ -119,6 +119,149 @@ export default function VillageMap3D({
   const aliveRef = useRef(false);
   // 재빌드 세대 — 늦게 도착한 텍스처 콜백이 옛 플롯을 만지지 않게
   const genRef = useRef(0);
+
+  // ── 🚶 산책(관람) 모드 ──────────────────────────────────────
+  // 내 벌이 플레이어가 되어 지면을 탭-투-무브로 돌아다닌다. 산책 중에만
+  // rAF 루프 허용(ADR-2 절충 — 모드 종료/탭 이탈 시 즉시 중단), 카메라는
+  // 벌을 리지드 팔로우(사용자 줌·회전 오프셋 보존).
+  const [walking, setWalking] = useState(false);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const groundMeshRef = useRef<THREE.Mesh | null>(null);
+  const walkRef = useRef<{
+    active: boolean;
+    sprite: THREE.Object3D | null;
+    pos: THREE.Vector3;
+    target: THREE.Vector3 | null;
+    raf: number;
+    highlight: THREE.Mesh | null;
+  }>({ active: false, sprite: null, pos: new THREE.Vector3(), target: null, raf: 0, highlight: null });
+
+  const selfPlotIndex = plots.findIndex((p) => p.isSelf);
+
+  function stopWalk() {
+    const w = walkRef.current;
+    w.active = false;
+    cancelAnimationFrame(w.raf);
+    const scene = sceneRef.current;
+    if (scene) {
+      if (w.sprite) scene.remove(w.sprite);
+      if (w.highlight) {
+        scene.remove(w.highlight);
+        w.highlight.geometry.dispose();
+        (w.highlight.material as THREE.Material).dispose();
+      }
+    }
+    w.sprite = null;
+    w.highlight = null;
+    w.target = null;
+    const controls = controlsRef.current;
+    if (controls) controls.enablePan = true;
+    setWalking(false);
+    requestRenderRef.current();
+  }
+
+  function startWalk() {
+    const scene = sceneRef.current;
+    const controls = controlsRef.current;
+    const camera = cameraRef.current;
+    const renderer = rendererRef.current;
+    if (!scene || !controls || !camera || !renderer || selfPlotIndex < 0) return;
+    const w = walkRef.current;
+    if (w.active) return;
+    w.active = true;
+    setWalking(true);
+    controls.enablePan = false; // 팬은 팔로우와 상충 — 줌/회전만 유지
+
+    // 시작 위치 = 내 집 앞
+    const { x, z } = plotPosition(selfPlotIndex);
+    w.pos.set(x, 0, z + 3.2);
+    w.target = null;
+
+    // 플레이어 스프라이트 (내 벌 후보 체인 재사용, 실패 시 노란 박스)
+    const holder = new THREE.Group();
+    holder.position.copy(w.pos);
+    scene.add(holder);
+    w.sprite = holder;
+    const bee = plots[selfPlotIndex].bee;
+    const tryTex = (i: number) => {
+      if (!w.active) return;
+      if (i >= bee.length) {
+        const cube = new THREE.Mesh(
+          new THREE.BoxGeometry(0.9, 0.9, 0.9),
+          new THREE.MeshLambertMaterial({ color: 0xfbbf24 }),
+        );
+        cube.position.y = 1.2;
+        holder.add(cube);
+        return;
+      }
+      getTexture(bee[i], (tex) => {
+        if (!w.active) return;
+        if (!tex) return tryTex(i + 1);
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, alphaTest: 0.04 }));
+        s.scale.set(2.4, 2.4, 1);
+        s.position.y = 1.4;
+        holder.add(s);
+      });
+    };
+    tryTex(0);
+
+    // 근접 플롯 하이라이트 링 (공유 1개)
+    const hl = new THREE.Mesh(
+      new THREE.RingGeometry(3.1, 3.7, 36),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.7 }),
+    );
+    hl.rotation.x = -Math.PI / 2;
+    hl.position.y = 0.05;
+    hl.visible = false;
+    scene.add(hl);
+    w.highlight = hl;
+
+    const SPEED = 7; // 월드유닛/초
+    let last = performance.now();
+    const step = (now: number) => {
+      if (!w.active) return;
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      // 이동 보간
+      if (w.target) {
+        const to = w.target.clone().sub(w.pos);
+        to.y = 0;
+        const d = to.length();
+        if (d < 0.15) {
+          w.target = null;
+        } else {
+          w.pos.add(to.normalize().multiplyScalar(Math.min(d, SPEED * dt)));
+        }
+      }
+      // bobbing — 이동 중엔 크게, 정지 시 잔잔히 부유
+      const bobA = w.target ? 0.22 : 0.08;
+      holder.position.set(w.pos.x, Math.abs(Math.sin(now / 130)) * bobA, w.pos.z);
+      // 근접 하이라이트 — 가장 가까운 플롯 (반경 5.5)
+      let bestI = -1;
+      let bestD = 5.5;
+      for (let i = 0; i < plots.length; i++) {
+        const p = plotPosition(i);
+        const d = Math.hypot(p.x - w.pos.x, p.z - w.pos.z);
+        if (d < bestD) { bestD = d; bestI = i; }
+      }
+      if (bestI >= 0) {
+        const p = plotPosition(bestI);
+        hl.position.set(p.x, 0.05, p.z);
+        hl.visible = true;
+      } else {
+        hl.visible = false;
+      }
+      // 카메라 리지드 팔로우 — target 이동분을 camera 에도 더해 오프셋 보존
+      const follow = new THREE.Vector3(w.pos.x, 1, w.pos.z);
+      const delta = follow.clone().sub(controls.target).multiplyScalar(0.14);
+      controls.target.add(delta);
+      camera.position.add(delta);
+      controls.update();
+      renderer.render(scene, camera);
+      w.raf = requestAnimationFrame(step);
+    };
+    w.raf = requestAnimationFrame(step);
+  }
 
   // ── 텍스처 로더 (캐시 + 실패 기억) ─────────────────────────
   function getTexture(url: string, cb: (tex: THREE.Texture | null) => void) {
@@ -427,6 +570,19 @@ export default function VillageMap3D({
           obj = obj.parent;
         }
       }
+      // 산책 중이면 빈 지면 탭 = 그 지점으로 걸어가기
+      const w = walkRef.current;
+      if (w.active) {
+        const gHit = ray.intersectObject(ground, false)[0];
+        if (gHit) {
+          const p = gHit.point;
+          w.target = new THREE.Vector3(
+            Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, p.x)),
+            0,
+            Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, p.z)),
+          );
+        }
+      }
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
@@ -434,6 +590,8 @@ export default function VillageMap3D({
     sceneRef.current = scene;
     rendererRef.current = renderer;
     cameraRef.current = camera;
+    controlsRef.current = controls;
+    groundMeshRef.current = ground;
 
     // 첫 프레임 (색 박스만으로도 완성된 씬) → 부모에 준비 완료 통지
     requestRender();
@@ -442,6 +600,8 @@ export default function VillageMap3D({
     return () => {
       aliveRef.current = false;
       disposed = true;
+      walkRef.current.active = false;
+      cancelAnimationFrame(walkRef.current.raf);
       observer.disconnect();
       renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
@@ -472,6 +632,8 @@ export default function VillageMap3D({
       rendererRef.current = null;
       cameraRef.current = null;
       plotsGroupRef.current = null;
+      controlsRef.current = null;
+      groundMeshRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -634,9 +796,39 @@ export default function VillageMap3D({
   }, [plots, facilities]);
 
   return (
-    <div
-      ref={mountRef}
-      style={{ width: "100%", height, borderRadius: 16, overflow: "hidden" }}
-    />
+    <div style={{ position: "relative", width: "100%", height }}>
+      <div
+        ref={mountRef}
+        style={{ width: "100%", height: "100%", borderRadius: 16, overflow: "hidden" }}
+      />
+      {selfPlotIndex >= 0 && (
+        <button
+          onClick={() => (walking ? stopWalk() : startWalk())}
+          style={{
+            position: "absolute", right: 12, bottom: 12,
+            minHeight: 48, padding: "10px 18px", borderRadius: 16,
+            border: "none", cursor: "pointer",
+            fontSize: 15, fontWeight: 900, fontFamily: "inherit",
+            color: "#fff",
+            background: walking
+              ? "linear-gradient(135deg, #64748B, #475569)"
+              : "linear-gradient(135deg, #F59E0B, #D97706)",
+            boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+          }}
+        >
+          {walking ? "✕ 그만" : "🚶 산책"}
+        </button>
+      )}
+      {walking && (
+        <div style={{
+          position: "absolute", left: 12, bottom: 14,
+          padding: "6px 12px", borderRadius: 12,
+          background: "rgba(255,255,255,0.85)", color: "#92400E",
+          fontSize: 12, fontWeight: 800, pointerEvents: "none",
+        }}>
+          바닥을 탭하면 그곳으로 걸어가요 🐝
+        </div>
+      )}
+    </div>
   );
 }

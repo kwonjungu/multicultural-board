@@ -12,13 +12,24 @@ const GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1beta";
 // #7: gemini-2.0-flash 는 2026-06-01 종료되어 API 가 에러를 반환한다(사용 금지).
 // 2.5-flash 가 현행 stable. 느린 원인은 모델이 아니라 thinking(추론) 단계였으므로
 // generateJson 에서 reasoning_effort:"none" 으로 thinking 을 꺼 속도를 회복한다.
+//
+// 🔒 비용 하드캡 (사용자 지시 2026-07-13): 기본은 **2.5 flash 계열**, 필요시
+// 3.0 까지 허용. 3.1+/Pro 등 그 위 고가 모델 금지. 런타임에서 차단.
+const ALLOWED_GEMINI_MODEL = /^gemini-(2\.5-flash(-lite|-image)?|3\.0-[a-z-]+)(-preview.*)?$/;
+export function assertAllowedGeminiModel(model: string): string {
+  if (!ALLOWED_GEMINI_MODEL.test(model)) {
+    throw new Error(`Gemini 모델 차단됨(비용 하드캡 — 2.5 flash 계열만 허용): ${model}`);
+  }
+  return model;
+}
+
 export const GEMINI_TEXT_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
-];
+].map(assertAllowedGeminiModel);
 
 // Image generation model (Gemini 2.5 Flash Image aka "Nano Banana")
-export const GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
+export const GEMINI_IMAGE_MODEL = assertAllowedGeminiModel("gemini-2.5-flash-image");
 
 // Gemini 다중 API 키 폴백 — lib/groq-client.ts 의 getGroqApiKeys 와 동일 패턴.
 // 환경변수 (우선순위 순): GEMINI_API_KEY → GEMINI_API_KEY_BACKUP → GEMINI_API_KEY_BACKUP2

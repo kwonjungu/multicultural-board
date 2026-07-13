@@ -89,6 +89,13 @@
 
 ## 🛡 가드레일 (반복하지 말아야 할 함정)
 
+- **🔒 Gemini 비용 하드캡 (사용자 지시, 절대 규칙).** 기본은 **2.5 flash 계열**
+  (`gemini-2.5-flash`, `-flash-lite`, `-flash-image`=나노바나나 1). 필요할 때만
+  3.0 허용. **3.1+·Pro 등 그 위 고가 모델 금지.** 이미지 대량 생성은 반드시
+  `batchGenerateContent`(배치 API, 50% 할인)로. lib/gemini.ts 의
+  `assertAllowedGeminiModel` 이 런타임에서 차단 — 새 모델 상수는 반드시 이 함수를 거칠 것.
+  스크립트(scripts/gen-*.mjs)에 모델을 하드코딩할 때도 이 규칙 적용.
+
 - **문서 번역(XML)의 공용 유틸은 `lib/xmlI18n.ts` 만 사용.** (1) decodeXml 은
   `&amp;` 를 반드시 마지막에 풀어야 한다 — 먼저 풀면 이중 이스케이프가 깨져
   재조립 XML 이 손상된다. (2) 번역 전에 mergePptxRuns / mergeHwpxRuns 로
