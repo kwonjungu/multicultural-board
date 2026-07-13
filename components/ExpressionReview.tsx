@@ -6,6 +6,7 @@ import {
 } from "@/lib/expressionLog";
 import { SRS_BOX_LABEL, type SrsBox } from "@/lib/srs";
 import { awardXp } from "@/lib/lms";
+import { reportQuestEvent } from "@/lib/quests";
 
 const PURPLE = "#8B5CF6";
 const PURPLE_DARK = "#6D28D9";
@@ -94,6 +95,7 @@ export default function ExpressionReview({
         } else if (earnedXp > 0) {
           await awardXp(roomCode, clientId, earnedXp);
         }
+        reportQuestEvent(roomCode, clientId, "expression_review"); // 📋 일일 퀘스트 — 세션 종료 1회
         setPhase("done");
       } else {
         setIdx((i) => i + 1);

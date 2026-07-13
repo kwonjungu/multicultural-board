@@ -1,6 +1,7 @@
 import { ref, push, set, runTransaction, onValue, off } from "firebase/database";
 import { getClientDb } from "./firebase-client";
 import { giveIndividualSticker } from "./stickers";
+import { reportQuestEvent } from "./quests";
 import type { LangMap } from "./gameData";
 
 // "내 감정 표현하기" — 활동 중 학생이 빠르게 비언어 표현으로 감정을 공유하는 카드.
@@ -129,6 +130,11 @@ export async function pushEmotion(p: PushEmotionParams): Promise<string> {
   if (p.bookId) entry.bookId = p.bookId;
   if (typeof p.pageIdx === "number") entry.pageIdx = p.pageIdx;
   await set(newRef, entry);
+  // 📋 일일 퀘스트 — 감정 체크인 저장 성공 직후 (EmotionCardDeck 은 room/clientId
+  // 스코프가 없어 실제 저장 성공 지점인 여기서 계측. 호출부는 전부 학생 onPick).
+  // 퀘스트 키는 학생 이름 (village/stickers 와 동일) — p.clientId 는 UUID 인 경우가
+  // 있어 authorName(= user.myName) 을 사용.
+  reportQuestEvent(p.roomCode, p.authorName, "emotion_checkin");
   return id;
 }
 

@@ -16,6 +16,7 @@
 
 import { ref, onValue, off, update, runTransaction } from "firebase/database";
 import { getClientDb } from "./firebase-client";
+import { reportQuestEvent } from "./quests";
 
 export const DEW_AMOUNT = 10;          // 꿀 이슬 줍기: 일 1회 +10
 export const HONEY_PER_STICKER = 5;    // 스티커 1개 = 꿀 5 환전
@@ -254,5 +255,7 @@ export async function waterFriendGarden(
   const after = (result.snapshot.val() as VillageState | null) ?? {};
   const gardenWater = after.gardenWater ?? 0;
   const gardenLevel = after.gardenLevel ?? 0;
+  // 📋 일일 퀘스트 — 물주기 성공 시, 물 준 학생(my) 기준.
+  reportQuestEvent(roomCode, myClientId, "village_water");
   return { status: "done", leveledUp: result.committed && gardenWater === 0, gardenLevel, gardenWater };
 }

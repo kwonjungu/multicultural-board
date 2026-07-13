@@ -16,6 +16,7 @@ import SentencePracticeModal from "./SentencePracticeModal";
 import EmotionCardDeck from "./EmotionCardDeck";
 import { pushEmotion, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
 import { pushExpressionDedup } from "@/lib/expressionLog";
+import { reportQuestEvent } from "@/lib/quests";
 import { filterPracticeCards } from "@/lib/sentencePractice";
 import { columnIconFor } from "@/lib/assets";
 import { QRCodeSVG } from "qrcode.react";
@@ -388,6 +389,11 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       });
       if (!res.ok) throw new Error("API 오류");
       setCards((prev) => prev.filter((c) => c.id !== tempId));
+
+      // 📋 일일 퀘스트 — 학생 카드 작성 성공 직후 (fire-and-forget, 내부 격리).
+      // 표현 추출 블록은 텍스트+비모국어 조건부라 그 안에 두면 누락됨 → 성공 직후에 배치.
+      // 퀘스트 키는 학생 이름 (village/stickers 동일 키 — myClientId 는 UUID 라 사용 금지).
+      if (!isTeacher) reportQuestEvent(roomCode, user.myName, "board_card");
 
       // ── 학생 표현 자동 추출 (백그라운드) ──
       // 학생이 모국어 외 언어(주로 한국어)로 쓴 텍스트만 학습 가치가 있다고 보고 추출.

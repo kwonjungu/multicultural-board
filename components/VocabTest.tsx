@@ -6,6 +6,7 @@ import { checkSpeechMatch } from "@/lib/vocabUtils";
 import type { QuizItem, ClozeItem, Mc4Item, Mc4ImageItem, MatchingItem, ListeningItem, SpeakItem } from "@/lib/quizFormats";
 import { FORMAT_ICON } from "@/lib/quizFormats";
 import { logAttempt } from "@/lib/vocabAttempts";
+import { reportQuestEvent } from "@/lib/quests";
 import {
   XP_PER_CORRECT, comboBonus, loseHeart, awardXp, recordLessonResult,
   subscribeLearner, effectiveHearts, MAX_HEARTS, type LearnerState,
@@ -231,6 +232,7 @@ export default function VocabTest({
     if (finalizedRef.current) return;
     finalizedRef.current = true;
     setFinalizing(true);
+    reportQuestEvent(roomCode, clientId, "vocab_session"); // 📋 일일 퀘스트 — 세션 1회 (finalizedRef 가드)
     try {
       if (sessionXp > 0) {
         const res = await awardXp(roomCode, clientId, sessionXp);

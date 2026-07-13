@@ -369,6 +369,8 @@ export default function RoomPage() {
             onClose={() => setHubView("hub")}
             onChangeMyLang={(l) => setUser({ ...user, myLang: l })}
             roomLangs={roomLangs}
+            roomCode={roomCode}
+            questClientId={user.isTeacher ? undefined : user.myName}
           />
           <SectionCaption section="games" isTeacher={user.isTeacher} />
         </>

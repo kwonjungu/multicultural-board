@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { LANGUAGES } from "@/lib/constants";
 import { useBackLayer } from "@/lib/backStack";
 import { GameText, prefetchGameTexts } from "@/lib/gameI18n";
+import { reportQuestEvent } from "@/lib/quests";
 import { gt, type LangMap } from "./games/uiText";
 import BeeMascot from "./BeeMascot";
 import CountryGuess from "./games/CountryGuess";
@@ -140,12 +141,15 @@ function GameIcon({ icon, iconImg, size }: { icon: string; iconImg?: string; siz
 
 const DEFAULT_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
 
-export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs }: {
+export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, roomCode, questClientId }: {
   myLang: string;
   onClose: () => void;
   /** "나" 카드에서 내 언어를 바꿀 때 호출 — 상위에서 UserConfig.myLang 갱신(localStorage 저장). */
   onChangeMyLang?: (lang: string) => void;
   roomLangs?: string[];
+  /** 📋 일일 퀘스트 계측용 (선택) — 없으면 계측 생략. questClientId = 학생 이름 (교사는 미전달). */
+  roomCode?: string;
+  questClientId?: string;
 }) {
   const friendLangCodes = roomLangs && roomLangs.length > 0 ? roomLangs : DEFAULT_LANG_CODES;
   const defaultFriend = friendLangCodes.find((c) => c !== (myLang || "ko")) || "en";
@@ -161,8 +165,15 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs }:
     prefetchGameTexts(GAMES.flatMap((g) => [{ ko: g.name }, { ko: g.sub }]), viewerLang);
   }, [viewerLang]);
 
+  // 📋 일일 퀘스트 — 게임 1판 종료 계측. 개별 게임(20종)은 종료 신호를 셸로
+  // 올리지 않으므로 "활성 게임에서 나가기"를 공통 종료 지점으로 사용 (1곳 원칙).
+  // fire-and-forget — 기존 화면 전환 흐름은 그대로.
+  const reportGamePlayed = () => {
+    if (roomCode && questClientId) reportQuestEvent(roomCode, questClientId, "game_play");
+  };
+
   // 뒤로 가기: 게임 플레이 중이면 게임 목록으로 (허브로 바로 나가지 않음).
-  useBackLayer(gameId !== null, () => setGameId(null));
+  useBackLayer(gameId !== null, () => { reportGamePlayed(); setGameId(null); });
 
   // 한국 학생끼리도 플레이 가능하도록 같은 언어 중복 선택 허용 (filter 제거)
   const availableFriendLangs = friendLangCodes;
@@ -362,7 +373,7 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs }:
             background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)",
           }}>
             <button
-              onClick={() => setGameId(null)}
+              onClick={() => { reportGamePlayed(); setGameId(null); }}
               aria-label="게임 목록으로"
               style={{
                 width: 44, height: 44, borderRadius: 12, border: `2px solid ${ActiveGame.color}44`,
@@ -383,7 +394,7 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs }:
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={() => { reportGamePlayed(); onClose(); }}
               aria-label="게임룸 닫기"
               style={{
                 width: 44, height: 44, borderRadius: 12, border: "2px solid #FDE68A",

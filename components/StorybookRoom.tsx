@@ -58,6 +58,7 @@ import StorybookWordQuiz from "./StorybookWordQuiz";
 import { useBackLayer } from "@/lib/backStack";
 import EmotionCardDeck from "./EmotionCardDeck";
 import { pushEmotion, emotionById, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
+import { reportQuestEvent } from "@/lib/quests";
 import { t, tFmt } from "@/lib/i18n";
 import { Fruit, FRUIT_KINDS } from "./DiscussionSession";
 import { useFurigana, RubyText } from "@/lib/furigana";
@@ -815,6 +816,9 @@ function StudentFreeLibrary({
     try {
       const b = await loadBook(id);
       setOpenBook(b);
+      // 📋 일일 퀘스트 — 자유 읽기에서 책을 열어 읽기 시작할 때 1회 (학생 전용 화면).
+      // 퀘스트 키는 학생 이름 (village/stickers 동일 키 — myClientId 는 UUID 라 사용 금지).
+      reportQuestEvent(roomCode, user.myName, "storybook_read");
     } catch (err) {
       console.error("free reader loadBook failed", err);
       window.alert("그림책을 불러오지 못했어요.");

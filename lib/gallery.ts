@@ -12,6 +12,7 @@
 
 import { ref, push, set, onValue, off, runTransaction } from "firebase/database";
 import { getClientDb } from "./firebase-client";
+import { reportQuestEvent } from "./quests";
 
 export interface GalleryComment {
   id: string;
@@ -74,6 +75,8 @@ export async function likeOncePerDay(
     if (cur && cur.last === today) return; // abort — 오늘 이미 좋아요
     return { last: today, count: (cur?.count ?? 0) + 1 };
   });
+  // 📋 일일 퀘스트 — 좋아요가 실제 기록된 경우만, 누른 학생(voter) 기준.
+  if (result.committed) reportQuestEvent(roomCode, voterClientId, "gallery_like");
   return result.committed;
 }
 
