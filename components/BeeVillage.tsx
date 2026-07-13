@@ -31,6 +31,7 @@ import {
   type VillageSlot,
 } from "@/lib/village";
 import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
+import QuestBoard from "./QuestBoard";
 import Toast from "./Toast";
 import { HONEY } from "@/lib/constants";
 import { t } from "@/lib/i18n";
@@ -240,6 +241,15 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
         tone={toast?.tone ?? "success"}
         onDismiss={() => setToast(null)}
       />
+
+      {/* ── 📋 오늘의 심부름 (학생만 — 일일 퀘스트 보드) ── */}
+      {!user.isTeacher && (
+        <QuestBoard
+          roomCode={roomCode}
+          myClientId={myClientId}
+          onToast={(msg, tone) => setToast({ msg, tone })}
+        />
+      )}
 
       {/* ── 내 꿀 지갑 + 상점 (학생만 — 교사는 관람) ── */}
       {!user.isTeacher && (
