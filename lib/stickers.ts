@@ -253,6 +253,8 @@ export function subscribeCosmetics(
       petPos: (val?.petPos as StudentCosmetics["petPos"]) ?? "right",
       backdrop: (val?.backdrop as StudentCosmetics["backdrop"]) ?? null,
       aura: (val?.aura as StudentCosmetics["aura"]) ?? null,
+      held: (val?.held as StudentCosmetics["held"]) ?? null,
+      acc: (val?.acc as StudentCosmetics["acc"]) ?? null,
     };
     cb(c);
   });
@@ -278,6 +280,8 @@ export function subscribeAllCosmetics(
         petPos: (v?.petPos as StudentCosmetics["petPos"]) ?? "right",
         backdrop: (v?.backdrop as StudentCosmetics["backdrop"]) ?? null,
         aura: (v?.aura as StudentCosmetics["aura"]) ?? null,
+        held: (v?.held as StudentCosmetics["held"]) ?? null,
+        acc: (v?.acc as StudentCosmetics["acc"]) ?? null,
       };
     }
     cb(out);
@@ -297,6 +301,8 @@ export async function setCosmetics(
     petPos: c.petPos ?? "right",
     backdrop: c.backdrop ?? null,
     aura: c.aura ?? null,
+    held: c.held ?? null,
+    acc: c.acc ?? null,
   };
   await set(ref(db, `${basePath(roomCode)}/cosmetics/${studentClientId}`), clean);
 }

@@ -2,7 +2,7 @@
 // Test: nextThreshold(0)=2, nextThreshold(8)=15, nextThreshold(15)=null
 // Test: progressInStage(5)=(current:1,total:4,percent:25)
 
-import type { Stage, SkinId, HatId, PetId, TrophyId, BackdropId, AuraId } from "./types";
+import type { Stage, SkinId, HatId, PetId, TrophyId, BackdropId, AuraId, HeldId, AccId } from "./types";
 
 // Stage thresholds: [min, max] inclusive. queen has no upper bound.
 export const STAGE_THRESHOLDS: Record<Stage, { min: number; max: number | null }> = {
@@ -111,63 +111,92 @@ export function stageImageWithSkinAndHat(
   return `/stickers/skin-hats/${stageKey(stage)}-${skin}-${hat}.png`;
 }
 
-// Helper: numeric rank of a stage (egg=0 ... queen=4)
-function rank(stage: Stage): number {
-  return STAGE_ORDER.indexOf(stage);
-}
-
 // === Unlock logic (pure, no Firebase) ===
+// 해금은 "스티커 개수" 기반. 스테이지 문턱(0/2/4/8/15)과 여왕벌 이후의
+// 로열 마일스톤(20/25/30)을 하나의 표로 관리한다 — 값 = 필요 스티커 수.
+// 전체 로스터 40종. docs/꿀벌마을-마스터플랜.md 의 표와 1:1 동기화 유지.
 
-// classic always. larva+: +orange,green. pupa+: +sky,pink,purple.
-export function unlockedSkins(stage: Stage): SkinId[] {
-  const r = rank(stage);
-  const out: SkinId[] = ["classic"];
-  if (r >= rank("larva")) out.push("orange", "green");
-  if (r >= rank("pupa"))  out.push("sky", "pink", "purple");
-  return out;
+export const ROYAL_MILESTONES: { at: number; label: string }[] = [
+  { at: 20, label: "반짝 여왕" },
+  { at: 25, label: "별빛 여왕" },
+  { at: 30, label: "전설의 여왕" },
+];
+
+export const UNLOCK_AT = {
+  skin: { classic: 0, orange: 2, green: 2, sky: 4, pink: 4, purple: 4 },
+  hat: {
+    top: 4, cap: 8, party: 8,
+    crown: 15, "crown-rose": 15, "crown-sapphire": 15, "crown-honey": 15,
+  },
+  backdrop: { flower: 4, hive: 4, rainbow: 4, night: 4, throne: 15, galaxy: 20 },
+  aura: { sparkle: 8, heart: 8, stardust: 8, royal: 15, prism: 25 },
+  pet: { dog: 8, cat: 15, rabbit: 15, butterfly: 15, fox: 20, owl: 25 },
+  trophy: { gold: 15, star: 15, diamond: 30 },
+  held: { honeypot: 8, book: 8, flag: 15 },
+  acc: { scarf: 4, glasses: 4, necklace: 8, cape: 15 },
+} as const;
+
+export type CosmeticKind = keyof typeof UNLOCK_AT;
+
+function unlockedOf<T extends string>(table: Record<T, number>, count: number): T[] {
+  const n = Math.max(0, Math.floor(count));
+  return (Object.keys(table) as T[]).filter((id) => n >= table[id]);
 }
 
-// pupa+: top. bee+: +cap,ribbon. queen+: +crown + 전용 왕관 3종.
-export function unlockedHats(stage: Stage): NonNullable<HatId>[] {
-  const r = rank(stage);
-  const out: NonNullable<HatId>[] = [];
-  if (r >= rank("pupa"))  out.push("top");
-  if (r >= rank("bee"))   out.push("cap", "party");
-  if (r >= rank("queen")) out.push("crown", "crown-rose", "crown-sapphire", "crown-honey");
-  return out;
+export function unlockedSkins(count: number): SkinId[] {
+  return unlockedOf(UNLOCK_AT.skin as Record<SkinId & string, number>, count);
+}
+export function unlockedHats(count: number): NonNullable<HatId>[] {
+  return unlockedOf(UNLOCK_AT.hat as Record<NonNullable<HatId>, number>, count);
+}
+export function unlockedBackdrops(count: number): NonNullable<BackdropId>[] {
+  return unlockedOf(UNLOCK_AT.backdrop as Record<NonNullable<BackdropId>, number>, count);
+}
+export function unlockedAuras(count: number): NonNullable<AuraId>[] {
+  return unlockedOf(UNLOCK_AT.aura as Record<NonNullable<AuraId>, number>, count);
+}
+export function unlockedPets(count: number): NonNullable<PetId>[] {
+  return unlockedOf(UNLOCK_AT.pet as Record<NonNullable<PetId>, number>, count);
+}
+export function unlockedTrophies(count: number): NonNullable<TrophyId>[] {
+  return unlockedOf(UNLOCK_AT.trophy as Record<NonNullable<TrophyId>, number>, count);
+}
+export function unlockedHeld(count: number): NonNullable<HeldId>[] {
+  return unlockedOf(UNLOCK_AT.held as Record<NonNullable<HeldId>, number>, count);
+}
+export function unlockedAccs(count: number): NonNullable<AccId>[] {
+  return unlockedOf(UNLOCK_AT.acc as Record<NonNullable<AccId>, number>, count);
 }
 
-// 배경: pupa+ 4종, queen 에서 왕좌 추가. Phase 3.
-export function unlockedBackdrops(stage: Stage): NonNullable<BackdropId>[] {
-  const r = rank(stage);
-  const out: NonNullable<BackdropId>[] = [];
-  if (r >= rank("pupa"))  out.push("flower", "hive", "rainbow", "night");
-  if (r >= rank("queen")) out.push("throne");
-  return out;
+/** 특정 아이템의 필요 스티커 수 (표에 없으면 0 = 항상 해금). */
+export function requiredCount(kind: CosmeticKind, id: string): number {
+  return (UNLOCK_AT[kind] as Record<string, number>)[id] ?? 0;
 }
 
-// 오라: bee+ 3종, queen 에서 로열 추가. Phase 3.
-export function unlockedAuras(stage: Stage): NonNullable<AuraId>[] {
-  const r = rank(stage);
-  const out: NonNullable<AuraId>[] = [];
-  if (r >= rank("bee"))   out.push("sparkle", "heart", "stardust");
-  if (r >= rank("queen")) out.push("royal");
-  return out;
+/** count 초과인 가장 가까운 해금 문턱. 전부 해금이면 null. */
+export function nextUnlockAt(count: number): number | null {
+  const n = Math.max(0, Math.floor(count));
+  let best: number | null = null;
+  for (const table of Object.values(UNLOCK_AT)) {
+    for (const at of Object.values(table) as number[]) {
+      if (at > n && (best === null || at < best)) best = at;
+    }
+  }
+  return best;
 }
 
-// bee+: dog. queen+: +cat,rabbit,butterfly.
-export function unlockedPets(stage: Stage): NonNullable<PetId>[] {
-  const r = rank(stage);
-  const out: NonNullable<PetId>[] = [];
-  if (r >= rank("bee"))   out.push("dog");
-  if (r >= rank("queen")) out.push("cat", "rabbit", "butterfly");
-  return out;
-}
-
-// queen+: gold, star.
-export function unlockedTrophies(stage: Stage): NonNullable<TrophyId>[] {
-  const r = rank(stage);
-  const out: NonNullable<TrophyId>[] = [];
-  if (r >= rank("queen")) out.push("gold", "star");
-  return out;
+/** 여왕벌 이후 진행률: 직전 해금 문턱 → 다음 문턱 구간의 %.
+ *  모든 아이템 해금(count ≥ 30) 시 null → 호출부는 phMaxStage 표기. */
+export function royalProgress(count: number): { nextAt: number; remaining: number; percent: number } | null {
+  const n = Math.max(0, Math.floor(count));
+  const nextAt = nextUnlockAt(n);
+  if (nextAt === null) return null;
+  let prevAt = 0;
+  for (const table of Object.values(UNLOCK_AT)) {
+    for (const at of Object.values(table) as number[]) {
+      if (at <= n && at > prevAt) prevAt = at;
+    }
+  }
+  const percent = Math.max(0, Math.min(100, Math.round(((n - prevAt) / (nextAt - prevAt)) * 100)));
+  return { nextAt, remaining: nextAt - n, percent };
 }

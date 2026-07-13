@@ -20,8 +20,17 @@ const STAGES = [
   { id: "bee",   key: "stage-4-bee" },
   { id: "queen", key: "stage-5-queen" },
 ];
-const PETS = [null, "dog", "cat", "rabbit", "butterfly"];
-const TROPHIES = [null, "gold", "star"];
+const PETS = [null, "dog", "cat", "rabbit", "butterfly", "fox", "owl"];
+const TROPHIES = [null, "gold", "star", "diamond"];
+// 오버레이 단품 (꿀벌 마을 40종 로스터 — lib/stage.ts UNLOCK_AT 와 1:1)
+const FLAT_ASSETS = [
+  ...["dog", "cat", "rabbit", "butterfly", "fox", "owl"].map((x) => `pet-${x}`),
+  ...["gold", "star", "diamond"].map((x) => `trophy-${x}`),
+  ...["flower", "hive", "rainbow", "night", "throne", "galaxy"].map((x) => `backdrop-${x}`),
+  ...["sparkle", "heart", "stardust", "royal", "prism"].map((x) => `aura-${x}`),
+  ...["honeypot", "book", "flag"].map((x) => `held-${x}`),
+  ...["scarf", "glasses", "necklace", "cape"].map((x) => `acc-${x}`),
+];
 
 function stageImage(stage) {
   const s = STAGES.find((x) => x.id === stage.id);
@@ -74,6 +83,16 @@ for (const stage of STAGES) {
       pass++;
     }
   }
+}
+
+// 오버레이 단품 전수 존재 검증 (pet/trophy/backdrop/aura/held/acc)
+for (const name of FLAT_ASSETS) {
+  total++;
+  if (!checkFile(`/stickers/${name}.png`)) {
+    fails.push({ missing: `/stickers/${name}.png` });
+    continue;
+  }
+  pass++;
 }
 
 // 50 random draws with pet+trophy also

@@ -1540,6 +1540,13 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "🔒 Откроется на след. этапе", uz: "🔒 Keyingi bosqichda ochiladi", hi: "🔒 अगले चरण में खुलेगा",
     id: "🔒 Buka di tahap berikutnya", ar: "🔒 يُفتح في المرحلة التالية", my: "🔒 နောက်အဆင့်တွင်ဖွင့်မည်",
   },
+  cosmeticLockedAt: {
+    ko: "🔒 스티커 {n}개에 해금", en: "🔒 Unlocks at {n} stickers", vi: "🔒 Mở khóa khi đủ {n} sticker",
+    zh: "🔒 集满{n}个贴纸解锁", fil: "🔒 Ma-unlock sa {n} sticker", ja: "🔒 シール{n}まいで解放",
+    th: "🔒 ปลดล็อกเมื่อครบ {n} สติ๊กเกอร์", km: "🔒 ដោះសោនៅ {n} ស្ទីគ័រ", mn: "🔒 {n} наалт цуглуулбал нээгдэнэ",
+    ru: "🔒 Откроется при {n} наклейках", uz: "🔒 {n} ta stikerda ochiladi", hi: "🔒 {n} स्टिकर पर खुलेगा",
+    id: "🔒 Terbuka di {n} stiker", ar: "🔒 يُفتح عند {n} ملصقًا", my: "🔒 စတစ်ကာ {n} ခုတွင် ဖွင့်မည်",
+  },
   cosmeticSave: {
     ko: "💾 저장", en: "💾 Save", vi: "💾 Lưu",
     zh: "💾 保存", fil: "💾 I-save", ja: "💾 保存",
@@ -1650,6 +1657,14 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     th: "ถึงระดับสูงสุด! 👑", km: "ដល់កម្រិតខ្ពស់បំផុត! 👑", mn: "Дээд түвшинд! 👑",
     ru: "Высший уровень! 👑", uz: "Eng yuqori! 👑", hi: "शीर्ष स्तर! 👑",
     id: "Tingkat tertinggi! 👑", ar: "وصلت للقمة! 👑", my: "ထိပ်ဆုံး! 👑",
+  },
+  phRoyalNextHint: {
+    ko: "다음 로열 보상까지 {n}개! 🎁", en: "{n} more to the next royal reward! 🎁",
+    vi: "Còn {n} nữa tới quà hoàng gia! 🎁", zh: "再得{n}个解锁皇家奖励!🎁",
+    fil: "{n} na lang para sa royal na regalo! 🎁", ja: "つぎのロイヤルほうびまで あと{n}こ!🎁",
+    th: "อีก {n} ถึงรางวัลราชินี! 🎁", km: "នៅសល់ {n} ទៀតដល់រង្វាន់រាជ! 🎁", mn: "Хааны шагнал хүртэл {n}! 🎁",
+    ru: "Ещё {n} до королевской награды! 🎁", uz: "Qirollik sovg'asigacha yana {n} ta! 🎁", hi: "अगले शाही इनाम तक {n} और! 🎁",
+    id: "{n} lagi menuju hadiah kerajaan! 🎁", ar: "بقي {n} للمكافأة الملكية! 🎁", my: "နောက်ဆုအထိ {n} ခုလို! 🎁",
   },
   phCustomize: {
     ko: "✨ 꾸미기", en: "✨ Customize", vi: "✨ Trang trí",

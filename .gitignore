@@ -58,3 +58,6 @@ output_cards/
 .image-batch-out/
 
 scripts/.asset_batch_job.json
+.cosmetics-batch-out/
+.village-batch-out/
+.acc-preview/

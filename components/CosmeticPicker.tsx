@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { t } from "@/lib/i18n";
+import { t, tFmt } from "@/lib/i18n";
 import { subscribeCosmetics, setCosmetics } from "@/lib/stickers";
 import {
   stageOf,
@@ -12,9 +12,16 @@ import {
   unlockedTrophies,
   unlockedBackdrops,
   unlockedAuras,
+  unlockedHeld,
+  unlockedAccs,
+  requiredCount,
+  royalProgress,
+  type CosmeticKind,
 } from "@/lib/stage";
-import { CharacterImage, CosmeticFrame } from "./CharacterComposite";
-import type { StudentCosmetics, SkinId, HatId, PetId, TrophyId, BackdropId, AuraId } from "@/lib/types";
+import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
+import type {
+  StudentCosmetics, SkinId, HatId, PetId, TrophyId, BackdropId, AuraId, HeldId, AccId,
+} from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -32,10 +39,18 @@ const ALL_HATS: NonNullable<HatId>[] = [
   "top", "cap", "party", "crown",
   "crown-rose", "crown-sapphire", "crown-honey", // 👑 여왕벌 전용
 ];
-const ALL_PETS: NonNullable<PetId>[] = ["dog", "cat", "rabbit", "butterfly"];
-const ALL_TROPHIES: NonNullable<TrophyId>[] = ["gold", "star"];
-const ALL_BACKDROPS: NonNullable<BackdropId>[] = ["flower", "hive", "rainbow", "night", "throne"];
-const ALL_AURAS: NonNullable<AuraId>[] = ["sparkle", "heart", "stardust", "royal"];
+const ALL_PETS: NonNullable<PetId>[] = ["dog", "cat", "rabbit", "butterfly", "fox", "owl"];
+const ALL_TROPHIES: NonNullable<TrophyId>[] = ["gold", "star", "diamond"];
+const ALL_BACKDROPS: NonNullable<BackdropId>[] = ["flower", "hive", "rainbow", "night", "throne", "galaxy"];
+const ALL_AURAS: NonNullable<AuraId>[] = ["sparkle", "heart", "stardust", "royal", "prism"];
+const ALL_HELD: NonNullable<HeldId>[] = ["honeypot", "book", "flag"];
+const ALL_ACCS: NonNullable<AccId>[] = ["scarf", "glasses", "necklace", "cape"];
+
+// 에셋 도착 전 아이템의 타일 폴백 (img 404 시 표시) — 로열 마일스톤 신규 5종
+const TILE_EMOJI: Record<string, string> = {
+  "pet-fox": "🦊", "pet-owl": "🦉", "trophy-diamond": "💎",
+  "backdrop-galaxy": "🌌", "aura-prism": "💠",
+};
 
 const DEFAULT_COSMETICS: StudentCosmetics = {
   skin: "classic",
@@ -45,9 +60,11 @@ const DEFAULT_COSMETICS: StudentCosmetics = {
   petPos: "right",
   backdrop: null,
   aura: null,
+  held: null,
+  acc: null,
 };
 
-type ItemKind = "skin" | "hat" | "pet" | "trophy";
+type ItemKind = "skin" | "hat" | "pet" | "trophy" | "backdrop" | "aura" | "held" | "acc";
 
 function assetPath(kind: ItemKind, id: string): string {
   return `/stickers/${kind}-${id}.png`;
@@ -69,12 +86,24 @@ export default function CosmeticPicker({
   const [error, setError] = useState<string | null>(null);
 
   const stage = useMemo(() => stageOf(stickerCount), [stickerCount]);
-  const uSkins = useMemo(() => new Set<SkinId>(unlockedSkins(stage)), [stage]);
-  const uHats = useMemo(() => new Set<NonNullable<HatId>>(unlockedHats(stage)), [stage]);
-  const uPets = useMemo(() => new Set<NonNullable<PetId>>(unlockedPets(stage)), [stage]);
-  const uTrophies = useMemo(() => new Set<NonNullable<TrophyId>>(unlockedTrophies(stage)), [stage]);
-  const uBackdrops = useMemo(() => new Set<NonNullable<BackdropId>>(unlockedBackdrops(stage)), [stage]);
-  const uAuras = useMemo(() => new Set<NonNullable<AuraId>>(unlockedAuras(stage)), [stage]);
+  // 해금은 전부 스티커 "개수" 기반 — 여왕벌(15) 이후에도 20/25/30 로열
+  // 마일스톤에서 계속 열린다 (꿀벌 마을 마스터플랜).
+  const uSkins = useMemo(() => new Set<SkinId>(unlockedSkins(stickerCount)), [stickerCount]);
+  const uHats = useMemo(() => new Set<NonNullable<HatId>>(unlockedHats(stickerCount)), [stickerCount]);
+  const uPets = useMemo(() => new Set<NonNullable<PetId>>(unlockedPets(stickerCount)), [stickerCount]);
+  const uTrophies = useMemo(() => new Set<NonNullable<TrophyId>>(unlockedTrophies(stickerCount)), [stickerCount]);
+  const uBackdrops = useMemo(() => new Set<NonNullable<BackdropId>>(unlockedBackdrops(stickerCount)), [stickerCount]);
+  const uAuras = useMemo(() => new Set<NonNullable<AuraId>>(unlockedAuras(stickerCount)), [stickerCount]);
+  const uHeld = useMemo(() => new Set<NonNullable<HeldId>>(unlockedHeld(stickerCount)), [stickerCount]);
+  const uAccs = useMemo(() => new Set<NonNullable<AccId>>(unlockedAccs(stickerCount)), [stickerCount]);
+  const royal = useMemo(() => royalProgress(stickerCount), [stickerCount]);
+
+  // 잠긴 타일 힌트: 필요 스티커 수를 그대로 보여준다 (여왕벌 문턱 15 이상은 👑)
+  function lockedHintFor(kind: CosmeticKind, id: string): string {
+    const at = requiredCount(kind, id);
+    const base = tFmt("cosmeticLockedAt", lang, { n: at });
+    return at >= 15 ? `👑 ${base}` : base;
+  }
 
   // Subscribe to cosmetics while open.
   // BUG FIX: Firebase onValue can fire multiple times (cache → server roundtrip
@@ -187,6 +216,7 @@ export default function CosmeticPicker({
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginTop: 2 }}>
               {stage.toUpperCase()} · {stickerCount} 🐝
+              {royal && <span style={{ marginLeft: 8, color: "#B45309" }}>🎁 {royal.nextAt}🐝 (-{royal.remaining})</span>}
             </div>
           </div>
           <button
@@ -236,6 +266,7 @@ export default function CosmeticPicker({
             >
               <CosmeticFrame backdrop={draft.backdrop} aura={draft.aura} />
               <CharacterImage stage={stage} skin={draft.skin} hat={draft.hat} />
+              <AccessoryLayer stage={stage} held={draft.held} acc={draft.acc} />
               {/* Trophy (bottom-left, slightly outside box) */}
               {draft.trophy && (
                 <img
@@ -285,7 +316,9 @@ export default function CosmeticPicker({
                     active={active}
                     unlocked={unlocked}
                     onClick={() => unlocked && setDraft((d) => ({ ...d, backdrop: id }))}
-                    lockedHint={id === "throne" ? "👑 여왕벌 전용" : t("cosmeticLocked", lang)}
+                    lockedHint={lockedHintFor("backdrop", id)}
+                    lockedAt={requiredCount("backdrop", id)}
+                    fallbackEmoji={TILE_EMOJI[`backdrop-${id}`]}
                     imageSrc={`/stickers/backdrop-${id}.png`}
                   />
                 );
@@ -310,7 +343,9 @@ export default function CosmeticPicker({
                     active={active}
                     unlocked={unlocked}
                     onClick={() => unlocked && setDraft((d) => ({ ...d, aura: id }))}
-                    lockedHint={id === "royal" ? "👑 여왕벌 전용" : t("cosmeticLocked", lang)}
+                    lockedHint={lockedHintFor("aura", id)}
+                    lockedAt={requiredCount("aura", id)}
+                    fallbackEmoji={TILE_EMOJI[`aura-${id}`]}
                     imageSrc={`/stickers/aura-${id}.png`}
                   />
                 );
@@ -330,7 +365,8 @@ export default function CosmeticPicker({
                     active={active}
                     unlocked={unlocked}
                     onClick={() => unlocked && setDraft((d) => ({ ...d, skin: id }))}
-                    lockedHint={t("cosmeticLocked", lang)}
+                    lockedHint={lockedHintFor("skin", id)}
+                    lockedAt={requiredCount("skin", id)}
                     imageSrc={stageImageWithSkin(stage, id)}
                   />
                 );
@@ -355,8 +391,61 @@ export default function CosmeticPicker({
                     active={active}
                     unlocked={unlocked}
                     onClick={() => unlocked && setDraft((d) => ({ ...d, hat: id }))}
-                    lockedHint={t("cosmeticLocked", lang)}
+                    lockedHint={lockedHintFor("hat", id)}
+                    lockedAt={requiredCount("hat", id)}
                     imageSrc={assetPath("hat", id)}
+                  />
+                );
+              })}
+            </Row>
+          </Section>
+
+          {/* 👓 액세서리 section — 꿀벌 마을 확장 (scarf/glasses: pupa~bee, cape: queen) */}
+          <Section title="👓 액세서리">
+            <Row>
+              <NoneTile
+                active={!draft.acc}
+                onClick={() => setDraft((d) => ({ ...d, acc: null }))}
+                label={t("cosmeticNone", lang)}
+              />
+              {ALL_ACCS.map((id) => {
+                const unlocked = uAccs.has(id);
+                const active = draft.acc === id;
+                return (
+                  <Tile
+                    key={`acc-${id}`}
+                    active={active}
+                    unlocked={unlocked}
+                    onClick={() => unlocked && setDraft((d) => ({ ...d, acc: id }))}
+                    lockedHint={lockedHintFor("acc", id)}
+                    lockedAt={requiredCount("acc", id)}
+                    imageSrc={assetPath("acc", id)}
+                  />
+                );
+              })}
+            </Row>
+          </Section>
+
+          {/* 🎒 소지품 section — 꿀벌 마을 확장 (honeypot/book: bee, flag: queen) */}
+          <Section title="🎒 소지품">
+            <Row>
+              <NoneTile
+                active={!draft.held}
+                onClick={() => setDraft((d) => ({ ...d, held: null }))}
+                label={t("cosmeticNone", lang)}
+              />
+              {ALL_HELD.map((id) => {
+                const unlocked = uHeld.has(id);
+                const active = draft.held === id;
+                return (
+                  <Tile
+                    key={`held-${id}`}
+                    active={active}
+                    unlocked={unlocked}
+                    onClick={() => unlocked && setDraft((d) => ({ ...d, held: id }))}
+                    lockedHint={lockedHintFor("held", id)}
+                    lockedAt={requiredCount("held", id)}
+                    imageSrc={assetPath("held", id)}
                   />
                 );
               })}
@@ -380,7 +469,9 @@ export default function CosmeticPicker({
                     active={active}
                     unlocked={unlocked}
                     onClick={() => unlocked && setDraft((d) => ({ ...d, pet: id }))}
-                    lockedHint={t("cosmeticLocked", lang)}
+                    lockedHint={lockedHintFor("pet", id)}
+                    lockedAt={requiredCount("pet", id)}
+                    fallbackEmoji={TILE_EMOJI[`pet-${id}`]}
                     imageSrc={assetPath("pet", id)}
                   />
                 );
@@ -435,7 +526,9 @@ export default function CosmeticPicker({
                     active={active}
                     unlocked={unlocked}
                     onClick={() => unlocked && setDraft((d) => ({ ...d, trophy: id }))}
-                    lockedHint={t("cosmeticLocked", lang)}
+                    lockedHint={lockedHintFor("trophy", id)}
+                    lockedAt={requiredCount("trophy", id)}
+                    fallbackEmoji={TILE_EMOJI[`trophy-${id}`]}
                     imageSrc={assetPath("trophy", id)}
                   />
                 );
@@ -534,9 +627,14 @@ interface TileProps {
   onClick: () => void;
   lockedHint: string;
   imageSrc: string;
+  /** 필요 스티커 수 — 잠금 오버레이에 "N🐝" 로 노출 (호버 불가한 태블릿 대응) */
+  lockedAt?: number;
+  /** 에셋 미도착 아이템의 이미지 404 폴백 이모지 */
+  fallbackEmoji?: string;
 }
 
-function Tile({ active, unlocked, onClick, lockedHint, imageSrc }: TileProps) {
+function Tile({ active, unlocked, onClick, lockedHint, imageSrc, lockedAt, fallbackEmoji }: TileProps) {
+  const [imgFail, setImgFail] = useState(false);
   return (
     <button
       onClick={onClick}
@@ -561,15 +659,23 @@ function Tile({ active, unlocked, onClick, lockedHint, imageSrc }: TileProps) {
       onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
       onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
     >
-      <img
-        src={imageSrc}
-        alt=""
-        aria-hidden="true"
-        style={{
-          width: 80, height: 80, objectFit: "contain",
+      {imgFail && fallbackEmoji ? (
+        <div style={{
+          fontSize: 42, lineHeight: 1,
           filter: unlocked ? "none" : "grayscale(1) opacity(0.45)",
-        }}
-      />
+        }}>{fallbackEmoji}</div>
+      ) : (
+        <img
+          src={imageSrc}
+          alt=""
+          aria-hidden="true"
+          onError={() => setImgFail(true)}
+          style={{
+            width: 80, height: 80, objectFit: "contain",
+            filter: unlocked ? "none" : "grayscale(1) opacity(0.45)",
+          }}
+        />
+      )}
       {active && (
         <div style={{
           position: "absolute", top: -8, right: -8,
@@ -584,10 +690,19 @@ function Tile({ active, unlocked, onClick, lockedHint, imageSrc }: TileProps) {
       {!unlocked && (
         <div style={{
           position: "absolute", inset: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
           fontSize: 26, color: "#9CA3AF",
           pointerEvents: "none",
-        }}>🔒</div>
+        }}>
+          🔒
+          {typeof lockedAt === "number" && lockedAt > 0 && (
+            <div style={{
+              fontSize: 12, fontWeight: 900, color: "#6B7280", marginTop: 2,
+              background: "rgba(255,255,255,0.85)", borderRadius: 8, padding: "1px 6px",
+            }}>{lockedAt}🐝</div>
+          )}
+        </div>
       )}
     </button>
   );

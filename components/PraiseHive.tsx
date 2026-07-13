@@ -16,8 +16,9 @@ import {
   stageImage,
   nextThreshold,
   progressInStage,
+  royalProgress,
 } from "@/lib/stage";
-import { CharacterImage, CosmeticFrame } from "./CharacterComposite";
+import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
 import {
   subscribeStudentStickers,
   subscribeTeamStickers,
@@ -343,6 +344,8 @@ function MyHiveTab({
     hat: null,
     pet: null,
     trophy: null,
+    held: null,
+    acc: null,
   });
   const [selectedSticker, setSelectedSticker] = useState<IndividualSticker | null>(null);
 
@@ -360,6 +363,9 @@ function MyHiveTab({
   const stage = stageOf(count);
   const progress = progressInStage(count);
   const next = nextThreshold(count);
+  // 여왕벌 이후: 로열 마일스톤(20/25/30)을 향한 진행률로 전환 —
+  // 최고 단계에서도 진행바가 멈추지 않는다 (꿀벌 마을 마스터플랜).
+  const royal = stage === "queen" ? royalProgress(count) : null;
   const remainingToNext = next === null ? null : next - count;
   const nextStage: Stage | null =
     next === null
@@ -446,6 +452,8 @@ function MyHiveTab({
             skin={cosmetics.skin}
             hat={cosmetics.hat}
           />
+          {/* 소지품 + 액세서리 — 꿀벌 마을 확장 */}
+          <AccessoryLayer stage={stage} held={cosmetics.held} acc={cosmetics.acc} />
           {/* Pet (bottom-right, slightly outside box) */}
           {cosmetics.pet && (
             <img
@@ -496,20 +504,24 @@ function MyHiveTab({
         >
           <div
             style={{
-              width: `${progress.percent}%`,
+              width: `${royal ? royal.percent : progress.percent}%`,
               height: "100%",
-              background: `linear-gradient(90deg, ${HONEY.h400}, ${HONEY.h500})`,
+              background: royal
+                ? "linear-gradient(90deg, #A78BFA, #F59E0B)"
+                : `linear-gradient(90deg, ${HONEY.h400}, ${HONEY.h500})`,
               transition: "width 0.5s ease",
             }}
           />
         </div>
         <div style={{ fontSize: 12, color: HONEY.h700, fontWeight: 700, marginTop: 6 }}>
-          {next === null || nextStage === null || remainingToNext === null
-            ? t("phMaxStage", lang)
-            : tFmt("phNextHint", lang, {
+          {next !== null && nextStage !== null && remainingToNext !== null
+            ? tFmt("phNextHint", lang, {
                 label: t(STAGE_LABEL_KEY[nextStage], lang),
                 n: remainingToNext,
-              })}
+              })
+            : royal
+            ? tFmt("phRoyalNextHint", lang, { n: royal.remaining })
+            : t("phMaxStage", lang)}
         </div>
 
         {/* Customize button */}
@@ -869,6 +881,7 @@ function RaceTab({
                   <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto" }}>
                     <CosmeticFrame backdrop={e.cosmetics.backdrop} aura={e.cosmetics.aura} />
                     <CharacterImage stage={st} skin={e.cosmetics.skin} hat={e.cosmetics.hat} />
+                    <AccessoryLayer stage={st} held={e.cosmetics.held} acc={e.cosmetics.acc} />
                     {e.cosmetics.trophy && (
                       <img
                         src={`/stickers/trophy-${e.cosmetics.trophy}.png`}
@@ -2305,6 +2318,7 @@ function GalleryPopover({
         <div style={{ position: "relative", width: 170, height: 170, margin: "4px auto 0" }}>
           <CosmeticFrame backdrop={target.cosmetics.backdrop} aura={target.cosmetics.aura} />
           <CharacterImage stage={st} skin={target.cosmetics.skin} hat={target.cosmetics.hat} />
+          <AccessoryLayer stage={st} held={target.cosmetics.held} acc={target.cosmetics.acc} />
           {target.cosmetics.trophy && (
             <img
               src={`/stickers/trophy-${target.cosmetics.trophy}.png`}

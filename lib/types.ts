@@ -168,11 +168,15 @@ export type HatId =
   | "top" | "cap" | "party" | "crown"
   | "crown-rose" | "crown-sapphire" | "crown-honey"
   | null;
-export type PetId = "dog" | "cat" | "rabbit" | "butterfly" | null;
-export type TrophyId = "gold" | "star" | null;
+// fox/owl 은 로열 마일스톤(스티커 20/25개) 해금 — 꿀벌 마을 마스터플랜
+export type PetId = "dog" | "cat" | "rabbit" | "butterfly" | "fox" | "owl" | null;
+export type TrophyId = "gold" | "star" | "diamond" | null;
 // 코스메틱 확장 Phase 3-4 (런타임 오버레이 — 합성본 불필요)
-export type BackdropId = "flower" | "hive" | "rainbow" | "night" | "throne" | null;
-export type AuraId = "sparkle" | "heart" | "stardust" | "royal" | null;
+export type BackdropId = "flower" | "hive" | "rainbow" | "night" | "throne" | "galaxy" | null;
+export type AuraId = "sparkle" | "heart" | "stardust" | "royal" | "prism" | null;
+// 소지품(손)·액세서리(몸) — 런타임 오버레이, anchors.json 의 face/neck 좌표 사용
+export type HeldId = "honeypot" | "book" | "flag" | null;
+export type AccId = "scarf" | "glasses" | "necklace" | "cape" | null;
 
 export type StickerSource = "teacher" | "mission";
 
@@ -215,6 +219,10 @@ export interface StudentCosmetics {
   backdrop?: BackdropId;
   /** 오라(캐릭터를 감싸는 이펙트 프레임). royal 은 여왕벌 전용. Phase 3. */
   aura?: AuraId;
+  /** 소지품(손/발치 오버레이). 꿀벌 마을 확장. */
+  held?: HeldId;
+  /** 액세서리(얼굴·목·몸 오버레이). cape 는 여왕벌 전용. 꿀벌 마을 확장. */
+  acc?: AccId;
 }
 
 // === Storybook ("그림책으로 공부하기") system ===
