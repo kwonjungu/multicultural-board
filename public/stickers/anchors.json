@@ -1,40 +1,42 @@
 {
-  "_doc": "Head anchor per character asset. Coords are percentages of the PNG's width/height. headTopYPct = top of head (where a hat's bottom should land). hatScalePct = hat width as % of image width. faceYPct = eye line center (glasses), neckYPct = below chin (scarf/necklace/cape), accScalePct = accessory width as % of box width. face/neck coords are measured on trimmed images.",
+  "_doc": "Head anchor per character asset. Coords are percentages of the PNG's width/height. headTopYPct = top of head (where a hat's bottom should land). hatScalePct = hat width as % of image width. faceYPct = eye line center (glasses), neckYPct = below chin (scarf/necklace/cape), accScalePct = accessory width as % of box width. heldXPct = held-item x position (box %) — letterbox correction for non-square PNGs. face/neck coords are measured on trimmed images.",
   "stage-1-egg": {
     "headXPct": 50,
     "headTopYPct": 3,
     "hatScalePct": 42,
-    "faceYPct": 34,
-    "neckYPct": 56,
-    "accScalePct": 46
+    "faceYPct": 38,
+    "neckYPct": 68,
+    "accScalePct": 46,
+    "heldXPct": 8
   },
   "stage-2-larva": {
-    "headXPct": 33,
-    "headTopYPct": 3,
+    "headXPct": 42,
+    "headTopYPct": 8,
     "hatScalePct": 42,
     "faceYPct": 24,
-    "neckYPct": 46,
+    "neckYPct": 42,
     "accScalePct": 42
   },
   "stage-3-pupa": {
     "headXPct": 50,
-    "headTopYPct": 2,
+    "headTopYPct": 38,
     "hatScalePct": 40,
-    "faceYPct": 36,
-    "neckYPct": 44,
-    "accScalePct": 38
+    "faceYPct": 25,
+    "neckYPct": 35,
+    "accScalePct": 38,
+    "heldXPct": 18
   },
   "stage-4-bee": {
     "headXPct": 50,
     "headTopYPct": 12,
     "hatScalePct": 42,
-    "faceYPct": 36,
+    "faceYPct": 40,
     "neckYPct": 54,
     "accScalePct": 50
   },
   "stage-5-queen": {
     "headXPct": 50,
-    "headTopYPct": 10,
+    "headTopYPct": 24,
     "hatScalePct": 34,
     "faceYPct": 37,
     "neckYPct": 56,

@@ -924,7 +924,7 @@ function RaceTab({
                       : "#FFFDF6",
                     border: `2px solid ${isSelf ? HONEY.h400 : HONEY.h100}`,
                     borderRadius: 16,
-                    padding: "12px 8px 10px",
+                    padding: "12px 8px 16px",
                     cursor: "pointer",
                     textAlign: "center",
                     fontFamily: "inherit",
@@ -942,7 +942,7 @@ function RaceTab({
                       <img
                         src={`/stickers/trophy-${e.cosmetics.trophy}.png`}
                         alt="" aria-hidden="true"
-                        style={{ position: "absolute", left: -8, bottom: -4, width: 32, height: 32, zIndex: 2 }}
+                        style={{ position: "absolute", top: -4, left: -8, width: 32, height: 32, zIndex: 2 }}
                       />
                     )}
                     {e.cosmetics.pet && (
@@ -1017,8 +1017,9 @@ function RaceTab({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
+                gridTemplateColumns: `repeat(${Math.max(top3.length, 1)}, 1fr)`,
                 gap: 10,
+                paddingTop: 22,
                 marginBottom: 18,
               }}
             >
@@ -1073,6 +1074,10 @@ function RaceTab({
                         color: "#1F2937",
                         wordBreak: "break-word",
                         minHeight: 18,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
                       }}
                     >
                       {e.name}
@@ -2161,10 +2166,10 @@ function StickerDetailPopover({
           aria-label="close"
           style={{
             position: "absolute",
-            top: 10,
-            right: 10,
-            width: 34,
-            height: 34,
+            top: 6,
+            right: 6,
+            width: 44,
+            height: 44,
             borderRadius: 10,
             background: HONEY.h50,
             border: `1.5px solid ${HONEY.h200}`,
@@ -2172,10 +2177,13 @@ function StickerDetailPopover({
             fontWeight: 900,
             color: HONEY.h800,
             cursor: "pointer",
+            zIndex: 1,
           }}
         >
           ✕
         </button>
+        {/* 닫기 버튼이 스크롤에 딸리지 않도록 스크롤 영역을 별도 div 로 분리 */}
+        <div style={{ maxHeight: "min(560px, 85vh)", overflowY: "auto" }}>
         <img
           src={`/stickers/sticker-${sticker.type}.png`}
           alt=""
@@ -2237,6 +2245,7 @@ function StickerDetailPopover({
           }}
         >
           {fromLabel}
+        </div>
         </div>
       </div>
       <style jsx global>{`
@@ -2363,8 +2372,8 @@ function GalleryPopover({
           onClick={onClose}
           aria-label="close"
           style={{
-            position: "absolute", top: 10, right: 10,
-            width: 34, height: 34, borderRadius: 10,
+            position: "absolute", top: 6, right: 6,
+            width: 44, height: 44, borderRadius: 10,
             background: HONEY.h50, border: `1.5px solid ${HONEY.h200}`,
             fontSize: 14, fontWeight: 900, color: HONEY.h800, cursor: "pointer",
           }}
@@ -2396,7 +2405,7 @@ function GalleryPopover({
           )}
         </div>
 
-        <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", marginTop: 10 }}>
+        <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", marginTop: 10, position: "relative", zIndex: 4 }}>
           {target.name}{isSelf ? " (나)" : ""}
         </div>
         <div style={{ fontSize: 12, fontWeight: 800, color: HONEY.h700, marginTop: 2 }}>
@@ -2441,7 +2450,7 @@ function GalleryPopover({
           {comments.length > 0 && (
             <div style={{
               display: "flex", flexDirection: "column", gap: 6,
-              maxHeight: 170, overflowY: "auto", marginBottom: 8,
+              maxHeight: "min(170px, 26vh)", overflowY: "auto", marginBottom: 8,
             }}>
               {comments.map((c) => (
                 <div key={c.id} style={{

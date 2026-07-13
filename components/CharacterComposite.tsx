@@ -28,6 +28,8 @@ interface CharAnchor {
   neckYPct?: number;
   /** 액세서리 기준 폭 (박스 폭 대비 %). */
   accScalePct?: number;
+  /** 소지품 x 위치, 박스 % — 비정사각 PNG 레터박스 보정용. */
+  heldXPct?: number;
 }
 const ANCHORS = anchorsData as unknown as Record<string, CharAnchor>;
 const FALLBACK_ANCHOR: CharAnchor = { headXPct: 50, headTopYPct: 18, hatScalePct: 38 };
@@ -170,8 +172,9 @@ export function CosmeticFrame({ backdrop, aura }: { backdrop?: BackdropId; aura?
 
 /** 소지품(held) + 액세서리(acc) 오버레이 — CharacterImage 와 같은 정사각
  *  박스 안에서, CharacterImage "뒤"(DOM 순서상 앞이면 cape 가 캐릭터를 가림)
- *  가 아니라 **CharacterImage 다음에** 넣는다. cape 만 zIndex 0(캐릭터 뒤,
- *  backdrop 위)으로 깔리고 나머지는 zIndex 2(캐릭터 앞).
+ *  가 아니라 **CharacterImage 다음에** 넣는다.
+ *  최종 z 스택: backdrop 0 < cape 0 < char 1 < hat폴백 2 < aura 3 < held/acc 4.
+ *  cape 만 zIndex 0(캐릭터 뒤, backdrop 위)으로 깔리고 나머지는 zIndex 4(aura 3 위).
  *  좌표는 anchors.json 의 faceYPct/neckYPct/accScalePct (트림 이미지 기준).
  *  캐릭터가 heroBeeFloat 로 부유하므로 착용형 acc 는 같은 애니메이션을 공유해
  *  몸에 붙어 움직이는 것처럼 보이게 한다. */
@@ -206,7 +209,7 @@ export function AccessoryLayer({
       <img src="/stickers/acc-glasses.png" alt="" aria-hidden="true" onError={hide}
         style={{
           position: "absolute", left: `${x - w / 2}%`, top: `${face - w * 0.21}%`,
-          width: `${w}%`, zIndex: 2, animation: floatAnim,
+          width: `${w}%`, zIndex: 4, animation: floatAnim,
           filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.15))",
         }} />
     );
@@ -215,8 +218,8 @@ export function AccessoryLayer({
     accEl = (
       <img src="/stickers/acc-scarf.png" alt="" aria-hidden="true" onError={hide}
         style={{
-          position: "absolute", left: `${x - w / 2}%`, top: `${neck - w * 0.16}%`,
-          width: `${w}%`, zIndex: 2, animation: floatAnim,
+          position: "absolute", left: `${x - w / 2}%`, top: `${neck - w * 0.26}%`,
+          width: `${w}%`, zIndex: 4, animation: floatAnim,
           filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.15))",
         }} />
     );
@@ -226,17 +229,17 @@ export function AccessoryLayer({
       <img src="/stickers/acc-necklace.png" alt="" aria-hidden="true" onError={hide}
         style={{
           position: "absolute", left: `${x - w / 2}%`, top: `${neck - w * 0.06}%`,
-          width: `${w}%`, zIndex: 2, animation: floatAnim,
+          width: `${w}%`, zIndex: 4, animation: floatAnim,
           filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.12))",
         }} />
     );
   } else if (acc === "cape") {
     // 망토는 캐릭터 뒤(z0) — backdrop(z0, DOM 앞) 위에 그려진다.
-    const w = Math.min(100, scale * 1.9);
+    const w = Math.min(100, scale * 1.35);
     accEl = (
       <img src="/stickers/acc-cape.png" alt="" aria-hidden="true" onError={hide}
         style={{
-          position: "absolute", left: `${x - w / 2}%`, top: `${neck - w * 0.14}%`,
+          position: "absolute", left: `${x - w / 2}%`, top: `${neck - w * 0.10}%`,
           width: `${w}%`, zIndex: 0, animation: floatAnim,
           filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.18))",
         }} />
@@ -253,8 +256,8 @@ export function AccessoryLayer({
           aria-hidden="true"
           onError={hide}
           style={{
-            position: "absolute", left: "1%", bottom: "2%",
-            width: "30%", zIndex: 2, animation: floatAnim,
+            position: "absolute", left: `${a.heldXPct ?? 1}%`, bottom: "2%",
+            width: "30%", zIndex: 4, animation: floatAnim,
             filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.18))",
           }}
         />
