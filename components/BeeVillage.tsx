@@ -53,6 +53,30 @@ import { t } from "@/lib/i18n";
 // 로드 전/WebGL 실패 시엔 아래 2D hex 맵이 그대로 폴백으로 남는다.
 const VillageMap3D = dynamic(() => import("./VillageMap3D"), { ssr: false });
 
+// ── Design tokens ──────────────────────────────────────────────
+const R = { card: 22, tile: 14, pill: 999 };
+const SH = {
+  card: "0 8px 24px rgba(180,83,9,0.12)",
+  popover: "0 20px 50px rgba(0,0,0,0.4)",
+  sheet: "0 -12px 40px rgba(0,0,0,0.25)",
+  cta: "0 6px 16px rgba(245,158,11,0.3)",
+};
+// HONEY.h400 = #FBBF24, HONEY.h500 = #F59E0B, HONEY.h100 = #FEF3C7
+const GR = {
+  cta: "linear-gradient(135deg, #FBBF24, #F59E0B)",
+  surface: "linear-gradient(160deg, #FEF3C7, #fff)",
+};
+const OVERLAY = { background: "rgba(9,7,30,0.6)", backdropFilter: "blur(4px)" };
+const CLOSE_BTN: React.CSSProperties = {
+  width: 44,
+  height: 44,
+  borderRadius: R.tile,
+  position: "absolute",
+  top: 6,
+  right: 6,
+};
+// ───────────────────────────────────────────────────────────────
+
 const DEFAULT_COSMETICS: StudentCosmetics = { skin: "classic", hat: null, pet: null, trophy: null };
 const DEFAULT_PLATE_COLOR = "#FDE68A"; // 기본 꿀색 문패
 
@@ -84,6 +108,51 @@ interface HouseEntry {
   village: VillageState;
 }
 
+// ── Shared ItemTile — used by shop panel and DecorateSheet ─────
+interface ItemTileProps {
+  emoji: string;
+  label: string;
+  price: number;
+  equipped: boolean;
+  has: boolean;
+  affordable: boolean;
+  removable?: boolean;
+  busy: boolean;
+  onClick: () => void;
+}
+function ItemTile({ emoji, label, price, equipped, has, affordable, removable = false, busy, onClick }: ItemTileProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      style={{
+        minHeight: 92,
+        padding: "10px 6px 8px",
+        borderRadius: R.tile,
+        border: `2px solid ${equipped ? HONEY.h500 : has ? HONEY.h300 : HONEY.h100}`,
+        background: equipped ? GR.surface : "#FFFDF6",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "center",
+        opacity: affordable ? 1 : 0.55,
+      }}
+    >
+      <div style={{ fontSize: 28, lineHeight: 1.1 }}>{emoji}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: HONEY.h700, marginTop: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
+        {equipped
+          ? removable ? "✅ 장착 중 (눌러서 해제)" : "✅ 장착 중"
+          : has
+          ? "보유 — 장착하기"
+          : `${price}🍯`}
+      </div>
+    </button>
+  );
+}
+// ───────────────────────────────────────────────────────────────
+
 export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfig }: Props) {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [countsReady, setCountsReady] = useState(false);
@@ -96,6 +165,17 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   const [map3d, setMap3d] = useState<"loading" | "on" | "off">("loading");
   // 내 집 꾸미기 바텀시트 (카탈로그 v2)
   const [decorateOpen, setDecorateOpen] = useState(false);
+
+  // ── 데스크톱 2열 레이아웃 (≥900px) ────────────────────────────
+  // SSR 프리렌더에서 window 접근 금지 — 초기 false, 마운트 후 판정 (BeeWorldMarble 패턴)
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 900px)");
+    const apply = () => setIsDesktop(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeAllStudentCounts(roomCode, (c) => {
@@ -324,331 +404,355 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   const gridW = HEX_W * HEX_COLS + HEX_W / 2;   // 홀수행 시프트 포함
   const gridH = (rows - 1) * HEX_ROW_STEP + HEX_H;
 
-  const card: React.CSSProperties = {
+  const cardStyle: React.CSSProperties = {
     background: "#fff",
-    borderRadius: 22,
+    borderRadius: R.card,
     padding: "16px 14px",
     border: `2px solid ${HONEY.h200}`,
-    boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
+    boxShadow: SH.card,
   };
+
+  // ── 마을 맵 카드 ────────────────────────────────────────────
+  const mapCard = (
+    <div style={{ ...cardStyle, padding: "16px 10px" /* hex grid: reduce horizontal padding to fit 5-col hex layout */ }}>
+      <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h900, margin: "0 6px 4px" }}>
+        🗺 마을 지도
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: HONEY.h700, margin: "0 6px 10px" }}>
+        {map3d === "on"
+          ? `한 손가락으로 돌리고, 두 손가락으로 이동·확대해요 · 집을 눌러 방문 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`
+          : `친구 집을 눌러 하루 한 번 💧 물을 줘요 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`}
+      </div>
+      {entries.length === 0 ? (
+        <div style={{ fontSize: 13, color: HONEY.h700, fontWeight: 600, textAlign: "center", padding: 20 }}>
+          아직 마을에 집이 없어요 — 칭찬 스티커를 받으면 집이 생겨요!
+        </div>
+      ) : (
+        <>
+        {/* 3D 맵 (기본) — 씬 준비 전엔 height 0 으로 감춰두고 2D 를 보여준다.
+            onFail(WebGL 불가·컨텍스트 유실) 시 완전히 내려가고 2D hex 맵 폴백. */}
+        {map3d !== "off" && (
+          <div style={{ height: map3d === "on" ? undefined : 0, overflow: "hidden" }}>
+            <VillageMap3D
+              plots={plots3d}
+              facilities={unlockedFacilities.map((f) => f.id)}
+              onSelect={(id) => setFocus(id)}
+              onReady={() => setMap3d("on")}
+              onFail={() => setMap3d("off")}
+            />
+          </div>
+        )}
+        {map3d !== "on" && (
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ position: "relative", width: gridW, height: gridH, margin: "0 auto" }}>
+            {plots.map((plot, i) => {
+              const r = Math.floor(i / HEX_COLS);
+              const c = i % HEX_COLS;
+              const x = c * HEX_W + (r % 2 === 1 ? HEX_W / 2 : 0);
+              const y = r * HEX_ROW_STEP;
+              const hexStyle: React.CSSProperties = {
+                position: "absolute",
+                left: x,
+                top: y,
+                width: HEX_W,
+                height: HEX_H,
+                clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "none",
+                padding: 0,
+              };
+              if (plot.kind === "plaza") {
+                return (
+                  <div
+                    key="plaza"
+                    style={{
+                      ...hexStyle,
+                      background: "radial-gradient(circle at 50% 35%, #E0F2FE 0%, #BAE6FD 70%, #7DD3FC 100%)",
+                    }}
+                  >
+                    <div style={{ fontSize: 26, lineHeight: 1.2 }}>
+                      {unlockedFacilities.length > 0
+                        ? unlockedFacilities.map((f) => f.emoji).join(" ")
+                        : "🚧"}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: "#075985", marginTop: 4 }}>
+                      마을 광장
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#0369A1", marginTop: 2 }}>
+                      🐝 {classTotal}
+                    </div>
+                  </div>
+                );
+              }
+              const e = plot.e;
+              const isSelf = e.id === myClientId && !user.isTeacher;
+              const st = stageOf(e.count);
+              const roofDeco = decoById(e.village.house?.roof);
+              const gardenDeco = decoById(e.village.house?.garden);
+              const plateColor = decoById(e.village.house?.plate)?.color ?? DEFAULT_PLATE_COLOR;
+              const gardenLevel = e.village.gardenLevel ?? 0;
+              const flowerCount = Math.min(1 + gardenLevel, 5);
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => setFocus(e.id)}
+                  aria-label={`${e.name}의 집`}
+                  style={{
+                    ...hexStyle,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    background: isSelf
+                      ? `radial-gradient(circle at 50% 30%, #FEF3C7 0%, #FDE68A 60%, ${HONEY.h300} 100%)`
+                      : "radial-gradient(circle at 50% 30%, #FEF9C3 0%, #D9F99D 55%, #86EFAC 100%)",
+                  }}
+                >
+                  {/* 지붕 */}
+                  <div style={{ fontSize: 24, lineHeight: 1 }}>{roofDeco?.emoji ?? "🏠"}</div>
+                  {/* 벌 — 68px hex 셀: held/acc 생략 (작은 크기에서 안 보임) */}
+                  <div style={{ position: "relative", width: 68, height: 68, marginTop: 2 }}>
+                    <CosmeticFrame backdrop={e.cosmetics.backdrop} aura={e.cosmetics.aura} />
+                    <CharacterImage stage={st} skin={e.cosmetics.skin} hat={e.cosmetics.hat} float={false} />
+                    <AccessoryLayer stage={st} float={false} />
+                  </div>
+                  {/* 정원 — 레벨만큼 꽃이 늘어난다 */}
+                  <div style={{ fontSize: 13, lineHeight: 1, letterSpacing: 2, marginTop: 3 }}>
+                    {(gardenDeco?.emoji ?? "🌱").repeat(flowerCount)}
+                  </div>
+                  {/* 문패 */}
+                  <div
+                    style={{
+                      marginTop: 4,
+                      maxWidth: "72%",
+                      padding: "2px 10px",
+                      borderRadius: R.pill,
+                      background: plateColor,
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      color: "#1F2937",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {e.name}{isSelf ? " ⭐" : ""}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        )}
+        </>
+      )}
+    </div>
+  );
+
+  // ── 마을 공동 시설 배너 ─────────────────────────────────────
+  const facilitiesBanner = (
+    <div style={cardStyle}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h900 }}>
+            🏛 마을 공동 시설
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
+            {nextFacility
+              ? `${nextFacility.emoji} ${nextFacility.label}까지 ${nextFacility.at - classTotal}개 남았어요! · 우리 반 칭찬 ${classTotal}🐝`
+              : "🎉 모든 시설이 완성됐어요! 마을 축제가 열렸어요!"}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {VILLAGE_FACILITIES.map((f) => {
+            const on = classTotal >= f.at;
+            return (
+              <div
+                key={f.at}
+                title={`${f.label} (학급 ${f.at}개)`}
+                style={{
+                  width: 52,
+                  minHeight: 56,
+                  borderRadius: R.tile,
+                  border: `2px solid ${on ? HONEY.h400 : HONEY.h100}`,
+                  background: on ? GR.surface : "#F9FAFB",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                  filter: on ? "none" : "grayscale(1)",
+                  opacity: on ? 1 : 0.55,
+                }}
+              >
+                <div style={{ fontSize: 22 }}>{f.emoji}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700 }}>{f.at}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* 다음 시설 진행바 */}
+      {nextFacility && (
+        <div
+          style={{
+            marginTop: 10,
+            height: 12,
+            background: HONEY.h50,
+            borderRadius: R.pill,
+            overflow: "hidden",
+            border: `1px solid ${HONEY.h200}`,
+          }}
+        >
+          <div
+            style={{
+              width: `${Math.max(0, Math.min(100, (classTotal / nextFacility.at) * 100))}%`,
+              height: "100%",
+              background: `linear-gradient(90deg, ${HONEY.h300}, ${HONEY.h500})`,
+              transition: "width 0.5s ease",
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  // ── 꿀 지갑 + 상점 패널 ────────────────────────────────────
+  const walletPanel = !user.isTeacher ? (
+    <div style={cardStyle}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 150 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: HONEY.h800 }}>내 꿀 주머니</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: HONEY.h800, letterSpacing: -0.3 }}>
+            🍯 {myHoney}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2 }}>
+            {myVillage.lastDew === today
+              ? "🌅 오늘의 꿀 이슬을 주웠어요"
+              : "🌅 마을에 오면 매일 꿀 이슬을 주워요"}
+            {" · 칭찬 스티커 1개 = 🍯5"}
+          </div>
+        </div>
+        <button
+          onClick={() => setShopOpen((v) => !v)}
+          style={{
+            minHeight: 52,
+            padding: "10px 20px",
+            background: shopOpen ? "#fff" : GR.cta,
+            color: shopOpen ? HONEY.h800 : "#fff",
+            border: `2px solid ${shopOpen ? HONEY.h300 : HONEY.h500}`,
+            borderRadius: R.tile,
+            fontSize: 13,
+            fontWeight: 900,
+            cursor: "pointer",
+            boxShadow: shopOpen ? "none" : SH.cta,
+            fontFamily: "inherit",
+            letterSpacing: -0.2,
+          }}
+        >
+          {shopOpen ? "상점 닫기 ✕" : "🛍 내 집 가꾸기"}
+        </button>
+      </div>
+
+      {/* 상점 패널 */}
+      {shopOpen && (
+        <div style={{ marginTop: 14 }}>
+          {(["roof", "garden", "plate"] as VillageSlot[]).map((slot) => (
+            <div key={slot} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: HONEY.h800, marginBottom: 6 }}>
+                {slot === "roof" ? "🏠" : slot === "garden" ? "🌱" : "🪧"} {SLOT_LABEL[slot]}
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
+                  gap: 8,
+                }}
+              >
+                {VILLAGE_DECOS.filter((d) => d.slot === slot).map((deco) => {
+                  const equipped = myVillage.house?.[deco.slot] === deco.id;
+                  const owned = myVillage.owned?.[deco.id] === true;
+                  const affordable = owned || myHoney >= deco.price;
+                  return (
+                    <ItemTile
+                      key={deco.id}
+                      emoji={deco.emoji}
+                      label={deco.label}
+                      price={deco.price}
+                      equipped={equipped}
+                      has={owned}
+                      affordable={affordable}
+                      removable={true}
+                      busy={shopBusy}
+                      onClick={() => handleDecoTap(deco)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700 }}>
+            한 번 산 데코는 계속 보유해요. 같은 칸의 다른 데코로 언제든 바꿀 수 있어요.
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  // ── 퀘스트 보드 ────────────────────────────────────────────
+  const questBoard = !user.isTeacher ? (
+    <QuestBoard
+      roomCode={roomCode}
+      myClientId={myClientId}
+      onToast={(msg, tone) => setToast({ msg, tone })}
+    />
+  ) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* 로컬 애니메이션 keyframes */}
+      <style>{`
+        @keyframes bv-popover-in {
+          from { opacity: 0; transform: translateY(26px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes bv-sheet-in {
+          from { opacity: 0; transform: translateY(40px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
       <Toast
         message={toast?.msg ?? null}
         tone={toast?.tone ?? "success"}
         onDismiss={() => setToast(null)}
       />
 
-      {/* ── 📋 오늘의 심부름 (학생만 — 일일 퀘스트 보드) ── */}
-      {!user.isTeacher && (
-        <QuestBoard
-          roomCode={roomCode}
-          myClientId={myClientId}
-          onToast={(msg, tone) => setToast({ msg, tone })}
-        />
+      {/* ── 데스크톱: 2열 그리드 / 모바일: 세로 스택 ── */}
+      {isDesktop ? (
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 280px", gap: 16, alignItems: "start" }}>
+          {/* 좌 메인 — 시설 배너 + 마을 맵 (핵심 기능) */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {facilitiesBanner}
+            {mapCard}
+          </div>
+          {/* 우 사이드바 — 퀘스트 + 꿀 지갑/상점 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {questBoard}
+            {walletPanel}
+          </div>
+        </div>
+      ) : (
+        /* 모바일: 퀘스트 → 지갑 → 시설 → 맵 */
+        <>
+          {questBoard}
+          {walletPanel}
+          {facilitiesBanner}
+          {mapCard}
+        </>
       )}
-
-      {/* ── 내 꿀 지갑 + 상점 (학생만 — 교사는 관람) ── */}
-      {!user.isTeacher && (
-        <div style={card}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: HONEY.h700 }}>내 꿀 주머니</div>
-              <div style={{ fontSize: 26, fontWeight: 900, color: HONEY.h800, letterSpacing: -0.3 }}>
-                🍯 {myHoney}
-              </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
-                {myVillage.lastDew === today
-                  ? "🌅 오늘의 꿀 이슬을 주웠어요"
-                  : "🌅 마을에 오면 매일 꿀 이슬을 주워요"}
-                {" · 칭찬 스티커 1개 = 🍯5"}
-              </div>
-            </div>
-            <button
-              onClick={() => setShopOpen((v) => !v)}
-              style={{
-                minHeight: 52,
-                padding: "10px 20px",
-                background: shopOpen
-                  ? "#fff"
-                  : `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`,
-                color: shopOpen ? HONEY.h800 : "#fff",
-                border: `2px solid ${shopOpen ? HONEY.h300 : HONEY.h500}`,
-                borderRadius: 14,
-                fontSize: 15,
-                fontWeight: 900,
-                cursor: "pointer",
-                boxShadow: shopOpen ? "none" : "0 6px 16px rgba(245,158,11,0.3)",
-                fontFamily: "inherit",
-                letterSpacing: -0.2,
-              }}
-            >
-              {shopOpen ? "상점 닫기 ✕" : "🛍 내 집 가꾸기"}
-            </button>
-          </div>
-
-          {/* 상점 패널 */}
-          {shopOpen && (
-            <div style={{ marginTop: 14 }}>
-              {(["roof", "garden", "plate"] as VillageSlot[]).map((slot) => (
-                <div key={slot} style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 900, color: HONEY.h800, marginBottom: 6 }}>
-                    {slot === "roof" ? "🏠" : slot === "garden" ? "🌱" : "🪧"} {SLOT_LABEL[slot]}
-                  </div>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
-                      gap: 8,
-                    }}
-                  >
-                    {VILLAGE_DECOS.filter((d) => d.slot === slot).map((deco) => {
-                      const equipped = myVillage.house?.[deco.slot] === deco.id;
-                      const owned = myVillage.owned?.[deco.id] === true;
-                      const affordable = owned || myHoney >= deco.price;
-                      return (
-                        <button
-                          key={deco.id}
-                          onClick={() => handleDecoTap(deco)}
-                          disabled={shopBusy}
-                          style={{
-                            minHeight: 92,
-                            padding: "10px 6px 8px",
-                            borderRadius: 14,
-                            border: `2px solid ${equipped ? HONEY.h500 : owned ? HONEY.h300 : HONEY.h100}`,
-                            background: equipped
-                              ? `linear-gradient(160deg, ${HONEY.h100}, #fff)`
-                              : "#FFFDF6",
-                            cursor: "pointer",
-                            fontFamily: "inherit",
-                            textAlign: "center",
-                            opacity: affordable ? 1 : 0.55,
-                          }}
-                        >
-                          <div style={{ fontSize: 28, lineHeight: 1.1 }}>{deco.emoji}</div>
-                          <div style={{ fontSize: 11.5, fontWeight: 900, color: "#1F2937", marginTop: 4 }}>
-                            {deco.label}
-                          </div>
-                          <div style={{ fontSize: 11, fontWeight: 900, color: HONEY.h700, marginTop: 2 }}>
-                            {equipped ? "✅ 장착 중 (눌러서 해제)" : owned ? "보유 — 장착하기" : `${deco.price}🍯`}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700 }}>
-                한 번 산 데코는 계속 보유해요. 같은 칸의 다른 데코로 언제든 바꿀 수 있어요.
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── 마을 공동 시설 배너 ── */}
-      <div style={card}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 180 }}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: HONEY.h800 }}>
-              🏛 마을 공동 시설 — 우리 반 칭찬 {classTotal}🐝
-            </div>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
-              {nextFacility
-                ? `${nextFacility.emoji} ${nextFacility.label}까지 ${nextFacility.at - classTotal}개 남았어요!`
-                : "🎉 모든 시설이 완성됐어요! 마을 축제가 열렸어요!"}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {VILLAGE_FACILITIES.map((f) => {
-              const on = classTotal >= f.at;
-              return (
-                <div
-                  key={f.at}
-                  title={`${f.label} (학급 ${f.at}개)`}
-                  style={{
-                    width: 52,
-                    minHeight: 56,
-                    borderRadius: 12,
-                    border: `2px solid ${on ? HONEY.h400 : HONEY.h100}`,
-                    background: on ? `linear-gradient(160deg, ${HONEY.h100}, #fff)` : "#F9FAFB",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 2,
-                    filter: on ? "none" : "grayscale(1)",
-                    opacity: on ? 1 : 0.55,
-                  }}
-                >
-                  <div style={{ fontSize: 22 }}>{f.emoji}</div>
-                  <div style={{ fontSize: 9, fontWeight: 900, color: HONEY.h700 }}>{f.at}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        {/* 다음 시설 진행바 */}
-        {nextFacility && (
-          <div
-            style={{
-              marginTop: 10,
-              height: 12,
-              background: HONEY.h50,
-              borderRadius: 999,
-              overflow: "hidden",
-              border: `1px solid ${HONEY.h200}`,
-            }}
-          >
-            <div
-              style={{
-                width: `${Math.max(0, Math.min(100, (classTotal / nextFacility.at) * 100))}%`,
-                height: "100%",
-                background: `linear-gradient(90deg, ${HONEY.h300}, ${HONEY.h500})`,
-                transition: "width 0.5s ease",
-              }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* ── 마을 맵 (육각 플롯 그리드) ── */}
-      <div style={{ ...card, padding: "16px 10px" }}>
-        <div style={{ fontSize: 15, fontWeight: 900, color: HONEY.h800, margin: "0 6px 4px" }}>
-          🗺 마을 지도
-        </div>
-        <div style={{ fontSize: 11.5, fontWeight: 700, color: HONEY.h700, margin: "0 6px 10px" }}>
-          {map3d === "on"
-            ? `한 손가락으로 돌리고, 두 손가락으로 이동·확대해요 · 집을 눌러 방문 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`
-            : `친구 집을 눌러 하루 한 번 💧 물을 줘요 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`}
-        </div>
-        {entries.length === 0 ? (
-          <div style={{ fontSize: 13, color: HONEY.h700, fontWeight: 600, textAlign: "center", padding: 20 }}>
-            아직 마을에 집이 없어요 — 칭찬 스티커를 받으면 집이 생겨요!
-          </div>
-        ) : (
-          <>
-          {/* 3D 맵 (기본) — 씬 준비 전엔 height 0 으로 감춰두고 2D 를 보여준다.
-              onFail(WebGL 불가·컨텍스트 유실) 시 완전히 내려가고 2D hex 맵 폴백. */}
-          {map3d !== "off" && (
-            <div style={{ height: map3d === "on" ? undefined : 0, overflow: "hidden" }}>
-              <VillageMap3D
-                plots={plots3d}
-                facilities={unlockedFacilities.map((f) => f.id)}
-                onSelect={(id) => setFocus(id)}
-                onReady={() => setMap3d("on")}
-                onFail={() => setMap3d("off")}
-              />
-            </div>
-          )}
-          {map3d !== "on" && (
-          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            <div style={{ position: "relative", width: gridW, height: gridH, margin: "0 auto" }}>
-              {plots.map((plot, i) => {
-                const r = Math.floor(i / HEX_COLS);
-                const c = i % HEX_COLS;
-                const x = c * HEX_W + (r % 2 === 1 ? HEX_W / 2 : 0);
-                const y = r * HEX_ROW_STEP;
-                const hexStyle: React.CSSProperties = {
-                  position: "absolute",
-                  left: x,
-                  top: y,
-                  width: HEX_W,
-                  height: HEX_H,
-                  clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "none",
-                  padding: 0,
-                };
-                if (plot.kind === "plaza") {
-                  return (
-                    <div
-                      key="plaza"
-                      style={{
-                        ...hexStyle,
-                        background: "radial-gradient(circle at 50% 35%, #E0F2FE 0%, #BAE6FD 70%, #7DD3FC 100%)",
-                      }}
-                    >
-                      <div style={{ fontSize: 26, lineHeight: 1.2 }}>
-                        {unlockedFacilities.length > 0
-                          ? unlockedFacilities.map((f) => f.emoji).join(" ")
-                          : "🚧"}
-                      </div>
-                      <div style={{ fontSize: 12, fontWeight: 900, color: "#075985", marginTop: 4 }}>
-                        마을 광장
-                      </div>
-                      <div style={{ fontSize: 10.5, fontWeight: 800, color: "#0369A1", marginTop: 2 }}>
-                        🐝 {classTotal}
-                      </div>
-                    </div>
-                  );
-                }
-                const e = plot.e;
-                const isSelf = e.id === myClientId && !user.isTeacher;
-                const st = stageOf(e.count);
-                const roofDeco = decoById(e.village.house?.roof);
-                const gardenDeco = decoById(e.village.house?.garden);
-                const plateColor = decoById(e.village.house?.plate)?.color ?? DEFAULT_PLATE_COLOR;
-                const gardenLevel = e.village.gardenLevel ?? 0;
-                const flowerCount = Math.min(1 + gardenLevel, 5);
-                return (
-                  <button
-                    key={e.id}
-                    onClick={() => setFocus(e.id)}
-                    aria-label={`${e.name}의 집`}
-                    style={{
-                      ...hexStyle,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      background: isSelf
-                        ? `radial-gradient(circle at 50% 30%, #FEF3C7 0%, #FDE68A 60%, ${HONEY.h300} 100%)`
-                        : "radial-gradient(circle at 50% 30%, #FEF9C3 0%, #D9F99D 55%, #86EFAC 100%)",
-                    }}
-                  >
-                    {/* 지붕 */}
-                    <div style={{ fontSize: 24, lineHeight: 1 }}>{roofDeco?.emoji ?? "🏠"}</div>
-                    {/* 벌 — 코스메틱 착용 상태 그대로 (합성 렌더 공유 컴포넌트) */}
-                    <div style={{ position: "relative", width: 68, height: 68, marginTop: 2 }}>
-                      <CosmeticFrame backdrop={e.cosmetics.backdrop} aura={e.cosmetics.aura} />
-                      <CharacterImage stage={st} skin={e.cosmetics.skin} hat={e.cosmetics.hat} float={false} />
-                      <AccessoryLayer stage={st} held={e.cosmetics.held} acc={e.cosmetics.acc} float={false} />
-                    </div>
-                    {/* 정원 — 레벨만큼 꽃이 늘어난다 */}
-                    <div style={{ fontSize: 13, lineHeight: 1, letterSpacing: 2, marginTop: 3 }}>
-                      {(gardenDeco?.emoji ?? "🌱").repeat(flowerCount)}
-                    </div>
-                    {/* 문패 */}
-                    <div
-                      style={{
-                        marginTop: 4,
-                        maxWidth: "72%",
-                        padding: "2px 10px",
-                        borderRadius: 999,
-                        background: plateColor,
-                        border: "1px solid rgba(0,0,0,0.08)",
-                        fontSize: 11,
-                        fontWeight: 900,
-                        color: "#1F2937",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {e.name}{isSelf ? " ⭐" : ""}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          )}
-          </>
-        )}
-      </div>
 
       {/* ── 집 상세 팝오버 (친구 집 방문 + 물주기 / 내 집이면 🛋 꾸미기) ── */}
       {focusEntry && (
@@ -733,13 +837,12 @@ function HousePopover({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(9,7,30,0.68)",
+        ...OVERLAY,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 220,
         padding: 20,
-        backdropFilter: "blur(4px)",
       }}
       role="dialog"
       aria-modal="true"
@@ -747,15 +850,15 @@ function HousePopover({
       <div
         style={{
           background: "#fff",
-          borderRadius: 22,
+          borderRadius: R.card,
           padding: "22px 20px 18px",
           maxWidth: 380,
           width: "100%",
           maxHeight: "88vh",
           overflowY: "auto",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          boxShadow: SH.popover,
           border: `3px solid ${HONEY.h300}`,
-          animation: "phPopoverIn 0.2s ease",
+          animation: "bv-popover-in 0.3s ease-out",
           textAlign: "center",
           position: "relative",
         }}
@@ -764,16 +867,19 @@ function HousePopover({
           onClick={onClose}
           aria-label="close"
           style={{
-            position: "absolute", top: 10, right: 10,
-            width: 34, height: 34, borderRadius: 10,
-            background: HONEY.h50, border: `1.5px solid ${HONEY.h200}`,
-            fontSize: 14, fontWeight: 900, color: HONEY.h800, cursor: "pointer",
+            ...CLOSE_BTN,
+            background: HONEY.h50,
+            border: `1.5px solid ${HONEY.h200}`,
+            fontSize: 14,
+            fontWeight: 900,
+            color: HONEY.h800,
+            cursor: "pointer",
           }}
         >✕</button>
 
         <div style={{ fontSize: 26 }}>{styleDeco?.emoji ?? roofDeco?.emoji ?? "🏠"}</div>
 
-        {/* 벌 — 코스메틱 풀 렌더 */}
+        {/* 벌 — 150px+ 팝오버: 코스메틱 풀 렌더 (held/acc 포함) */}
         <div style={{ position: "relative", width: 150, height: 150, margin: "2px auto 0" }}>
           <CosmeticFrame backdrop={entry.cosmetics.backdrop} aura={entry.cosmetics.aura} />
           <CharacterImage stage={st} skin={entry.cosmetics.skin} hat={entry.cosmetics.hat} />
@@ -792,7 +898,7 @@ function HousePopover({
           )}
         </div>
 
-        <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", marginTop: 8 }}>
+        <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h900, marginTop: 8 }}>
           {entry.name}{isSelf ? " (나)" : ""}의 집
         </div>
 
@@ -803,10 +909,10 @@ function HousePopover({
             padding: "12px 14px",
             background: "linear-gradient(160deg, #F0FDF4, #fff)",
             border: "2px solid #BBF7D0",
-            borderRadius: 16,
+            borderRadius: R.tile,
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 900, color: "#166534" }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#166534" }}>
             {gardenDeco ? `${gardenDeco.emoji} ${gardenDeco.label}` : "🌱 정원"} · Lv.{gardenLevel}
           </div>
           <div style={{ fontSize: 20, letterSpacing: 4, marginTop: 6 }}>
@@ -822,7 +928,7 @@ function HousePopover({
         {/* 물주기 버튼 / 내 집이면 꾸미기 */}
         {isSelf ? (
           <>
-            <div style={{ marginTop: 12, fontSize: 12, fontWeight: 800, color: HONEY.h700 }}>
+            <div style={{ marginTop: 12, fontSize: 12, fontWeight: 700, color: HONEY.h700 }}>
               친구들이 물을 주면 내 정원이 자라요 🌷
             </div>
             <button
@@ -832,14 +938,14 @@ function HousePopover({
                 minHeight: 52,
                 width: "100%",
                 padding: "10px 24px",
-                background: `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`,
+                background: GR.cta,
                 color: "#fff",
                 border: "none",
-                borderRadius: 14,
-                fontSize: 15,
+                borderRadius: R.tile,
+                fontSize: 13,
                 fontWeight: 900,
                 cursor: "pointer",
-                boxShadow: "0 6px 16px rgba(245,158,11,0.3)",
+                boxShadow: SH.cta,
                 fontFamily: "inherit",
               }}
             >
@@ -860,8 +966,8 @@ function HousePopover({
                 : "#F3F4F6",
               color: canWater && !busy ? "#fff" : "#9CA3AF",
               border: "none",
-              borderRadius: 14,
-              fontSize: 15,
+              borderRadius: R.tile,
+              fontSize: 13,
               fontWeight: 900,
               cursor: canWater && !busy ? "pointer" : "default",
               boxShadow: canWater && !busy ? "0 6px 16px rgba(2,132,199,0.3)" : "none",
@@ -917,47 +1023,10 @@ function DecorateSheet({
     }
   }
 
-  function tile(deco: VillageDecoV2) {
-    const equipped = isEquipped(deco);
-    const has = owned[deco.id] === true;
-    const affordable = has || honey >= deco.price;
-    const removable = deco.slot === "fence" || deco.slot === "yard";
-    return (
-      <button
-        key={deco.id}
-        onClick={() => onTap(deco, yardIndex)}
-        disabled={busy}
-        style={{
-          minHeight: 92,
-          padding: "10px 6px 8px",
-          borderRadius: 14,
-          border: `2px solid ${equipped ? HONEY.h500 : has ? HONEY.h300 : HONEY.h100}`,
-          background: equipped ? `linear-gradient(160deg, ${HONEY.h100}, #fff)` : "#FFFDF6",
-          cursor: "pointer",
-          fontFamily: "inherit",
-          textAlign: "center",
-          opacity: affordable ? 1 : 0.55,
-        }}
-      >
-        <div style={{ fontSize: 28, lineHeight: 1.1 }}>{deco.emoji}</div>
-        <div style={{ fontSize: 11.5, fontWeight: 900, color: "#1F2937", marginTop: 4 }}>
-          {deco.label}
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 900, color: HONEY.h700, marginTop: 2 }}>
-          {equipped
-            ? removable ? "✅ 장착 중 (눌러서 해제)" : "✅ 장착 중"
-            : has
-            ? "보유 — 장착하기"
-            : `${deco.price}🍯`}
-        </div>
-      </button>
-    );
-  }
-
   function section(title: string, slot: VillageDecoV2["slot"]) {
     return (
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 900, color: HONEY.h800, marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: HONEY.h800, marginBottom: 6 }}>
           {title}
         </div>
         <div
@@ -967,7 +1036,26 @@ function DecorateSheet({
             gap: 8,
           }}
         >
-          {VILLAGE_DECOS_V2.filter((d) => d.slot === slot).map(tile)}
+          {VILLAGE_DECOS_V2.filter((d) => d.slot === slot).map((deco) => {
+            const equipped = isEquipped(deco);
+            const has = owned[deco.id] === true;
+            const affordable = has || honey >= deco.price;
+            const removable = deco.slot === "fence" || deco.slot === "yard";
+            return (
+              <ItemTile
+                key={deco.id}
+                emoji={deco.emoji}
+                label={deco.label}
+                price={deco.price}
+                equipped={equipped}
+                has={has}
+                affordable={affordable}
+                removable={removable}
+                busy={busy}
+                onClick={() => onTap(deco, yardIndex)}
+              />
+            );
+          })}
         </div>
       </div>
     );
@@ -979,12 +1067,11 @@ function DecorateSheet({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(9,7,30,0.55)",
+        ...OVERLAY,
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "center",
         zIndex: 230,
-        backdropFilter: "blur(3px)",
       }}
       role="dialog"
       aria-modal="true"
@@ -992,21 +1079,22 @@ function DecorateSheet({
       <div
         style={{
           background: "#fff",
-          borderRadius: "22px 22px 0 0",
+          borderRadius: `${R.card}px ${R.card}px 0 0`,
           padding: "16px 16px 22px",
           width: "100%",
           maxWidth: 560,
           maxHeight: "78vh",
           overflowY: "auto",
           WebkitOverflowScrolling: "touch",
-          boxShadow: "0 -12px 40px rgba(0,0,0,0.25)",
+          boxShadow: SH.sheet,
           borderTop: `3px solid ${HONEY.h300}`,
+          animation: "bv-sheet-in 0.3s ease-out",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h800 }}>🛋 내 집 꾸미기</div>
-            <div style={{ fontSize: 11.5, fontWeight: 800, color: HONEY.h700, marginTop: 2 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h900 }}>🛋 내 집 꾸미기</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
               내 꿀 🍯 {honey} · 한 번 산 아이템은 계속 보유해요
             </div>
           </div>
@@ -1014,9 +1102,13 @@ function DecorateSheet({
             onClick={onClose}
             aria-label="close"
             style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: HONEY.h50, border: `1.5px solid ${HONEY.h200}`,
-              fontSize: 14, fontWeight: 900, color: HONEY.h800, cursor: "pointer",
+              ...CLOSE_BTN,
+              background: HONEY.h50,
+              border: `1.5px solid ${HONEY.h200}`,
+              fontSize: 14,
+              fontWeight: 900,
+              color: HONEY.h800,
+              cursor: "pointer",
             }}
           >✕</button>
         </div>
@@ -1027,7 +1119,7 @@ function DecorateSheet({
 
         {/* 마당 — 슬롯 3칸 (좌/우/앞) 선택 후 아이템 장착 */}
         <div style={{ marginBottom: 4 }}>
-          <div style={{ fontSize: 13, fontWeight: 900, color: HONEY.h800, marginBottom: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: HONEY.h800, marginBottom: 6 }}>
             🌳 마당 (3칸)
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -1041,15 +1133,15 @@ function DecorateSheet({
                   style={{
                     flex: 1,
                     minHeight: 62,
-                    borderRadius: 12,
+                    borderRadius: R.tile,
                     border: `2px solid ${active ? HONEY.h500 : HONEY.h200}`,
-                    background: active ? `linear-gradient(160deg, ${HONEY.h100}, #fff)` : "#FFFDF6",
+                    background: active ? GR.surface : "#FFFDF6",
                     cursor: "pointer",
                     fontFamily: "inherit",
                   }}
                 >
                   <div style={{ fontSize: 20 }}>{cur?.emoji ?? "➕"}</div>
-                  <div style={{ fontSize: 10.5, fontWeight: 900, color: HONEY.h700 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700 }}>
                     {label} {cur ? `· ${cur.label}` : "· 비어 있음"}
                   </div>
                 </button>
@@ -1063,7 +1155,25 @@ function DecorateSheet({
               gap: 8,
             }}
           >
-            {VILLAGE_DECOS_V2.filter((d) => d.slot === "yard").map(tile)}
+            {VILLAGE_DECOS_V2.filter((d) => d.slot === "yard").map((deco) => {
+              const equipped = isEquipped(deco);
+              const has = owned[deco.id] === true;
+              const affordable = has || honey >= deco.price;
+              return (
+                <ItemTile
+                  key={deco.id}
+                  emoji={deco.emoji}
+                  label={deco.label}
+                  price={deco.price}
+                  equipped={equipped}
+                  has={has}
+                  affordable={affordable}
+                  removable={true}
+                  busy={busy}
+                  onClick={() => onTap(deco, yardIndex)}
+                />
+              );
+            })}
           </div>
         </div>
 
