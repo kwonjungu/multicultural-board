@@ -40,6 +40,12 @@ import {
   type GalleryEntry,
 } from "@/lib/gallery";
 import { checkSafety } from "@/lib/chatSafety";
+import {
+  dailyQuestsFor,
+  todayKey,
+  subscribeTodayQuests,
+  unclaimedCount,
+} from "@/lib/quests";
 import { HONEY } from "@/lib/constants";
 import { t, tFmt } from "@/lib/i18n";
 
@@ -151,6 +157,18 @@ export default function PraiseHive({
 }: Props) {
   const lang = user.myLang;
   const [tab, setTab] = useState<Tab>(user.isTeacher ? "race" : "mine");
+
+  // 📋 일일 퀘스트 미수령 보상 배지 (학생만 — 교사 뷰는 배지 없음).
+  // 다른 모듈에서 활동하고 돌아왔을 때 "받을 게 있다"를 탭 라벨에서 알려준다.
+  const [questUnclaimed, setQuestUnclaimed] = useState(0);
+  useEffect(() => {
+    if (user.isTeacher || !myClientId || !roomCode) return;
+    const quests = dailyQuestsFor(todayKey(), myClientId);
+    const unsub = subscribeTodayQuests(roomCode, myClientId, (s) => {
+      setQuestUnclaimed(unclaimedCount(quests, s));
+    });
+    return () => unsub();
+  }, [user.isTeacher, myClientId, roomCode]);
 
   // village 탭 라벨은 한국어 하드코딩 (가드레일 — 신규 i18n 키 대량 추가 금지)
   const tabs: { id: Tab; labelKey?: string; label?: string }[] = useMemo(() => {
@@ -297,6 +315,31 @@ export default function PraiseHive({
                 }}
               >
                 {tb.labelKey ? t(tb.labelKey, lang) : tb.label}
+                {/* 미수령 퀘스트 보상 배지 — clip-path 가 자식을 자르므로
+                    모서리 절대배치 대신 라벨 옆 인라인 배지로 표시 */}
+                {tb.id === "village" && questUnclaimed > 0 && (
+                  <span
+                    aria-label={`받을 보상 ${questUnclaimed}개`}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      minWidth: 18,
+                      height: 18,
+                      padding: "0 5px",
+                      marginLeft: 6,
+                      borderRadius: 999,
+                      background: "#F97316",
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      verticalAlign: "middle",
+                      boxShadow: "0 2px 6px rgba(249,115,22,0.4)",
+                    }}
+                  >
+                    {questUnclaimed}
+                  </span>
+                )}
               </button>
             );
           })}
