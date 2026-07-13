@@ -9,8 +9,15 @@
 // UI 문구는 한국어 하드코딩 (가드레일 — 신규 i18n 키 대량 추가 금지).
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import type { UserConfig, RoomConfig, StudentCosmetics } from "@/lib/types";
-import { stageOf } from "@/lib/stage";
+import {
+  stageOf,
+  stageImage,
+  stageImageWithSkin,
+  stageImageWithHat,
+  stageImageWithSkinAndHat,
+} from "@/lib/stage";
 import { subscribeAllStudentCounts, subscribeAllCosmetics } from "@/lib/stickers";
 import {
   subscribeVillage,
@@ -20,21 +27,31 @@ import {
   equipDeco,
   waterFriendGarden,
   decoById,
+  decoV2ById,
+  effectiveHouseV2,
+  ownedDecoIdsV2,
   todayStr,
   VILLAGE_DECOS,
+  VILLAGE_DECOS_V2,
   VILLAGE_FACILITIES,
   WATER_PER_LEVEL,
   DEW_AMOUNT,
   type VillageData,
   type VillageState,
   type VillageDeco,
+  type VillageDecoV2,
   type VillageSlot,
 } from "@/lib/village";
 import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
+import type { VillagePlot3D } from "./VillageMap3D";
 import QuestBoard from "./QuestBoard";
 import Toast from "./Toast";
 import { HONEY } from "@/lib/constants";
 import { t } from "@/lib/i18n";
+
+// 🗺 3D 마을 맵 — three.js(~600KB)가 들어 있어 반드시 dynamic + ssr:false.
+// 로드 전/WebGL 실패 시엔 아래 2D hex 맵이 그대로 폴백으로 남는다.
+const VillageMap3D = dynamic(() => import("./VillageMap3D"), { ssr: false });
 
 const DEFAULT_COSMETICS: StudentCosmetics = { skin: "classic", hat: null, pet: null, trophy: null };
 const DEFAULT_PLATE_COLOR = "#FDE68A"; // 기본 꿀색 문패
@@ -75,6 +92,10 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   const [toast, setToast] = useState<{ msg: string; tone: "success" | "error" } | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
+  // 3D 맵 상태 — loading(청크·씬 준비 전: 2D 표시) / on(3D) / off(WebGL 실패: 2D 폴백)
+  const [map3d, setMap3d] = useState<"loading" | "on" | "off">("loading");
+  // 내 집 꾸미기 바텀시트 (카탈로그 v2)
+  const [decorateOpen, setDecorateOpen] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeAllStudentCounts(roomCode, (c) => {
@@ -154,6 +175,36 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   const today = todayStr();
   const focusEntry = focus ? entries.find((e) => e.id === focus) ?? null : null;
 
+  // ── 3D 씬 입력 데이터 (구독 갱신 → memo 갱신 → 씬 재빌드 에코) ─────
+  const plots3d: VillagePlot3D[] = useMemo(
+    () =>
+      entries.map((e) => {
+        const st = stageOf(e.count);
+        const { skin, hat } = e.cosmetics;
+        // 벌 빌보드 텍스처 후보 — CharacterImage 의 폴백 체인과 동일 순서:
+        // skin+hat 합성본 → classic+hat 합성본 → skin 단품 → 기본 stage
+        const bee: string[] = [];
+        if (hat) {
+          bee.push(stageImageWithSkinAndHat(st, skin, hat));
+          if (skin !== "classic") bee.push(stageImageWithHat(st, hat));
+        }
+        if (skin !== "classic") bee.push(stageImageWithSkin(st, skin));
+        bee.push(stageImage(st));
+        const h = effectiveHouseV2(e.village); // v1 장착값 무료 매핑 포함
+        return {
+          id: e.id,
+          name: e.name,
+          isSelf: e.id === myClientId && !user.isTeacher,
+          bee,
+          style: h.style,
+          plate: h.plate,
+          fence: h.fence,
+          yard: h.yard,
+        };
+      }),
+    [entries, myClientId, user.isTeacher],
+  );
+
   // ── 상점 구매/장착 ──────────────────────────────────────────
   const [shopBusy, setShopBusy] = useState(false);
   async function handleDecoTap(deco: VillageDeco) {
@@ -187,6 +238,53 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
       }
     } catch (err) {
       console.error("buyOrEquipDeco failed", err);
+      setToast({ msg: "문제가 생겼어요. 다시 시도해 주세요.", tone: "error" });
+    }
+    setShopBusy(false);
+  }
+
+  // ── 꾸미기 바텀시트 (카탈로그 v2) 구매/장착/해제 ─────────────────
+  async function handleDecoV2Tap(deco: VillageDecoV2, yardIndex = 0) {
+    if (shopBusy) return;
+    const houseV2 = effectiveHouseV2(myVillage);
+    const equipped =
+      deco.slot === "yard"
+        ? houseV2.yard[yardIndex] === deco.id
+        : deco.slot === "style"
+        ? houseV2.style === deco.id
+        : deco.slot === "plate"
+        ? houseV2.plate === deco.id
+        : houseV2.fence === deco.id;
+    if (equipped) {
+      // 집/문패는 항상 하나 장착 (해제 개념 없음). 울타리/마당만 비울 수 있다.
+      if (deco.slot === "style" || deco.slot === "plate") return;
+      equipDeco(roomCode, myClientId, deco.slot, null, yardIndex).catch((err) => {
+        console.error("equipDeco(v2) failed", err);
+        setToast({ msg: "문제가 생겼어요. 다시 시도해 주세요.", tone: "error" });
+      });
+      setToast({ msg: `${deco.emoji} ${deco.label} 해제`, tone: "success" });
+      return;
+    }
+    if (ownedDecoIdsV2(myVillage)[deco.id]) {
+      // 보유(기본템·v1 무료 매핑 포함) — 재화 무관, 낙관적 쓰기
+      equipDeco(roomCode, myClientId, deco.slot, deco.id, yardIndex).catch((err) => {
+        console.error("equipDeco(v2) failed", err);
+        setToast({ msg: "문제가 생겼어요. 다시 시도해 주세요.", tone: "error" });
+      });
+      setToast({ msg: `${deco.emoji} ${deco.label} 장착!`, tone: "success" });
+      return;
+    }
+    // 구매 — 잔액 검증은 트랜잭션 안에서 (동시 탭 안전)
+    setShopBusy(true);
+    try {
+      const res = await buyOrEquipDeco(roomCode, myClientId, deco, yardIndex);
+      if (res.status === "poor") {
+        setToast({ msg: `꿀이 부족해요 (${deco.price}🍯 필요)`, tone: "error" });
+      } else {
+        setToast({ msg: `${deco.emoji} ${deco.label} 구매 완료! (-${deco.price}🍯)`, tone: "success" });
+      }
+    } catch (err) {
+      console.error("buyOrEquipDeco(v2) failed", err);
       setToast({ msg: "문제가 생겼어요. 다시 시도해 주세요.", tone: "error" });
     }
     setShopBusy(false);
@@ -421,13 +519,30 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
           🗺 마을 지도
         </div>
         <div style={{ fontSize: 11.5, fontWeight: 700, color: HONEY.h700, margin: "0 6px 10px" }}>
-          친구 집을 눌러 하루 한 번 💧 물을 줘요 — 물 {WATER_PER_LEVEL}번이면 정원이 자라요
+          {map3d === "on"
+            ? `한 손가락으로 돌리고, 두 손가락으로 이동·확대해요 · 집을 눌러 방문 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`
+            : `친구 집을 눌러 하루 한 번 💧 물을 줘요 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`}
         </div>
         {entries.length === 0 ? (
           <div style={{ fontSize: 13, color: HONEY.h700, fontWeight: 600, textAlign: "center", padding: 20 }}>
             아직 마을에 집이 없어요 — 칭찬 스티커를 받으면 집이 생겨요!
           </div>
         ) : (
+          <>
+          {/* 3D 맵 (기본) — 씬 준비 전엔 height 0 으로 감춰두고 2D 를 보여준다.
+              onFail(WebGL 불가·컨텍스트 유실) 시 완전히 내려가고 2D hex 맵 폴백. */}
+          {map3d !== "off" && (
+            <div style={{ height: map3d === "on" ? undefined : 0, overflow: "hidden" }}>
+              <VillageMap3D
+                plots={plots3d}
+                facilities={unlockedFacilities.map((f) => f.id)}
+                onSelect={(id) => setFocus(id)}
+                onReady={() => setMap3d("on")}
+                onFail={() => setMap3d("off")}
+              />
+            </div>
+          )}
+          {map3d !== "on" && (
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <div style={{ position: "relative", width: gridW, height: gridH, margin: "0 auto" }}>
               {plots.map((plot, i) => {
@@ -530,10 +645,12 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
               })}
             </div>
           </div>
+          )}
+          </>
         )}
       </div>
 
-      {/* ── 집 상세 팝오버 (친구 집 방문 + 물주기) ── */}
+      {/* ── 집 상세 팝오버 (친구 집 방문 + 물주기 / 내 집이면 🛋 꾸미기) ── */}
       {focusEntry && (
         <HousePopover
           lang={lang}
@@ -543,7 +660,22 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
           wateredToday={myVillage.watered?.[today]?.[focusEntry.id] === true}
           busy={waterBusy}
           onWater={() => handleWater(focusEntry)}
+          onDecorate={() => {
+            setFocus(null);
+            setDecorateOpen(true);
+          }}
           onClose={() => setFocus(null)}
+        />
+      )}
+
+      {/* ── 🛋 내 집 꾸미기 바텀시트 (카탈로그 v2 — 3D 슬롯) ── */}
+      {decorateOpen && !user.isTeacher && (
+        <DecorateSheet
+          village={myVillage}
+          honey={myHoney}
+          busy={shopBusy}
+          onTap={handleDecoV2Tap}
+          onClose={() => setDecorateOpen(false)}
         />
       )}
     </div>
@@ -562,6 +694,7 @@ function HousePopover({
   wateredToday,
   busy,
   onWater,
+  onDecorate,
   onClose,
 }: {
   lang: string;
@@ -571,6 +704,8 @@ function HousePopover({
   wateredToday: boolean;
   busy: boolean;
   onWater: () => void;
+  /** 내 집일 때만 — 🛋 꾸미기 바텀시트 열기 */
+  onDecorate: () => void;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -587,6 +722,8 @@ function HousePopover({
   const gardenWater = v.gardenWater ?? 0;
   const roofDeco = decoById(v.house?.roof);
   const gardenDeco = decoById(v.house?.garden);
+  // v2 집 스타일 (v1 지붕 매핑 포함) — 팝오버 상단 아이콘
+  const styleDeco = decoV2ById(effectiveHouseV2(v).style);
   const canWater = !isSelf && !isTeacher && !wateredToday;
   void lang;
 
@@ -634,7 +771,7 @@ function HousePopover({
           }}
         >✕</button>
 
-        <div style={{ fontSize: 26 }}>{roofDeco?.emoji ?? "🏠"}</div>
+        <div style={{ fontSize: 26 }}>{styleDeco?.emoji ?? roofDeco?.emoji ?? "🏠"}</div>
 
         {/* 벌 — 코스메틱 풀 렌더 */}
         <div style={{ position: "relative", width: 150, height: 150, margin: "2px auto 0" }}>
@@ -682,11 +819,33 @@ function HousePopover({
           </div>
         </div>
 
-        {/* 물주기 버튼 */}
+        {/* 물주기 버튼 / 내 집이면 꾸미기 */}
         {isSelf ? (
-          <div style={{ marginTop: 12, fontSize: 12, fontWeight: 800, color: HONEY.h700 }}>
-            친구들이 물을 주면 내 정원이 자라요 🌷
-          </div>
+          <>
+            <div style={{ marginTop: 12, fontSize: 12, fontWeight: 800, color: HONEY.h700 }}>
+              친구들이 물을 주면 내 정원이 자라요 🌷
+            </div>
+            <button
+              onClick={onDecorate}
+              style={{
+                marginTop: 12,
+                minHeight: 52,
+                width: "100%",
+                padding: "10px 24px",
+                background: `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`,
+                color: "#fff",
+                border: "none",
+                borderRadius: 14,
+                fontSize: 15,
+                fontWeight: 900,
+                cursor: "pointer",
+                boxShadow: "0 6px 16px rgba(245,158,11,0.3)",
+                fontFamily: "inherit",
+              }}
+            >
+              🛋 꾸미기 — 집·문패·울타리·마당
+            </button>
+          </>
         ) : isTeacher ? null : (
           <button
             onClick={onWater}
@@ -712,6 +871,205 @@ function HousePopover({
             {wateredToday ? "오늘은 이미 물을 줬어요 ✅" : "💧 물주기 (하루 1번)"}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 🛋 내 집 꾸미기 바텀시트 — 카탈로그 v2 (3D 슬롯: 집/문패/울타리/마당×3)
+// 구매·장착 로직은 buyOrEquipDeco/equipDeco 확장판 (부모의 handleDecoV2Tap).
+// ============================================================
+
+function DecorateSheet({
+  village,
+  honey,
+  busy,
+  onTap,
+  onClose,
+}: {
+  village: VillageState;
+  honey: number;
+  busy: boolean;
+  onTap: (deco: VillageDecoV2, yardIndex?: number) => void;
+  onClose: () => void;
+}) {
+  const [yardIndex, setYardIndex] = useState(0);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // 구독 에코로 village 가 갱신되면 여기도 즉시 최신 장착 상태를 반영한다
+  const house = effectiveHouseV2(village);
+  const owned = ownedDecoIdsV2(village);
+
+  function isEquipped(deco: VillageDecoV2): boolean {
+    switch (deco.slot) {
+      case "style": return house.style === deco.id;
+      case "plate": return house.plate === deco.id;
+      case "fence": return house.fence === deco.id;
+      case "yard":  return house.yard[yardIndex] === deco.id;
+    }
+  }
+
+  function tile(deco: VillageDecoV2) {
+    const equipped = isEquipped(deco);
+    const has = owned[deco.id] === true;
+    const affordable = has || honey >= deco.price;
+    const removable = deco.slot === "fence" || deco.slot === "yard";
+    return (
+      <button
+        key={deco.id}
+        onClick={() => onTap(deco, yardIndex)}
+        disabled={busy}
+        style={{
+          minHeight: 92,
+          padding: "10px 6px 8px",
+          borderRadius: 14,
+          border: `2px solid ${equipped ? HONEY.h500 : has ? HONEY.h300 : HONEY.h100}`,
+          background: equipped ? `linear-gradient(160deg, ${HONEY.h100}, #fff)` : "#FFFDF6",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          textAlign: "center",
+          opacity: affordable ? 1 : 0.55,
+        }}
+      >
+        <div style={{ fontSize: 28, lineHeight: 1.1 }}>{deco.emoji}</div>
+        <div style={{ fontSize: 11.5, fontWeight: 900, color: "#1F2937", marginTop: 4 }}>
+          {deco.label}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 900, color: HONEY.h700, marginTop: 2 }}>
+          {equipped
+            ? removable ? "✅ 장착 중 (눌러서 해제)" : "✅ 장착 중"
+            : has
+            ? "보유 — 장착하기"
+            : `${deco.price}🍯`}
+        </div>
+      </button>
+    );
+  }
+
+  function section(title: string, slot: VillageDecoV2["slot"]) {
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 900, color: HONEY.h800, marginBottom: 6 }}>
+          {title}
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
+            gap: 8,
+          }}
+        >
+          {VILLAGE_DECOS_V2.filter((d) => d.slot === slot).map(tile)}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(9,7,30,0.55)",
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+        zIndex: 230,
+        backdropFilter: "blur(3px)",
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "22px 22px 0 0",
+          padding: "16px 16px 22px",
+          width: "100%",
+          maxWidth: 560,
+          maxHeight: "78vh",
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+          boxShadow: "0 -12px 40px rgba(0,0,0,0.25)",
+          borderTop: `3px solid ${HONEY.h300}`,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h800 }}>🛋 내 집 꾸미기</div>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: HONEY.h700, marginTop: 2 }}>
+              내 꿀 🍯 {honey} · 한 번 산 아이템은 계속 보유해요
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="close"
+            style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: HONEY.h50, border: `1.5px solid ${HONEY.h200}`,
+              fontSize: 14, fontWeight: 900, color: HONEY.h800, cursor: "pointer",
+            }}
+          >✕</button>
+        </div>
+
+        {section("🏠 집 스타일", "style")}
+        {section("🪧 문패", "plate")}
+        {section("🚧 울타리", "fence")}
+
+        {/* 마당 — 슬롯 3칸 (좌/우/앞) 선택 후 아이템 장착 */}
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: HONEY.h800, marginBottom: 6 }}>
+            🌳 마당 (3칸)
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            {(["왼쪽", "오른쪽", "앞"] as const).map((label, i) => {
+              const cur = decoV2ById(house.yard[i]);
+              const active = yardIndex === i;
+              return (
+                <button
+                  key={i}
+                  onClick={() => setYardIndex(i)}
+                  style={{
+                    flex: 1,
+                    minHeight: 62,
+                    borderRadius: 12,
+                    border: `2px solid ${active ? HONEY.h500 : HONEY.h200}`,
+                    background: active ? `linear-gradient(160deg, ${HONEY.h100}, #fff)` : "#FFFDF6",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <div style={{ fontSize: 20 }}>{cur?.emoji ?? "➕"}</div>
+                  <div style={{ fontSize: 10.5, fontWeight: 900, color: HONEY.h700 }}>
+                    {label} {cur ? `· ${cur.label}` : "· 비어 있음"}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
+              gap: 8,
+            }}
+          >
+            {VILLAGE_DECOS_V2.filter((d) => d.slot === "yard").map(tile)}
+          </div>
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700, marginTop: 10 }}>
+          예전에 산 지붕·정원 아이템은 새 마을에서도 그대로 쓸 수 있어요 (무료 전환).
+        </div>
       </div>
     </div>
   );
