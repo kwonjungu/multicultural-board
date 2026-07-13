@@ -99,6 +99,19 @@
   배치 폴링 간격은 20s 가 아니라 60s+ (요청 수 부풀림 방지). 단건 테스트
   생성(비배치) 금지 — 검증은 로컬 sharp 합성으로.
 
+- **그림책 세션 노드는 endSession wipe 이후 부활 금지.** `endSession` 은
+  `rooms/{}/storybook` 서브트리를 통째로 지우는데, 그 **이후에** 실행될 수 있는
+  정리 코드(자동 읽기 finally 등)가 세션 경로에 `update()` 를 쓰면 없는 노드를
+  만들어 `{autoReading}`만 담긴 **유령 세션**이 남는다 → 방 전체(교사 포함)가
+  영구 "수업 준비 중" 대기 화면에 갇히고, 그림책 세션 우선 규칙 때문에 화이트보드
+  학생 따라오기까지 차단된다 (2026-07-13 방 1111 장애). 세션 경로의 사후 쓰기는
+  `runTransaction(cur ? merge : cur)` 가드 필수 (`setAutoReading` 참조). 방어선:
+  활성 판정(page.tsx)과 StorybookRoom 셸은 **bookId 없는 세션 = 세션 없음**으로
+  취급. 진단·재현 도구: `scripts/inspect-room.mjs`(읽기 전용),
+  `scripts/ghost-session-test.mjs`(테스트 방 전용 유령 심기/청소),
+  `scripts/repro-errors.mjs`(playwright-core + 시스템 Chrome 교사 플로우 자동 클릭).
+  로컬 `.env.local` 은 배포 번들의 공개 클라이언트 설정으로 복원해 둠 (git 미추적).
+
 - **문서 번역(XML)의 공용 유틸은 `lib/xmlI18n.ts` 만 사용.** (1) decodeXml 은
   `&amp;` 를 반드시 마지막에 풀어야 한다 — 먼저 풀면 이중 이스케이프가 깨져
   재조립 XML 이 손상된다. (2) 번역 전에 mergePptxRuns / mergeHwpxRuns 로

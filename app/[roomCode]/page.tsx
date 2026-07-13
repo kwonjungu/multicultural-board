@@ -159,7 +159,10 @@ export default function RoomPage() {
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeSession(roomCode, (session) => {
-      const active = !!session && session.phase !== "done";
+      // bookId 없는 세션은 유령(정리 코드가 wipe 후 남긴 잔여 노드) — 활성으로 치지
+      // 않는다. 이걸 활성으로 치면 전 학생이 영구 대기 화면에 갇히고 화이트보드
+      // 따라오기까지 차단된다 (2026-07-13 방 1111 장애).
+      const active = !!session && !!session.bookId && session.phase !== "done";
       setStorybookActive(active);
       storybookActiveRef.current = active;
       if (active && !user.isTeacher) {

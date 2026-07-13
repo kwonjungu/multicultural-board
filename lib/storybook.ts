@@ -1,4 +1,4 @@
-import { ref, set, update, push, onValue, remove, get } from "firebase/database";
+import { ref, set, update, push, onValue, remove, get, runTransaction } from "firebase/database";
 import { getClientDb } from "./firebase-client";
 import type {
   StorybookSession,
@@ -277,7 +277,14 @@ export async function setAllowReviewChat(
 /** [항목 7] 자동 읽기 진행 중 표시 — 교사가 켜면 학생 화면에 배지가 뜬다. */
 export async function setAutoReading(roomCode: string, on: boolean): Promise<void> {
   const db = getClientDb();
-  await update(ref(db, sessionPath(roomCode)), { autoReading: on });
+  // ⚠ update() 금지 — 자동 읽기의 finally/stop 이 endSession 의 wipe "이후"에
+  // 실행되면 update 가 세션 노드를 {autoReading}만 담아 되살려 방 전체가
+  // 유령 세션(영구 대기 화면)에 갇힌다 (2026-07-13 방 1111 장애).
+  // 트랜잭션 가드: 세션이 없으면(null) 그대로 두고 아무것도 만들지 않는다.
+  await runTransaction(
+    ref(db, sessionPath(roomCode)),
+    (cur: StorybookSession | null) => (cur ? { ...cur, autoReading: on } : cur),
+  );
 }
 
 // === Responses ===

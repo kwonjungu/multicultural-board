@@ -30,6 +30,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/three": "^0.184.1",
+    "playwright-core": "^1.61.1",
     "typescript": "^5"
   }
 }

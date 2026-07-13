@@ -227,7 +227,9 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
   }, [roomCode]);
 
   // ── No active session ────────────────────────────────────
-  if (!session) {
+  // bookId 없는 세션 = 유령 노드(예: wipe 이후 남은 {autoReading}) — 세션 없음과
+  // 동일하게 취급해야 교사는 책 목록, 학생은 자유 읽기로 정상 진입한다.
+  if (!session || !session.bookId) {
     if (isTeacher) {
       return (
         <TeacherSetup
