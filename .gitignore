@@ -60,4 +60,5 @@ output_cards/
 scripts/.asset_batch_job.json
 .cosmetics-batch-out/
 .village-batch-out/
+.village3d-batch-out/
 .acc-preview/
