@@ -19,6 +19,7 @@ import {
   royalProgress,
 } from "@/lib/stage";
 import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
+import BeeVillage from "./BeeVillage";
 import {
   subscribeStudentStickers,
   subscribeTeamStickers,
@@ -71,7 +72,7 @@ interface Props {
   onOpenCosmetics: () => void;
 }
 
-type Tab = "mine" | "race" | "team" | "manage";
+type Tab = "mine" | "village" | "race" | "team" | "manage";
 
 const STICKER_TYPES: StickerType[] = [
   "helpful",
@@ -151,18 +152,21 @@ export default function PraiseHive({
   const lang = user.myLang;
   const [tab, setTab] = useState<Tab>(user.isTeacher ? "race" : "mine");
 
-  const tabs: { id: Tab; labelKey: string }[] = useMemo(() => {
-    // 교사: 주는 UI 중심 — '나의 꿀벌집'(mine) 제거, 관리·개인전·단체전 순.
+  // village 탭 라벨은 한국어 하드코딩 (가드레일 — 신규 i18n 키 대량 추가 금지)
+  const tabs: { id: Tab; labelKey?: string; label?: string }[] = useMemo(() => {
+    // 교사: 주는 UI 중심 — '나의 꿀벌집'(mine) 제거, 관리·마을(관람)·개인전·단체전 순.
     if (user.isTeacher) {
       return [
         { id: "manage", labelKey: "phTabManage" },
+        { id: "village", label: "🏡 꿀벌 마을" },
         { id: "race", labelKey: "phTabIndividual" },
         { id: "team", labelKey: "phTabTeam" },
       ];
     }
-    // 학생: 기존 그대로 (나의 꿀벌집·개인전·단체전)
+    // 학생: 나의 꿀벌집 · 꿀벌 마을(V2 게임) · 개인전 · 단체전
     return [
       { id: "mine", labelKey: "phTabMine" },
+      { id: "village", label: "🏡 꿀벌 마을" },
       { id: "race", labelKey: "phTabIndividual" },
       { id: "team", labelKey: "phTabTeam" },
     ];
@@ -292,7 +296,7 @@ export default function PraiseHive({
                   transition: "transform 0.15s",
                 }}
               >
-                {t(tb.labelKey, lang)}
+                {tb.labelKey ? t(tb.labelKey, lang) : tb.label}
               </button>
             );
           })}
@@ -304,6 +308,15 @@ export default function PraiseHive({
             roomCode={roomCode}
             myClientId={myClientId}
             onOpenCosmetics={onOpenCosmetics}
+          />
+        )}
+        {tab === "village" && (
+          <BeeVillage
+            lang={lang}
+            roomCode={roomCode}
+            user={user}
+            myClientId={myClientId}
+            roomConfig={roomConfig}
           />
         )}
         {tab === "race" && (

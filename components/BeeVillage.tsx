@@ -1,0 +1,708 @@
+"use client";
+
+// 🏡 꿀벌 마을 (V2) — PraiseHive 의 별도 탭 게임.
+// docs/꿀벌마을-마스터플랜.md §5. 스티커 꾸미기와 독립인 자체 게임 루프:
+//   ① 꿀 이슬 줍기(일 1회 +10) ② 스티커→꿀 환전(증가분 ×5)
+//   ③ 내 집 가꾸기(데코 구매·장착) ④ 친구 집 물주기(하루 1회/친구, 5회=정원 Lv+1)
+//   ⑤ 마을 공동 시설(학급 스티커 합계 해금)
+// 렌더는 CharacterComposite(CharacterImage+AccessoryLayer+CosmeticFrame) 재사용.
+// UI 문구는 한국어 하드코딩 (가드레일 — 신규 i18n 키 대량 추가 금지).
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { UserConfig, RoomConfig, StudentCosmetics } from "@/lib/types";
+import { stageOf } from "@/lib/stage";
+import { subscribeAllStudentCounts, subscribeAllCosmetics } from "@/lib/stickers";
+import {
+  subscribeVillage,
+  collectDailyDew,
+  exchangeStickerHoney,
+  buyOrEquipDeco,
+  equipDeco,
+  waterFriendGarden,
+  decoById,
+  todayStr,
+  VILLAGE_DECOS,
+  VILLAGE_FACILITIES,
+  WATER_PER_LEVEL,
+  DEW_AMOUNT,
+  type VillageData,
+  type VillageState,
+  type VillageDeco,
+  type VillageSlot,
+} from "@/lib/village";
+import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
+import Toast from "./Toast";
+import { HONEY } from "@/lib/constants";
+import { t } from "@/lib/i18n";
+
+const DEFAULT_COSMETICS: StudentCosmetics = { skin: "classic", hat: null, pet: null, trophy: null };
+const DEFAULT_PLATE_COLOR = "#FDE68A"; // 기본 꿀색 문패
+
+const SLOT_LABEL: Record<VillageSlot, string> = {
+  roof: "지붕",
+  garden: "정원",
+  plate: "문패",
+};
+
+function shortId(id: string): string {
+  if (!id) return "??????";
+  const clean = id.replace(/[^a-zA-Z0-9]/g, "");
+  return (clean || id).slice(0, 6);
+}
+
+interface Props {
+  lang: string;
+  roomCode: string;
+  user: UserConfig;
+  myClientId: string;
+  roomConfig: RoomConfig;
+}
+
+interface HouseEntry {
+  id: string;
+  name: string;
+  count: number;
+  cosmetics: StudentCosmetics;
+  village: VillageState;
+}
+
+export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfig }: Props) {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [countsReady, setCountsReady] = useState(false);
+  const [allCosmetics, setAllCosmetics] = useState<Record<string, StudentCosmetics>>({});
+  const [village, setVillage] = useState<VillageData>({});
+  const [toast, setToast] = useState<{ msg: string; tone: "success" | "error" } | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
+  const [shopOpen, setShopOpen] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeAllStudentCounts(roomCode, (c) => {
+      setCounts(c);
+      setCountsReady(true);
+    });
+    return () => unsub();
+  }, [roomCode]);
+
+  useEffect(() => {
+    const unsub = subscribeAllCosmetics(roomCode, setAllCosmetics);
+    return () => unsub();
+  }, [roomCode]);
+
+  useEffect(() => {
+    const unsub = subscribeVillage(roomCode, setVillage);
+    return () => unsub();
+  }, [roomCode]);
+
+  // ── 입장 보상: 꿀 이슬(일 1회) + 스티커 환전(증가분) ──────────────
+  // 마운트당 1회 (useRef 가드 — StrictMode double-invoke 대비. 트랜잭션
+  // 자체도 날짜/기준점 가드로 멱등이라 중복 지급은 없다.)
+  const rewardsRanRef = useRef(false);
+  useEffect(() => {
+    if (user.isTeacher || !countsReady || rewardsRanRef.current) return;
+    rewardsRanRef.current = true;
+    const myCount = counts[myClientId] ?? 0;
+    (async () => {
+      try {
+        const dew = await collectDailyDew(roomCode, myClientId);
+        const ex = await exchangeStickerHoney(roomCode, myClientId, myCount);
+        const parts: string[] = [];
+        if (dew.collected) parts.push(`🌅 꿀 이슬 +${DEW_AMOUNT}`);
+        if (ex.gained > 0) parts.push(`🐝 칭찬 보너스 +${ex.gained}`);
+        if (parts.length > 0) setToast({ msg: `${parts.join(" · ")} 🍯`, tone: "success" });
+      } catch (err) {
+        console.error("village entry rewards failed", err);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countsReady, user.isTeacher, roomCode, myClientId]);
+
+  // ── 마을 주민 (전시장 RaceTab 과 동일한 roster 필터 규칙) ─────────
+  const entries: HouseEntry[] = useMemo(() => {
+    const roster = roomConfig.roster ?? [];
+    const rosterSet = new Set(roster);
+    let ids = Array.from(
+      new Set([...Object.keys(counts), ...Object.keys(allCosmetics), ...Object.keys(village)]),
+    );
+    if (roster.length > 0) ids = ids.filter((id) => rosterSet.has(id));
+    const arr = ids.map((id) => ({
+      id,
+      count: counts[id] ?? 0,
+      name:
+        id === myClientId
+          ? user.myName
+          : rosterSet.has(id)
+          ? id
+          : `${t("phStudentPrefix", lang)} #${shortId(id)}`,
+      cosmetics: allCosmetics[id] ?? DEFAULT_COSMETICS,
+      village: village[id] ?? {},
+    }));
+    // 이름순 고정 배치 — 순위가 아니라 "마을 지도"이므로 자리가 흔들리지 않게.
+    arr.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    return arr;
+  }, [counts, allCosmetics, village, myClientId, user.myName, lang, roomConfig.roster]);
+
+  const classTotal = useMemo(
+    () => Object.values(counts).reduce((a, b) => a + b, 0),
+    [counts],
+  );
+  const unlockedFacilities = VILLAGE_FACILITIES.filter((f) => classTotal >= f.at);
+  const nextFacility = VILLAGE_FACILITIES.find((f) => classTotal < f.at) ?? null;
+
+  const myVillage: VillageState = village[myClientId] ?? {};
+  const myHoney = myVillage.honey ?? 0;
+  const today = todayStr();
+  const focusEntry = focus ? entries.find((e) => e.id === focus) ?? null : null;
+
+  // ── 상점 구매/장착 ──────────────────────────────────────────
+  const [shopBusy, setShopBusy] = useState(false);
+  async function handleDecoTap(deco: VillageDeco) {
+    if (shopBusy) return;
+    const equipped = myVillage.house?.[deco.slot] === deco.id;
+    const owned = myVillage.owned?.[deco.id] === true;
+    if (equipped) {
+      // 해제 — 재화 무관, 낙관적 쓰기 (가드레일: await 로 UI 붙잡지 않기)
+      equipDeco(roomCode, myClientId, deco.slot, null).catch((err) => {
+        console.error("equipDeco failed", err);
+        setToast({ msg: "문제가 생겼어요. 다시 시도해 주세요.", tone: "error" });
+      });
+      return;
+    }
+    if (owned) {
+      equipDeco(roomCode, myClientId, deco.slot, deco.id).catch((err) => {
+        console.error("equipDeco failed", err);
+        setToast({ msg: "문제가 생겼어요. 다시 시도해 주세요.", tone: "error" });
+      });
+      setToast({ msg: `${deco.emoji} ${deco.label} 장착!`, tone: "success" });
+      return;
+    }
+    // 구매 — 잔액 검증은 트랜잭션 안에서 (동시 탭 안전)
+    setShopBusy(true);
+    try {
+      const res = await buyOrEquipDeco(roomCode, myClientId, deco);
+      if (res.status === "poor") {
+        setToast({ msg: `꿀이 부족해요 (${deco.price}🍯 필요)`, tone: "error" });
+      } else {
+        setToast({ msg: `${deco.emoji} ${deco.label} 구매 완료! (-${deco.price}🍯)`, tone: "success" });
+      }
+    } catch (err) {
+      console.error("buyOrEquipDeco failed", err);
+      setToast({ msg: "문제가 생겼어요. 다시 시도해 주세요.", tone: "error" });
+    }
+    setShopBusy(false);
+  }
+
+  // ── 물주기 ──────────────────────────────────────────────────
+  const [waterBusy, setWaterBusy] = useState(false);
+  async function handleWater(friend: HouseEntry) {
+    if (waterBusy || user.isTeacher || friend.id === myClientId) return;
+    setWaterBusy(true);
+    try {
+      const res = await waterFriendGarden(roomCode, myClientId, friend.id);
+      if (res.status === "already") {
+        setToast({ msg: "오늘은 이미 물을 줬어요 — 내일 또 와요!", tone: "error" });
+      } else if (res.leveledUp) {
+        setToast({ msg: `🌷 ${friend.name}의 정원이 자랐어요! (Lv.${res.gardenLevel})`, tone: "success" });
+      } else {
+        setToast({ msg: `💧 ${friend.name}의 정원에 물을 줬어요! (${res.gardenWater}/${WATER_PER_LEVEL})`, tone: "success" });
+      }
+    } catch (err) {
+      console.error("waterFriendGarden failed", err);
+      setToast({ msg: "문제가 생겼어요. 다시 시도해 주세요.", tone: "error" });
+    }
+    setWaterBusy(false);
+  }
+
+  // ── 육각 플롯 그리드 기하 (가드레일: 반올림 금지, 겹침 H/4, 홀수행 W/2) ──
+  const HEX_W = 172;
+  const HEX_H = HEX_W * 2 / Math.sqrt(3);       // fractional 유지
+  const HEX_ROW_STEP = HEX_H * 0.75;            // 행 간 수직 거리 (겹침 = H/4)
+  const HEX_COLS = 3;
+  const plots: Array<{ kind: "plaza" } | { kind: "house"; e: HouseEntry }> = [
+    { kind: "plaza" },
+    ...entries.map((e) => ({ kind: "house" as const, e })),
+  ];
+  const rows = Math.ceil(plots.length / HEX_COLS);
+  const gridW = HEX_W * HEX_COLS + HEX_W / 2;   // 홀수행 시프트 포함
+  const gridH = (rows - 1) * HEX_ROW_STEP + HEX_H;
+
+  const card: React.CSSProperties = {
+    background: "#fff",
+    borderRadius: 22,
+    padding: "16px 14px",
+    border: `2px solid ${HONEY.h200}`,
+    boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <Toast
+        message={toast?.msg ?? null}
+        tone={toast?.tone ?? "success"}
+        onDismiss={() => setToast(null)}
+      />
+
+      {/* ── 내 꿀 지갑 + 상점 (학생만 — 교사는 관람) ── */}
+      {!user.isTeacher && (
+        <div style={card}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 150 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: HONEY.h700 }}>내 꿀 주머니</div>
+              <div style={{ fontSize: 26, fontWeight: 900, color: HONEY.h800, letterSpacing: -0.3 }}>
+                🍯 {myHoney}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
+                {myVillage.lastDew === today
+                  ? "🌅 오늘의 꿀 이슬을 주웠어요"
+                  : "🌅 마을에 오면 매일 꿀 이슬을 주워요"}
+                {" · 칭찬 스티커 1개 = 🍯5"}
+              </div>
+            </div>
+            <button
+              onClick={() => setShopOpen((v) => !v)}
+              style={{
+                minHeight: 52,
+                padding: "10px 20px",
+                background: shopOpen
+                  ? "#fff"
+                  : `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`,
+                color: shopOpen ? HONEY.h800 : "#fff",
+                border: `2px solid ${shopOpen ? HONEY.h300 : HONEY.h500}`,
+                borderRadius: 14,
+                fontSize: 15,
+                fontWeight: 900,
+                cursor: "pointer",
+                boxShadow: shopOpen ? "none" : "0 6px 16px rgba(245,158,11,0.3)",
+                fontFamily: "inherit",
+                letterSpacing: -0.2,
+              }}
+            >
+              {shopOpen ? "상점 닫기 ✕" : "🛍 내 집 가꾸기"}
+            </button>
+          </div>
+
+          {/* 상점 패널 */}
+          {shopOpen && (
+            <div style={{ marginTop: 14 }}>
+              {(["roof", "garden", "plate"] as VillageSlot[]).map((slot) => (
+                <div key={slot} style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: HONEY.h800, marginBottom: 6 }}>
+                    {slot === "roof" ? "🏠" : slot === "garden" ? "🌱" : "🪧"} {SLOT_LABEL[slot]}
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
+                      gap: 8,
+                    }}
+                  >
+                    {VILLAGE_DECOS.filter((d) => d.slot === slot).map((deco) => {
+                      const equipped = myVillage.house?.[deco.slot] === deco.id;
+                      const owned = myVillage.owned?.[deco.id] === true;
+                      const affordable = owned || myHoney >= deco.price;
+                      return (
+                        <button
+                          key={deco.id}
+                          onClick={() => handleDecoTap(deco)}
+                          disabled={shopBusy}
+                          style={{
+                            minHeight: 92,
+                            padding: "10px 6px 8px",
+                            borderRadius: 14,
+                            border: `2px solid ${equipped ? HONEY.h500 : owned ? HONEY.h300 : HONEY.h100}`,
+                            background: equipped
+                              ? `linear-gradient(160deg, ${HONEY.h100}, #fff)`
+                              : "#FFFDF6",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            textAlign: "center",
+                            opacity: affordable ? 1 : 0.55,
+                          }}
+                        >
+                          <div style={{ fontSize: 28, lineHeight: 1.1 }}>{deco.emoji}</div>
+                          <div style={{ fontSize: 11.5, fontWeight: 900, color: "#1F2937", marginTop: 4 }}>
+                            {deco.label}
+                          </div>
+                          <div style={{ fontSize: 11, fontWeight: 900, color: HONEY.h700, marginTop: 2 }}>
+                            {equipped ? "✅ 장착 중 (눌러서 해제)" : owned ? "보유 — 장착하기" : `${deco.price}🍯`}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700 }}>
+                한 번 산 데코는 계속 보유해요. 같은 칸의 다른 데코로 언제든 바꿀 수 있어요.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 마을 공동 시설 배너 ── */}
+      <div style={card}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div style={{ fontSize: 15, fontWeight: 900, color: HONEY.h800 }}>
+              🏛 마을 공동 시설 — 우리 반 칭찬 {classTotal}🐝
+            </div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
+              {nextFacility
+                ? `${nextFacility.emoji} ${nextFacility.label}까지 ${nextFacility.at - classTotal}개 남았어요!`
+                : "🎉 모든 시설이 완성됐어요! 마을 축제가 열렸어요!"}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {VILLAGE_FACILITIES.map((f) => {
+              const on = classTotal >= f.at;
+              return (
+                <div
+                  key={f.at}
+                  title={`${f.label} (학급 ${f.at}개)`}
+                  style={{
+                    width: 52,
+                    minHeight: 56,
+                    borderRadius: 12,
+                    border: `2px solid ${on ? HONEY.h400 : HONEY.h100}`,
+                    background: on ? `linear-gradient(160deg, ${HONEY.h100}, #fff)` : "#F9FAFB",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    filter: on ? "none" : "grayscale(1)",
+                    opacity: on ? 1 : 0.55,
+                  }}
+                >
+                  <div style={{ fontSize: 22 }}>{f.emoji}</div>
+                  <div style={{ fontSize: 9, fontWeight: 900, color: HONEY.h700 }}>{f.at}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {/* 다음 시설 진행바 */}
+        {nextFacility && (
+          <div
+            style={{
+              marginTop: 10,
+              height: 12,
+              background: HONEY.h50,
+              borderRadius: 999,
+              overflow: "hidden",
+              border: `1px solid ${HONEY.h200}`,
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.max(0, Math.min(100, (classTotal / nextFacility.at) * 100))}%`,
+                height: "100%",
+                background: `linear-gradient(90deg, ${HONEY.h300}, ${HONEY.h500})`,
+                transition: "width 0.5s ease",
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* ── 마을 맵 (육각 플롯 그리드) ── */}
+      <div style={{ ...card, padding: "16px 10px" }}>
+        <div style={{ fontSize: 15, fontWeight: 900, color: HONEY.h800, margin: "0 6px 4px" }}>
+          🗺 마을 지도
+        </div>
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: HONEY.h700, margin: "0 6px 10px" }}>
+          친구 집을 눌러 하루 한 번 💧 물을 줘요 — 물 {WATER_PER_LEVEL}번이면 정원이 자라요
+        </div>
+        {entries.length === 0 ? (
+          <div style={{ fontSize: 13, color: HONEY.h700, fontWeight: 600, textAlign: "center", padding: 20 }}>
+            아직 마을에 집이 없어요 — 칭찬 스티커를 받으면 집이 생겨요!
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <div style={{ position: "relative", width: gridW, height: gridH, margin: "0 auto" }}>
+              {plots.map((plot, i) => {
+                const r = Math.floor(i / HEX_COLS);
+                const c = i % HEX_COLS;
+                const x = c * HEX_W + (r % 2 === 1 ? HEX_W / 2 : 0);
+                const y = r * HEX_ROW_STEP;
+                const hexStyle: React.CSSProperties = {
+                  position: "absolute",
+                  left: x,
+                  top: y,
+                  width: HEX_W,
+                  height: HEX_H,
+                  clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "none",
+                  padding: 0,
+                };
+                if (plot.kind === "plaza") {
+                  return (
+                    <div
+                      key="plaza"
+                      style={{
+                        ...hexStyle,
+                        background: "radial-gradient(circle at 50% 35%, #E0F2FE 0%, #BAE6FD 70%, #7DD3FC 100%)",
+                      }}
+                    >
+                      <div style={{ fontSize: 26, lineHeight: 1.2 }}>
+                        {unlockedFacilities.length > 0
+                          ? unlockedFacilities.map((f) => f.emoji).join(" ")
+                          : "🚧"}
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 900, color: "#075985", marginTop: 4 }}>
+                        마을 광장
+                      </div>
+                      <div style={{ fontSize: 10.5, fontWeight: 800, color: "#0369A1", marginTop: 2 }}>
+                        🐝 {classTotal}
+                      </div>
+                    </div>
+                  );
+                }
+                const e = plot.e;
+                const isSelf = e.id === myClientId && !user.isTeacher;
+                const st = stageOf(e.count);
+                const roofDeco = decoById(e.village.house?.roof);
+                const gardenDeco = decoById(e.village.house?.garden);
+                const plateColor = decoById(e.village.house?.plate)?.color ?? DEFAULT_PLATE_COLOR;
+                const gardenLevel = e.village.gardenLevel ?? 0;
+                const flowerCount = Math.min(1 + gardenLevel, 5);
+                return (
+                  <button
+                    key={e.id}
+                    onClick={() => setFocus(e.id)}
+                    aria-label={`${e.name}의 집`}
+                    style={{
+                      ...hexStyle,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      background: isSelf
+                        ? `radial-gradient(circle at 50% 30%, #FEF3C7 0%, #FDE68A 60%, ${HONEY.h300} 100%)`
+                        : "radial-gradient(circle at 50% 30%, #FEF9C3 0%, #D9F99D 55%, #86EFAC 100%)",
+                    }}
+                  >
+                    {/* 지붕 */}
+                    <div style={{ fontSize: 24, lineHeight: 1 }}>{roofDeco?.emoji ?? "🏠"}</div>
+                    {/* 벌 — 코스메틱 착용 상태 그대로 (합성 렌더 공유 컴포넌트) */}
+                    <div style={{ position: "relative", width: 68, height: 68, marginTop: 2 }}>
+                      <CosmeticFrame backdrop={e.cosmetics.backdrop} aura={e.cosmetics.aura} />
+                      <CharacterImage stage={st} skin={e.cosmetics.skin} hat={e.cosmetics.hat} float={false} />
+                      <AccessoryLayer stage={st} held={e.cosmetics.held} acc={e.cosmetics.acc} float={false} />
+                    </div>
+                    {/* 정원 — 레벨만큼 꽃이 늘어난다 */}
+                    <div style={{ fontSize: 13, lineHeight: 1, letterSpacing: 2, marginTop: 3 }}>
+                      {(gardenDeco?.emoji ?? "🌱").repeat(flowerCount)}
+                    </div>
+                    {/* 문패 */}
+                    <div
+                      style={{
+                        marginTop: 4,
+                        maxWidth: "72%",
+                        padding: "2px 10px",
+                        borderRadius: 999,
+                        background: plateColor,
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        fontSize: 11,
+                        fontWeight: 900,
+                        color: "#1F2937",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {e.name}{isSelf ? " ⭐" : ""}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 집 상세 팝오버 (친구 집 방문 + 물주기) ── */}
+      {focusEntry && (
+        <HousePopover
+          lang={lang}
+          entry={focusEntry}
+          isSelf={focusEntry.id === myClientId && !user.isTeacher}
+          isTeacher={user.isTeacher}
+          wateredToday={myVillage.watered?.[today]?.[focusEntry.id] === true}
+          busy={waterBusy}
+          onWater={() => handleWater(focusEntry)}
+          onClose={() => setFocus(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// 집 상세 팝오버 — 이름 + 벌 + 정원 게이지 + 💧 물주기 (하루 1회/친구)
+// ============================================================
+
+function HousePopover({
+  lang,
+  entry,
+  isSelf,
+  isTeacher,
+  wateredToday,
+  busy,
+  onWater,
+  onClose,
+}: {
+  lang: string;
+  entry: HouseEntry;
+  isSelf: boolean;
+  isTeacher: boolean;
+  wateredToday: boolean;
+  busy: boolean;
+  onWater: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const st = stageOf(entry.count);
+  const v = entry.village;
+  const gardenLevel = v.gardenLevel ?? 0;
+  const gardenWater = v.gardenWater ?? 0;
+  const roofDeco = decoById(v.house?.roof);
+  const gardenDeco = decoById(v.house?.garden);
+  const canWater = !isSelf && !isTeacher && !wateredToday;
+  void lang;
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(9,7,30,0.68)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 220,
+        padding: 20,
+        backdropFilter: "blur(4px)",
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 22,
+          padding: "22px 20px 18px",
+          maxWidth: 380,
+          width: "100%",
+          maxHeight: "88vh",
+          overflowY: "auto",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          border: `3px solid ${HONEY.h300}`,
+          animation: "phPopoverIn 0.2s ease",
+          textAlign: "center",
+          position: "relative",
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="close"
+          style={{
+            position: "absolute", top: 10, right: 10,
+            width: 34, height: 34, borderRadius: 10,
+            background: HONEY.h50, border: `1.5px solid ${HONEY.h200}`,
+            fontSize: 14, fontWeight: 900, color: HONEY.h800, cursor: "pointer",
+          }}
+        >✕</button>
+
+        <div style={{ fontSize: 26 }}>{roofDeco?.emoji ?? "🏠"}</div>
+
+        {/* 벌 — 코스메틱 풀 렌더 */}
+        <div style={{ position: "relative", width: 150, height: 150, margin: "2px auto 0" }}>
+          <CosmeticFrame backdrop={entry.cosmetics.backdrop} aura={entry.cosmetics.aura} />
+          <CharacterImage stage={st} skin={entry.cosmetics.skin} hat={entry.cosmetics.hat} />
+          <AccessoryLayer stage={st} held={entry.cosmetics.held} acc={entry.cosmetics.acc} />
+          {entry.cosmetics.pet && (
+            <img
+              src={`/stickers/pet-${entry.cosmetics.pet}.png`}
+              alt="" aria-hidden="true"
+              style={{
+                position: "absolute", bottom: -6, width: 54, height: 54, zIndex: 2,
+                ...(entry.cosmetics.petPos === "left"
+                  ? { left: -16, transform: "scaleX(-1)" }
+                  : { right: -16 }),
+              }}
+            />
+          )}
+        </div>
+
+        <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", marginTop: 8 }}>
+          {entry.name}{isSelf ? " (나)" : ""}의 집
+        </div>
+
+        {/* 정원 게이지 */}
+        <div
+          style={{
+            marginTop: 12,
+            padding: "12px 14px",
+            background: "linear-gradient(160deg, #F0FDF4, #fff)",
+            border: "2px solid #BBF7D0",
+            borderRadius: 16,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 900, color: "#166534" }}>
+            {gardenDeco ? `${gardenDeco.emoji} ${gardenDeco.label}` : "🌱 정원"} · Lv.{gardenLevel}
+          </div>
+          <div style={{ fontSize: 20, letterSpacing: 4, marginTop: 6 }}>
+            {Array.from({ length: WATER_PER_LEVEL }).map((_, i) => (
+              <span key={i} style={{ opacity: i < gardenWater ? 1 : 0.22 }}>💧</span>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#15803D", marginTop: 4 }}>
+            물 {gardenWater}/{WATER_PER_LEVEL} — {WATER_PER_LEVEL}번 받으면 정원이 한 단계 자라요
+          </div>
+        </div>
+
+        {/* 물주기 버튼 */}
+        {isSelf ? (
+          <div style={{ marginTop: 12, fontSize: 12, fontWeight: 800, color: HONEY.h700 }}>
+            친구들이 물을 주면 내 정원이 자라요 🌷
+          </div>
+        ) : isTeacher ? null : (
+          <button
+            onClick={onWater}
+            disabled={!canWater || busy}
+            style={{
+              marginTop: 14,
+              minHeight: 52,
+              width: "100%",
+              padding: "10px 24px",
+              background: canWater && !busy
+                ? "linear-gradient(135deg, #38BDF8, #0284C7)"
+                : "#F3F4F6",
+              color: canWater && !busy ? "#fff" : "#9CA3AF",
+              border: "none",
+              borderRadius: 14,
+              fontSize: 15,
+              fontWeight: 900,
+              cursor: canWater && !busy ? "pointer" : "default",
+              boxShadow: canWater && !busy ? "0 6px 16px rgba(2,132,199,0.3)" : "none",
+              fontFamily: "inherit",
+            }}
+          >
+            {wateredToday ? "오늘은 이미 물을 줬어요 ✅" : "💧 물주기 (하루 1번)"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
