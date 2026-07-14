@@ -22,6 +22,7 @@ import {
   BONUS_XP,
   type DailyQuestState,
   type QuestDef,
+  type QuestEventType,
 } from "@/lib/quests";
 import { awardXp } from "@/lib/lms";
 import { HONEY } from "@/lib/constants";
@@ -30,9 +31,11 @@ interface Props {
   roomCode: string;
   myClientId: string;
   onToast: (msg: string, tone: "success" | "error") => void;
+  /** 미완료 심부름 클릭 → 그 활동을 할 수 있는 화면으로 이동 (BeeVillage 가 라우팅) */
+  onGoTo?: (event: QuestEventType) => void;
 }
 
-export default function QuestBoard({ roomCode, myClientId, onToast }: Props) {
+export default function QuestBoard({ roomCode, myClientId, onToast, onGoTo }: Props) {
   const [state, setState] = useState<DailyQuestState>({});
   // 낙관적 수령 표시 (연타 방지 겸용) — questId 또는 "bonus"
   const [pending, setPending] = useState<Record<string, true>>({});
@@ -123,22 +126,23 @@ export default function QuestBoard({ roomCode, myClientId, onToast }: Props) {
           const done = questDone(q, state);
           const claimed = questClaimed(q, state) || pending[q.id] === true;
           const progress = questProgress(q, state);
-          return (
-            <div
-              key={q.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                minHeight: 52,
-                padding: "8px 12px",
-                borderRadius: 14,
-                border: `2px solid ${done ? HONEY.h300 : HONEY.h100}`,
-                background: done
-                  ? `linear-gradient(160deg, ${HONEY.h100}, #fff)`
-                  : "#FFFDF6",
-              }}
-            >
+          // 미완료 심부름은 행 전체가 버튼 — 누르면 그 활동을 하는 화면으로 이동.
+          // (완료 행은 내부에 "받기" 버튼이 중첩되므로 div 유지 — 중첩 버튼 방지)
+          const clickable = !done && !!onGoTo;
+          const rowStyle: React.CSSProperties = {
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            minHeight: 52,
+            padding: "8px 12px",
+            borderRadius: 14,
+            border: `2px solid ${done ? HONEY.h300 : HONEY.h100}`,
+            background: done
+              ? `linear-gradient(160deg, ${HONEY.h100}, #fff)`
+              : "#FFFDF6",
+          };
+          const rowInner = (
+            <>
               <div style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{q.emoji}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
@@ -147,15 +151,52 @@ export default function QuestBoard({ roomCode, myClientId, onToast }: Props) {
                     fontWeight: 900,
                     color: "#1F2937",
                     letterSpacing: -0.2,
+                    textAlign: "left",
                   }}
                 >
                   {q.label}
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: HONEY.h700, marginTop: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: HONEY.h700, marginTop: 1, textAlign: "left" }}>
                   {done ? "✅ 완료!" : `진행 ${progress}/${q.target}`}
                   {" · "}보상 {q.reward}🍯
                 </div>
               </div>
+            </>
+          );
+          if (clickable) {
+            return (
+              <button
+                key={q.id}
+                onClick={() => onGoTo!(q.event)}
+                aria-label={`${q.label} 하러 가기`}
+                style={{
+                  ...rowStyle,
+                  width: "100%",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {rowInner}
+                <div
+                  style={{
+                    flexShrink: 0,
+                    fontSize: 12,
+                    fontWeight: 900,
+                    color: HONEY.h800,
+                    background: `linear-gradient(160deg, ${HONEY.h100}, #fff)`,
+                    border: `2px solid ${HONEY.h200}`,
+                    borderRadius: 999,
+                    padding: "6px 12px",
+                  }}
+                >
+                  하러 가기 →
+                </div>
+              </button>
+            );
+          }
+          return (
+            <div key={q.id} style={rowStyle}>
+              {rowInner}
               {done && (
                 claimed ? (
                   <div

@@ -45,6 +45,7 @@ import {
 import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
 import type { VillagePlot3D } from "./VillageMap3D";
 import QuestBoard from "./QuestBoard";
+import { type QuestEventType } from "@/lib/quests";
 import Toast from "./Toast";
 import { HONEY } from "@/lib/constants";
 import { t } from "@/lib/i18n";
@@ -98,6 +99,8 @@ interface Props {
   user: UserConfig;
   myClientId: string;
   roomConfig: RoomConfig;
+  /** 심부름 클릭 이동 — village_water 는 여기서 지도 스크롤로 처리, 나머지는 위로 전달 */
+  onQuestNavigate?: (event: QuestEventType) => void;
 }
 
 interface HouseEntry {
@@ -153,7 +156,7 @@ function ItemTile({ emoji, label, price, equipped, has, affordable, removable = 
 }
 // ───────────────────────────────────────────────────────────────
 
-export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfig }: Props) {
+export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfig, onQuestNavigate }: Props) {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [countsReady, setCountsReady] = useState(false);
   const [allCosmetics, setAllCosmetics] = useState<Record<string, StudentCosmetics>>({});
@@ -165,6 +168,8 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   const [map3d, setMap3d] = useState<"loading" | "on" | "off">("loading");
   // 내 집 꾸미기 바텀시트 (카탈로그 v2)
   const [decorateOpen, setDecorateOpen] = useState(false);
+  // 심부름 "물주기" 클릭 시 지도 카드로 스크롤하기 위한 ref
+  const mapCardRef = useRef<HTMLDivElement>(null);
 
   // ── 데스크톱 2열 레이아웃 (≥900px) ────────────────────────────
   // SSR 프리렌더에서 window 접근 금지 — 초기 false, 마운트 후 판정 (BeeWorldMarble 패턴)
@@ -414,7 +419,7 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
 
   // ── 마을 맵 카드 ────────────────────────────────────────────
   const mapCard = (
-    <div style={{ ...cardStyle, padding: "16px 10px" /* hex grid: reduce horizontal padding to fit 5-col hex layout */ }}>
+    <div ref={mapCardRef} style={{ ...cardStyle, padding: "16px 10px" /* hex grid: reduce horizontal padding to fit 5-col hex layout */ }}>
       <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h900, margin: "0 6px 4px" }}>
         🗺 마을 지도
       </div>
@@ -702,11 +707,22 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   ) : null;
 
   // ── 퀘스트 보드 ────────────────────────────────────────────
+  // 심부름 클릭 → 활동 화면 이동. 물주기는 이 탭 안이므로 지도로 스크롤만,
+  // 나머지는 PraiseHive(탭 전환·허브 이동)로 위임.
+  const handleQuestGo = (event: QuestEventType) => {
+    if (event === "village_water") {
+      mapCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setToast({ msg: "💧 친구 집을 눌러 물을 줄 수 있어요!", tone: "success" });
+      return;
+    }
+    onQuestNavigate?.(event);
+  };
   const questBoard = !user.isTeacher ? (
     <QuestBoard
       roomCode={roomCode}
       myClientId={myClientId}
       onToast={(msg, tone) => setToast({ msg, tone })}
+      onGoTo={handleQuestGo}
     />
   ) : null;
 

@@ -20,6 +20,8 @@ import {
 } from "@/lib/stage";
 import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
 import BeeVillage from "./BeeVillage";
+import { type QuestEventType } from "@/lib/quests";
+import { TutorialBus } from "@/lib/tutorial/bus";
 import {
   subscribeStudentStickers,
   subscribeTeamStickers,
@@ -125,6 +127,17 @@ const STAGE_LABEL_KEY: Record<Stage, string> = {
 };
 
 // ---- helpers ----
+
+// 📋 심부름 → 활동 화면 매핑 (reportQuestEvent 계측 위치 기준).
+// gallery_like(개인전 탭)·village_water(마을 지도)는 하위 컴포넌트가 자체 처리.
+const QUEST_NAV_DEST: Partial<Record<QuestEventType, string>> = {
+  vocab_session: "vocab",        // VocabTest — 단어 학습 허브
+  expression_review: "vocab",    // ExpressionReview 는 VocabHub 안에 있음
+  emotion_checkin: "board",      // EmotionCardDeck — 소통창
+  board_card: "board",           // 소통판 글쓰기
+  storybook_read: "storybook",   // 그림책
+  game_play: "games",            // 게임룸
+};
 
 function shortId(id: string): string {
   if (!id) return "??????";
@@ -360,6 +373,16 @@ export default function PraiseHive({
             user={user}
             myClientId={myClientId}
             roomConfig={roomConfig}
+            onQuestNavigate={(event) => {
+              // 친구 꿀벌 응원(gallery_like)은 이 화면의 개인전 탭 전시장에서 —
+              // 나머지는 page.tsx 가 수신하는 tutorial-navigate 버스로 허브 화면 전환.
+              if (event === "gallery_like") {
+                setTab("race");
+                return;
+              }
+              const dest = QUEST_NAV_DEST[event];
+              if (dest) TutorialBus.emit("tutorial-navigate", dest);
+            }}
           />
         )}
         {tab === "race" && (
