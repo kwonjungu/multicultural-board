@@ -1,6 +1,6 @@
 "use client";
 
-// "🐝 AI 꿀비와 함께하는 즐거운 공부 공간" — 입장 화면 상단 배너 (설계서 항목 10)
+// "🐝 AI 꿀비와 함께하는 즐거운 소통 공간" — 입장 화면 상단 배너 (설계서 항목 10)
 // 구글 주아체(Jua — app/layout.tsx 에서 로드됨) + 무지개 그라데이션 텍스트.
 // 메인 입장(app/page.tsx) · 방별 입장(SetupScreen) · 허브(HomeHub) 맨 위에 배치.
 export default function BeeBanner({ compact }: { compact?: boolean }) {
@@ -37,7 +37,7 @@ export default function BeeBanner({ compact }: { compact?: boolean }) {
             filter: "drop-shadow(0 2px 4px rgba(180,83,9,0.2))",
           }}
         >
-          AI 꿀비와 함께하는 즐거운 공부 공간
+          AI 꿀비와 함께하는 즐거운 소통 공간
         </span>
       </div>
     </div>
