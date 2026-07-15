@@ -41,7 +41,7 @@ const COMMENTARY_TAGS: RegExp[] = [
 export function validateTranslation(
   original: string,
   translated: string,
-  opts?: { allowSameAsSource?: boolean },
+  opts?: { allowSameAsSource?: boolean; targetLang?: string },
 ): TranslationCheck {
   const orig = (original ?? "").trim();
   const tr = (translated ?? "").trim();
@@ -84,6 +84,16 @@ export function validateTranslation(
   // 대부분 동일 문자열 반복
   if (tr.length > 10 && /^(.)\1{5,}$/.test(tr.slice(0, 20))) {
     return { valid: false, reason: "repeated_char" };
+  }
+
+  // 부분 번역 — 비한국어 번역에 한글이 상당량 남음 ("안녕, 선생님" → "HI, 선생님" 패턴)
+  // 고유명사(이름 등) 한두 글자는 허용해야 하므로 2자 이상 + 비율 30% 초과일 때만 실패 처리.
+  if (opts?.targetLang && opts.targetLang !== "ko") {
+    const hangulCount = (tr.match(/[가-힣]/g) ?? []).length;
+    const visibleLen = tr.replace(/\s/g, "").length;
+    if (hangulCount >= 2 && visibleLen > 0 && hangulCount / visibleLen > 0.3) {
+      return { valid: false, reason: "hangul_residue" };
+    }
   }
 
   return { valid: true };

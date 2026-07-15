@@ -112,9 +112,11 @@ async function translateWithFallback(params: {
   const systemMsg = `You are a translation and safety assistant for a Korean multicultural elementary classroom.
 Rules for translation:
 - Translate faithfully. Preserve meaning, tone, and length.
+- Translate EVERY word fully into each target language. Never leave source-language words
+  mixed in (ko→en "안녕, 선생님" must be "Hi, teacher" — NOT "Hi, 선생님").
 - Do NOT add explanations, notes, disclaimers, or prefixes like "Here is the translation".
 - Do NOT wrap output in quotes or markdown.
-- Preserve proper nouns and numbers exactly.
+- Preserve numbers exactly. Personal names may be romanized/transliterated for the target language.
 - If the input is already in a target language, copy it verbatim.
 
 Rules for safety check:
@@ -161,7 +163,7 @@ Respond with exactly this JSON shape (no extra keys, no markdown):
           let tr = cleanTranslation(parsed.translations[lang] ?? "");
           // 같은 언어 → 원문 그대로 허용
           const allowSame = lang === fromLang;
-          const check = validateTranslation(src, tr, { allowSameAsSource: allowSame });
+          const check = validateTranslation(src, tr, { allowSameAsSource: allowSame, targetLang: lang });
           if (!check.valid) {
             console.warn(`[translate] ${model} / ${lang} invalid (${check.reason}) → 원본 유지`);
             tr = text; // 원문으로 폴백
