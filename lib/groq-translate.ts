@@ -1,14 +1,16 @@
 /**
  * Groq 다중 모델 폴백 번역 유틸 — 품질 강화판
  *
- * 2025-04 현재 Groq Production/Preview 텍스트 모델 전체 등록
  * 한 모델이 429(rate limit) 또는 400/404(미지원) 시 다음 모델로 자동 전환.
  *
- * 2026-07 현재 모델 체인 (llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외):
- *   openai/gpt-oss-120b                  ★ 기본 (Groq 권장 대체)
- *   qwen/qwen3.6-27b                     폴백1 (다국어 특화)
- *   openai/gpt-oss-20b                   폴백2
- *   llama-3.1-8b-instant                 폴백3
+ * 2026-07-23 실측 기준 모델 체인:
+ *   openai/gpt-oss-120b                  ★ 기본 (RPD 1,000 · TPM 8K)
+ *   openai/gpt-oss-20b                   폴백1 (RPD 1,000 · TPM 8K)
+ *   llama-3.1-8b-instant                 폴백2 (RPD 14,400 · TPM 6K)
+ * 제외된 모델:
+ *   - llama-3.3-70b-versatile : 2026-08-16 decommission 예정
+ *   - qwen/qwen3.6-27b        : <think> 영어 추론이 응답에 그대로 유출됨
+ *   - meta-llama/llama-4-scout: 목록에서 사라짐(사용 불가)
  *
  * 품질 가드:
  *   - temperature 0.1 (창의성 최소화 → 원문 충실도)

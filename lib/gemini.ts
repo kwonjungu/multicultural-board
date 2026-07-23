@@ -237,8 +237,10 @@ function autoClose(text: string): string {
 }
 
 // === Vision: 이미지 + 프롬프트 → 텍스트 (활동지 OCR 용) ===
-// Gemini 2.5 Flash 는 Groq 의 llama-4-scout 보다 한국어 OCR·레이아웃 인식이
-// 훨씬 정확하다. OpenAI 호환 엔드포인트가 data URL image_url 을 지원한다.
+// 활동지 OCR 은 Gemini 2.5 Flash 계열로만 수행한다. Groq 의 llama-4-scout 비전
+// 모델이 2026-07 목록에서 사라져 유일하게 살아있는 비전 경로가 Gemini 다.
+// 폴백은 모델(2.5-flash → 2.5-flash-lite) + 키 로테이션 2중으로 확보한다.
+// OpenAI 호환 엔드포인트가 data URL image_url 을 지원한다.
 
 export interface VisionOptions {
   system?: string;
@@ -252,38 +254,51 @@ export interface VisionOptions {
 export async function visionCompletion(
   opts: VisionOptions,
 ): Promise<{ content: string; model: string }> {
-  const client = geminiTextClient(); // GEMINI_API_KEY 없으면 여기서 throw → 호출부가 폴백
+  // Groq scout 비전 모델이 2026-07 목록에서 사라져 활동지 OCR 은 Gemini 만 남았다.
+  // 폴백 경로를 실제로 살아있게 하려면 (1) 모델 폴백(2.5-flash → 2.5-flash-lite)에
+  // 더해 (2) 키 로테이션(GEMINI_API_KEY_BACKUP*)까지 겹쳐야 한 키가 429/한도여도
+  // 다른 키·모델로 넘어간다. generateImage 의 키 폴백과 동일 정책.
+  const keys = getGeminiApiKeys();
+  if (keys.length === 0) throw new Error("GEMINI_API_KEY not set"); // 호출부가 Groq/다음 경로로 폴백
   let lastErr: unknown = null;
-  for (const model of GEMINI_TEXT_MODELS) {
-    try {
-      const completion = await client.chat.completions.create({
-        model,
-        messages: [
-          ...(opts.system ? [{ role: "system" as const, content: opts.system }] : []),
-          {
-            role: "user" as const,
-            content: [
-              { type: "image_url" as const, image_url: { url: opts.imageUrl } },
-              { type: "text" as const, text: opts.prompt },
-            ],
-          },
-        ],
-        temperature: opts.temperature ?? 0.1,
-        max_tokens: opts.maxTokens ?? 8192,
-        ...(opts.json ? { response_format: { type: "json_object" as const } } : {}),
-      });
-      const content = completion.choices[0]?.message?.content?.trim() || "";
-      if (!content) {
-        lastErr = new Error(`empty vision reply from ${model}`);
-        continue;
+  for (let ki = 0; ki < keys.length; ki++) {
+    const client = geminiClientForKey(keys[ki]);
+    let rotateKey = false; // 이 키가 429/auth 로 막혔으면 다음 키로 넘어간다
+    for (const model of GEMINI_TEXT_MODELS) {
+      try {
+        const completion = await client.chat.completions.create({
+          model,
+          messages: [
+            ...(opts.system ? [{ role: "system" as const, content: opts.system }] : []),
+            {
+              role: "user" as const,
+              content: [
+                { type: "image_url" as const, image_url: { url: opts.imageUrl } },
+                { type: "text" as const, text: opts.prompt },
+              ],
+            },
+          ],
+          temperature: opts.temperature ?? 0.1,
+          max_tokens: opts.maxTokens ?? 8192,
+          ...(opts.json ? { response_format: { type: "json_object" as const } } : {}),
+        });
+        const content = completion.choices[0]?.message?.content?.trim() || "";
+        if (!content) {
+          lastErr = new Error(`empty vision reply from ${model}`);
+          continue;
+        }
+        return { content, model };
+      } catch (err) {
+        lastErr = err;
+        const status = (err as { status?: number })?.status;
+        // 400/404/503 은 다음 모델(같은 키)로. 429·401·403 은 키 소진/문제이므로
+        // 이 키의 나머지 모델은 건너뛰고 바깥 루프에서 다음 키로 넘어간다.
+        if (status === 429 || status === 401 || status === 403) { rotateKey = true; break; }
+        if (status === 400 || status === 404 || status === 503) continue;
+        break;
       }
-      return { content, model };
-    } catch (err) {
-      lastErr = err;
-      const status = (err as { status?: number })?.status;
-      if (status === 429 || status === 400 || status === 404 || status === 503) continue;
-      break;
     }
+    if (!rotateKey) break; // 회복 불가능한 에러 — 다른 키로 재시도해도 의미 없음
   }
   throw lastErr instanceof Error ? lastErr : new Error("visionCompletion failed");
 }

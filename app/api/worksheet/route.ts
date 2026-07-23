@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { LANGUAGES } from "@/lib/constants";
 import { translateLongText } from "@/lib/groq-translate";
 import { translateSegments } from "@/lib/segment-translate";
-import { withGroqKeyFallback } from "@/lib/groq-client";
 import { extractJson, visionCompletion } from "@/lib/gemini";
 import { sanitizeOcrBlocks, type OcrBlock } from "@/lib/ocrBlocks";
 
@@ -12,15 +11,12 @@ export const maxDuration = 120;
 /**
  * 활동지 번역 파이프라인 (사진):
  *   1) 비전 OCR — 텍스트 블록 + 좌표만 추출 (번역은 시키지 않는다)
- *      Gemini 2.5 Flash 우선 (한국어 OCR·레이아웃 인식 정확) → Groq scout 폴백
+ *      Gemini 2.5 flash 계열 전용 (visionCompletion 이 모델+키 폴백 처리).
+ *      Groq 의 llama-4-scout 비전 모델은 2026-07 목록에서 사라져 폴백 대상이 없다.
  *   2) 좌표 검증·정규화 (sanitizeOcrBlocks)
  *   3) 번역은 전용 파이프라인 (LibreTranslate → Groq, 품질 검증 포함)
  * 예전처럼 비전 모델 한 방에 OCR+좌표+번역을 다 시키면 셋 다 품질이 떨어졌다.
  */
-
-const GROQ_VISION_MODELS = [
-  "meta-llama/llama-4-scout-17b-16e-instruct",
-];
 
 function ocrPrompt(fromName: string): string {
   return `This image is a photo of a classroom worksheet. The text is mainly in ${fromName}.
@@ -51,7 +47,9 @@ async function runOcr(imageDataUrl: string, fromName: string): Promise<OcrOutcom
   let lastRaw = "";
   let lastModel = "";
 
-  // 1) Gemini (키 없거나 실패하면 조용히 Groq 으로)
+  // 비전 OCR 은 Gemini 2.5 flash 계열 전용 (visionCompletion 이 모델 폴백 +
+  // 키 로테이션 처리). scout 이 죽어 Groq 비전 폴백은 존재하지 않는다.
+  // 블록 파싱에 실패하거나 0개여도 원시 응답(lastRaw)은 살려 상위에서 통짜 번역으로 폴백.
   try {
     const { content, model } = await visionCompletion({
       prompt, imageUrl: imageDataUrl, json: true, maxTokens: 8192,
@@ -60,47 +58,10 @@ async function runOcr(imageDataUrl: string, fromName: string): Promise<OcrOutcom
     const parsed = extractJson<{ blocks?: unknown }>(content);
     const blocks = sanitizeOcrBlocks(parsed.blocks);
     if (blocks.length > 0) return { blocks, rawText: content, model };
-    console.warn("[worksheet] Gemini OCR 이 블록 0개 반환 — Groq 재시도");
+    console.warn("[worksheet] Gemini OCR 이 블록 0개 반환 — 원시 응답으로 통짜 번역 폴백");
+    return { blocks: [], rawText: content, model };
   } catch (err) {
-    console.warn("[worksheet] Gemini vision 실패 → Groq 폴백:", (err as Error).message);
-  }
-
-  // 2) Groq llama-4-scout
-  try {
-    const content = await withGroqKeyFallback(async (groq) => {
-      let inner = "";
-      let innerErr: unknown = null;
-      for (const model of GROQ_VISION_MODELS) {
-        try {
-          const completion = await groq.chat.completions.create({
-            model,
-            messages: [{
-              role: "user",
-              content: [
-                { type: "image_url", image_url: { url: imageDataUrl } },
-                { type: "text", text: prompt },
-              ],
-            }],
-            max_tokens: 6000,
-            temperature: 0.1,
-          });
-          inner = (completion.choices[0]?.message?.content || "").trim();
-          lastModel = model;
-          innerErr = null;
-          break;
-        } catch (e) {
-          console.error(`[worksheet] Vision model ${model} failed:`, e);
-          innerErr = e;
-        }
-      }
-      if (innerErr && !inner) throw innerErr;
-      return inner;
-    });
-    lastRaw = content || lastRaw;
-    const parsed = extractJson<{ blocks?: unknown }>(content);
-    const blocks = sanitizeOcrBlocks(parsed.blocks);
-    return { blocks, rawText: content, model: lastModel };
-  } catch (err) {
+    console.warn("[worksheet] Gemini vision 실패:", (err as Error).message);
     if (lastRaw) return { blocks: [], rawText: lastRaw, model: lastModel };
     throw err;
   }

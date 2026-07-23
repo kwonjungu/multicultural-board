@@ -122,9 +122,10 @@
   (함초롱 아님 — 오타면 교체 무효). 대상 언어별 폰트는 pptxFontForLang /
   hwpxFontForLang 맵으로만 정한다 (태국어·아랍어 등에 한국어 폰트 강제 금지).
 
-- **활동지 사진 번역은 OCR 과 번역을 분리한다.** 비전 모델(Gemini 2.5 Flash
-  우선 → Groq scout 폴백)에는 블록+좌표 추출만 시키고, 번역은
-  `lib/segment-translate.ts` (LibreTranslate→Groq 품질검증) 파이프라인으로.
+- **활동지 사진 번역은 OCR 과 번역을 분리한다.** 비전 모델(Gemini 2.5 flash →
+  flash-lite + 키 로테이션. Groq scout 은 2026-07 목록에서 사라져 폴백 불가)에는
+  블록+좌표 추출만 시키고, 번역은 `lib/segment-translate.ts`
+  (LibreTranslate→Groq→Gemini flash-lite 최후 폴백, 품질검증 공통) 파이프라인으로.
   비전 한 방에 OCR+좌표+번역을 다 시키면 셋 다 망가진다. 좌표는
   `sanitizeOcrBlocks` 로 반드시 검증(0~1 클램프, % 변환, 픽셀 응답 폐기).
 

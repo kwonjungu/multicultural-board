@@ -20,10 +20,10 @@ export const maxDuration = 120;
  *   fallback: true 이면 기본 모델이 실패해 대체 모델 사용
  */
 
-const VISION_MODELS = [
-  "meta-llama/llama-4-scout-17b-16e-instruct",   // Groq 현재 유일한 비전 모델 (2025-04)
-];
+// 비전(OCR) 은 Gemini 2.5 flash 계열 전용 (visionCompletion 이 모델+키 폴백 수행).
+// Groq 의 llama-4-scout 비전 모델은 2026-07 목록에서 사라져 폴백 대상이 없다.
 
+// 텍스트 정리(mode="text") 용 Groq 체인.
 // llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
 // qwen3.6-27b 는 <think> 추론 유출로 제외.
 const TEXT_MODELS = [
@@ -91,61 +91,18 @@ export async function POST(req: NextRequest) {
 }
 
 async function runVision(imageUrl: string, userPrompt: string) {
-  // 1) Gemini 2.5 Flash — 한국어 OCR 정확도가 Groq scout 보다 훨씬 높다.
-  //    키 미설정·한도 초과 시 조용히 Groq 으로 폴백.
-  try {
-    const { content, model } = await visionCompletion({
-      system: OCR_SYSTEM,
-      prompt: userPrompt,
-      imageUrl,
-      maxTokens: 8192,
-      temperature: 0.15,
-    });
-    if (content) return { content, model, fallback: false };
-  } catch (err) {
-    console.warn("[worksheet-analyze] Gemini vision 실패 → Groq 폴백:", (err as Error).message);
-  }
-
-  // 2) Groq 비전 모델 (폴백)
-  let usedModel = "";
-  let fallback = true;
-
-  const content = await withGroqKeyFallback(async (groq) => {
-    let inner = "";
-    let lastErr: unknown;
-    for (let i = 0; i < VISION_MODELS.length; i++) {
-      const model = VISION_MODELS[i];
-      try {
-        const completion = await groq.chat.completions.create({
-          model,
-          messages: [
-            { role: "system", content: OCR_SYSTEM },
-            {
-              role: "user",
-              content: [
-                { type: "image_url", image_url: { url: imageUrl } },
-                { type: "text", text: userPrompt },
-              ],
-            },
-          ],
-          max_tokens: 4096,
-          temperature: 0.15,
-        });
-        inner = completion.choices[0]?.message?.content?.trim() || "";
-        usedModel = model;
-        if (i > 0) fallback = true;
-        lastErr = null;
-        break;
-      } catch (e) {
-        console.error(`Vision model ${model} failed:`, e);
-        lastErr = e;
-      }
-    }
-    if (lastErr && !inner) throw lastErr;
-    return inner;
+  // 활동지 OCR 은 Gemini 2.5 flash 계열 전용. visionCompletion 이 내부적으로
+  // 모델 폴백(2.5-flash → 2.5-flash-lite) + 키 로테이션(BACKUP*)까지 처리한다.
+  // Groq 비전 모델(scout)은 2026-07 목록에서 제거돼 폴백 대상이 없다.
+  // 사용한 모델이 1순위(gemini-2.5-flash)가 아니면 fallback=true 로 표시.
+  const { content, model } = await visionCompletion({
+    system: OCR_SYSTEM,
+    prompt: userPrompt,
+    imageUrl,
+    maxTokens: 8192,
+    temperature: 0.15,
   });
-
-  return { content, model: usedModel, fallback };
+  return { content, model, fallback: model !== "gemini-2.5-flash" };
 }
 
 async function runText(fullPrompt: string) {
