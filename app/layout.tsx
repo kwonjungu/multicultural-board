@@ -31,7 +31,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         WebkitFontSmoothing: "antialiased" as const,
       }}>
         {children}
-        <style>{`
+        {/* 텍스트 자식으로 넣으면 SSR 이 "…" 를 &quot; 로 이스케이프해
+            (style 은 raw-text 요소라 브라우저가 복원 안 함) 하이드레이션
+            불일치 + [data-theme="dark"] 선택자 파손 → __html 로 주입 */}
+        <style dangerouslySetInnerHTML={{ __html: `
           /* ── 1~2학년 친화판 디자인 토큰 (단일 소스) ── */
           :root{
             --bg:#FFFBEB; --surface:#FFFFFF; --ink:#2B2A33; --ink-soft:#5B5566;
@@ -147,7 +150,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           ::-webkit-scrollbar-thumb { background: #FDE68A; border-radius: 4px; }
           ::-webkit-scrollbar-track { background: transparent; }
           ::selection { background: #F59E0B33; }
-        `}</style>
+        ` }} />
       </body>
     </html>
   );
