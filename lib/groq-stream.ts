@@ -137,18 +137,34 @@ async function acquireGeminiStream(
 ): Promise<AcquiredStream> {
   const keys = getGeminiApiKeys();
   if (!keys.length) throw new Error("gemini-stream: GEMINI_API_KEY not set");
+  // #7과 동일: 2.5 계열 thinking 이 max_tokens 를 잠식하면 보이는 답이 빈/잘린
+  // 상태로 끝나(finish_reason:length) BLOCK_REPLY 로 오인 대체된다 → thinking OFF.
+  // 파라미터가 거부(400)되면 없이 1회 재시도 (generateJson 의 폴백과 동일 정책).
+  const paramsFor = (model: string, thinkingOff: boolean) => {
+    const base = { model, messages, temperature, max_tokens: maxTokens, stream: true as const };
+    return thinkingOff
+      ? { ...base, ...({ reasoning_effort: "none" } as Record<string, unknown>) }
+      : base;
+  };
   let lastErr: unknown = null;
   for (const key of keys) {
     const client = geminiClientForKey(key);
     for (const model of GEMINI_CHAT_MODELS) {
       try {
-        const stream = await client.chat.completions.create({
-          model, messages, temperature, max_tokens: maxTokens, stream: true,
-        });
+        const stream = await client.chat.completions.create(paramsFor(model, true));
         return { stream, model };
       } catch (err) {
-        lastErr = err;
-        const status = (err as { status?: number })?.status ?? 0;
+        let finalErr = err;
+        if (((err as { status?: number })?.status ?? 0) === 400) {
+          try {
+            const stream = await client.chat.completions.create(paramsFor(model, false));
+            return { stream, model };
+          } catch (err2) {
+            finalErr = err2;
+          }
+        }
+        lastErr = finalErr;
+        const status = (finalErr as { status?: number })?.status ?? 0;
         if (status === 429 || status === 400 || status === 404) continue; // 다음 모델
         break; // 키 문제(401/403 등) → 다음 키
       }
