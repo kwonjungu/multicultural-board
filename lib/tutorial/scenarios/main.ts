@@ -96,7 +96,7 @@ export const mainHubStudentScenario: TutorialScenario = {
       expression: "celebrate",
       lines: [
         { text: "소통의 게임! 🎮 내가 제일 좋아하는 곳이야~" },
-        { text: "국가 맞추기, 월드마블, 그림 그려 맞추기… 친구랑 같이 하는 놀이가 잔뜩 있어!", expression: "cheer" },
+        { text: "이 나라는 어디?, 꿀벌 월드 마블, 그림 맞히기… 친구랑 같이 하는 놀이가 21가지나 있어!", expression: "cheer" },
         { text: "게임 카드를 누르면 바로 시작돼. 이제 칭찬 꿀벌집으로 가자!", expression: "welcome" },
       ],
     },
@@ -131,7 +131,7 @@ export const mainHubStudentScenario: TutorialScenario = {
       kind: "celebrate",
       lines: [
         { text: "자, 이게 우리 반 전체 지도야! 🗺️", expression: "celebrate" },
-        { text: "아, 가끔 선생님이 시작하면 다 같이 만드는 그림책도 열릴 거야~ 기대해!", expression: "cheer" },
+        { text: "아, 그림책 공부에서는 언제든 그림책을 읽을 수 있어~ 선생님이 수업을 시작하면 자동으로 열리기도 해!", expression: "cheer" },
         { text: "즐거운 하루 보내! 🐝", expression: "welcome" },
       ],
       reward: sharedReward,
@@ -186,7 +186,7 @@ export const mainHubTeacherScenario: TutorialScenario = {
       side: "bottom",
       expression: "celebrate",
       lines: [
-        { text: "소통창 내부입니다. 상단 도구 모음에 **QR 입장·승인·내보내기·의견 나누기·관리**가 모여 있어요." },
+        { text: "소통창 내부입니다. 상단 도구 모음에 **승인·QR 입장·의견 나누기·PPTX 번역·모두 부르기**가 모여 있어요." },
         { text: "컬럼(주제)은 소통판 안에서 바로 추가·수정·삭제할 수 있습니다.", expression: "cheer" },
       ],
     },
@@ -233,8 +233,8 @@ export const mainHubTeacherScenario: TutorialScenario = {
       side: "bottom",
       expression: "think",
       lines: [
-        { text: "**단어 카드** 📚 어휘 400개가 준비돼 있어요." },
-        { text: "학생별 진도가 개별 추적되고, **받아쓰기 시험**도 내실 수 있어요.", expression: "cheer" },
+        { text: "**단어 카드** 📚 어휘 100개가 준비돼 있어요." },
+        { text: "'반 전체 보기'로 학생별 진도를 확인하고, **받아쓰기 학습지**도 인쇄하실 수 있어요.", expression: "cheer" },
       ],
     },
     // ── 허브 복귀 후 마무리 ──
@@ -243,7 +243,7 @@ export const mainHubTeacherScenario: TutorialScenario = {
       kind: "celebrate",
       lines: [
         { text: "이게 우리 반 전체 구조예요. 🗺️", expression: "celebrate" },
-        { text: "참, **모둠 그림책**은 선생님이 세션을 시작하시면 학생 화면으로 자동 이동됩니다!", expression: "cheer" },
+        { text: "참, **그림책 공부**에서는 AI로 그림책을 만들 수 있고, 수업 세션을 시작하시면 학생 화면이 자동 이동됩니다!", expression: "cheer" },
         { text: "즐거운 수업 되세요, 선생님 🐝", expression: "teacher" },
       ],
       reward: { emoji: "🎓", label: "꿀벌 교실 안내 완료!" },

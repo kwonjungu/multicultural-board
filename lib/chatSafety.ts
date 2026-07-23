@@ -64,23 +64,34 @@ function normalize(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+// 모델 "출력" 검사에서는 제외하는 항목 — 정상 한국어와 substring 충돌.
+// 실증 오탐: "게임룸에 가 보지 않을래?" → "보지"(BLOCK), "정답이 맞았어!" → "맞았어"(DISTRESS).
+// 학생 "입력" 검사에는 그대로 적용된다 (입력은 짧고 어린이 발화라 충돌 확률이 낮음).
+const OUTPUT_EXEMPT = new Set([
+  "보지", "자지", "꺼져", "닥쳐", "죽어", "뒤져", "뒤질", "졸라", // "-아/어 보지", "불이 꺼져", "엄마를 졸라" 류
+  "맞았어", // 정답 확인 "맞았어!"
+]);
+
 export interface SafetyCheck {
   blocked: boolean;
   distress: boolean;
   reason?: string;
 }
 
-export function checkSafety(text: string): SafetyCheck {
+export function checkSafety(text: string, opts?: { target?: "input" | "output" }): SafetyCheck {
   if (!text) return { blocked: false, distress: false };
   const n = normalize(text);
+  const isOutput = opts?.target === "output";
 
   for (const kw of DISTRESS_SUBSTRINGS) {
+    if (isOutput && OUTPUT_EXEMPT.has(kw)) continue;
     if (n.includes(kw.toLowerCase())) {
       return { blocked: false, distress: true, reason: kw };
     }
   }
 
   for (const kw of BLOCK_SUBSTRINGS) {
+    if (isOutput && OUTPUT_EXEMPT.has(kw)) continue;
     if (n.includes(kw.toLowerCase())) {
       return { blocked: true, distress: false, reason: kw };
     }
@@ -149,10 +160,32 @@ export const BLOCK_REPLY: Record<string, string> = {
   my: "ဟမ်… အဲဒါ ကျွန်တော်တို့ရဲ့ပုံပြင်နဲ့ အဆင်မပြေဘူး။ တခြားမေးပါ!",
 };
 
-export function replyForSafety(lang: string, kind: "distress" | "block" | "warning"): string {
+// Shown on infrastructure errors (모델 전면 실패·빈 응답·스트림 끊김).
+// BLOCK_REPLY 와 반드시 분리 — 같은 문구를 쓰면 정상 질문이 "부적절 판정"으로
+// 오인된다 (2026-07-23 "카지노 게임 할래" 오인 사례).
+export const ERROR_REPLY: Record<string, string> = {
+  ko: "앗, 지금 머리가 잠깐 복잡했어. 조금 있다가 다시 한 번 말해줄래?",
+  en: "Oops, my head got a little fuzzy just now. Can you say that again in a moment?",
+  vi: "Ối, đầu mình hơi rối một chút. Bạn nói lại sau một lát nhé?",
+  zh: "哎呀,我刚才有点晕。稍等一下再跟我说一次好吗?",
+  fil: "Naku, medyo nahilo ako sandali. Pwede mong ulitin mamaya?",
+  ja: "あれれ、いま あたまが ちょっと ぼんやりしちゃった。すこし あとで もういちど いってくれる?",
+  th: "อุ๊ย หัวของฉันมึนไปแป๊บนึง อีกสักครู่พูดอีกทีได้ไหม?",
+  km: "អូ ខួរក្បាលខ្ញុំវិលបន្តិច។ សូមនិយាយម្តងទៀតបន្តិចទៀតបានទេ?",
+  mn: "Өө, толгой минь жаахан эргэчихлээ. Жоохон байгаад дахин хэлээрэй?",
+  ru: "Ой, у меня немного закружилась голова. Скажи ещё раз чуть позже, хорошо?",
+  uz: "Voy, boshim biroz aylanib qoldi. Birozdan keyin yana aytasanmi?",
+  hi: "अरे, मेरा सिर थोड़ा चकरा गया। थोड़ी देर बाद फिर से कहोगे?",
+  id: "Aduh, kepalaku sedikit pusing tadi. Bisa ulangi sebentar lagi?",
+  ar: "عفوًا، شعرت بدوار بسيط الآن. هل تعيد ما قلته بعد قليل؟",
+  my: "အိုး ခေါင်းနည်းနည်းမူးသွားတယ်။ ခဏနေရင် ထပ်ပြောပေးနိုင်မလား?",
+};
+
+export function replyForSafety(lang: string, kind: "distress" | "block" | "warning" | "error"): string {
   const table =
     kind === "distress" ? DISTRESS_REPLY
     : kind === "warning" ? BLOCK_WARNING
+    : kind === "error" ? ERROR_REPLY
     : BLOCK_REPLY;
   return table[lang] || table.ko || table.en;
 }

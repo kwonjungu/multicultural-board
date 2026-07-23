@@ -177,11 +177,13 @@ export default function TutorChat({
       }
       setMessages((prev) => [...prev, {
         role: "assistant",
-        content: final.reply || replyForSafety(lang, "block"),
+        // 빈 응답/통신 실패는 콘텐츠 차단이 아니므로 "error" 문구 — "block" 을 쓰면
+        // 정상 질문이 부적절 판정받은 것처럼 보인다.
+        content: final.reply || replyForSafety(lang, "error"),
       }]);
     } catch (err) {
       console.error("tutor chat failed", err);
-      setMessages((prev) => [...prev, { role: "assistant", content: replyForSafety(lang, "block") }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: replyForSafety(lang, "error") }]);
     }
     setStreamText(null);
     setBusy(false);

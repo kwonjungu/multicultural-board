@@ -173,6 +173,13 @@ async function acquireGeminiStream(
   throw lastErr ?? new Error("gemini-stream: no key/model succeeded");
 }
 
+// 채팅 UI 는 마크다운을 렌더링하지 않는다 — **굵게**, `코드` 가 기호 그대로
+// 보이므로 델타·최종 텍스트에서 마크다운 기호를 제거한다. (프롬프트로도 금지하지만
+// LLM 이 습관적으로 넣는 경우의 최종 안전망)
+function stripMarkdown(s: string): string {
+  return s.replace(/[*`]/g, "").replace(/^#{1,4}\s*/gm, "");
+}
+
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
   "Cache-Control": "no-cache, no-transform",
@@ -216,8 +223,9 @@ export async function streamChatResponse(params: StreamChatParams): Promise<Resp
       acquired = await acquireGroqStream(messages, models, temperature, maxTokens);
     }
   } catch (err) {
-    console.error("groq-stream: all keys+models failed", err);
-    return sseSingleFinal(replyForSafety(lang, "block"), "error");
+    // 진단용: 429(쿼터)인지 401(키)인지 로그에서 바로 구분되도록 status 를 남긴다.
+    console.error(`groq-stream: all keys+models failed (status=${(err as { status?: number })?.status ?? "?"})`, err);
+    return sseSingleFinal(replyForSafety(lang, "error"), "error");
   }
 
   const { stream: chatStream, model } = acquired;
@@ -232,7 +240,7 @@ export async function streamChatResponse(params: StreamChatParams): Promise<Resp
           if (!delta) continue;
           acc += delta;
 
-          const safety = checkSafety(acc);
+          const safety = checkSafety(acc, { target: "output" });
           if (safety.blocked || safety.distress) {
             const kind: ChatKind = safety.distress ? "distress" : "block";
             controller.enqueue(sseLine({
@@ -243,21 +251,21 @@ export async function streamChatResponse(params: StreamChatParams): Promise<Resp
           }
           // #8 delta 스크럽 — 외국어가 화면에 "뜨는" 것을 차단. acc(원본)는
           // 종료 시 오염 판정·재생성에 쓰므로 그대로 둔다.
-          const shown = scrubDelta(delta, allow);
+          const shown = stripMarkdown(scrubDelta(delta, allow));
           if (shown) controller.enqueue(sseLine({ type: "delta", text: shown }));
         }
 
         const full = (acc || "").trim();
         if (!full) {
           controller.enqueue(sseLine({
-            type: "final", reply: replyForSafety(lang, "block"), kind: "error", model,
+            type: "final", reply: replyForSafety(lang, "error"), kind: "error", model,
           }));
         } else {
           // #8 오염 시 1회 재생성 → finalize(라우트의 sanitize/질문종결) →
           //    그래도 비면 안전 폴백(타깃 언어). 외국어 덩어리는 절대 노출 안 됨.
           const cleaned = await ensureTargetLang(full, { messages, models, lang, allow, temperature, maxTokens });
-          let reply = finalize ? finalize(cleaned) : sanitizeReply(cleaned, allow);
-          if (!reply || reply.replace(/\s/g, "").length < 2) reply = replyForSafety(lang, "block");
+          let reply = stripMarkdown(finalize ? finalize(cleaned) : sanitizeReply(cleaned, allow));
+          if (!reply || reply.replace(/\s/g, "").length < 2) reply = replyForSafety(lang, "error");
           controller.enqueue(sseLine({ type: "final", reply, kind: "normal", model }));
         }
         controller.close();
@@ -266,8 +274,8 @@ export async function streamChatResponse(params: StreamChatParams): Promise<Resp
         console.error("groq-stream: mid-stream error", err);
         const full = acc.trim();
         const reply = full.length >= 10
-          ? (finalize ? finalize(full) : sanitizeReply(full, allow))
-          : replyForSafety(lang, "block");
+          ? stripMarkdown(finalize ? finalize(full) : sanitizeReply(full, allow))
+          : replyForSafety(lang, "error");
         const kind: ChatKind = full.length >= 10 ? "normal" : "error";
         try {
           controller.enqueue(sseLine({ type: "final", reply, kind, model }));

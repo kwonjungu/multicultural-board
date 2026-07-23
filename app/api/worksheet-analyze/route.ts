@@ -25,9 +25,10 @@ const VISION_MODELS = [
 ];
 
 // llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
+// qwen3.6-27b 는 <think> 추론 유출로 제외.
 const TEXT_MODELS = [
   "openai/gpt-oss-120b",
-  "qwen/qwen3.6-27b",
+  "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",
 ];
 

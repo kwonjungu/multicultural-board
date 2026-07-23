@@ -23,9 +23,9 @@ import {
   batchValidity, cleanTranslation, validateTranslation,
 } from "./translation-quality";
 
+// qwen3.6-27b 는 <think> 추론 유출로 제외 (검증기가 걸러도 호출 낭비).
 const GROQ_MODELS = [
   "openai/gpt-oss-120b",
-  "qwen/qwen3.6-27b",
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",
 ];

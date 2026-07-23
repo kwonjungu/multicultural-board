@@ -28,7 +28,7 @@ const CAPTIONS: Record<CaptionKey, CaptionMeta> = {
         "너가 한국어로 글을 쓰면 친구들 화면엔 자기 나라말로 바뀌어.",
       ],
       tips: [
-        "친구 글에 좋아요 ❤️ 꾹!",
+        "친구 글에 댓글을 달아봐 💬",
         "선생님 칭찬 스티커도 여기서 받아져~",
       ],
       expression: "cheer",
@@ -80,18 +80,18 @@ const CAPTIONS: Record<CaptionKey, CaptionMeta> = {
         "친구들이랑 같이 놀면서 말을 배워봐!",
       ],
       tips: [
-        "국가 맞추기, 그림 그려 맞추기, 단어 타워…",
+        "이 나라는 어디?, 그림 맞히기, 단어 탑 쌓기…",
         "혼자도 되고, 여럿이 해도 돼~",
       ],
       expression: "celebrate",
     },
     teacher: {
-      title: "게임 17종",
+      title: "게임 21종",
       body: [
         "아이스브레이킹·어휘 복습·모둠 활동용 게임을 고르세요.",
       ],
       tips: [
-        "인원/난이도별 분류",
+        "전통놀이·보드게임·역할극 등 21종",
         "게임마다 사용 언어 선택 가능",
       ],
       expression: "teacher",
@@ -131,7 +131,7 @@ const CAPTIONS: Record<CaptionKey, CaptionMeta> = {
       ],
       tips: [
         "꾸미기로 모자·리본 바꾸기 🎩",
-        "친구 벌에도 스티커 선물 가능!",
+        "개인전 전시장에서 친구 벌에 ❤️ 좋아요·💬 응원 남기기!",
       ],
       expression: "welcome",
     },
@@ -156,14 +156,14 @@ const CAPTIONS: Record<CaptionKey, CaptionMeta> = {
       ],
       tips: [
         "발음 듣기 🔊 + 따라 말하기 🎤",
-        "받아쓰기 시험도 도전!",
+        "🔥 오늘의 일일 챌린지도 도전!",
       ],
       expression: "think",
     },
     teacher: {
-      title: "어휘 학습 (400개)",
+      title: "어휘 학습 (100개)",
       body: [
-        "학생 진도가 개별 추적되고, 받아쓰기 시험 출제가 가능합니다.",
+        "학생 진도가 개별 추적되고, 받아쓰기 학습지를 인쇄할 수 있습니다.",
       ],
       tips: [
         "난이도·주제별 필터",
@@ -175,20 +175,20 @@ const CAPTIONS: Record<CaptionKey, CaptionMeta> = {
   storybook: {
     key: "storybook",
     student: {
-      title: "모둠 그림책 📖",
+      title: "그림책 공부 📖",
       body: [
-        "우리 모둠이 같이 만드는 그림책이야!",
+        "선생님과 다 같이 그림책을 읽고 공부하는 곳이야!",
       ],
       tips: [
-        "선생님이 시작하면 자동으로 열려",
-        "AI가 이야기 짜는 걸 도와줘 🤖",
+        "선생님이 수업을 시작하면 자동으로 열려 (혼자 읽기도 돼!)",
+        "책 속 인물이랑 대화도 할 수 있어 🤖",
       ],
       expression: "celebrate",
     },
     teacher: {
-      title: "협업 그림책 세션",
+      title: "그림책 수업 세션",
       body: [
-        "모둠별로 이야기를 같이 만드는 활동입니다.",
+        "AI로 그림책을 만들어 반 전체가 함께 읽는 활동입니다.",
       ],
       tips: [
         "세션 시작 시 학생 화면 자동 이동",

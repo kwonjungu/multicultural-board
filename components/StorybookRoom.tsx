@@ -3751,14 +3751,15 @@ function CharacterChat({
       // 로컬 에코가 즉시 발화하므로 await 없이 기록 → streamText 정리 순서로
       // 깜빡임 없이 확정 버블로 전환된다.
       appendChatTurn(roomCode, myClientId, character.id, {
-        from: "character", text: data.reply || replyForSafety(lang, "block"),
+        // 빈 응답은 콘텐츠 차단이 아니라 인프라 문제 → "error" 문구 (block 오인 방지)
+        from: "character", text: data.reply || replyForSafety(lang, "error"),
         timestamp: Date.now(),
         flagged: data.kind !== "normal",
       }).catch((err) => console.error("character turn write failed", err));
     } catch (err) {
       console.error("chat request failed", err);
       appendChatTurn(roomCode, myClientId, character.id, {
-        from: "character", text: replyForSafety(lang, "block"),
+        from: "character", text: replyForSafety(lang, "error"),
         timestamp: Date.now(), flagged: true,
       }).catch(() => {});
     }

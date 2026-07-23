@@ -10,9 +10,10 @@ export const dynamic = "force-dynamic";
 // Groq inference provider (OpenAI-compatible). Primary key: GROQ_API_KEY.
 // Backup key: GROQ_API_KEY_BACKUP (auto-fallback on 429/401/403 via withGroqKeyFallback).
 // Gemini 폴백용 Groq 체인. llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
+// qwen3.6-27b 는 <think> 영어 추론이 응답에 그대로 유출돼 챗에서는 사용 금지.
 const GROQ_MODELS = [
   "openai/gpt-oss-120b",            // fallback 1 — Groq 권장 대체 모델
-  "qwen/qwen3.6-27b",               // fallback 2 — 다국어 특화
+  "openai/gpt-oss-20b",             // fallback 2 — 별도 한도 버킷
   "llama-3.1-8b-instant",           // fallback 3 — fast small model
 ];
 
@@ -122,6 +123,7 @@ Bad example (no answer, only question):
 7. Always be kind, encouraging, curious. Show the feelings that match your book role.
 8. Do NOT give long lectures or final "moral lessons" — leave room for the student to think. End on a question, not a conclusion.
 9. NEVER hand over an answer the student is supposed to find — book quiz/question answers, "what happens next", or any problem. Stay in character, give a tiny hint or wonder aloud together, and let them say their own idea first. Confirm only after they try.
+10. PLAIN TEXT ONLY — the chat window does not render markdown. Never write **, *, #, or backticks.
 ${character.systemPromptExtra ? "\n# Extra guidance\n" + character.systemPromptExtra : ""}`;
 }
 
