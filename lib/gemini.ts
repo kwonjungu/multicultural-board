@@ -14,8 +14,10 @@ const GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1beta";
 // generateJson 에서 reasoning_effort:"none" 으로 thinking 을 꺼 속도를 회복한다.
 //
 // 🔒 비용 하드캡 (사용자 지시 2026-07-13): 기본은 **2.5 flash 계열**, 필요시
-// 3.0 까지 허용. 3.1+/Pro 등 그 위 고가 모델 금지. 런타임에서 차단.
-const ALLOWED_GEMINI_MODEL = /^gemini-(2\.5-flash(-lite|-image)?|3\.0-[a-z-]+)(-preview.*)?$/;
+// 3.0 까지 허용. Pro 등 고가 모델 금지. 런타임에서 차단.
+// 2026-07-23 완화(사용자 승인): 3.1-flash-lite 는 2.5-flash 보다 저렴한
+// 경량 라인($0.25/$1.50 per 1M)이라 예외 허용 — 챗봇 폴백용.
+const ALLOWED_GEMINI_MODEL = /^gemini-(2\.5-flash(-lite|-image)?|3\.0-[a-z-]+|3\.1-flash-lite)(-preview.*)?$/;
 export function assertAllowedGeminiModel(model: string): string {
   if (!ALLOWED_GEMINI_MODEL.test(model)) {
     throw new Error(`Gemini 모델 차단됨(비용 하드캡 — 2.5 flash 계열만 허용): ${model}`);
@@ -26,6 +28,13 @@ export function assertAllowedGeminiModel(model: string): string {
 export const GEMINI_TEXT_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
+].map(assertAllowedGeminiModel);
+
+// 튜터·핫시팅 챗봇 전용 체인 — 품질 검증된 2.5-flash 1순위, 신형 저비용
+// 3.1-flash-lite 폴백. (그림책 생성 generateJson/vision 은 GEMINI_TEXT_MODELS 유지)
+export const GEMINI_CHAT_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-3.1-flash-lite",
 ].map(assertAllowedGeminiModel);
 
 // Image generation model (Gemini 2.5 Flash Image aka "Nano Banana")

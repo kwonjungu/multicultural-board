@@ -15,7 +15,7 @@
 import type OpenAI from "openai";
 import { checkSafety, replyForSafety } from "./chatSafety";
 import { withGroqKeyFallback } from "./groq-client";
-import { geminiClientForKey, getGeminiApiKeys, GEMINI_TEXT_MODELS } from "./gemini";
+import { geminiClientForKey, getGeminiApiKeys, GEMINI_CHAT_MODELS } from "./gemini";
 import { scrubDelta, sanitizeReply, targetScriptRatio } from "./langGuard";
 import { LANGUAGES } from "./constants";
 
@@ -140,7 +140,7 @@ async function acquireGeminiStream(
   let lastErr: unknown = null;
   for (const key of keys) {
     const client = geminiClientForKey(key);
-    for (const model of GEMINI_TEXT_MODELS) {
+    for (const model of GEMINI_CHAT_MODELS) {
       try {
         const stream = await client.chat.completions.create({
           model, messages, temperature, max_tokens: maxTokens, stream: true,

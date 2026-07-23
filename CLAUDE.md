@@ -91,7 +91,9 @@
 
 - **🔒 Gemini 비용 하드캡 (사용자 지시, 절대 규칙).** 기본은 **2.5 flash 계열**
   (`gemini-2.5-flash`, `-flash-lite`, `-flash-image`=나노바나나 1). 필요할 때만
-  3.0 허용. **3.1+·Pro 등 그 위 고가 모델 금지.** 이미지 대량 생성은 반드시
+  3.0 허용. **Pro 등 고가 모델 금지.** 예외(사용자 승인 2026-07-23):
+  `gemini-3.1-flash-lite` 는 2.5-flash 보다 저렴한 경량 라인($0.25/$1.50 per 1M)
+  이라 허용 — 챗봇(GEMINI_CHAT_MODELS) 폴백으로 사용. 이미지 대량 생성은 반드시
   `batchGenerateContent`(배치 API, 50% 할인)로. lib/gemini.ts 의
   `assertAllowedGeminiModel` 이 런타임에서 차단 — 새 모델 상수는 반드시 이 함수를 거칠 것.
   스크립트(scripts/gen-*.mjs)에 모델을 하드코딩할 때도 이 규칙 적용.
