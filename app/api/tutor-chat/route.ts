@@ -9,10 +9,11 @@ import { sanitizeReply } from "@/lib/langGuard";
 
 export const dynamic = "force-dynamic";
 
+// Gemini 폴백용 Groq 체인. llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",        // primary — best quality for child-safe chat
-  "openai/gpt-oss-120b",            // fallback 1
-  "llama-3.1-8b-instant",           // fallback 2 — fast small model
+  "openai/gpt-oss-120b",            // fallback 1 — Groq 권장 대체 모델
+  "qwen/qwen3.6-27b",               // fallback 2 — 다국어 특화
+  "llama-3.1-8b-instant",           // fallback 3 — fast small model
 ];
 
 const LANG_DISPLAY: Record<string, string> = {
@@ -115,7 +116,9 @@ export async function POST(req: NextRequest) {
   const allowLangs = lang === "ko" ? ["ko"] : [lang, "ko"];
 
   // Layer 2~4: 스트리밍 + 증분 안전검사 + delta 스크럽 + final 새니타이즈
+  // 튜터 챗봇은 Gemini(2.5 flash) 1순위 — 15개 언어 품질이 좋고, 실패 시 Groq 폴백.
   return streamChatResponse({
+    provider: "gemini",
     messages,
     models: GROQ_MODELS,
     lang,

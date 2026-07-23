@@ -1,5 +1,6 @@
-// Groq 챗 응답을 SSE(Server-Sent Events)로 스트리밍하는 공용 헬퍼.
+// 챗 응답을 SSE(Server-Sent Events)로 스트리밍하는 공용 헬퍼.
 // storybook-chat / tutor-chat 라우트가 함께 사용한다.
+// provider:"gemini" 를 주면 Gemini(2.5 flash 계열) 1순위 + Groq 폴백으로 동작한다.
 //
 // 이벤트 형식 (모두 `data: {json}\n\n` 한 줄):
 //   { type: "delta", text: string }                          — 토큰 조각
@@ -14,6 +15,7 @@
 import type OpenAI from "openai";
 import { checkSafety, replyForSafety } from "./chatSafety";
 import { withGroqKeyFallback } from "./groq-client";
+import { geminiClientForKey, getGeminiApiKeys, GEMINI_TEXT_MODELS } from "./gemini";
 import { scrubDelta, sanitizeReply, targetScriptRatio } from "./langGuard";
 import { LANGUAGES } from "./constants";
 
@@ -91,6 +93,68 @@ interface StreamChatParams {
    * 기본 [lang]. 튜터처럼 타깃 언어 + 한국어 예시를 함께 쓰면 [lang,"ko"] 전달.
    */
   scrubLangs?: string[];
+  /**
+   * "gemini" 면 Gemini(2.5 flash 계열, 비용 하드캡 준수)를 1순위로 시도하고,
+   * 키가 없거나 전부 실패하면 기존 Groq 키/모델 폴백 체인으로 내려간다.
+   * 기본은 "groq" (기존 동작 그대로) — 튜터/핫시팅 챗봇만 "gemini" 를 쓴다.
+   */
+  provider?: "groq" | "gemini";
+}
+
+type AcquiredStream = { stream: AsyncIterable<OpenAI.ChatCompletionChunk>; model: string };
+
+/** Groq 스트림 획득 — 기존 키/모델 폴백 체계 (429/401/403 → 다음 키, 400/404 → 다음 모델). */
+async function acquireGroqStream(
+  messages: ChatMessage[], models: string[], temperature: number, maxTokens: number,
+): Promise<AcquiredStream> {
+  return withGroqKeyFallback(async (client) => {
+    let lastErr: unknown = null;
+    for (const model of models) {
+      try {
+        const stream = await client.chat.completions.create({
+          model, messages, temperature, max_tokens: maxTokens, stream: true,
+        });
+        return { stream, model };
+      } catch (err) {
+        lastErr = err;
+        const status = (err as { status?: number })?.status ?? 0;
+        if (status === 400 || status === 404) continue; // 모델 미지원 → 다음 모델
+        throw err; // 429/401/403 등 → 키 폴백으로
+      }
+    }
+    throw lastErr ?? new Error("groq-stream: no model succeeded");
+  });
+}
+
+/**
+ * Gemini 스트림 획득 — 키 로테이션 × 모델 폴백 (getGeminiApiKeys 순서대로).
+ * 429/400/404 → 다음 모델, 그 외(401/403 등) → 다음 키. 전부 실패 시 throw
+ * → 호출부가 Groq 체인으로 폴백한다. Gemini 도 OpenAI 호환 엔드포인트라
+ * 청크 형식이 Groq 와 동일해 이후 파이프라인을 그대로 태운다.
+ */
+async function acquireGeminiStream(
+  messages: ChatMessage[], temperature: number, maxTokens: number,
+): Promise<AcquiredStream> {
+  const keys = getGeminiApiKeys();
+  if (!keys.length) throw new Error("gemini-stream: GEMINI_API_KEY not set");
+  let lastErr: unknown = null;
+  for (const key of keys) {
+    const client = geminiClientForKey(key);
+    for (const model of GEMINI_TEXT_MODELS) {
+      try {
+        const stream = await client.chat.completions.create({
+          model, messages, temperature, max_tokens: maxTokens, stream: true,
+        });
+        return { stream, model };
+      } catch (err) {
+        lastErr = err;
+        const status = (err as { status?: number })?.status ?? 0;
+        if (status === 429 || status === 400 || status === 404) continue; // 다음 모델
+        break; // 키 문제(401/403 등) → 다음 키
+      }
+    }
+  }
+  throw lastErr ?? new Error("gemini-stream: no key/model succeeded");
 }
 
 const SSE_HEADERS = {
@@ -120,44 +184,34 @@ export async function streamChatResponse(params: StreamChatParams): Promise<Resp
   // #8 허용 언어(스크립트) 목록 — 기본 [lang].
   const allow = params.scrubLangs && params.scrubLangs.length ? params.scrubLangs : [lang];
 
-  // 1) 스트림 획득까지는 기존 키/모델 폴백 체계를 그대로 사용.
-  //    (429/401/403 → 다음 키, 400/404 → 다음 모델. create() 시점에 throw 됨)
-  let acquired: { stream: AsyncIterable<OpenAI.ChatCompletionChunk>; model: string };
+  // 1) 스트림 획득. provider:"gemini" 면 Gemini 1순위 → 실패 시 Groq 체인.
+  //    (오염 재생성 ensureTargetLang 은 의도적으로 Groq 유지 — 짧은 정리용 재생성이라
+  //     품질 차이가 작고, Gemini 장애 상황에서도 복구 경로가 살아 있어야 한다)
+  let acquired: AcquiredStream;
   try {
-    acquired = await withGroqKeyFallback(async (client) => {
-      let lastErr: unknown = null;
-      for (const model of models) {
-        try {
-          const stream = await client.chat.completions.create({
-            model,
-            messages,
-            temperature,
-            max_tokens: maxTokens,
-            stream: true,
-          });
-          return { stream, model };
-        } catch (err) {
-          lastErr = err;
-          const status = (err as { status?: number })?.status ?? 0;
-          if (status === 400 || status === 404) continue; // 모델 미지원 → 다음 모델
-          throw err; // 429/401/403 등 → 키 폴백으로
-        }
+    if (params.provider === "gemini") {
+      try {
+        acquired = await acquireGeminiStream(messages, temperature, maxTokens);
+      } catch (err) {
+        console.warn("gemini-stream: Groq 로 폴백", err);
+        acquired = await acquireGroqStream(messages, models, temperature, maxTokens);
       }
-      throw lastErr ?? new Error("groq-stream: no model succeeded");
-    });
+    } else {
+      acquired = await acquireGroqStream(messages, models, temperature, maxTokens);
+    }
   } catch (err) {
     console.error("groq-stream: all keys+models failed", err);
     return sseSingleFinal(replyForSafety(lang, "block"), "error");
   }
 
-  const { stream: groqStream, model } = acquired;
+  const { stream: chatStream, model } = acquired;
 
-  // 2) Groq 청크를 SSE 로 변환하면서 증분 안전검사.
+  // 2) LLM 청크를 SSE 로 변환하면서 증분 안전검사.
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       let acc = "";
       try {
-        for await (const chunk of groqStream) {
+        for await (const chunk of chatStream) {
           const delta = chunk.choices?.[0]?.delta?.content ?? "";
           if (!delta) continue;
           acc += delta;

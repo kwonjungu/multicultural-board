@@ -8,8 +8,8 @@ import {
 } from "@/lib/translation-quality";
 
 // 번역 + 안전 검사용 모델 체인 (translate-route 전용 — JSON mode 지원 필수)
+// llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
 const TRANSLATE_MODELS = [
-  "llama-3.3-70b-versatile",
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",

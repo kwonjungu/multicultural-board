@@ -47,9 +47,9 @@ function requireKey(): string {
   return k;
 }
 
-export function geminiTextClient(): OpenAI {
+export function geminiClientForKey(key: string): OpenAI {
   return new OpenAI({
-    apiKey: requireKey(),
+    apiKey: key,
     baseURL: GEMINI_BASE_URL,
     // #7: 호출당 45s 상한 — 한 호출이 함수 예산(60s)을 통째로 잡아먹고 504 되는
     // 것을 막고, 느린 호출은 빨리 실패시켜 다음 모델로 폴백한다.
@@ -57,6 +57,10 @@ export function geminiTextClient(): OpenAI {
     // SDK 자동 재시도는 429 Retry-After(수십 초)를 기다려 체감 지연만 키운다.
     maxRetries: 0,
   });
+}
+
+export function geminiTextClient(): OpenAI {
+  return geminiClientForKey(requireKey());
 }
 
 // === Text: generate JSON with fallback + simple self-critique loop ===

@@ -9,10 +9,11 @@ export const dynamic = "force-dynamic";
 
 // Groq inference provider (OpenAI-compatible). Primary key: GROQ_API_KEY.
 // Backup key: GROQ_API_KEY_BACKUP (auto-fallback on 429/401/403 via withGroqKeyFallback).
+// Gemini 폴백용 Groq 체인. llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",        // primary — best quality for child-safe chat
-  "openai/gpt-oss-120b",            // fallback 1
-  "llama-3.1-8b-instant",           // fallback 2 — fast small model
+  "openai/gpt-oss-120b",            // fallback 1 — Groq 권장 대체 모델
+  "qwen/qwen3.6-27b",               // fallback 2 — 다국어 특화
+  "llama-3.1-8b-instant",           // fallback 3 — fast small model
 ];
 
 const LANG_DISPLAY: Record<string, string> = {
@@ -183,7 +184,9 @@ export async function POST(req: NextRequest) {
   ];
 
   // === Layer 2~4: 스트리밍 + 증분 안전검사 + 정리/질문형 종결 강제(final 에 반영) ===
+  // 핫시팅 챗봇은 Gemini(2.5 flash) 1순위 — 캐릭터 연기·다국어 품질, 실패 시 Groq 폴백.
   return streamChatResponse({
+    provider: "gemini",
     messages,
     models: GROQ_MODELS,
     lang: replyLang,

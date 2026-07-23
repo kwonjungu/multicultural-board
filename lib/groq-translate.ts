@@ -4,14 +4,11 @@
  * 2025-04 현재 Groq Production/Preview 텍스트 모델 전체 등록
  * 한 모델이 429(rate limit) 또는 400/404(미지원) 시 다음 모델로 자동 전환.
  *
- * Production:
- *   llama-3.3-70b-versatile              300K TPM  ★ 기본
- *   openai/gpt-oss-120b                  250K TPM  폴백1
- *   openai/gpt-oss-20b                   250K TPM  폴백2
- *   llama-3.1-8b-instant                 250K TPM  폴백3
- * Preview:
- *   qwen/qwen3-32b                       300K TPM  폴백4 (다국어 특화)
- *   meta-llama/llama-4-scout-17b-16e     300K TPM  폴백5 (비전 겸용)
+ * 2026-07 현재 모델 체인 (llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외):
+ *   openai/gpt-oss-120b                  ★ 기본 (Groq 권장 대체)
+ *   qwen/qwen3.6-27b                     폴백1 (다국어 특화)
+ *   openai/gpt-oss-20b                   폴백2
+ *   llama-3.1-8b-instant                 폴백3
  *
  * 품질 가드:
  *   - temperature 0.1 (창의성 최소화 → 원문 충실도)
@@ -27,17 +24,14 @@ import {
 } from "./translation-quality";
 
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
   "openai/gpt-oss-120b",
+  "qwen/qwen3.6-27b",
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",
-  "qwen/qwen3-32b",
-  "meta-llama/llama-4-scout-17b-16e-instruct",
 ];
 
 // JSON mode (response_format: json_object) 확실히 지원되는 모델만 명시
 const JSON_MODE_MODELS = new Set([
-  "llama-3.3-70b-versatile",
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",

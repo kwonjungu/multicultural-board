@@ -24,9 +24,10 @@ const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",   // Groq 현재 유일한 비전 모델 (2025-04)
 ];
 
+// llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
 const TEXT_MODELS = [
-  "llama-3.3-70b-versatile",
   "openai/gpt-oss-120b",
+  "qwen/qwen3.6-27b",
   "llama-3.1-8b-instant",
 ];
 

@@ -3,8 +3,8 @@ import { VOCAB_WORDS } from "@/lib/vocabWords";
 import { extractVocabLocal, MatchedWord } from "@/lib/vocabUtils";
 import { withGroqKeyFallback, getGroqApiKeys } from "@/lib/groq-client";
 
+// llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",

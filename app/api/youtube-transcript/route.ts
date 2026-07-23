@@ -9,9 +9,8 @@ export const runtime = "nodejs";
 // 워치 페이지 + json3 + 번역 체인까지 — 여유 있게.
 export const maxDuration = 60;
 
-// 자막 번역 전용 모델 체인 (JSON mode 필요).
+// 자막 번역 전용 모델 체인 (JSON mode 필요). llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
 const MODELS = [
-  "llama-3.3-70b-versatile",
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",
