@@ -8,11 +8,13 @@ import {
 } from "@/lib/translation-quality";
 
 // 번역 + 안전 검사용 모델 체인 (translate-route 전용 — JSON mode 지원 필수)
-// llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
+// llama-3.3-70b 는 2026-08-16 종료됨.
+// llama-3.1-8b-instant 는 2026-08-16 free/developer 티어 종료됨.
+// 대체로 qwen3.8-27b 투입(2026-09-06 실측: JSON 정상·<think> 유출 없음·더 빠름).
 const TRANSLATE_MODELS = [
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
-  "llama-3.1-8b-instant",
+  "qwen/qwen3.8-27b",                 // fallback 3 — 다른 계열·별도 버킷
 ];
 
 interface TranslateResult {

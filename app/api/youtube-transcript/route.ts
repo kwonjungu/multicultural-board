@@ -13,7 +13,7 @@ export const maxDuration = 60;
 const MODELS = [
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
-  "llama-3.1-8b-instant",
+  "qwen/qwen3.8-27b",                 // fallback 3 — 다른 계열·별도 버킷
 ];
 
 // 자막 전문이 너무 길면 토큰/지연이 폭증하므로 상한. 교실용 클립 기준.

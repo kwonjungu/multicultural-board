@@ -6,10 +6,11 @@
  * 2026-07-23 실측 기준 모델 체인:
  *   openai/gpt-oss-120b                  ★ 기본 (RPD 1,000 · TPM 8K)
  *   openai/gpt-oss-20b                   폴백1 (RPD 1,000 · TPM 8K)
- *   llama-3.1-8b-instant                 폴백2 (RPD 14,400 · TPM 6K)
+ *   qwen/qwen3.8-27b                     폴백2 (2026-09-06 추가 · 별도 버킷)
  * 제외된 모델:
- *   - llama-3.3-70b-versatile : 2026-08-16 decommission 예정
- *   - qwen/qwen3.6-27b        : <think> 영어 추론이 응답에 그대로 유출됨
+ *   - llama-3.3-70b-versatile : 2026-08-16 종료됨
+ *   - llama-3.1-8b-instant    : 2026-08-16 free/dev 티어 종료됨
+ *   - qwen/qwen3.6-27b        : JSON 검증 실패(2026-09-06 재확인)
  *   - meta-llama/llama-4-scout: 목록에서 사라짐(사용 불가)
  *
  * 품질 가드:
@@ -25,18 +26,20 @@ import {
   batchValidity, cleanTranslation, validateTranslation,
 } from "./translation-quality";
 
-// qwen3.6-27b 는 <think> 추론 유출로 제외 (검증기가 걸러도 호출 낭비).
+// qwen3.8-27b 는 2026-09-06 실측으로 복귀시켰다 — JSON 정상, <think> 유출 없음,
+// gpt-oss 대비 2.5~3.5배 빠르다. 계열이 달라 별도 한도 버킷이기도 하다.
+// (qwen3.6-27b 는 여전히 JSON 검증 실패라 제외 유지.)
 const GROQ_MODELS = [
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
-  "llama-3.1-8b-instant",
+  "qwen/qwen3.8-27b",
 ];
 
 // JSON mode (response_format: json_object) 확실히 지원되는 모델만 명시
 const JSON_MODE_MODELS = new Set([
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
-  "llama-3.1-8b-instant",
+  "qwen/qwen3.8-27b",
 ]);
 
 function shouldSkipModel(err: unknown): boolean {

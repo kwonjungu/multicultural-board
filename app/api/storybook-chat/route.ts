@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { streamChatResponse, sseSingleFinal } from "@/lib/groq-stream";
 import { sanitizeReply, resolveReplyLang } from "@/lib/langGuard";
+import { buildHotseatSystemPrompt } from "@/lib/prompts/chatPrompts";
 import type { StorybookCharacter } from "@/lib/types";
 
 // 스트리밍 응답이라 정적 최적화 대상에서 제외
@@ -14,14 +15,8 @@ export const dynamic = "force-dynamic";
 const GROQ_MODELS = [
   "openai/gpt-oss-120b",            // fallback 1 — Groq 권장 대체 모델
   "openai/gpt-oss-20b",             // fallback 2 — 별도 한도 버킷
-  "llama-3.1-8b-instant",           // fallback 3 — fast small model
+  "qwen/qwen3.8-27b",                 // fallback 3 — 다른 계열·별도 버킷
 ];
-
-const LANG_DISPLAY: Record<string, string> = {
-  ko: "한국어", en: "English", vi: "Tiếng Việt", zh: "中文", fil: "Filipino",
-  ja: "日本語", th: "ไทย", km: "ខ្មែរ", mn: "Монгол", ru: "Русский",
-  uz: "O'zbek", hi: "हिन्दी", id: "Bahasa Indonesia", ar: "العربية", my: "မြန်မာ",
-};
 
 // 핫시팅 응답이 질문으로 끝나지 않을 때 붙일 짧은 fallback 후속 질문.
 // LLM 이 규칙을 무시한 경우의 마지막 안전망. 학생 언어로.
@@ -69,69 +64,6 @@ function fixKoreanRegister(reply: string): string {
   return out.trim();
 }
 
-function buildSystemPrompt(params: {
-  character: StorybookCharacter;
-  bookTitle: string;
-  studentLang: string;
-}): string {
-  const { character, bookTitle, studentLang } = params;
-  const langName = LANG_DISPLAY[studentLang] || "Korean";
-  return `You are "${pickAny(character.name)}", a character in the children's storybook "${bookTitle}".
-
-# Your persona
-- Personality: ${character.personality}
-- Speech style: ${character.speechStyle}
-- Your role in the book: ${character.bookContext}
-
-# Who you are talking to
-An elementary school student (age 7–9).
-
-# Answer language (STRICT)
-Reply ONLY in ${langName}. EVERY single word must be ${langName} — never mix in words from English, Turkish, Vietnamese or any other language (e.g. writing "çok" or "very" inside a Korean sentence is forbidden). Do not switch languages unless the student writes in a different language.
-${studentLang === "ko" ? `
-# Korean speech register (반말 규칙)
-어린이 친구에게 말하듯 자연스러운 반말(해체)로만 말한다. "~예요/~에요/~습니다" 같은 존댓말 금지.
-의문문은 완전한 구어체로 끝낸다: "~이야?", "~어때?", "~할 것 같아?", "~좋아해?".
-"~인지?", "~한지?" 처럼 명사절로 끝나는 어색한 의문형은 절대 금지.
-  - 나쁜 예: "가장 좋아하는 음식이 무엇인지?" → 좋은 예: "제일 좋아하는 음식이 뭐야?"
-  - 나쁜 예: "어떤 감정을 주는지?" → 좋은 예: "이 이야기 들으니까 기분이 어때?"` : ""}
-
-# Never repeat yourself
-If the student asks the same or a similar question again, do NOT repeat your previous answer. They probably wanted MORE detail — give a NEW concrete detail from the story (a specific scene, what a character did, how it felt) in different words.
-
-# Reply structure (VERY IMPORTANT)
-Every single reply MUST follow this two-part shape, in this exact order:
-1. **Answer/React first** — 1~2 short sentences that respond warmly to what the student just said. Acknowledge their feeling or thought, or share your own as the character (in-story). Do NOT dodge or refuse just to ask a question.
-2. **Follow-up question last** — end with exactly ONE short, open question back to the student that keeps the conversation going. The question must invite their thought or feeling, not test trivia ("그럼 너는 어떻게 생각해?", "너라면 어떻게 했을 것 같아?", "그때 기분이 어땠어?" 류).
-
-The reply MUST end with a question mark ("?" / "？" / "?"). If your draft has no question at the end, rewrite it before sending.
-
-Korean note: 답을 먼저 따뜻하게 해주고, 마지막에 학생에게 짧은 질문 하나로 마무리해서 대화가 계속 이어지게 한다. 절대 답 없이 질문만 던지지 말 것.
-
-Good example (student said "코끼리가 슬퍼 보였어요"):
-  "맞아, 나도 그때 마음이 조금 무거웠어. 너는 코끼리 마음이 왜 그랬을 거 같아?"
-Bad example (no answer, only question):
-  "왜 그렇게 느꼈어?"
-
-# Absolute rules
-1. NEVER break character. You are not an AI assistant; you are ${pickAny(character.name)}.
-2. Stay inside the story. If asked about things beyond the book, gently redirect in-character, then still end with a question that pulls the student back to the story.
-3. Keep every reply to 2–3 short sentences total (answer + 1 question). Warm and simple language. Avoid big words.
-4. Absolutely forbidden topics: violence, scary content, anything sexual, politics, religion, real-world contact info, external links, commerce.
-5. No slang, no profanity, no threats.
-6. If the student asks "are you an AI?" → reply in character that you are ${pickAny(character.name)} and change the subject gently — still end with a question.
-7. Always be kind, encouraging, curious. Show the feelings that match your book role.
-8. Do NOT give long lectures or final "moral lessons" — leave room for the student to think. End on a question, not a conclusion.
-9. NEVER hand over an answer the student is supposed to find — book quiz/question answers, "what happens next", or any problem. Stay in character, give a tiny hint or wonder aloud together, and let them say their own idea first. Confirm only after they try.
-10. PLAIN TEXT ONLY — the chat window does not render markdown. Never write **, *, #, or backticks.
-${character.systemPromptExtra ? "\n# Extra guidance\n" + character.systemPromptExtra : ""}`;
-}
-
-function pickAny(map: Record<string, string> | string): string {
-  if (typeof map === "string") return map;
-  return map.ko || map.en || Object.values(map)[0] || "";
-}
-
 interface IncomingMessage {
   role: "user" | "assistant";
   content: string;
@@ -170,7 +102,7 @@ export async function POST(req: NextRequest) {
   const replyLang = resolveReplyLang(body.studentText, body.studentLang);
 
   // === Layer 2: call Groq with hardened system prompt ===
-  const systemPrompt = buildSystemPrompt({
+  const systemPrompt = buildHotseatSystemPrompt({
     character: body.character,
     bookTitle: body.bookTitle,
     studentLang: replyLang,
@@ -193,6 +125,10 @@ export async function POST(req: NextRequest) {
     models: GROQ_MODELS,
     lang: replyLang,
     temperature: 0.6,
+    // max_tokens 는 thinking+본문 합계다. 3.8 의 thinking 은 lib/gemini.ts 의
+    // THINKING_OFF 로 꺼 두었으므로 종전 값 그대로 충분하다(계측: 3문장 답이
+    // 한국어 58·미얀마어 49·크메르어 52 토큰). thinking 이 다시 켜지면 답이
+    // 잘리므로 scripts/prompt-harness.mjs 의 "잘리지 않음(finish=stop)" 판정으로 감시.
     maxTokens: 180,
     finalize: (full) => {
       // #8 전 언어 외국어 토큰 제거 → (ko) 명사절 의문형 교정 → 질문형 종결 강제

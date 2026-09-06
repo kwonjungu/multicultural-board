@@ -9,36 +9,58 @@ const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai
 const GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 // Text models — ordered by preference with fallback on rate-limit.
-// #7: gemini-2.0-flash 는 2026-06-01 종료되어 API 가 에러를 반환한다(사용 금지).
-// 2.5-flash 가 현행 stable. 느린 원인은 모델이 아니라 thinking(추론) 단계였으므로
-// generateJson 에서 reasoning_effort:"none" 으로 thinking 을 꺼 속도를 회복한다.
 //
-// 🔒 비용 하드캡 (사용자 지시 2026-07-13): 기본은 **2.5 flash 계열**, 필요시
-// 3.0 까지 허용. Pro 등 고가 모델 금지. 런타임에서 차단.
-// 2026-07-23 완화(사용자 승인): 3.1-flash-lite 는 2.5-flash 보다 저렴한
-// 경량 라인($0.25/$1.50 per 1M)이라 예외 허용 — 챗봇 폴백용.
-const ALLOWED_GEMINI_MODEL = /^gemini-(2\.5-flash(-lite|-image)?|3\.0-[a-z-]+|3\.1-flash-lite)(-preview.*)?$/;
+// 모델 세대 이력 (전부 지원 종료가 이유다)
+//   gemini-2.0-flash        2026-06-01 종료됨
+//   gemini-2.5-flash        2026-10-16 종료 예정  ← 2026-09-06 에 3.8-flash 로 교체
+//   llama-3.3-70b (Groq)    2026-08-16 종료됨
+// 느린 원인은 모델이 아니라 thinking(추론) 단계였으므로 thinking 을 꺼 속도를 회복한다.
+// 단, 3.8 에서는 스위치가 바뀌었다 — reasoning_effort:"none" 은 무시되고
+// THINKING_OFF(아래) 만 실제로 먹힌다. 자세한 계측 근거는 THINKING_OFF 주석 참조.
+//
+// 🔒 비용 하드캡 (사용자 지시 2026-07-13): Flash 계열만. Pro 등 고가 모델 금지.
+//   2026-07-23 완화: 3.1-flash-lite 예외 허용 ($0.25/$1.50 per 1M — 최저가).
+//   2026-09-06 갱신: 2.5-flash 종료로 3.8-flash 승격.
+//     3.8-flash 는 $0.75/$3.75 로 2.5-flash($0.30/$2.50)보다 비싸다.
+//     2027-01-01 부터 도입가가 끝나 $1.50/$7.50 로 오른다.
+//     그래도 Flash 계열이고 교실 규모 호출량에서는 월 몇 달러 차이다.
+//     비용이 문제가 되면 1순위를 gemini-3.1-flash-lite 로 내리면 된다 — 그쪽이
+//     오히려 종전 2.5-flash 보다 싸다.
+//
+// 허용 목록은 정규식 패턴이 아니라 명시 목록이다. 패턴은 의도치 않은 신형
+// 고가 모델까지 통과시킨다.
+const ALLOWED_GEMINI_MODELS = new Set([
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
+  "gemini-3.1-flash-image",
+  "gemini-3.1-flash-lite-image",
+]);
 export function assertAllowedGeminiModel(model: string): string {
-  if (!ALLOWED_GEMINI_MODEL.test(model)) {
-    throw new Error(`Gemini 모델 차단됨(비용 하드캡 — 2.5 flash 계열만 허용): ${model}`);
+  if (!ALLOWED_GEMINI_MODELS.has(model)) {
+    throw new Error(
+      `Gemini 모델 차단됨(비용 하드캡 — Flash 계열 허용 목록에 없음): ${model}`,
+    );
   }
   return model;
 }
 
 export const GEMINI_TEXT_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-].map(assertAllowedGeminiModel);
-
-// 튜터·핫시팅 챗봇 전용 체인 — 품질 검증된 2.5-flash 1순위, 신형 저비용
-// 3.1-flash-lite 폴백. (그림책 생성 generateJson/vision 은 GEMINI_TEXT_MODELS 유지)
-export const GEMINI_CHAT_MODELS = [
-  "gemini-2.5-flash",
+  "gemini-3.8-flash",
   "gemini-3.1-flash-lite",
 ].map(assertAllowedGeminiModel);
 
-// Image generation model (Gemini 2.5 Flash Image aka "Nano Banana")
-export const GEMINI_IMAGE_MODEL = assertAllowedGeminiModel("gemini-2.5-flash-image");
+// 튜터·핫시팅 챗봇 전용 체인. (그림책 생성 generateJson/vision 은 GEMINI_TEXT_MODELS)
+export const GEMINI_CHAT_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.1-flash-lite",
+].map(assertAllowedGeminiModel);
+
+// Image generation model (Gemini 3.1 Flash Image aka "Nano Banana 2").
+// 종전 gemini-2.5-flash-image 는 2.5 세대라 함께 올린다.
+export const GEMINI_IMAGE_MODEL = assertAllowedGeminiModel("gemini-3.1-flash-image");
 
 // Gemini 다중 API 키 폴백 — lib/groq-client.ts 의 getGroqApiKeys 와 동일 패턴.
 // 환경변수 (우선순위 순): GEMINI_API_KEY → GEMINI_API_KEY_BACKUP → GEMINI_API_KEY_BACKUP2
@@ -72,6 +94,19 @@ export function geminiTextClient(): OpenAI {
   return geminiClientForKey(requireKey());
 }
 
+/**
+ * Gemini 3.x 에서 thinking 을 끄는 유일하게 유효한 파라미터.
+ *
+ * 2026-09-06 계측: `reasoning_effort:"none"` 은 3.8-flash 에서 무시된다. thinking
+ * 토큰이 max_tokens 를 통째로 잠식해(관측 0~669 토큰, 미얀마어·크메르어는 거의 항상
+ * 발생) 답이 문장 중간에서 잘렸다. 아래 파라미터를 보내면 thinking=0 이 되고 답이
+ * 온전해진다. **두 파라미터를 함께 보내면 400** 이므로 reasoning_effort 는 쓰지 않는다.
+ * (검증: `npm run harness:prompt` 의 "잘리지 않음(finish=stop)" 판정)
+ */
+export const THINKING_OFF = {
+  extra_body: { google: { thinking_config: { thinking_budget: 0 } } },
+} as const;
+
 // === Text: generate JSON with fallback + simple self-critique loop ===
 
 export interface GenerateJsonOptions {
@@ -101,12 +136,16 @@ async function createJsonCompletion(
     max_tokens: opts.maxTokens ?? 8192,
     response_format: { type: "json_object" as const },
   };
-  // #7: 2.5 계열의 thinking 을 꺼 생성 지연(20~40s)을 제거. Gemini OpenAI 호환
-  // 엔드포인트는 reasoning_effort:"none" 으로 thinking 을 끈다(OpenAI SDK 타입엔
-  // 없어 추가 필드로 주입). 엔드포인트가 이 값을 거부하면 호출자가 thinkingOff=false
-  // 로 폴백한다 — 파라미터 호환성 변화에도 그림책 생성이 깨지지 않도록.
+  // #7: thinking 을 꺼 생성 지연(20~40s)을 제거. (OpenAI SDK 타입엔 없어 추가 필드로 주입)
+  //
+  // 2026-09-06 계측(scripts/prompt-harness.mjs): 3.8 은 reasoning_effort:"none" 을
+  // **무시한다**. thinking 토큰이 max_tokens 를 잠식해 응답이 문장 중간에서 잘렸다
+  // (finish_reason=length). 실제로 먹히는 스위치는
+  //   extra_body.google.thinking_config.thinking_budget = 0
+  // 이며, 이 둘을 함께 보내면 400 이다 — 그래서 reasoning_effort 는 보내지 않는다.
+  // 엔드포인트가 이 값을 거부하면 호출자가 thinkingOff=false 로 폴백한다.
   const params = thinkingOff
-    ? { ...base, ...({ reasoning_effort: "none" } as Record<string, unknown>) }
+    ? { ...base, ...(THINKING_OFF as Record<string, unknown>) }
     : base;
   return client.chat.completions.create(params);
 }
@@ -122,7 +161,7 @@ export async function generateJson<T = unknown>(
       try {
         completion = await createJsonCompletion(client, model, opts, true);
       } catch (err) {
-        // reasoning_effort:"none" 이 거부되면(400) thinking 파라미터 없이 1회 재시도.
+        // thinking 끄기 파라미터가 거부되면(400) 그것 없이 1회 재시도.
         if ((err as { status?: number })?.status === 400) {
           completion = await createJsonCompletion(client, model, opts, false);
         } else {

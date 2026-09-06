@@ -89,15 +89,49 @@
 
 ## 🛡 가드레일 (반복하지 말아야 할 함정)
 
-- **🔒 Gemini 비용 하드캡 (사용자 지시, 절대 규칙).** 기본은 **2.5 flash 계열**
-  (`gemini-2.5-flash`, `-flash-lite`, `-flash-image`=나노바나나 1). 필요할 때만
-  3.0 허용. **Pro 등 고가 모델 금지.** 예외(사용자 승인 2026-07-23):
-  `gemini-3.1-flash-lite` 는 2.5-flash 보다 저렴한 경량 라인($0.25/$1.50 per 1M)
-  이라 허용 — 챗봇(GEMINI_CHAT_MODELS) 폴백으로 사용. 이미지 대량 생성은 반드시
-  `batchGenerateContent`(배치 API, 50% 할인)로. lib/gemini.ts 의
-  `assertAllowedGeminiModel` 이 런타임에서 차단 — 새 모델 상수는 반드시 이 함수를 거칠 것.
-  스크립트(scripts/gen-*.mjs)에 모델을 하드코딩할 때도 이 규칙 적용.
+- **🔒 Gemini 비용 하드캡 (사용자 지시, 절대 규칙).** **Flash 계열만. Pro 등 고가 모델 금지.**
+  허용 목록은 `lib/gemini.ts` 의 `ALLOWED_GEMINI_MODELS`(정규식이 아니라 **명시 집합** —
+  패턴은 의도치 않은 신형 고가 모델까지 통과시킨다). 새 모델 상수는 반드시
+  `assertAllowedGeminiModel` 을 거칠 것. 스크립트(scripts/gen-*.mjs)도 같은 규칙.
+  이미지 대량 생성은 반드시 `batchGenerateContent`(배치 API, 50% 할인)로.
   **생성 스크립트 실행(=과금)은 사용자가 명시적으로 요청/승인한 웨이브만.**
+
+- **모델 세대 교체 이력 — 전부 지원 종료가 이유다.** 이 프로젝트는 이미 세 번 겪었다.
+  | 모델 | 사유 |
+  |---|---|
+  | `gemini-2.0-flash` | 2026-06-01 종료됨 |
+  | `llama-3.3-70b` (Groq) | 2026-08-16 종료됨 |
+  | `gemini-2.5-flash` | **2026-10-16 종료 예정** → 2026-09-06 에 `gemini-3.8-flash` 로 교체 |
+
+  **현행(2026-09-06):** 텍스트·챗봇 `gemini-3.8-flash` → `gemini-3.1-flash-lite` 폴백,
+  이미지 `gemini-3.1-flash-image`(나노바나나 2).
+
+  **요금이 올랐다.** 3.8-flash 는 $0.75/$3.75 로 종전 2.5-flash($0.30/$2.50)보다 비싸고,
+  **2027-01-01 부터 도입가가 끝나 $1.50/$7.50** 이 된다. 교실 규모 호출량에서는 월 몇 달러
+  차이라 그대로 두었으나, 비용이 문제가 되면 **1순위를 `gemini-3.1-flash-lite` 로 내리면
+  된다** — 그쪽($0.25/$1.50)이 오히려 종전 2.5-flash 보다 싸다.
+
+- **🧠 3.8 의 thinking 은 `reasoning_effort:"none"` 으로 안 꺼진다 — `THINKING_OFF` 를 쓸 것.**
+  2026-09-06 계측(`npm run harness:prompt`): 3.8-flash 는 `reasoning_effort:"none"` 을
+  **조용히 무시**하고 thinking 토큰을 쓴다(한 턴 0~669 토큰). `max_tokens` 는
+  thinking+본문 합계라 thinking 이 상한을 통째로 먹고 답이 **문장 중간에서 잘린다**
+  (`finish_reason=length`). 게다가 thinking 은 주어진 상한만큼 부풀어서 **상한을 올려도
+  해결되지 않는다**(cap 700 → thinking 669). 특히 **미얀마어·크메르어 답변은 거의 매번**
+  잘렸다 — 다국어 교실에서 치명적. 실제로 먹히는 스위치는 `lib/gemini.ts` 의
+  `THINKING_OFF`(`extra_body.google.thinking_config.thinking_budget = 0`) 하나뿐이고,
+  **`reasoning_effort` 와 함께 보내면 400** 이다. 새 Gemini 호출부는 반드시 `THINKING_OFF`
+  를 쓰고, 세대를 또 올릴 땐 하네스의 "잘리지 않음(finish=stop)" 판정으로 먼저 확인할 것.
+
+- **모델 세대를 올리면 `npm run harness:prompt` 를 먼저 돌린다.** 챗봇·그림책 프롬프트가
+  새 모델에서도 약속한 모양을 내는지 실제 호출로 검사한다(19콜, 예산 30콜). 프롬프트는
+  `lib/prompts/*.ts` 한 곳에만 두고 라우트와 하네스가 **같은 문자열**을 import 한다 —
+  하네스에 복사본을 두면 드리프트로 회귀를 놓친다. 자동 판정은 기계로 확실한 것만
+  (문장 수·마크다운·존댓말·인물 이탈·정답 누설·언어 오염·JSON 스키마·잘림), 재미와
+  인물다움은 `out/prompt-harness-*/human-review.md` 통독본으로 사람이 본다.
+
+  **모델명을 비교에 하드코딩하지 말 것.** `worksheet-analyze` 가 `model !== "gemini-2.5-flash"`
+  로 폴백 여부를 판정하고 있어서, 세대가 바뀌면 **모든 호출이 폴백으로 잘못 표시**될
+  뻔했다. 지금은 `GEMINI_TEXT_MODELS[0]` 을 참조한다.
   배치 폴링 간격은 20s 가 아니라 60s+ (요청 수 부풀림 방지). 단건 테스트
   생성(비배치) 금지 — 검증은 로컬 sharp 합성으로.
 

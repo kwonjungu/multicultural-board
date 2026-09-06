@@ -5,11 +5,11 @@
 //
 // 폴백 사다리 (2026-07-23 최신화):
 //   1) LibreTranslate            — 무제한(셀프호스팅). 지원 언어쌍일 때만.
-//   2) Groq 배치 번역             — gpt-oss-120b → gpt-oss-20b → llama-3.1-8b-instant.
+//   2) Groq 배치 번역             — gpt-oss-120b → gpt-oss-20b.
 //                                   활동지 한 장이 세그먼트 수십 개라 TPM 8K 가 금방 차
 //                                   429 가 잦다 → 다음 단계로.
 //   3) Gemini 2.5 flash-lite      — Groq 이 통째로 소진됐을 때의 최후 폴백.
-//                                   generateJson(reasoning_effort:"none" + 400 재시도)
+//                                   generateJson(THINKING_OFF + 400 재시도)
 //                                   재사용. 결과는 Groq 과 동일한 검증 게이트
 //                                   (cleanTranslation → batchValidity) 를 통과시킨다.
 
@@ -70,7 +70,7 @@ function isUntranslatable(text: string): boolean {
 
 /**
  * Gemini 최후 폴백 배치 번역.
- * generateJson(2.5-flash → 2.5-flash-lite, reasoning_effort:"none" + 400 재시도)로
+ * generateJson(2.5-flash → 2.5-flash-lite, THINKING_OFF + 400 재시도)로
  * {"out":[...]} 를 받아 개수 검증 → cleanTranslation → validateTranslation 게이트를
  * Groq 경로와 동일하게 통과시킨다. 개수 불일치 청크는 원문 유지(억지 정렬 금지).
  */

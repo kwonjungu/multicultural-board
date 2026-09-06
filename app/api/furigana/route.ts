@@ -5,8 +5,9 @@ import { validateRuby, type RubySeg } from "@/lib/furiganaCore";
 export const maxDuration = 30;
 
 // groq-translate.ts 와 동일 모델 우선순위. llama-3.3-70b 는 2026-08-16 decommission
-// 예정이라 제외, qwen3.6-27b 는 <think> 추론 유출로 제외.
-const MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+// 종료됨. qwen3.6-27b 는 JSON 검증 실패로 제외하되, qwen3.8-27b 는 2026-09-06
+// 실측에서 후리가나 출력이 gpt-oss-120b 와 동일해 폴백으로 추가.
+const MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"];
 
 const SYSTEM = `You add furigana to Japanese text for elementary school children.
 Input: a JSON array of Japanese strings.

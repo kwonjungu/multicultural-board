@@ -15,7 +15,7 @@
 import type OpenAI from "openai";
 import { checkSafety, replyForSafety } from "./chatSafety";
 import { withGroqKeyFallback } from "./groq-client";
-import { geminiClientForKey, getGeminiApiKeys, GEMINI_CHAT_MODELS } from "./gemini";
+import { geminiClientForKey, getGeminiApiKeys, GEMINI_CHAT_MODELS, THINKING_OFF } from "./gemini";
 import { scrubDelta, sanitizeReply, targetScriptRatio } from "./langGuard";
 import { LANGUAGES } from "./constants";
 
@@ -137,13 +137,15 @@ async function acquireGeminiStream(
 ): Promise<AcquiredStream> {
   const keys = getGeminiApiKeys();
   if (!keys.length) throw new Error("gemini-stream: GEMINI_API_KEY not set");
-  // #7과 동일: 2.5 계열 thinking 이 max_tokens 를 잠식하면 보이는 답이 빈/잘린
-  // 상태로 끝나(finish_reason:length) BLOCK_REPLY 로 오인 대체된다 → thinking OFF.
+  // #7과 동일: thinking 이 max_tokens 를 잠식하면 보이는 답이 빈/잘린 상태로 끝나
+  // (finish_reason:length) BLOCK_REPLY 로 오인 대체된다 → thinking OFF.
+  // 2026-09-06: 3.8 은 reasoning_effort:"none" 을 무시한다(미얀마어·크메르어 답변이
+  // 매번 잘렸다). 실제로 먹히는 스위치는 lib/gemini.ts 의 THINKING_OFF 뿐이다.
   // 파라미터가 거부(400)되면 없이 1회 재시도 (generateJson 의 폴백과 동일 정책).
   const paramsFor = (model: string, thinkingOff: boolean) => {
     const base = { model, messages, temperature, max_tokens: maxTokens, stream: true as const };
     return thinkingOff
-      ? { ...base, ...({ reasoning_effort: "none" } as Record<string, unknown>) }
+      ? { ...base, ...(THINKING_OFF as Record<string, unknown>) }
       : base;
   };
   let lastErr: unknown = null;

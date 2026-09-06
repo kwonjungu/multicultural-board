@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withGroqKeyFallback } from "@/lib/groq-client";
-import { visionCompletion } from "@/lib/gemini";
+import { visionCompletion, GEMINI_TEXT_MODELS } from "@/lib/gemini";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -24,12 +24,14 @@ export const maxDuration = 120;
 // Groq 의 llama-4-scout 비전 모델은 2026-07 목록에서 사라져 폴백 대상이 없다.
 
 // 텍스트 정리(mode="text") 용 Groq 체인.
-// llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
+// llama-3.3-70b 는 2026-08-16 종료됨.
+// llama-3.1-8b-instant 는 2026-08-16 free/developer 티어 종료됨.
+// 대체로 qwen3.8-27b 투입(2026-09-06 실측: JSON 정상·<think> 유출 없음·더 빠름).
 // qwen3.6-27b 는 <think> 추론 유출로 제외.
 const TEXT_MODELS = [
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
-  "llama-3.1-8b-instant",
+  "qwen/qwen3.8-27b",                 // fallback 3 — 다른 계열·별도 버킷
 ];
 
 const OCR_SYSTEM = `너는 초등학교 교실용 활동지 OCR 어시스턴트다.
@@ -94,7 +96,8 @@ async function runVision(imageUrl: string, userPrompt: string) {
   // 활동지 OCR 은 Gemini 2.5 flash 계열 전용. visionCompletion 이 내부적으로
   // 모델 폴백(2.5-flash → 2.5-flash-lite) + 키 로테이션(BACKUP*)까지 처리한다.
   // Groq 비전 모델(scout)은 2026-07 목록에서 제거돼 폴백 대상이 없다.
-  // 사용한 모델이 1순위(gemini-2.5-flash)가 아니면 fallback=true 로 표시.
+  // 사용한 모델이 1순위가 아니면 fallback=true 로 표시.
+  // 모델명을 하드코딩하지 않는다 — 세대가 바뀌면 판정이 조용히 틀어진다.
   const { content, model } = await visionCompletion({
     system: OCR_SYSTEM,
     prompt: userPrompt,
@@ -102,7 +105,7 @@ async function runVision(imageUrl: string, userPrompt: string) {
     maxTokens: 8192,
     temperature: 0.15,
   });
-  return { content, model, fallback: model !== "gemini-2.5-flash" };
+  return { content, model, fallback: model !== GEMINI_TEXT_MODELS[0] };
 }
 
 async function runText(fullPrompt: string) {
