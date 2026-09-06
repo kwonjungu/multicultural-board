@@ -58,6 +58,33 @@ export const GEMINI_CHAT_MODELS = [
   "gemini-3.1-flash-lite",
 ].map(assertAllowedGeminiModel);
 
+// 저자원 언어에서 3.8 이 답을 잘라먹는다 — 언어별로 1순위를 바꾼다.
+//
+// 2026-09-06 실측 (핫시팅 프롬프트, max_tokens 180, THINKING_OFF 적용, 언어당 8회).
+// 숫자는 finish_reason==="length" 로 잘린 횟수.
+//
+//   우즈베크 5/8   힌디 4/8   크메르 1/8   아랍 1/8      ← 3.8 위험
+//   미얀마 0/8  태국 0/8  몽골 0/8  중국 0/8  일본 0/8  러시아 0/8  한국 0/8  베트남 0/8
+//   3.1-flash-lite 는 위 11개 언어 전부 0/8.
+//
+// 처음에는 "동남아 문자"나 "비라틴 문자"가 원인이라고 보았으나 둘 다 틀렸다.
+// 우즈베크어는 라틴 문자인데 가장 심했고, 미얀마어·태국어는 멀쩡했다.
+// 실제 요인은 문자 종류가 아니라 **학습 데이터가 적은 언어일수록 모델이 더 오래
+// 생각하는 것**으로 보인다. THINKING_OFF 로도 완전히 눌리지 않는다.
+//
+// 그래서 규칙을 "위험한 언어 목록"이 아니라 **안전이 확인된 언어 목록**으로 둔다.
+// 새 언어가 추가되면 자동으로 안전한 lite 로 가고, 실측 후에 승격한다.
+// 반대로 두면 새 언어가 조용히 잘린 답을 내보낸다.
+const GEMINI_CHAT_38_VERIFIED_LANGS = new Set([
+  "ko", "vi", "zh", "ja", "ru", "mn", "th", "my",
+]);
+
+/** 학생 언어에 맞는 챗봇 모델 체인. 미검증 언어는 3.1-flash-lite 를 1순위로. */
+export function chatModelsForLang(lang: string): string[] {
+  if (GEMINI_CHAT_38_VERIFIED_LANGS.has(lang)) return GEMINI_CHAT_MODELS;
+  return ["gemini-3.1-flash-lite", "gemini-3.8-flash"].map(assertAllowedGeminiModel);
+}
+
 // Image generation model (Gemini 3.1 Flash Image aka "Nano Banana 2").
 // 종전 gemini-2.5-flash-image 는 2.5 세대라 함께 올린다.
 export const GEMINI_IMAGE_MODEL = assertAllowedGeminiModel("gemini-3.1-flash-image");

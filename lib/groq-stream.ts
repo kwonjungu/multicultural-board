@@ -15,7 +15,7 @@
 import type OpenAI from "openai";
 import { checkSafety, replyForSafety } from "./chatSafety";
 import { withGroqKeyFallback } from "./groq-client";
-import { geminiClientForKey, getGeminiApiKeys, GEMINI_CHAT_MODELS, THINKING_OFF } from "./gemini";
+import { geminiClientForKey, getGeminiApiKeys, chatModelsForLang, THINKING_OFF } from "./gemini";
 import { scrubDelta, sanitizeReply, targetScriptRatio } from "./langGuard";
 import { LANGUAGES } from "./constants";
 
@@ -133,7 +133,7 @@ async function acquireGroqStream(
  * 청크 형식이 Groq 와 동일해 이후 파이프라인을 그대로 태운다.
  */
 async function acquireGeminiStream(
-  messages: ChatMessage[], temperature: number, maxTokens: number,
+  messages: ChatMessage[], temperature: number, maxTokens: number, lang: string,
 ): Promise<AcquiredStream> {
   const keys = getGeminiApiKeys();
   if (!keys.length) throw new Error("gemini-stream: GEMINI_API_KEY not set");
@@ -151,7 +151,7 @@ async function acquireGeminiStream(
   let lastErr: unknown = null;
   for (const key of keys) {
     const client = geminiClientForKey(key);
-    for (const model of GEMINI_CHAT_MODELS) {
+    for (const model of chatModelsForLang(lang)) {
       try {
         const stream = await client.chat.completions.create(paramsFor(model, true));
         return { stream, model };
@@ -216,7 +216,7 @@ export async function streamChatResponse(params: StreamChatParams): Promise<Resp
   try {
     if (params.provider === "gemini") {
       try {
-        acquired = await acquireGeminiStream(messages, temperature, maxTokens);
+        acquired = await acquireGeminiStream(messages, temperature, maxTokens, lang);
       } catch (err) {
         console.warn("gemini-stream: Groq 로 폴백", err);
         acquired = await acquireGroqStream(messages, models, temperature, maxTokens);
