@@ -84,6 +84,23 @@ export function childUxCss(): string {
 :root[data-ux-text="large"] [data-ux-root]:not([data-ux-root] *){ zoom: calc(1 / var(--ux-legacy-zoom)); }
 [data-ux-legacy]{ zoom: var(--ux-legacy-zoom, 1); }
 
+/* ── 넓은 화면 밀도 ───────────────────────────────────────────────────
+   20~24px 본문과 56px 조작 영역은 손가락으로 휴대폰을 쓰는 아이 기준이다.
+   마우스를 쓰는 데스크톱에서 그대로 두면 화면이 '세로로 늘린 휴대폰' 이
+   되어 한 번에 보이는 내용이 너무 적다. 1024px 이상에서는 한 단계 줄인다.
+   '큰 글씨' 를 고른 사용자에게는 적용하지 않는다 — 크게 보려고 고른 설정을
+   화면 폭이 되돌리면 안 된다. */
+@media (min-width: 1024px){
+  :root:not([data-ux-text="large"]){
+    --ux-font-body: 1.0625rem;
+    --ux-font-body-emphasis: 1.25rem;
+    --ux-font-label: 1rem;
+    --ux-font-secondary: .9375rem;
+    --ux-control-min: 44px;
+    --ux-action-min: 52px;
+  }
+}
+
 /* 아이 조작 영역: 글이 길면 가로가 아니라 세로로 늘어난다. */
 [data-ux-role="control"]{
   min-height: var(--ux-control-min);

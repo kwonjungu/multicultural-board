@@ -52,9 +52,15 @@ check('화면을 100vh + overflow:hidden 으로 잠그지 않는다', () => {
   assert.ok(!/overflow:\s*hidden/.test(rootBlock), '루트에서 overflow:hidden 금지');
 });
 
-check('아이 기본 화면은 주제 하나, 전체 컬럼 보기는 데스크톱 교사 옵션', () => {
-  assert.match(bc, /const view: "topic" \| "all" = isTeacher && wide \? teacherView : "topic";/,
-    '학생/태블릿은 언제나 주제 중심 보기여야 한다');
+check('좁은 화면은 주제 하나, 넓은 화면 기본은 전체 한눈에 보기', () => {
+  // 계약 변경(2026-09-12): 전체 보기를 데스크톱 교사 전용에서 '넓은 화면의 기본'으로
+  // 옮겼다. 패들렛을 쓰는 사람은 전체가 한눈에 보이길 기대하고 데스크톱에는 공간이
+  // 있다. 좁은 화면에서 옆으로 미는 보드를 주는 것은 여전히 금지다.
+  assert.match(bc, /const view: "topic" \| "all" = wide \? wideView : "topic";/,
+    '좁은 화면은 언제나 주제 중심, 넓은 화면만 선택 가능해야 한다');
+  assert.match(bc, /useState<"topic" \| "all">\("all"\)/, '넓은 화면 기본값이 전체 보기가 아니다');
+  assert.match(bc, /bd-viewswitch/, '보기 전환이 교사 전용에 갇혀 있거나 사라졌다');
+  assert.ok(!/isTeacher && wide/.test(bc), '보기 선택을 교사에게만 주지 않는다');
   assert.match(bc, /matchMedia\("\(min-width: 1024px\)"\)/, '데스크톱 판정이 없다');
   assert.match(bc, /view === "all"/, '전체 컬럼 보기 분기가 사라졌다');
   assert.match(bc, /bd-columns/, '전체 컬럼 보기 레이아웃이 사라졌다');

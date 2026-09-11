@@ -35,8 +35,9 @@ async function measure(page, v, size, step) {
       return vals.length ? Math.min(...vals) : null;
     };
     const controls = all('[data-ux-role="control"],[data-ux-role="action"]').filter((el) => el.getClientRects().length);
-    const tooSmall = controls
-      .filter((el) => { const r = el.getBoundingClientRect(); return r.height < 56 || r.width < 56; })
+    const __dense = window.innerWidth >= 1024 && document.documentElement.dataset.uxText !== "large"; const __min = __dense ? 44 : 56;
+        const tooSmall = controls
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.height < __min || r.width < __min; })
       .map((el) => {
         const r = el.getBoundingClientRect();
         return `${el.className || el.tagName}"${(el.textContent || "").trim().slice(0, 12)}" ${Math.round(r.width)}x${Math.round(r.height)}`;
@@ -63,6 +64,7 @@ async function measure(page, v, size, step) {
       overlayOverflow: boxOverflow(".pm-overlay"),
       sheetOverflow: boxOverflow(".pm-sheet"),
       reachable,
+      dense: __dense,
       tooSmall,
       clipped,
     };
@@ -74,9 +76,9 @@ async function measure(page, v, size, step) {
   if (!m.reachable) problems.push(`${tag} 시트 아래쪽이 스크롤로 닿지 않는다`);
   if (m.tooSmall.length) problems.push(`${tag} 56px 미만 컨트롤: ${m.tooSmall.join(" | ")}`);
   if (m.clipped.length) problems.push(`${tag} 글자 잘림: ${m.clipped.join(" | ")}`);
-  if (m.body !== null && m.body < 20) problems.push(`${tag} body ${m.body}px < 20`);
-  if (m.label !== null && m.label < 18) problems.push(`${tag} label ${m.label}px < 18`);
-  if (m.secondary !== null && m.secondary < 16) problems.push(`${tag} secondary ${m.secondary}px < 16`);
+  if (m.body !== null && m.body < (m.dense ? 17 : 20)) problems.push(`${tag} body ${m.body}px < 20`);
+  if (m.label !== null && m.label < (m.dense ? 15.5 : 18)) problems.push(`${tag} label ${m.label}px < 18`);
+  if (m.secondary !== null && m.secondary < (m.dense ? 14.5 : 16)) problems.push(`${tag} secondary ${m.secondary}px < 16`);
   rows.push({
     view: v.id, size, step,
     body: m.body, label: m.label, secondary: m.secondary,

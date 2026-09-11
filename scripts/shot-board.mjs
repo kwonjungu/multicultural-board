@@ -55,8 +55,9 @@ async function measure(page, view, size, step) {
   const m = await page.evaluate(() => {
     const px = (el) => (el ? parseFloat(getComputedStyle(el).fontSize) : null);
     const controls = Array.from(document.querySelectorAll('[data-ux-role="control"],[data-ux-role="action"]'));
-    const tooSmall = controls
-      .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && (r.height < 56 || r.width < 56); })
+    const __dense = window.innerWidth >= 1024 && document.documentElement.dataset.uxText !== "large"; const __min = __dense ? 44 : 56;
+        const tooSmall = controls
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && (r.height < __min || r.width < __min); })
       .map((el) => `${el.className || el.tagName} ${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`);
     // 가로로 잘린 글자만 잡는다. 세로 접기('더 읽기')는 의도된 상태다.
     const clipped = Array.from(document.querySelectorAll("[data-ux-role]"))
@@ -71,6 +72,8 @@ async function measure(page, view, size, step) {
       cards: document.querySelectorAll(".pc-card").length,
       roots,
       docOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      dense: __dense,
+      dense: __dense,
       tooSmall, clipped,
     };
   });
@@ -80,9 +83,9 @@ async function measure(page, view, size, step) {
   if (m.roots !== 1) problems.push(`${tag} data-ux-root ${m.roots}개 (1개여야 함)`);
   if (m.tooSmall.length) problems.push(`${tag} 56px 미만 컨트롤: ${m.tooSmall.slice(0, 6).join(" | ")}`);
   if (m.clipped.length) problems.push(`${tag} 글자 잘림: ${m.clipped.slice(0, 6).join(" | ")}`);
-  if (m.body !== null && m.body < 20) problems.push(`${tag} body ${m.body}px < 20`);
-  if (m.label !== null && m.label < 18) problems.push(`${tag} label ${m.label}px < 18`);
-  if (m.secondary !== null && m.secondary < 16) problems.push(`${tag} secondary ${m.secondary}px < 16`);
+  if (m.body !== null && m.body < (m.dense ? 17 : 20)) problems.push(`${tag} body ${m.body}px < 20`);
+  if (m.label !== null && m.label < (m.dense ? 15.5 : 18)) problems.push(`${tag} label ${m.label}px < 18`);
+  if (m.secondary !== null && m.secondary < (m.dense ? 14.5 : 16)) problems.push(`${tag} secondary ${m.secondary}px < 16`);
   await page.screenshot({ path: `reports/C/board-${step}-${view.id}-${size}.png` });
 }
 
@@ -90,6 +93,16 @@ for (const v of VIEWS) {
   for (const size of TEXT) {
     // ── 학생 기본 화면 ──
     const { ctx, page } = await openPage(v, size, "");
+
+    // 넓은 화면의 기본은 '전체 한눈에 보기' 다. 그 상태를 먼저 재고,
+    // 그다음 '한 주제' 로 바꿔 기존 단계들을 이어서 잰다.
+    const viewSwitch = page.locator(".bd-viewswitch button");
+    if (await viewSwitch.count()) {
+      await measure(page, v, size, "allcolumns");
+      await viewSwitch.nth(1).click();
+      await page.waitForTimeout(200);
+    }
+
     const topics = page.locator(".bd-topic");
     await topics.nth(0).click();
     await page.waitForTimeout(150);

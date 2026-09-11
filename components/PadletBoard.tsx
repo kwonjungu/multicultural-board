@@ -108,11 +108,15 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const [sessionMinimized, setSessionMinimized] = useState(false);
   const [editModal, setEditModal] = useState<{ card: CardData; colTitle: string; colColor: string } | null>(null);
 
-  // ── 아이의 기본 화면은 '지금 주제' 하나다 (README §6.1) ───────────────
-  // 옆으로 미는 전체 컬럼 보기는 데스크톱 교사에게만 선택지로 남긴다.
+  // ── 화면 폭이 기준이다 ────────────────────────────────────────────────
+  // 좁은 화면(휴대폰·태블릿 세로)은 '지금 주제' 하나만 본다 — 옆으로 미는 보드는
+  // 아이가 자기 주제를 못 찾는다(README §6.1).
+  // 넓은 화면은 반대다. 패들렛을 쓰는 사람은 전체를 한눈에 보는 걸 기대하고,
+  // 데스크톱에는 그럴 공간이 있다. 그래서 넓은 화면의 기본은 '전체 보기'이고
+  // 교사뿐 아니라 학생도 두 보기를 직접 고를 수 있다.
   const [wide, setWide] = useState(false);
-  const [teacherView, setTeacherView] = useState<"topic" | "all">("all");
-  const view: "topic" | "all" = isTeacher && wide ? teacherView : "topic";
+  const [wideView, setWideView] = useState<"topic" | "all">("all");
+  const view: "topic" | "all" = wide ? wideView : "topic";
   const [activeColId, setActiveColId] = useState<string | null>(fixture?.columns?.[0]?.id ?? null);
   /** 교사 전용 주제 관리 패널. 학생 화면에는 렌더되지 않는다. */
   const [colManageOpen, setColManageOpen] = useState<string | null>(null);
@@ -658,30 +662,31 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         <TextSizeMenu />
       </header>
 
-      <main className="bd-main">
+      <main className={view === "all" ? "bd-main bd-main-full" : "bd-main"}>
+        {/* 보기 전환 — 넓은 화면에서만. 좁은 화면에는 선택지 자체를 두지 않는다. */}
+        {wide && (
+          <div className="bd-viewswitch" role="group" aria-label={t("boardViewSwitch", lang)}>
+            <button
+              type="button"
+              data-ux-role="control"
+              className="bd-btn"
+              aria-pressed={wideView === "all"}
+              onClick={() => setWideView("all")}
+            >{t("boardAllTopics", lang)}{wideView === "all" ? " ✓" : ""}</button>
+            <button
+              type="button"
+              data-ux-role="control"
+              className="bd-btn"
+              aria-pressed={wideView === "topic"}
+              onClick={() => setWideView("topic")}
+            >{t("boardOneTopic", lang)}{wideView === "topic" ? " ✓" : ""}</button>
+          </div>
+        )}
         {/* ── 선생님 도구 — 아이의 일상 행동과 시각적으로 분리한다 (README §3.7) ── */}
         {isTeacher && (
           <section className="bd-teacher" aria-label="선생님 도구">
             <h2 data-ux-role="label" className="bd-teacher-title">선생님 도구</h2>
             <div className="bd-teacher-row">
-              {wide && (
-                <>
-                  <button
-                    type="button"
-                    data-ux-role="control"
-                    className="bd-btn"
-                    aria-pressed={teacherView === "topic"}
-                    onClick={() => setTeacherView("topic")}
-                  >{t("boardOneTopic", lang)}{teacherView === "topic" ? " ✓" : ""}</button>
-                  <button
-                    type="button"
-                    data-ux-role="control"
-                    className="bd-btn"
-                    aria-pressed={teacherView === "all"}
-                    onClick={() => setTeacherView("all")}
-                  >{t("boardAllTopics", lang)}{teacherView === "all" ? " ✓" : ""}</button>
-                </>
-              )}
               <button
                 type="button"
                 data-ux-role="control"
@@ -1254,6 +1259,8 @@ const BOARD_CSS = `
 }
 .bd-id-name{ font-weight: 900; color: var(--ux-ink); word-break: keep-all; }
 .bd-id-sub{ overflow-wrap: anywhere; }
+/* 전체 주제 보기는 화면 폭을 다 쓴다 — 읽기 열 제한은 카드 안(42ch)에서 건다. */
+.bd-main-full{ max-width: none !important; }
 .bd-main{
   flex: 1; width: 100%; max-width: 760px; margin: 0 auto; box-sizing: border-box;
   padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-8);
@@ -1346,22 +1353,26 @@ const BOARD_CSS = `
 
 /* 전체 주제 보기 — 데스크톱 교사 전용. 가로 스크롤은 이 상자 안에서만 일어난다. */
 .bd-columns{
-  display: flex; gap: var(--ux-space-4); align-items: flex-start;
+  display: flex; gap: var(--ux-space-3); align-items: flex-start;
   overflow-x: auto; padding-bottom: var(--ux-space-3);
 }
+/* 전체 보기에서는 제목을 크게 반복하지 않는다 — 바로 위 전환 버튼이 이미 말한다. */
+.bd-main-full .bd-ask{ font-size: var(--ux-font-label); color: var(--ux-ink-soft); }
 .bd-col{
-  width: clamp(300px, 26vw, 360px); flex-shrink: 0;
+  /* 패들렛처럼 여러 주제가 한눈에 들어와야 한다. 1280px 에서 4개, 1920px 에서 6개. */
+  width: clamp(240px, 19vw, 290px); flex-shrink: 0;
   display: flex; flex-direction: column; gap: var(--ux-space-2);
   border: 2px solid var(--ux-primary-border); padding: var(--ux-space-2);
   background: var(--ux-surface); box-sizing: border-box;
 }
 .bd-col-head{
-  display: flex; align-items: center; gap: var(--ux-space-2);
+  /* 좁아진 컬럼에서 주제 이름이 잘리면 안 된다 — 두 줄로 내려온다. */
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--ux-space-2);
   border-radius: var(--ux-radius-surface); padding: var(--ux-space-2) var(--ux-space-3);
 }
 .bd-col-art{ width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; background: var(--ux-surface); border-radius: var(--ux-radius-surface); }
-.bd-col-title{ flex: 1; min-width: 0; font-weight: 900; color: var(--ux-ink); word-break: keep-all; overflow-wrap: anywhere; }
-.bd-col-count{ flex-shrink: 0; color: var(--ux-ink); }
+.bd-col-title{ flex: 1 1 100%; min-width: 0; font-weight: 900; color: var(--ux-ink); white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+.bd-col-count{ flex-shrink: 0; color: var(--ux-ink); margin-left: auto; }
 .bd-col-tools{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
 .bd-col-body{ display: grid; gap: var(--ux-space-3); max-height: clamp(320px, 62svh, 900px); overflow-y: auto; }
 .bd-col-empty{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }

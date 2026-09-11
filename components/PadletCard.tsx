@@ -5,7 +5,7 @@ import { ref, onValue, off, push, set, remove } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { CardData, CommentData, TranscriptData } from "@/lib/types";
 import { LANGUAGES } from "@/lib/constants";
-import { t, tFmt } from "@/lib/i18n";
+import { t, tFmt, tPlain } from "@/lib/i18n";
 import { speak, cancelSpeak } from "@/lib/ttsMulti";
 import ImageLightbox from "./ImageLightbox";
 
@@ -414,7 +414,7 @@ export default function PadletCard({
         className="pc-btn"
         aria-pressed={on}
         onClick={() => toggleSpeak(id, text, lang)}
-      >{(on ? t("cardStop", viewerLang) : t("cardListen", viewerLang)) + suffix}</button>
+      >{(on ? tPlain("cardStop", viewerLang) : tPlain("cardListen", viewerLang)) + suffix}</button>
     );
   }
 
@@ -444,7 +444,7 @@ export default function PadletCard({
               <button type="button" data-ux-role="control" className="pc-btn" onClick={() => onEdit?.()}>고치기</button>
             )}
             {isTeacher && onPraise && !card.isTeacher && (
-              <button type="button" data-ux-role="control" className="pc-btn" onClick={() => onPraise()}>{t("praiseAction", viewerLang)}</button>
+              <button type="button" data-ux-role="control" className="pc-btn" onClick={() => onPraise()}>{tPlain("praiseAction", viewerLang)}</button>
             )}
             {canDelete && onDelete && (
               <button type="button" data-ux-role="control" className="pc-btn danger" onClick={() => onDelete()}>지우기</button>
@@ -497,7 +497,7 @@ export default function PadletCard({
                 className="pc-btn"
                 aria-disabled={retryState === "loading"}
                 onClick={retryTranslate}
-              >{retryState === "loading" ? t("cardTranslating", viewerLang) : t("cardRetryTranslate", viewerLang)}</button>
+              >{retryState === "loading" ? t("cardTranslating", viewerLang) : tPlain("cardRetryTranslate", viewerLang)}</button>
             </div>
           )}
 
@@ -511,7 +511,7 @@ export default function PadletCard({
           {/* 긴 글은 줄 수로 잘라 없애지 않고 펼칠 수 있게 둔다. */}
           {isLong && (
             <button type="button" data-ux-role="control" className="pc-btn" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
-              {expanded ? t("cardReadLess", viewerLang) : t("cardReadMore", viewerLang)}
+              {expanded ? tPlain("cardReadLess", viewerLang) : tPlain("cardReadMore", viewerLang)}
             </button>
           )}
 
@@ -519,7 +519,7 @@ export default function PadletCard({
           {!sameLang && !translating && !translateFailed && (
             <div className="pc-sub">
               <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={showOriginal} onClick={() => setShowOriginal((v) => !v)}>
-                {showOriginal ? t("cardHideOriginal", viewerLang) : t("cardShowOriginal", viewerLang)}
+                {showOriginal ? tPlain("cardHideOriginal", viewerLang) : tPlain("cardShowOriginal", viewerLang)}
               </button>
               {showOriginal && (
                 <div className="pc-alt">
@@ -535,7 +535,7 @@ export default function PadletCard({
           {viewerLang !== "ko" && koText && koText !== card.originalText && (
             <div className="pc-sub">
               <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={showKorean} onClick={() => setShowKorean((v) => !v)}>
-                {showKorean ? t("cardHideKorean", viewerLang) : t("cardAlsoKorean", viewerLang)}
+                {showKorean ? tPlain("cardHideKorean", viewerLang) : tPlain("cardAlsoKorean", viewerLang)}
               </button>
               {showKorean && (
                 <div className="pc-alt">
@@ -550,7 +550,7 @@ export default function PadletCard({
           {otherLangs.length > 0 && (
             <div className="pc-sub">
               <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={showOthers} onClick={() => setShowOthers((v) => !v)}>
-                {t("cardOtherLangs", viewerLang)}
+                {tPlain("cardOtherLangs", viewerLang)}
               </button>
               {showOthers && otherLangs.map((l) => (
                 <div key={l} className="pc-alt">
@@ -568,7 +568,7 @@ export default function PadletCard({
       {cardType === "youtube" && card.youtubeId && (
         <div className="pc-sub">
           <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={transcriptOpen} onClick={toggleTranscript}>
-            {transcriptOpen ? t("captionHide", viewerLang) : t("captionShow", viewerLang)}
+            {transcriptOpen ? tPlain("captionHide", viewerLang) : tPlain("captionShow", viewerLang)}
           </button>
 
           {transcriptOpen && (
@@ -598,7 +598,7 @@ export default function PadletCard({
                     {src && src !== viewerLang && (
                       <>
                         <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={transcriptOrigOpen} onClick={() => setTranscriptOrigOpen((v) => !v)}>
-                          {t("captionOriginal", viewerLang)}
+                          {tPlain("captionOriginal", viewerLang)}
                         </button>
                         {transcriptOrigOpen && (
                           <p data-ux-role="body" data-ux-reading lang={src} className="pc-body pre">{transcript.original}</p>
@@ -608,7 +608,7 @@ export default function PadletCard({
                     {others.length > 0 && (
                       <>
                         <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={transcriptOtherOpen} onClick={() => setTranscriptOtherOpen((v) => !v)}>
-                          {t("cardOtherLangs", viewerLang)}
+                          {tPlain("cardOtherLangs", viewerLang)}
                         </button>
                         {transcriptOtherOpen && others.map((l) => (
                           <p key={l} data-ux-role="body" data-ux-reading lang={l} className="pc-body pre">{transcript.translations[l]}</p>
@@ -665,7 +665,7 @@ export default function PadletCard({
           className="pc-btn"
           aria-expanded={commentsOpen}
           onClick={() => setCommentsOpen((v) => !v)}
-        >{t("cardReply", viewerLang)}{commentCount > 0 ? ` ${commentCount}` : ""}</button>
+        >{tPlain("cardReply", viewerLang)}{commentCount > 0 ? ` ${commentCount}` : ""}</button>
       </div>
 
       {/* ── 반응: 순위가 아니라 하고 싶은 말 ── */}
@@ -682,7 +682,7 @@ export default function PadletCard({
               aria-disabled={!myClientId}
               onClick={() => pickReaction(r.id)}
             >
-              {t(r.key, viewerLang)}{on ? " ✓" : ""}{counts[r.id] > 0 ? ` ${counts[r.id]}` : ""}
+              {tPlain(r.key, viewerLang)}{on ? " ✓" : ""}{counts[r.id] > 0 ? ` ${counts[r.id]}` : ""}
             </button>
           );
         })}
@@ -715,10 +715,10 @@ export default function PadletCard({
                   <div className="pc-actions">
                     <ListenButton id={`c:${comment.id}`} text={displayText} lang={viewerLang} />
                     {isTeacher && isPendingComment && (
-                      <button type="button" data-ux-role="control" className="pc-btn" onClick={() => approveComment(comment.id)}>{t("approve", viewerLang)}</button>
+                      <button type="button" data-ux-role="control" className="pc-btn" onClick={() => approveComment(comment.id)}>{tPlain("approve", viewerLang)}</button>
                     )}
                     {canDeleteThis && (
-                      <button type="button" data-ux-role="control" className="pc-btn danger" onClick={() => deleteComment(comment.id, comment)}>{t("deleteComment", viewerLang)}</button>
+                      <button type="button" data-ux-role="control" className="pc-btn danger" onClick={() => deleteComment(comment.id, comment)}>{tPlain("deleteComment", viewerLang)}</button>
                     )}
                   </div>
                 </div>
@@ -730,7 +730,7 @@ export default function PadletCard({
             <p data-ux-role="body" className="pc-state warn" role="alert">{commentError}</p>
           )}
 
-          <label data-ux-role="label" className="pc-label" htmlFor={`pc-reply-${card.id}`}>{t("cardReply", viewerLang)}</label>
+          <label data-ux-role="label" className="pc-label" htmlFor={`pc-reply-${card.id}`}>{tPlain("cardReply", viewerLang)}</label>
           <input
             id={`pc-reply-${card.id}`}
             className="pc-input"
@@ -828,6 +828,17 @@ export const CARD_CSS = `
 .pc-label{ font-weight: 800; color: var(--ux-ink); }
 
 .pc-actions, .pc-reactions{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+/* 데스크톱: 버튼이 한 줄에 하나씩 쌓이면 카드가 세로로 한없이 길어진다.
+   마우스를 쓰는 폭에서는 칩처럼 줄여 한 줄에 여러 개가 들어가게 한다.
+   '큰 글씨' 를 고른 사용자에게는 적용하지 않는다. */
+@media (min-width: 1024px){
+  :root:not([data-ux-text="large"]) .pc-btn[data-ux-role="control"]{
+    min-width: 0;   /* 높이는 밀도 토큰(44px)을 그대로 지킨다 — 줄어드는 건 가로다 */
+    font-size: var(--ux-font-secondary);
+    padding: var(--ux-space-1) var(--ux-space-3);
+    border-radius: var(--ux-radius-pill);
+  }
+}
 .pc-btn{
   background: var(--ux-surface); color: var(--ux-ink);
   border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;

@@ -35,8 +35,9 @@ const MEASURE = () => {
   const pick = (sel) => document.querySelector(sel);
   const roots = document.querySelectorAll("[data-ux-root]");
   const controls = Array.from(document.querySelectorAll('[data-ux-role="control"],[data-ux-role="action"]'));
-  const tooSmall = controls
-    .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && (r.height < 56 || r.width < 56); })
+  const __dense = window.innerWidth >= 1024 && document.documentElement.dataset.uxText !== "large"; const __min = __dense ? 44 : 56;
+        const tooSmall = controls
+    .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && (r.height < __min || r.width < __min); })
     .map((el) => `${el.className || el.tagName} ${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`);
   const clipped = Array.from(document.querySelectorAll("[data-ux-role]"))
     .filter((el) => el.scrollWidth > el.clientWidth + 1)
@@ -48,6 +49,8 @@ const MEASURE = () => {
     secondary: cs(pick('[data-ux-role="secondary"]')),
     title: cs(pick('[data-ux-role="title"]')),
     docOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+    dense: __dense,
+    dense: __dense,
     tooSmall, clipped,
   };
 };
@@ -79,8 +82,8 @@ for (const game of GAMES) {
         if (m.docOverflow > 0) problems.push(`[${tag}/${step}] 가로 overflow ${m.docOverflow}px`);
         if (m.tooSmall.length) problems.push(`[${tag}/${step}] 56px 미만 컨트롤: ${m.tooSmall.join(" | ")}`);
         if (m.clipped.length) problems.push(`[${tag}/${step}] 글자 잘림: ${m.clipped.join(" | ")}`);
-        if (m.label !== null && m.label < 18) problems.push(`[${tag}/${step}] label ${m.label}px < 18`);
-        if (m.secondary !== null && m.secondary < 16) problems.push(`[${tag}/${step}] secondary ${m.secondary}px < 16`);
+        if (m.label !== null && m.label < (m.dense ? 15.5 : 18)) problems.push(`[${tag}/${step}] label ${m.label}px < 18`);
+        if (m.secondary !== null && m.secondary < (m.dense ? 14.5 : 16)) problems.push(`[${tag}/${step}] secondary ${m.secondary}px < 16`);
         await page.screenshot({ path: `reports/F/${game.id}-${step}-${v.id}-${size}.png`, fullPage: true });
       };
 

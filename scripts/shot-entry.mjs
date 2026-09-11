@@ -40,8 +40,9 @@ for (const v of VIEWS) {
         const box = (el) => (el ? el.getBoundingClientRect() : null);
         const pick = (sel) => document.querySelector(sel);
         const controls = Array.from(document.querySelectorAll('[data-ux-role="control"],[data-ux-role="action"]'));
+        const __dense = window.innerWidth >= 1024 && document.documentElement.dataset.uxText !== "large"; const __min = __dense ? 44 : 56;
         const tooSmall = controls
-          .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && (r.height < 56 || r.width < 56); })
+          .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && (r.height < __min || r.width < __min); })
           .map((el) => `${el.className || el.tagName} ${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`);
         const clipped = Array.from(document.querySelectorAll('[data-ux-role]'))
           .filter((el) => el.scrollWidth > el.clientWidth + 1)
@@ -53,6 +54,8 @@ for (const v of VIEWS) {
           title: cs(pick('[data-ux-role="title"]')),
           cta: (() => { const r = box(pick(".setup-cta")); return r ? Math.round(r.height) : null; })(),
           docOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          dense: __dense,
+          dense: __dense,
           tooSmall, clipped,
         };
       });
@@ -60,8 +63,8 @@ for (const v of VIEWS) {
       if (m.docOverflow > 0) problems.push(`[${v.id}/${size}/${step}] 가로 overflow ${m.docOverflow}px`);
       if (m.tooSmall.length) problems.push(`[${v.id}/${size}/${step}] 56px 미만 컨트롤: ${m.tooSmall.join(" | ")}`);
       if (m.clipped.length) problems.push(`[${v.id}/${size}/${step}] 글자 잘림: ${m.clipped.join(" | ")}`);
-      if (m.label !== null && m.label < 18) problems.push(`[${v.id}/${size}/${step}] label ${m.label}px < 18`);
-      if (m.secondary !== null && m.secondary < 16) problems.push(`[${v.id}/${size}/${step}] secondary ${m.secondary}px < 16`);
+      if (m.label !== null && m.label < (m.dense ? 15.5 : 18)) problems.push(`[${v.id}/${size}/${step}] label ${m.label}px < 18`);
+      if (m.secondary !== null && m.secondary < (m.dense ? 14.5 : 16)) problems.push(`[${v.id}/${size}/${step}] secondary ${m.secondary}px < 16`);
       await page.screenshot({ path: `reports/B/entry-${step}-${v.id}-${size}.png`, fullPage: true });
     };
 

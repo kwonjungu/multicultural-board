@@ -72,8 +72,9 @@ for (const screen of SCREENS) {
           const pick = (sel) => document.querySelector(sel);
           const name = (el) => `${el.className || el.tagName}`.trim().slice(0, 34);
           const controls = Array.from(document.querySelectorAll('[data-ux-role="control"],[data-ux-role="action"]'));
-          const tooSmall = controls
-            .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && (r.height < 56 || r.width < 56); })
+          const __dense = window.innerWidth >= 1024 && document.documentElement.dataset.uxText !== "large"; const __min = __dense ? 44 : 56;
+        const tooSmall = controls
+            .filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && (r.height < __min || r.width < __min); })
             .map((el) => { const r = el.getBoundingClientRect(); return `${name(el)} ${Math.round(r.width)}x${Math.round(r.height)}`; });
           // 글자 잘림: 역할 있는 요소가 제 내용보다 좁거나(가로) 낮으면(세로) 잘린 것이다.
           const clipped = Array.from(document.querySelectorAll('[data-ux-role]'))
@@ -96,6 +97,8 @@ for (const screen of SCREENS) {
             cards: document.querySelectorAll('.hub-card').length,
             cardCols,
             docOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+            dense: __dense,
+            dense: __dense,
             tooSmall, clipped, shortCards,
           };
         });
@@ -110,8 +113,8 @@ for (const screen of SCREENS) {
         if (m.tooSmall.length) problems.push(`[${tag}] 56px 미만 컨트롤: ${m.tooSmall.join(" | ")}`);
         if (m.clipped.length) problems.push(`[${tag}] 글자 잘림: ${m.clipped.join(" | ")}`);
         if (m.shortCards.length) problems.push(`[${tag}] 카드 높이 112px 미만: ${m.shortCards.join(" | ")}`);
-        if (m.label !== null && m.label < 18) problems.push(`[${tag}] label ${m.label}px < 18`);
-        if (m.secondary !== null && m.secondary < 16) problems.push(`[${tag}] secondary ${m.secondary}px < 16`);
+        if (m.label !== null && m.label < (m.dense ? 15.5 : 18)) problems.push(`[${tag}] label ${m.label}px < 18`);
+        if (m.secondary !== null && m.secondary < (m.dense ? 14.5 : 16)) problems.push(`[${tag}] secondary ${m.secondary}px < 16`);
         // 열 수 계약: 360px 1열 / 600~1023px 2열 / 1024px 이상 3열
         const wantCols = v.width < 600 ? 1 : v.width < 1024 ? 2 : 3;
         if (m.cardCols !== null && m.cardCols !== wantCols) {

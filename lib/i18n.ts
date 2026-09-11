@@ -2619,6 +2619,9 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "No topics yet. They appear when your teacher adds one.", uz: "No topics yet. They appear when your teacher adds one.", hi: "No topics yet. They appear when your teacher adds one.",
     id: "No topics yet. They appear when your teacher adds one.", ar: "No topics yet. They appear when your teacher adds one.", my: "No topics yet. They appear when your teacher adds one.",
   },
+  boardViewSwitch: {
+    ko: "보기 전환", en: "Change view", vi: "Change view", zh: "Change view", fil: "Change view", ja: "Change view", th: "Change view", km: "Change view", mn: "Change view", ru: "Change view", uz: "Change view", hi: "Change view", id: "Change view", ar: "Change view", my: "Change view",
+  },
   boardAllTopics: {
     ko: "전체 주제 보기", en: "See all topics", vi: "See all topics",
     zh: "See all topics", fil: "See all topics", ja: "See all topics",
@@ -2787,6 +2790,18 @@ export function t(key: string, lang: string): string {
   const map = UI_TEXT[key];
   const raw = map?.[lang] || map?.["en"] || map?.["ko"] || key;
   return withKo(raw, map?.["ko"], lang);
+}
+
+/**
+ * 한국어 병기 없이 보는 사람 언어로만.
+ *
+ * t() 는 학습을 위해 "Listen (듣기)" 처럼 한국어를 괄호로 덧붙인다. 본문·제목에는
+ * 맞지만, 카드마다 반복되는 작은 동작 버튼에 붙으면 라벨이 두 배가 되어 한 줄에
+ * 하나씩 쌓이고 데스크톱에서 카드가 세로로 한없이 길어진다. 그런 자리에만 쓴다.
+ */
+export function tPlain(key: string, lang: string): string {
+  const map = UI_TEXT[key];
+  return map?.[lang] || map?.["en"] || map?.["ko"] || key;
 }
 
 // Simple {placeholder} substitution for parametric strings
