@@ -1,54 +1,280 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { Stage, SkinId, HatId, BackdropId, AuraId, HeldId, AccId } from "@/lib/types";
-import {
-  stageImage,
-  stageImageWithSkin,
-  stageImageWithHat,
-  stageImageWithSkinAndHat,
-} from "@/lib/stage";
-import anchorsData from "@/public/stickers/anchors.json";
-
-// ============================================================
-// 캐릭터 합성 렌더 — PraiseHive(히어로·전시장)와 CosmeticPicker(미리보기)가
-// 공유한다. 미리보기와 실제 전시 렌더가 어긋나지 않도록 합성 체인·좌표
-// 로직은 반드시 이 파일에만 둔다.
-// ============================================================
-
-// Head anchors — 합성본이 전부 404 일 때의 최후 폴백 오버레이에만 사용.
-// (왕관 포함 모든 모자 조합은 stage-hats/skin-hats 합성본이 1순위)
-interface CharAnchor {
-  headXPct: number;
-  headTopYPct: number;
-  hatScalePct: number;
-  /** 눈높이 중심 (안경). 트림 이미지 기준 %. */
-  faceYPct?: number;
-  /** 턱 아래 (목도리/목걸이/망토). */
-  neckYPct?: number;
-  /** 액세서리 기준 폭 (박스 폭 대비 %). */
-  accScalePct?: number;
-  /** 소지품 x 위치, 박스 % — 비정사각 PNG 레터박스 보정용. */
-  heldXPct?: number;
-}
-const ANCHORS = anchorsData as unknown as Record<string, CharAnchor>;
-const FALLBACK_ANCHOR: CharAnchor = { headXPct: 50, headTopYPct: 18, hatScalePct: 38 };
-
-const STAGE_ANCHOR_KEY: Record<Stage, string> = {
-  egg: "stage-1-egg",
-  larva: "stage-2-larva",
-  pupa: "stage-3-pupa",
-  bee: "stage-4-bee",
-  queen: "stage-5-queen",
-};
-
-/** Character image with multi-step fallback chain:
- *  skin+hat composite → classic+hat composite → skin-only → plain stage.
- *  각 404 시 onError 로 다음 후보 시도.
+/**
+ * 캐릭터 합성 렌더 — **plan 을 그리기만 한다**(작업 D, README §7.3).
  *
- *  모자 합성본을 전부 실패하고 본체 후보까지 내려온 경우에만
- *  anchors.json 좌표로 모자 PNG 를 오버레이한다 (모자 증발 방지).
+ * 좌표·폴백 판단은 전부 `lib/characterRenderPlan.ts`(순수 함수)에 있고,
+ * 기하 계약은 `lib/childUx/renderPlanContract.ts` 가 동결했다. 이 파일은
+ * plan 을 DOM 으로 옮기고 로드 실패만 되돌려준다.
+ *
+ * 지켜야 하는 것:
+ *  - PraiseHive · CosmeticPicker · BeeVillage 가 **같은 plan** 을 본다(ART-04).
+ *    미리보기와 실제 화면이 달랐던 원인은 각자 렌더였다.
+ *  - 몸 + 착용물은 **부모 그룹 하나에서만** 부유한다. 레이어마다 애니메이션을
+ *    걸면 늦게 로드된 레이어의 위상이 어긋난다(ART-04).
+ *  - 그림자는 장면 접지용 1개. 레이어마다 다른 방향의 그림자를 더하지 않는다.
+ *  - 로드 실패는 자산당 1회만 시도하고, 장식이 바뀌면 실패 상태를 비운다(ART-05).
  */
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import type { Stage, SkinId, HatId, BackdropId, AuraId, HeldId, AccId } from "@/lib/types";
+import { useChildUx } from "@/lib/childUx";
+import type { CharacterRenderPlan, CharacterRenderProps, RenderLayer } from "@/lib/childUx/renderPlanContract";
+import {
+  buildCharacterRenderPlan,
+  bodyCandidates,
+  characterPropsKey,
+  skinWasDowngraded,
+} from "@/lib/characterRenderPlan";
+
+export interface CharacterCompositeProps {
+  stage: Stage;
+  skin: SkinId;
+  hat?: HatId;
+  held?: HeldId;
+  acc?: AccId;
+  backdrop?: BackdropId;
+  aura?: AuraId;
+  /** 정사각 컨테이너 한 변(CSS px). 생략하면 부모 크기를 실측한다. */
+  size?: number;
+  /** 부유 애니메이션. reduced-motion 에서는 값과 무관하게 멈춘다. */
+  float?: boolean;
+  /** 이 화면에서만 그릴 레이어. 옛 3분할 API(아래) 호환용. */
+  only?: "environment" | "body" | "attachments";
+  /** fixture/테스트 전용 — 모든 자산 로드 실패를 강제한다. */
+  forceAssetFailure?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}
+
+/** 화면에서 실제로 적용되는 모션 설정. CSS 쪽 차단과 별개로 plan 에도 반영한다. */
+function useReducedMotion(): boolean {
+  const { motion } = useChildUx();
+  const [systemReduced, setSystemReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setSystemReduced(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  if (motion === "reduced") return true;
+  if (motion === "full") return false;
+  return systemReduced;
+}
+
+/** SSR 에서 useLayoutEffect 경고를 내지 않기 위한 동형 훅. */
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** size 를 넘기지 않은 호출부를 위해 컨테이너 한 변을 잰다. */
+function useMeasuredSize(enabled: boolean): [React.RefObject<HTMLDivElement>, number] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState(0);
+  useIsoLayoutEffect(() => {
+    if (!enabled) return;
+    const el = ref.current;
+    if (!el) return;
+    const read = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      const next = Math.min(w, h) || w || h;
+      setSize((prev) => (Math.abs(prev - next) < 0.5 ? prev : next));
+    };
+    read();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [enabled]);
+  return [ref, size];
+}
+
+const FLOAT_GROUP_KINDS = new Set(["cape-back", "body-back", "body", "front-hand-mask", "hat", "face-accessory"]);
+const CLIPPED_KINDS = new Set(["background"]);
+
+export default function CharacterComposite({
+  stage,
+  skin,
+  hat = null,
+  held = null,
+  acc = null,
+  backdrop = null,
+  aura = null,
+  size,
+  float = true,
+  only,
+  forceAssetFailure = false,
+  className,
+  style,
+}: CharacterCompositeProps) {
+  const reducedMotion = useReducedMotion();
+  const [boxRef, measured] = useMeasuredSize(size === undefined);
+  const boxSize = size ?? measured;
+
+  const props: CharacterRenderProps = useMemo(
+    () => ({ stage, skin, hat, held, acc, backdrop, aura, size: boxSize, reducedMotion }),
+    [stage, skin, hat, held, acc, backdrop, aura, boxSize, reducedMotion],
+  );
+
+  // 실패한 자산은 후보당 1회만 시도한다. 장식이 바뀌면 비운다(ART-05) —
+  // 일시적인 네트워크 오류 뒤에 같은 장식을 다시 고르면 정상 복구되어야 한다.
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const propsKey = characterPropsKey(props);
+  const lastKeyRef = useRef(propsKey);
+  if (lastKeyRef.current !== propsKey) {
+    lastKeyRef.current = propsKey;
+    if (failed.size > 0) setFailed(new Set<string>());
+  }
+
+  const forced = useMemo(() => {
+    if (!forceAssetFailure) return null;
+    const s = new Set<string>(bodyCandidates(props).map((c) => c.assetId));
+    if (hat) s.add(`hat/${hat}`);
+    if (acc) s.add(`acc/${acc}`);
+    if (held) s.add(`held/${held}`);
+    if (backdrop) s.add(`backdrop/${backdrop}`);
+    if (aura) s.add(`aura/${aura}`);
+    return s as ReadonlySet<string>;
+  }, [forceAssetFailure, props, hat, acc, held, backdrop, aura]);
+
+  const plan = useMemo(
+    () => buildCharacterRenderPlan(props, { failedAssetIds: forced ?? failed }),
+    [props, forced, failed],
+  );
+
+  // 선택한 스킨이 유지되지 않은 경우는 개발 로그로만 남긴다(README §7.3).
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" && skinWasDowngraded(props, plan)) {
+      console.warn(`[CharacterComposite] 스킨 "${props.skin}" 자산을 못 써서 기본 단계로 내려갔다 (${plan.resolvedAssetId})`);
+    }
+  }, [props, plan]);
+
+  const onLayerError = useCallback((assetId: string) => {
+    setFailed((prev) => {
+      if (prev.has(assetId)) return prev;
+      const next = new Set(prev);
+      next.add(assetId);
+      return next;
+    });
+  }, []);
+
+  const wantEnvironment = only === undefined || only === "environment";
+  const wantBody = only === undefined || only === "body";
+  const wantAttachments = only === undefined || only === "attachments";
+
+  const visible = plan.layers.filter((l) => {
+    if (l.kind === "background" || l.kind === "aura" || l.kind === "environment-shadow") return wantEnvironment;
+    if (l.kind === "held-back" || l.kind === "held-front" || l.kind === "face-accessory" || l.kind === "cape-back") return wantAttachments;
+    return wantBody;
+  });
+
+  const clipped = visible.filter((l) => CLIPPED_KINDS.has(l.kind));
+  const floating = visible.filter((l) => FLOAT_GROUP_KINDS.has(l.kind) && !CLIPPED_KINDS.has(l.kind));
+  // 바닥 소품·그림자·오라는 몸과 함께 흔들리지 않는다 — 바닥에 붙어 있어야 한다.
+  const grounded = visible.filter((l) => !FLOAT_GROUP_KINDS.has(l.kind) && !CLIPPED_KINDS.has(l.kind));
+
+  // size 를 받은 호출부는 자기 박스를 만들고, 안 받은 호출부(옛 API)는 부모를 채운다.
+  const wrapperStyle: CSSProperties =
+    size !== undefined
+      ? { position: "relative", width: size, height: size, pointerEvents: "none", ...style }
+      : { position: "absolute", inset: 0, pointerEvents: "none", ...style };
+
+  return (
+    <div
+      ref={boxRef}
+      className={className}
+      data-ux-character=""
+      data-plan-status={plan.status}
+      data-plan-hash={plan.planHash}
+      data-plan-asset={plan.resolvedAssetId}
+      data-plan-size={boxSize || undefined}
+      style={wrapperStyle}
+    >
+      {clipped.length > 0 && (
+        <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: "14%" }}>
+          {clipped.map((l) => (
+            <LayerImage key={layerKey(l)} layer={l} onError={onLayerError} />
+          ))}
+        </div>
+      )}
+      {grounded.map((l) => (
+        <LayerImage key={layerKey(l)} layer={l} onError={onLayerError} />
+      ))}
+      {floating.length > 0 && (
+        <div
+          data-ux-character-group=""
+          style={{
+            position: "absolute",
+            inset: 0,
+            // 몸과 착용물은 여기 하나에서만 움직인다(ART-04).
+            animation: float && !reducedMotion ? "heroBeeFloat 3s ease-in-out infinite" : undefined,
+            transformOrigin: "50% 70%",
+          }}
+        >
+          {floating.map((l) => (
+            <LayerImage key={layerKey(l)} layer={l} onError={onLayerError} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function layerKey(l: RenderLayer): string {
+  return `${l.kind}:${l.assetId}`;
+}
+
+function LayerImage({ layer, onError }: { layer: RenderLayer; onError: (assetId: string) => void }) {
+  return (
+    <img
+      src={layer.src}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      data-layer-kind={layer.kind}
+      data-layer-asset={layer.assetId}
+      /** 계산값 검증용(scripts/shot-character.mjs) — 렌더 박스와 3px 이내여야 한다. */
+      data-plan-box={`${layer.left},${layer.top},${layer.width},${layer.height}`}
+      onError={() => onError(layer.assetId)}
+      style={{
+        position: "absolute",
+        left: layer.left,
+        top: layer.top,
+        width: layer.width,
+        height: layer.height,
+        // 박스가 이미 자산 비율대로 계산돼 있으므로 fill 이 곧 contain 이다.
+        objectFit: "fill",
+        opacity: layer.opacity,
+        transform: layer.rotateDeg ? `rotate(${layer.rotateDeg}deg)` : undefined,
+        transformOrigin:
+          layer.rotateDeg && layer.originX !== undefined && layer.originY !== undefined
+            ? `${layer.originX - layer.left}px ${layer.originY - layer.top}px`
+            : undefined,
+        pointerEvents: "none",
+      }}
+    />
+  );
+}
+
+/** 화면에 보일 상태 문구. 실패를 빈 화면으로 두지 않기 위한 것(README §7.3). */
+export function planNoticeText(plan: CharacterRenderPlan): string | null {
+  if (plan.notice === "decorating") return "장식을 준비하고 있어요";
+  if (plan.notice === "asset-missing") return "그림을 불러오지 못했어요";
+  return null;
+}
+
+// ============================================================
+// 옛 3분할 API — BeeVillage(작업 E 소유)가 아직 이 모양으로 쓴다.
+// 내부는 전부 위의 CharacterComposite/plan 한 경로다.
+// ============================================================
+
+/** 배경(뒤) + 오라(앞) 환경 레이어. */
+export function CosmeticFrame({ backdrop, aura }: { backdrop?: BackdropId; aura?: AuraId }) {
+  return <CharacterComposite stage="bee" skin="classic" backdrop={backdrop ?? null} aura={aura ?? null} only="environment" float={false} />;
+}
+
+/** 몸(+모자). 폴백 체인과 좌표는 plan 이 정한다. */
 export function CharacterImage({
   stage,
   skin,
@@ -58,210 +284,35 @@ export function CharacterImage({
   stage: Stage;
   skin: SkinId;
   hat: HatId;
-  /** heroBeeFloat 부유 애니메이션 (전역 keyframes, app/layout.tsx) */
   float?: boolean;
 }) {
-  // 후보 URL 배열 (순서대로 시도).
-  const candidates: string[] = [];
-  if (hat) {
-    candidates.push(stageImageWithSkinAndHat(stage, skin, hat));
-    if (skin !== "classic") candidates.push(stageImageWithHat(stage, hat));
-  }
-  const hatCandidates = candidates.length;
-  if (skin !== "classic") candidates.push(stageImageWithSkin(stage, skin));
-  candidates.push(stageImage(stage));
-
-  const [idx, setIdx] = useState(0);
-  const [hatFail, setHatFail] = useState(false);
-  // 코스메틱이 실시간으로 바뀌는 화면(꾸미기 미리보기, 구독 갱신)에서
-  // 이전 조합의 폴백 인덱스가 새 조합으로 새지 않도록 조합 변경 시 리셋.
-  useEffect(() => {
-    setIdx(0);
-    setHatFail(false);
-  }, [stage, skin, hat]);
-
-  const src = candidates[Math.min(idx, candidates.length - 1)];
-  // 모자 합성본 후보를 전부 지나쳐 본체만 그리게 됐을 때만 오버레이 폴백.
-  const overlayHat = hat && idx >= hatCandidates ? hat : null;
-
-  const anchor = ANCHORS[STAGE_ANCHOR_KEY[stage]] ?? FALLBACK_ANCHOR;
-  const hatW = anchor.hatScalePct; // 박스 폭 대비 %
-  const hatLeft = anchor.headXPct - hatW / 2;
-  const hatTop = anchor.headTopYPct - hatW * 0.85; // 바닥이 머리에 15% 침투
-
-  const floatAnim = float ? "heroBeeFloat 3s ease-in-out infinite" : undefined;
-
-  return (
-    <>
-      <img
-        src={src}
-        alt=""
-        aria-hidden="true"
-        onError={() => setIdx((i) => i + 1)}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "contain",
-          animation: floatAnim,
-          filter: "drop-shadow(0 8px 18px rgba(245,158,11,0.4))",
-          zIndex: 1,
-        }}
-      />
-      {overlayHat && !hatFail && (
-        <img
-          src={`/stickers/hat-${overlayHat}.png`}
-          alt=""
-          aria-hidden="true"
-          onError={() => setHatFail(true)}
-          style={{
-            position: "absolute",
-            left: `${hatLeft}%`,
-            top: `${hatTop}%`,
-            width: `${hatW}%`,
-            height: `${hatW}%`,
-            objectFit: "contain",
-            animation: floatAnim,
-            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.2))",
-            zIndex: 2,
-          }}
-        />
-      )}
-    </>
-  );
+  return <CharacterComposite stage={stage} skin={skin} hat={hat} only="body" float={float} />;
 }
 
-/** 배경 + 오라 오버레이 — 캐릭터 박스(정사각, position:relative) 안에서 사용.
- *  backdrop 은 캐릭터 뒤(z0, 라운드 클립), aura 는 캐릭터 앞(z3, 포인터 통과). */
-export function CosmeticFrame({ backdrop, aura }: { backdrop?: BackdropId; aura?: AuraId }) {
-  return (
-    <>
-      {backdrop && (
-        <img
-          src={`/stickers/backdrop-${backdrop}.png`}
-          alt=""
-          aria-hidden="true"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          style={{
-            position: "absolute", inset: "-4%",
-            width: "108%", height: "108%",
-            objectFit: "cover", borderRadius: "14%",
-            zIndex: 0,
-          }}
-        />
-      )}
-      {aura && (
-        <img
-          src={`/stickers/aura-${aura}.png`}
-          alt=""
-          aria-hidden="true"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          style={{
-            position: "absolute", inset: "-8%",
-            width: "116%", height: "116%",
-            objectFit: "contain",
-            zIndex: 3, pointerEvents: "none",
-            animation: "heroBeeFloat 4s ease-in-out infinite reverse",
-          }}
-        />
-      )}
-    </>
-  );
-}
-
-/** 소지품(held) + 액세서리(acc) 오버레이 — CharacterImage 와 같은 정사각
- *  박스 안에서, CharacterImage "뒤"(DOM 순서상 앞이면 cape 가 캐릭터를 가림)
- *  가 아니라 **CharacterImage 다음에** 넣는다.
- *  최종 z 스택: backdrop 0 < cape 0 < char 1 < hat폴백 2 < aura 3 < held/acc 4.
- *  cape 만 zIndex 0(캐릭터 뒤, backdrop 위)으로 깔리고 나머지는 zIndex 4(aura 3 위).
- *  좌표는 anchors.json 의 faceYPct/neckYPct/accScalePct (트림 이미지 기준).
- *  캐릭터가 heroBeeFloat 로 부유하므로 착용형 acc 는 같은 애니메이션을 공유해
- *  몸에 붙어 움직이는 것처럼 보이게 한다. */
+/**
+ * 소지품(held) + 액세서리(acc).
+ *
+ * 액세서리 좌표는 **실제로 그려진 몸 자산**의 앵커에서 나온다. 그래서 skin/hat
+ * 을 같이 받아야 한다 — 넘기지 않으면 classic 으로 가정하며, 색 스킨 화면에서는
+ * 위치가 맞지 않을 수 있다(ART-01 이 지적한 바로 그 경우). 작업 E 는
+ * CharacterComposite 로 옮기거나 skin/hat 을 넘겨줄 것.
+ */
 export function AccessoryLayer({
   stage,
   held,
   acc,
+  skin = "classic",
+  hat = null,
   float = true,
 }: {
   stage: Stage;
   held?: HeldId;
   acc?: AccId;
+  skin?: SkinId;
+  hat?: HatId;
   float?: boolean;
 }) {
-  const a = ANCHORS[STAGE_ANCHOR_KEY[stage]] ?? FALLBACK_ANCHOR;
-  const x = a.headXPct;
-  const face = a.faceYPct ?? 34;
-  const neck = a.neckYPct ?? 52;
-  const scale = a.accScalePct ?? 46;
-  const floatAnim = float ? "heroBeeFloat 3s ease-in-out infinite" : undefined;
-
-  const hide = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    (e.currentTarget as HTMLImageElement).style.display = "none";
-  };
-
-  // acc 별 배치 파라미터 (박스 % 단위)
-  let accEl: React.ReactNode = null;
-  if (acc === "glasses") {
-    // 0.92: 양쪽 눈을 모두 덮는 폭 (0.74 는 bee/queen 에서 한쪽 눈만 걸침)
-    const w = scale * 0.92;
-    accEl = (
-      <img src="/stickers/acc-glasses.png" alt="" aria-hidden="true" onError={hide}
-        style={{
-          position: "absolute", left: `${x - w / 2}%`, top: `${face - w * 0.21}%`,
-          width: `${w}%`, zIndex: 4, animation: floatAnim,
-          filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.15))",
-        }} />
-    );
-  } else if (acc === "scarf") {
-    const w = scale * 1.02;
-    accEl = (
-      <img src="/stickers/acc-scarf.png" alt="" aria-hidden="true" onError={hide}
-        style={{
-          position: "absolute", left: `${x - w / 2}%`, top: `${neck - w * 0.26}%`,
-          width: `${w}%`, zIndex: 4, animation: floatAnim,
-          filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.15))",
-        }} />
-    );
-  } else if (acc === "necklace") {
-    const w = scale * 0.92;
-    accEl = (
-      <img src="/stickers/acc-necklace.png" alt="" aria-hidden="true" onError={hide}
-        style={{
-          position: "absolute", left: `${x - w / 2}%`, top: `${neck - w * 0.06}%`,
-          width: `${w}%`, zIndex: 4, animation: floatAnim,
-          filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.12))",
-        }} />
-    );
-  } else if (acc === "cape") {
-    // 망토는 캐릭터 뒤(z0) — backdrop(z0, DOM 앞) 위에 그려진다.
-    const w = Math.min(100, scale * 1.35);
-    accEl = (
-      <img src="/stickers/acc-cape.png" alt="" aria-hidden="true" onError={hide}
-        style={{
-          position: "absolute", left: `${x - w / 2}%`, top: `${neck - w * 0.10}%`,
-          width: `${w}%`, zIndex: 0, animation: floatAnim,
-          filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.18))",
-        }} />
-    );
-  }
-
   return (
-    <>
-      {accEl}
-      {held && (
-        <img
-          src={`/stickers/held-${held}.png`}
-          alt=""
-          aria-hidden="true"
-          onError={hide}
-          style={{
-            position: "absolute", left: `${a.heldXPct ?? 1}%`, bottom: "2%",
-            width: "30%", zIndex: 4, animation: floatAnim,
-            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.18))",
-          }}
-        />
-      )}
-    </>
+    <CharacterComposite stage={stage} skin={skin} hat={hat} held={held ?? null} acc={acc ?? null} only="attachments" float={float} />
   );
 }

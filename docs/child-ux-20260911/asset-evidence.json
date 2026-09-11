@@ -1,0 +1,203 @@
+{
+  "note": "Read-only measurement. No source images modified. Alpha bbox is not an anatomical anchor.",
+  "results": [
+    {
+      "file": "public/stickers/stage-1-egg.png",
+      "sha256": "d401635d0798a9a8e5d72133221edf07741070c5fb9cf8b9a0addf971c98f49e",
+      "width": 360,
+      "height": 418,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 353,
+        "bottom": 411
+      },
+      "contain320": {
+        "scale": 0.7655502392344498,
+        "offsetX": 22.20095693779905,
+        "offsetY": 0
+      }
+    },
+    {
+      "file": "public/stickers/stage-2-larva.png",
+      "sha256": "88646d2f8de4a523d86d50fc508cadbbade8ea7bfe13fe8cf10776d17eca143f",
+      "width": 524,
+      "height": 524,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 517,
+        "bottom": 517
+      },
+      "contain320": {
+        "scale": 0.6106870229007634,
+        "offsetX": 0,
+        "offsetY": 0
+      }
+    },
+    {
+      "file": "public/stickers/stage-3-pupa.png",
+      "sha256": "997c74cc131f8d504aab3d5a950d8c4b5fc3cf80650bd24610ac640cae796110",
+      "width": 361,
+      "height": 524,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 354,
+        "bottom": 517
+      },
+      "contain320": {
+        "scale": 0.6106870229007634,
+        "offsetX": 49.770992366412216,
+        "offsetY": 0
+      }
+    },
+    {
+      "file": "public/stickers/stage-4-bee.png",
+      "sha256": "9e412191d0b918d38b8a666900d68f5a5e36eb6ceb94d3c939bd1d48b90cb0d6",
+      "width": 399,
+      "height": 399,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 16,
+        "top": 6,
+        "right": 382,
+        "bottom": 392
+      },
+      "contain320": {
+        "scale": 0.8020050125313283,
+        "offsetX": 0,
+        "offsetY": 0
+      }
+    },
+    {
+      "file": "public/stickers/stage-5-queen.png",
+      "sha256": "931fd656b9ea29025732487ba53af791899c6b378b7bc5b71cbe2ed4ceb7423e",
+      "width": 356,
+      "height": 356,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 13,
+        "top": 6,
+        "right": 343,
+        "bottom": 349
+      },
+      "contain320": {
+        "scale": 0.898876404494382,
+        "offsetX": 0,
+        "offsetY": 0
+      }
+    },
+    {
+      "file": "public/stickers/acc-glasses.png",
+      "sha256": "0ceba9145742e5f367905bd468a24a64dd5cb9756c69b16328b4d00ff001d77d",
+      "width": 372,
+      "height": 169,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 162
+      },
+      "contain320": {
+        "scale": 0.8602150537634409,
+        "offsetX": 0,
+        "offsetY": 87.31182795698925
+      }
+    },
+    {
+      "file": "public/stickers/acc-scarf.png",
+      "sha256": "c6e6e0b06430fbf8cc56837194dd43320f7801be859d2a63692cc4c033aac53f",
+      "width": 297,
+      "height": 372,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 290,
+        "bottom": 365
+      },
+      "contain320": {
+        "scale": 0.8602150537634409,
+        "offsetX": 32.258064516129025,
+        "offsetY": 0
+      }
+    },
+    {
+      "file": "public/stickers/acc-cape.png",
+      "sha256": "5600944ce4cdb9b29e3402a0f73f2e361713b187e59256b63e53833bbca4c665",
+      "width": 372,
+      "height": 299,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 292
+      },
+      "contain320": {
+        "scale": 0.8602150537634409,
+        "offsetX": 0,
+        "offsetY": 31.3978494623656
+      }
+    },
+    {
+      "file": "public/stickers/held-book.png",
+      "sha256": "e9e8173d9034f1c73c54b106a5765bb9073c5fa3b207efa0c3f3b3cd79e4ce17",
+      "width": 372,
+      "height": 257,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 250
+      },
+      "contain320": {
+        "scale": 0.8602150537634409,
+        "offsetX": 0,
+        "offsetY": 49.46236559139784
+      }
+    },
+    {
+      "file": "public/stickers/held-flag.png",
+      "sha256": "ff6ccae6599339d4c5c6f1a8ae6e4ae0807d98c430c6f2fe7db1bfc6d2475f7b",
+      "width": 246,
+      "height": 372,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 239,
+        "bottom": 365
+      },
+      "contain320": {
+        "scale": 0.8602150537634409,
+        "offsetX": 54.19354838709677,
+        "offsetY": 0
+      }
+    },
+    {
+      "file": "public/stickers/held-honeypot.png",
+      "sha256": "a6244fd48657d3ab441f1cb289bf4f051165787b78e3a971f9961ccd7fab084c",
+      "width": 300,
+      "height": 372,
+      "alphaThreshold": 8,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 293,
+        "bottom": 365
+      },
+      "contain320": {
+        "scale": 0.8602150537634409,
+        "offsetX": 30.967741935483872,
+        "offsetY": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "baseline": "ee898b008d51415aa94640341287a9720567da68",
+  "productionRoom": "1111",
+  "tasks": [
+    {"id":"A","dependsOn":[],"owner":"Opus integration","files":["app/layout.tsx","package.json","package-lock.json","lib/types.ts","components/GameRoom.tsx","components/ui/child/**","lib/childUx/**"],"checks":["G0 isolation","token computed styles","200% text","typecheck"],"output":"Frozen tokens, component props, render-plan contract, fixture adapter"},
+    {"id":"B","dependsOn":["A"],"owner":"Entry UI","files":["components/SetupScreen.tsx","components/HomeHub.tsx","components/BeeBanner.tsx","components/ui/FlyingBees.tsx"],"checks":["ENTRY-01","ENTRY-02","ENTRY-03","ENTRY-04","G2 viewports"],"output":"Entry flow and home navigation with screenshots"},
+    {"id":"C","dependsOn":["A"],"owner":"Communication UI","files":["components/PadletBoard.tsx","components/PadletCard.tsx","components/PostModal.tsx","components/TutorChat.tsx"],"checks":["BOARD-01","BOARD-02","POST-01","POST-02","POST-03","IME-01","STREAM-01","AUDIO-01"],"output":"Topic view, readable cards, recoverable composition"},
+    {"id":"D","dependsOn":["A"],"owner":"Character compositing","files":["components/CharacterComposite.tsx","components/PraiseHive.tsx","components/CosmeticPicker.tsx","lib/characterRenderPlan.ts","public/stickers/manifest-v2.json"],"checks":["ART-01","ART-02","ART-03","ART-04","G3 composite approval"],"output":"Versioned manifest, render plan, approved character plates"},
+    {"id":"E","dependsOn":["A","D"],"owner":"Village scene","files":["components/BeeVillage.tsx","components/VillageMap3D.tsx","lib/villageRenderer/**"],"checks":["ART-04","SCENE-01","SCENE-02","G4 frame budget"],"output":"Grounded 2.5D scene with shared character plan and 2D fallback"},
+    {"id":"F","dependsOn":["A"],"owner":"Game reliability","files":["components/games/**","lib/wordMemoryState.ts","lib/marbleReducer.ts","lib/yutLogic.ts"],"checks":["MEMORY-01","MEMORY-02","MEMORY-03","TABOO-01","TABOO-02","REWARD-01","GAMES-ALL"],"output":"Reproduced issues, minimal fixes, state tests and game inventory"},
+    {"id":"Q","dependsOn":["B","C","D","E","F"],"owner":"Independent QA","files":["tests/child-ux/**","reports/child-ux/**","scripts/test-child-ux-*.mjs"],"checks":["G1 all required","G2 accessibility","G3 visual review","G4 release","production build"],"output":"Evidence linked to exact commit, fail/blocked register, release recommendation"}
+  ]
+}

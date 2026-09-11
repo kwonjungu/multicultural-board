@@ -1,56 +1,51 @@
 "use client";
 
-import { useState, useEffect, useRef, type CSSProperties } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ref, onValue, off, push, set, remove } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { CardData, CommentData, TranscriptData } from "@/lib/types";
-import { LANGUAGES, CARD_PALETTES } from "@/lib/constants";
-import { t } from "@/lib/i18n";
+import { LANGUAGES } from "@/lib/constants";
+import { t, tFmt } from "@/lib/i18n";
+import { speak, cancelSpeak } from "@/lib/ttsMulti";
 import ImageLightbox from "./ImageLightbox";
-
-const TTS_LANG_MAP: Record<string, string> = {
-  ko: "ko-KR", en: "en-US", vi: "vi-VN", zh: "zh-CN", fil: "fil-PH",
-  ja: "ja-JP", th: "th-TH", km: "km-KH", mn: "mn-MN", ru: "ru-RU",
-  uz: "uz-UZ", hi: "hi-IN", id: "id-ID", ar: "ar-SA", my: "my-MM",
-};
-
-// Languages that Web Speech API reliably supports across browsers
-const WEB_SPEECH_SUPPORTED = new Set(["ko", "en", "vi", "zh", "ja", "th", "ru", "hi", "id", "ar"]);
 
 const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
-// Singleton audio element to avoid overlapping playback
-let serverTtsAudio: HTMLAudioElement | null = null;
+/** 이 길이를 넘으면 '더 읽기'로 접는다. 글을 잘라 없애지 않는다. */
+const LONG_TEXT = 220;
 
-async function speakText(text: string, lang: string) {
-  if (typeof window === "undefined") return;
+type ReactionKind = "thanks" | "same" | "nice";
+const REACTIONS: { id: ReactionKind; key: string }[] = [
+  { id: "thanks", key: "reactThanks" },
+  { id: "same", key: "reactSame" },
+  { id: "nice", key: "reactNice" },
+];
+const REACTION_IDS = new Set<string>(["thanks", "same", "nice"]);
 
-  const bcp47 = TTS_LANG_MAP[lang] || "en-US";
+type RawReactions = Record<string, string | boolean>;
 
-  // Check if browser has a matching voice loaded
-  const voices = window.speechSynthesis?.getVoices() ?? [];
-  const langPrefix = bcp47.split("-")[0];
-  const hasVoice = voices.some((v) => v.lang.startsWith(langPrefix));
-
-  if (WEB_SPEECH_SUPPORTED.has(lang) && hasVoice) {
-    // Use Web Speech API
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = bcp47;
-    window.speechSynthesis.speak(u);
-  } else {
-    // Fall back to server-side Google Translate TTS proxy
-    try {
-      window.speechSynthesis?.cancel();
-      if (serverTtsAudio) { serverTtsAudio.pause(); serverTtsAudio = null; }
-      const url = `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text.slice(0, 200))}`;
-      const audio = new Audio(url);
-      serverTtsAudio = audio;
-      await audio.play();
-    } catch {
-      // silent fail — network error or browser blocked autoplay
+/**
+ * 기존 좋아요 데이터 호환 어댑터.
+ *
+ * 옛 스키마는 `rooms/{room}/cards/{card}/likes/{clientId} === true` 였다. 반응
+ * 스키마 변경은 별도 작업이므로 노드는 그대로 두고, 값만 반응 종류 문자열로
+ * 쓴다. 옛 `true` 는 지우지 않고 '예전 좋아요'로 따로 세어 보존한다
+ * (기존 카운트 코드도 truthy 검사라 그대로 동작한다).
+ */
+export function readReactions(raw: RawReactions | null | undefined, myClientId?: string) {
+  const counts: Record<ReactionKind, number> = { thanks: 0, same: 0, nice: 0 };
+  let legacy = 0;
+  let mine: ReactionKind | null = null;
+  for (const [clientId, val] of Object.entries(raw || {})) {
+    if (!val) continue;
+    if (typeof val === "string" && REACTION_IDS.has(val)) {
+      counts[val as ReactionKind] += 1;
+      if (myClientId && clientId === myClientId) mine = val as ReactionKind;
+    } else {
+      legacy += 1;
     }
   }
+  return { counts, legacy, mine };
 }
 
 function timeAgo(ts: number) {
@@ -58,79 +53,6 @@ function timeAgo(ts: number) {
   if (s < 60) return "방금";
   if (s < 3600) return `${Math.floor(s / 60)}분 전`;
   return `${Math.floor(s / 3600)}시간 전`;
-}
-
-function TranslationRow({ lang, text, accent }: { lang: string; text: string; accent: string }) {
-  return (
-    <div style={{
-      position: "relative",
-      background: accent + "14",
-      borderLeft: "4px solid " + accent,
-      padding: "10px 14px",
-      borderRadius: "0 10px 10px 0",
-      marginTop: 8,
-    }}>
-      <span style={{ fontSize: 12, display: "block", marginBottom: 4, color: accent, fontWeight: 800 }}>
-        {LANGUAGES[lang]?.flag} {LANGUAGES[lang]?.label}
-      </span>
-      <span style={{ fontSize: 15, color: "#374151", lineHeight: 1.65, fontWeight: 500 }}>{text}</span>
-      <button
-        onClick={() => speakText(text, lang)}
-        title="읽어주기"
-        aria-label={`${LANGUAGES[lang]?.label} 읽어주기`}
-        style={{
-          position: "absolute", top: 8, right: 8,
-          background: "rgba(255,255,255,0.8)", border: `1.5px solid ${accent}44`, cursor: "pointer",
-          fontSize: 13, color: accent, padding: "4px 8px",
-          transition: "all 0.15s", lineHeight: 1, borderRadius: 10, fontWeight: 700,
-        }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.08)"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.8)"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
-      >🔊</button>
-    </div>
-  );
-}
-
-// 자막 전문 블록 — 줄바꿈 보존(whiteSpace: pre-wrap) + 스크롤 + 읽어주기.
-function TranscriptBlock({ lang, text, accent }: { lang: string; text: string; accent: string }) {
-  return (
-    <div style={{
-      position: "relative",
-      background: accent + "0F",
-      borderLeft: "4px solid " + accent,
-      padding: "10px 40px 10px 14px",
-      borderRadius: "0 10px 10px 0",
-      marginTop: 8,
-    }}>
-      <span style={{ fontSize: 12, display: "block", marginBottom: 4, color: accent, fontWeight: 800 }}>
-        {LANGUAGES[lang]?.flag} {LANGUAGES[lang]?.label}
-      </span>
-      <div style={{
-        fontSize: 14, color: "#374151", lineHeight: 1.7, fontWeight: 500,
-        whiteSpace: "pre-wrap", maxHeight: 220, overflowY: "auto",
-      }}>{text}</div>
-      <button
-        onClick={() => speakText(text, lang)}
-        title="읽어주기"
-        aria-label={`${LANGUAGES[lang]?.label} 읽어주기`}
-        style={{
-          position: "absolute", top: 8, right: 8,
-          background: "rgba(255,255,255,0.85)", border: `1.5px solid ${accent}44`, cursor: "pointer",
-          fontSize: 13, color: accent, padding: "4px 8px",
-          lineHeight: 1, borderRadius: 10, fontWeight: 700,
-        }}
-      >🔊</button>
-    </div>
-  );
-}
-
-function transcriptSubBtnStyle(accent: string): CSSProperties {
-  return {
-    background: "rgba(255,255,255,0.7)", border: `1.5px dashed ${accent}44`, cursor: "pointer",
-    fontSize: 12, color: accent, fontWeight: 700,
-    padding: "6px 12px", marginTop: 8, borderRadius: 999,
-    display: "inline-flex", alignItems: "center", gap: 4,
-  };
 }
 
 interface Props {
@@ -147,6 +69,8 @@ interface Props {
   roomCode: string;
   roomLangs: string[];
   approvalMode?: boolean;
+  /** 개발용 fixture — Firebase 구독과 외부 API 호출을 하지 않는다 (HARNESS §2). */
+  fixture?: boolean;
 }
 
 export default function PadletCard({
@@ -163,14 +87,24 @@ export default function PadletCard({
   roomCode,
   roomLangs,
   approvalMode,
+  fixture,
 }: Props) {
-  const p = CARD_PALETTES[card.paletteIdx % CARD_PALETTES.length];
-  const [open, setOpen] = useState(false);
-  // 이미지/그림 클릭 확대 (공용 라이트박스)
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(card.timestamp);
   const cardType = card.cardType || "text";
+
+  // 읽기 상태
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [showKorean, setShowKorean] = useState(false);
+  const [showOthers, setShowOthers] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [localTr, setLocalTr] = useState<Record<string, string> | null>(null);
+  const [retryState, setRetryState] = useState<"idle" | "loading" | "failed">("idle");
+
+  // 듣기 — 재생 중인 것은 카드 전체에서 하나뿐이다 (AUDIO-01).
+  const [speaking, setSpeaking] = useState<string | null>(null);
+  const playToken = useRef(0);
 
   // YouTube 자막 번역 상태
   const [transcriptOpen, setTranscriptOpen] = useState(false);
@@ -179,16 +113,11 @@ export default function PadletCard({
   const [transcriptOtherOpen, setTranscriptOtherOpen] = useState(false);
   const [transcriptOrigOpen, setTranscriptOrigOpen] = useState(false);
   const [localTranscript, setLocalTranscript] = useState<TranscriptData | null>(null);
-  // 교사 수동 붙여넣기 폴백
   const [pasteText, setPasteText] = useState("");
   const [pasteSubmitting, setPasteSubmitting] = useState(false);
 
-  // Comment state
+  // 답장(댓글)
   const [commentsOpen, setCommentsOpen] = useState(false);
-  // Like state (Firebase 영구화)
-  const [likedByMe, setLikedByMe] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [likeBump, setLikeBump] = useState(0);
   const [comments, setComments] = useState<CommentData[]>([]);
   const [commentCount, setCommentCount] = useState(0);
   const [commentInput, setCommentInput] = useState("");
@@ -196,47 +125,57 @@ export default function PadletCard({
   const [commentError, setCommentError] = useState<string | null>(null);
   const commentDraftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 반응 (기존 likes 노드 위의 호환 어댑터)
+  const [reactRaw, setReactRaw] = useState<RawReactions>({});
+
   // Tick to update edit window expiry
   useEffect(() => {
+    setNow(Date.now());
     const interval = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(interval);
   }, []);
 
-  // Likes listener — always subscribed so the count is visible
+  /** 카드가 사라지거나 다른 카드로 넘어가면 재생 중인 음성을 반드시 끊는다. */
   useEffect(() => {
+    return () => { cancelSpeak(); };
+  }, [card.id]);
+
+  // 반응 listener — 개수는 항상 보이게 상시 구독
+  useEffect(() => {
+    if (fixture) return;
     const db = getClientDb();
     const likesRef = ref(db, `rooms/${roomCode}/cards/${card.id}/likes`);
     const unsub = onValue(likesRef, (snap) => {
-      const data = (snap.val() as Record<string, boolean> | null) || {};
-      const count = Object.values(data).filter(Boolean).length;
-      setLikeCount(count);
-      setLikedByMe(!!myClientId && !!data[myClientId]);
+      setReactRaw((snap.val() as RawReactions | null) || {});
     });
     return () => { off(likesRef); void unsub; };
-  }, [roomCode, card.id, myClientId]);
+  }, [roomCode, card.id, fixture]);
 
-  async function toggleLike() {
+  const { counts, legacy, mine } = readReactions(reactRaw, myClientId);
+
+  async function pickReaction(kind: ReactionKind) {
     if (!myClientId) return;
+    const next: ReactionKind | null = mine === kind ? null : kind;
+    // 낙관적 반영 — 실패하면 구독이 서버 값으로 되돌려 준다.
+    setReactRaw((prev) => {
+      const copy = { ...prev };
+      if (next) copy[myClientId] = next; else delete copy[myClientId];
+      return copy;
+    });
+    if (fixture) return;
     const db = getClientDb();
-    const myLikeRef = ref(db, `rooms/${roomCode}/cards/${card.id}/likes/${myClientId}`);
-    setLikeBump((n) => n + 1);
-    // optimistic flip
-    const next = !likedByMe;
-    setLikedByMe(next);
-    setLikeCount((c) => c + (next ? 1 : -1));
+    const myRef = ref(db, `rooms/${roomCode}/cards/${card.id}/likes/${myClientId}`);
     try {
-      if (next) await set(myLikeRef, true);
-      else await remove(myLikeRef);
+      if (next) await set(myRef, next);
+      else await remove(myRef);
     } catch {
-      // revert on failure
-      setLikedByMe(!next);
-      setLikeCount((c) => c + (next ? -1 : 1));
+      // 구독 콜백이 서버 값을 다시 씌운다.
     }
   }
 
-  // Comment listener (only when open)
+  // 답장 listener (열었을 때만)
   useEffect(() => {
-    if (!commentsOpen) return;
+    if (!commentsOpen || fixture) return;
     const db = getClientDb();
     const commentsRef = ref(db, `rooms/${roomCode}/cards/${card.id}/comments`);
     const unsub = onValue(commentsRef, (snap) => {
@@ -248,42 +187,91 @@ export default function PadletCard({
       }
       const list: CommentData[] = Object.values(data) as CommentData[];
       list.sort((a, b) => a.timestamp - b.timestamp);
-      // Filter pending for non-teachers
       const visible = isTeacher ? list : list.filter((c) => !c.status || c.status === "approved");
       setComments(visible);
       setCommentCount(list.filter((c) => !c.status || c.status === "approved").length);
     });
     return () => {
       off(commentsRef);
-      // unsub is already handled by off, but keep reference to satisfy lint
       void unsub;
     };
-  }, [commentsOpen, roomCode, card.id, isTeacher]);
+  }, [commentsOpen, roomCode, card.id, isTeacher, fixture]);
 
   // Draft restore on open
   useEffect(() => {
-    if (commentsOpen) {
-      const key = `draft:comment:${roomCode}:${card.id}`;
-      const saved = localStorage.getItem(key);
-      if (saved) setCommentInput(saved);
-    }
-  }, [commentsOpen, roomCode, card.id]);
+    if (!commentsOpen || fixture) return;
+    const key = `draft:comment:${roomCode}:${card.id}`;
+    const saved = localStorage.getItem(key);
+    if (saved) setCommentInput(saved);
+  }, [commentsOpen, roomCode, card.id, fixture]);
 
   const isMyCard = !!myClientId && card.authorClientId === myClientId;
   const withinEditWindow = now - card.timestamp < EDIT_WINDOW_MS;
   const canEdit = (isTeacher || (isMyCard && withinEditWindow)) && !!onEdit;
   const canDelete = isTeacher || (isMyCard && withinEditWindow);
 
+  // ── 읽기 계약: 내 언어 하나를 본문으로, 나머지는 눌러서 편다 (README §6.2) ──
+  const sameLang = viewerLang === card.authorLang;
+  const myText = localTr?.[viewerLang] ?? card.translations?.[viewerLang];
+  const translating = !sameLang && !!card.loading && !myText;
+  const translateFailed = !sameLang && !card.loading && (!!card.translateError || !myText);
+  const bodyText = sameLang ? card.originalText : (myText || "");
+  const readingText = bodyText || card.originalText || "";
+  const isLong = readingText.length > LONG_TEXT;
+  const koText = card.translations?.ko ?? (card.authorLang === "ko" ? card.originalText : undefined);
   const otherLangs = Object.keys(card.translations || {}).filter(
-    (l) => l !== card.authorLang && l !== viewerLang
+    (l) => l !== card.authorLang && l !== viewerLang && l !== "ko"
   );
 
-  const pendingBorderStyle = isPending
-    ? { border: "2px solid #F59E0B", background: "#FFFBEB" }
-    : {};
+  async function toggleSpeak(id: string, text: string, lang: string) {
+    if (!text.trim()) return;
+    // 카드 간 이동·재생 중 전환 — 어떤 경우에도 활성 재생은 하나뿐이다.
+    cancelSpeak();
+    if (speaking === id) { setSpeaking(null); return; }
+    const token = ++playToken.current;
+    setSpeaking(id);
+    try {
+      await speak(text, lang);
+    } finally {
+      if (playToken.current === token) setSpeaking(null);
+    }
+  }
+
+  /** 번역 실패 복구 — 저장 없이 이 화면에서만 다시 번역한다. */
+  async function retryTranslate() {
+    if (fixture || retryState === "loading") return;
+    setRetryState("loading");
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: card.originalText,
+          fromLang: card.authorLang,
+          targetLangs: [viewerLang],
+          colId: "comment",
+          authorName: card.authorName,
+          isTeacher: false,
+          paletteIdx: 0,
+          roomCode,
+          cardType: "comment", // translate-only: Firebase 에 저장하지 않는다
+        }),
+      });
+      if (!res.ok) throw new Error("translate failed");
+      const data = await res.json();
+      if (data?.translations?.[viewerLang]) {
+        setLocalTr(data.translations as Record<string, string>);
+        setRetryState("idle");
+      } else {
+        setRetryState("failed");
+      }
+    } catch {
+      setRetryState("failed");
+    }
+  }
 
   async function submitComment() {
-    if (!commentInput.trim() || submittingComment) return;
+    if (!commentInput.trim() || submittingComment || fixture) return;
     setSubmittingComment(true);
     setCommentError(null);
     const text = commentInput.trim();
@@ -333,17 +321,18 @@ export default function PadletCard({
   }
 
   function deleteComment(commentId: string, comment: CommentData) {
-    const canDelete =
+    const allowed =
       isTeacher ||
       (myClientId &&
         comment.authorClientId === myClientId &&
         Date.now() - comment.timestamp < 5 * 60 * 1000);
-    if (!canDelete) return;
+    if (!allowed || fixture) return;
     const db = getClientDb();
     remove(ref(db, `rooms/${roomCode}/cards/${card.id}/comments/${commentId}`));
   }
 
   function approveComment(commentId: string) {
+    if (fixture) return;
     const db = getClientDb();
     set(ref(db, `rooms/${roomCode}/cards/${card.id}/comments/${commentId}/status`), "approved");
   }
@@ -353,7 +342,7 @@ export default function PadletCard({
   async function toggleTranscript() {
     const next = !transcriptOpen;
     setTranscriptOpen(next);
-    if (!next || transcript || transcriptLoading || !card.youtubeId) return;
+    if (!next || transcript || transcriptLoading || !card.youtubeId || fixture) return;
     setTranscriptLoading(true);
     setTranscriptErr(null);
     try {
@@ -376,9 +365,9 @@ export default function PadletCard({
     setTranscriptLoading(false);
   }
 
-  // 교사가 직접 붙여넣은 자막을 번역해 올린다(모든 학생 언어로).
+  /** 교사가 직접 붙여넣은 자막을 모든 학생 언어로 번역해 올린다. */
   async function submitManualTranscript() {
-    if (!pasteText.trim() || pasteSubmitting || !card.youtubeId) return;
+    if (!pasteText.trim() || pasteSubmitting || !card.youtubeId || fixture) return;
     setPasteSubmitting(true);
     setTranscriptErr(null);
     try {
@@ -404,635 +393,461 @@ export default function PadletCard({
     setPasteSubmitting(false);
   }
 
+  const enterUnlessComposing = (run: () => void) => (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    // 한국어·일본어·중국어 조합 중 Enter 는 확정용이다 — 전송으로 쓰지 않는다.
+    if ((e.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return;
+    e.preventDefault();
+    run();
+  };
+
+  /** 라벨 있는 듣기 버튼. 재생 중에는 '멈추기'로 바뀐다. */
+  function ListenButton({ id, text, lang, withLang }: { id: string; text: string; lang: string; withLang?: boolean }) {
+    if (!text?.trim()) return null;
+    const on = speaking === id;
+    // 한 카드에 듣기 버튼이 여럿일 때 어느 글을 읽는지 라벨로 구분한다.
+    const suffix = withLang && LANGUAGES[lang]?.label ? ` · ${LANGUAGES[lang].label}` : "";
+    return (
+      <button
+        type="button"
+        data-ux-role="control"
+        className="pc-btn"
+        aria-pressed={on}
+        onClick={() => toggleSpeak(id, text, lang)}
+      >{(on ? t("cardStop", viewerLang) : t("cardListen", viewerLang)) + suffix}</button>
+    );
+  }
+
   return (
-    <div
-      style={{
-        background: isPending ? "#FFFBEB" : p.bg,
-        borderRadius: 18,
-        border: isPending ? "2px solid #F59E0B" : "1px solid " + p.accent + "22",
-        borderLeft: isPending ? "5px solid #F59E0B" : `5px solid ${p.accent}`,
-        boxShadow: "0 4px 12px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.03)",
-        marginBottom: 12,
-        transition: "box-shadow 0.2s, transform 0.2s",
-        overflow: "hidden",
-        ...pendingBorderStyle,
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 10px 28px rgba(180,83,9,0.12), 0 4px 8px rgba(0,0,0,0.04)";
-        (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.03)";
-        (e.currentTarget as HTMLDivElement).style.transform = "none";
-      }}
+    <article
+      className={isPending ? "pc-card pending" : "pc-card"}
+      style={{ borderInlineStartColor: colColor }}
+      aria-label={`${card.authorName}의 이야기`}
     >
-      <div style={{ padding: "14px 16px 12px" }}>
-        {/* Author row */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 14, flexShrink: 0,
-            background: `linear-gradient(135deg, ${p.accent}, ${p.accent}aa)`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: card.isTeacher ? 18 : 16, fontWeight: 900, color: "#fff",
-            boxShadow: `0 4px 10px ${p.accent}44`,
-          }}>
-            {card.isTeacher ? "👩‍🏫" : card.authorName.charAt(0).toUpperCase()}
-          </div>
+      {/* ── 1. 누가 썼는지 ── */}
+      <header className="pc-who">
+        <span aria-hidden className="pc-avatar" style={{ background: colColor }}>
+          {card.isTeacher ? "🧑‍🏫" : card.authorName.charAt(0).toUpperCase()}
+        </span>
+        <span className="pc-who-text">
+          <span data-ux-role="label" className="pc-name"><bdi>{card.authorName}</bdi></span>
+          <span data-ux-role="secondary" className="pc-meta">
+            {timeAgo(card.timestamp)}
+            {card.isTeacher ? ` · ${t("teacherTag", viewerLang)}` : ""}
+            {card.editedAt ? " · 수정됨" : ""}
+            {isPending ? " · 선생님이 확인하고 있어요" : ""}
+          </span>
+        </span>
+        {(canEdit || (canDelete && onDelete) || (isTeacher && onPraise && !card.isTeacher)) && (
+          <span className="pc-owner-tools">
+            {canEdit && (
+              <button type="button" data-ux-role="control" className="pc-btn" onClick={() => onEdit?.()}>고치기</button>
+            )}
+            {isTeacher && onPraise && !card.isTeacher && (
+              <button type="button" data-ux-role="control" className="pc-btn" onClick={() => onPraise()}>{t("praiseAction", viewerLang)}</button>
+            )}
+            {canDelete && onDelete && (
+              <button type="button" data-ux-role="control" className="pc-btn danger" onClick={() => onDelete()}>지우기</button>
+            )}
+          </span>
+        )}
+      </header>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 800, fontSize: 15, color: "#1F2937" }}>
-                {card.authorName}
-              </span>
-              {card.isTeacher && (
-                <span style={{
-                  fontSize: 11, background: p.accent, color: "#fff",
-                  borderRadius: 999, padding: "2px 8px", fontWeight: 700,
-                  height: 20, display: "inline-flex", alignItems: "center",
-                }}>{t("teacherTag", viewerLang)}</span>
-              )}
-              {cardType !== "text" && (
-                <span style={{
-                  fontSize: 11, background: "#F3F4F6", color: "#6B7280",
-                  borderRadius: 999, padding: "2px 8px",
-                  height: 20, display: "inline-flex", alignItems: "center",
-                }}>
-                  {cardType === "image" ? "🖼️ 사진" : cardType === "youtube" ? "📺 YouTube" : t("drawBadge", viewerLang)}
-                </span>
-              )}
-              {card.flagged && (
-                <span style={{
-                  fontSize: 11, background: "#FEF2F2", color: "#DC2626",
-                  borderRadius: 999, padding: "2px 8px", border: "1px solid #FECACA",
-                  height: 20, display: "inline-flex", alignItems: "center",
-                }}>⚠️ 검토</span>
-              )}
-              {isPending && (
-                <span style={{
-                  fontSize: 11, background: "#FEF3C7", color: "#D97706",
-                  borderRadius: 999, padding: "2px 8px", border: "1px solid #FDE68A",
-                  fontWeight: 700,
-                  height: 20, display: "inline-flex", alignItems: "center",
-                }}>대기 중</span>
-              )}
-              {card.editedAt && (
-                <span style={{
-                  fontSize: 11, background: "#F0F9FF", color: "#0369A1",
-                  borderRadius: 999, padding: "2px 8px",
-                  height: 20, display: "inline-flex", alignItems: "center",
-                }}>수정됨</span>
-              )}
-            </div>
-            <div style={{
-              fontSize: 12, color: "#6B7280", marginTop: 3,
-              display: "flex", alignItems: "center", gap: 5, fontWeight: 600,
-              flexWrap: "wrap",
-            }}>
-              <span style={{ whiteSpace: "nowrap" }}>
-                {LANGUAGES[card.authorLang]?.flag} {LANGUAGES[card.authorLang]?.label}
-              </span>
-              <span style={{ color: "#E5E7EB" }}>·</span>
-              <span style={{ whiteSpace: "nowrap" }}>{timeAgo(card.timestamp)}</span>
-            </div>
-          </div>
+      {/* ── 2. 그림·사진 ── */}
+      {(cardType === "image" || cardType === "drawing") && card.imageUrl && !imgError && (
+        <button type="button" className="pc-img-btn" onClick={() => setZoomSrc(card.imageUrl!)} aria-label="그림 크게 보기">
+          <img src={card.imageUrl} alt={cardType === "drawing" ? "친구가 그린 그림" : "친구가 올린 사진"} onError={() => setImgError(true)} className="pc-img" />
+        </button>
+      )}
+      {(cardType === "image" || cardType === "drawing") && imgError && (
+        <p data-ux-role="body" className="pc-state warn">{t("cardImageFailed", viewerLang)}</p>
+      )}
+      <ImageLightbox src={zoomSrc} alt={`${card.authorName}의 ${cardType === "drawing" ? "그림" : "사진"}`} onClose={() => setZoomSrc(null)} />
 
-          {/* Action buttons — grouped together, icon-only, can wrap below author
-              info on narrow cards without squeezing the "lang · time" line. */}
-          {(canEdit || canDelete || (isTeacher && onPraise && !card.isTeacher)) && (
-            <div
-              style={{
-                display: "flex",
-                gap: 4,
-                flexShrink: 0,
-                alignSelf: "flex-start",
-                flexWrap: "wrap",
-                justifyContent: "flex-end",
-                maxWidth: 108,
-              }}
-            >
-              {canEdit && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
-                  title={isTeacher ? "수정" : "5분 내 수정 가능"}
-                  aria-label="수정"
-                  style={{
-                    background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 8,
-                    width: 32, height: 32, padding: 0, cursor: "pointer", fontSize: 14, color: "#0369A1",
-                    fontWeight: 700, transition: "all 0.15s",
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#E0F2FE"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F0F9FF"; }}
-                >
-                  ✏️
-                </button>
-              )}
-              {isTeacher && onPraise && !card.isTeacher && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onPraise(); }}
-                  title={`${t("praiseAction", viewerLang)} — ${card.authorName}`}
-                  aria-label={t("praiseAction", viewerLang)}
-                  style={{
-                    background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8,
-                    width: 32, height: 32, padding: 0, cursor: "pointer", fontSize: 15, color: "#B45309",
-                    fontWeight: 800, transition: "all 0.15s",
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF3C7"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FFFBEB"; }}
-                >
-                  🌟
-                </button>
-              )}
-              {canDelete && onDelete && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                  title="삭제 (되돌리기 가능)"
-                  aria-label="삭제"
-                  style={{
-                    background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8,
-                    width: 32, height: 32, padding: 0, cursor: "pointer", fontSize: 14, color: "#DC2626",
-                    fontWeight: 700, transition: "all 0.15s",
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEE2E2"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF2F2"; }}
-                >
-                  🗑️
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Image / Drawing — 클릭하면 크게 보기 ── */}
-        {(cardType === "image" || cardType === "drawing") && card.imageUrl && !imgError && (
-          <img
-            src={card.imageUrl}
-            alt={cardType}
-            onError={() => setImgError(true)}
-            onClick={() => setZoomSrc(card.imageUrl!)}
-            title="크게 보기"
-            style={{ width: "100%", borderRadius: 10, display: "block", cursor: "zoom-in" }}
+      {cardType === "youtube" && card.youtubeId && (
+        <div className="pc-video">
+          <iframe
+            src={`https://www.youtube.com/embed/${card.youtubeId}`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title="YouTube video"
           />
-        )}
-        <ImageLightbox src={zoomSrc} alt={`${card.authorName}의 ${cardType === "drawing" ? "그림" : "사진"}`} onClose={() => setZoomSrc(null)} />
-        {(cardType === "image" || cardType === "drawing") && imgError && (
-          <div style={{ padding: "24px", textAlign: "center", color: "#9CA3AF", fontSize: 12, background: "#F9FAFB", borderRadius: 10 }}>
-            이미지를 불러올 수 없습니다
-          </div>
-        )}
-        {/* 활동지 이미지: 번역 텍스트 */}
-        {cardType === "image" && card.originalText && (
-          <div style={{
-            marginTop: 8, padding: "8px 12px", borderRadius: 8,
-            background: p.accent + "0A", borderLeft: `3px solid ${p.accent}`,
-          }}>
-            <div style={{ fontSize: 10, color: p.accent, fontWeight: 700, marginBottom: 3, opacity: 0.8 }}>
-              {LANGUAGES[card.authorLang]?.flag} 번역
-            </div>
-            <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.65 }}>
-              {card.translations?.[viewerLang] && viewerLang !== card.authorLang
-                ? card.translations[viewerLang]
-                : card.originalText}
-            </div>
-          </div>
-        )}
-
-        {/* ── YouTube ── */}
-        {cardType === "youtube" && card.youtubeId && (
-          <>
-            <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 10, overflow: "hidden" }}>
-              <iframe
-                src={`https://www.youtube.com/embed/${card.youtubeId}`}
-                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                title="YouTube video"
-              />
-            </div>
-
-            {/* 자막 번역 토글 */}
-            <button
-              onClick={toggleTranscript}
-              style={{
-                background: transcriptOpen ? p.accent + "14" : "rgba(255,255,255,0.7)",
-                border: `1.5px dashed ${p.accent}55`, cursor: "pointer",
-                fontSize: 13, color: p.accent, fontWeight: 800,
-                padding: "8px 14px", marginTop: 8, borderRadius: 999,
-                display: "inline-flex", alignItems: "center", gap: 4, transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = p.accent + "14")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = transcriptOpen ? p.accent + "14" : "rgba(255,255,255,0.7)")}
-            >
-              {transcriptOpen ? t("captionHide", viewerLang) : t("captionShow", viewerLang)}
-            </button>
-
-            {transcriptOpen && (
-              <div style={{ marginTop: 8 }}>
-                {transcriptLoading && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#6B7280", padding: "10px 14px", background: "#F9FAFB", borderRadius: 10 }}>
-                    <span style={{ display: "inline-block", animation: "pulse 1.2s ease-in-out infinite" }}>● ● ●</span>
-                    {t("captionLoading", viewerLang)}
-                  </div>
-                )}
-
-                {!transcriptLoading && transcriptErr && (
-                  <div style={{ fontSize: 13, color: "#6B7280", padding: "10px 14px", background: "#F9FAFB", borderRadius: 10 }}>
-                    {transcriptErr}
-                  </div>
-                )}
-
-                {!transcriptLoading && transcript && !transcript.available && (
-                  <div style={{ fontSize: 13, color: "#6B7280", padding: "10px 14px", background: "#F9FAFB", borderRadius: 10 }}>
-                    📝 {transcript.reason || t("captionNone", viewerLang)}
-                  </div>
-                )}
-
-                {!transcriptLoading && transcript && transcript.available && (() => {
-                  const src = transcript.sourceLang;
-                  const viewerText = viewerLang === src
-                    ? transcript.original
-                    : (transcript.translations?.[viewerLang] || transcript.original);
-                  const otherLangs = roomLangs.filter(
-                    (l) => l !== viewerLang && l !== src && transcript.translations?.[l],
-                  );
-                  return (
-                    <>
-                      <TranscriptBlock
-                        lang={viewerLang}
-                        text={viewerText}
-                        accent={colColor}
-                      />
-
-                      {src && src !== viewerLang && (
-                        <div>
-                          <button
-                            onClick={() => setTranscriptOrigOpen((v) => !v)}
-                            style={transcriptSubBtnStyle(p.accent)}
-                          >
-                            {transcriptOrigOpen ? "▲ " : "▼ "}{LANGUAGES[src]?.flag} {t("captionOriginal", viewerLang)}
-                          </button>
-                          {transcriptOrigOpen && (
-                            <TranscriptBlock lang={src} text={transcript.original} accent={p.accent} />
-                          )}
-                        </div>
-                      )}
-
-                      {otherLangs.length > 0 && (
-                        <div>
-                          <button
-                            onClick={() => setTranscriptOtherOpen((v) => !v)}
-                            style={transcriptSubBtnStyle(p.accent)}
-                          >
-                            {transcriptOtherOpen ? "▲ 접기" : `▼ +${otherLangs.length}개 언어 더보기`}
-                          </button>
-                          {transcriptOtherOpen && otherLangs.map((l) => (
-                            <TranscriptBlock key={l} lang={l} text={transcript.translations[l]} accent={p.accent} />
-                          ))}
-                        </div>
-                      )}
-
-                      {transcript.truncated && (
-                        <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 6, paddingLeft: 4 }}>
-                          ⓘ 긴 영상이라 앞부분만 번역했어요
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-
-                {/* 교사용 붙여넣기 폴백 — 자동 추출이 막혔거나 자막이 없을 때 */}
-                {isTeacher && !transcriptLoading && (!transcript || !transcript.available) && (
-                  <div style={{
-                    marginTop: 10, padding: "12px 14px", background: "#F0F9FF",
-                    border: "1px dashed #7DD3FC", borderRadius: 12,
-                  }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: "#0369A1", marginBottom: 6 }}>
-                      👩‍🏫 교사용 · 자막 직접 붙여넣기
-                    </div>
-                    <div style={{ fontSize: 11, color: "#0C4A6E", marginBottom: 8, lineHeight: 1.5 }}>
-                      YouTube 자동 자막을 가져올 수 없을 때, 영상 설명/자막 스크립트를 붙여넣으면
-                      모든 학생 언어로 자동 번역돼요. ({LANGUAGES[viewerLang]?.label} 기준으로 인식)
-                    </div>
-                    <textarea
-                      value={pasteText}
-                      onChange={(e) => setPasteText(e.target.value)}
-                      placeholder="여기에 자막/스크립트를 붙여넣으세요"
-                      disabled={pasteSubmitting}
-                      rows={4}
-                      style={{
-                        width: "100%", borderRadius: 10, padding: "10px 12px",
-                        border: "1.5px solid #BAE6FD", fontSize: 14, outline: "none",
-                        resize: "vertical", boxSizing: "border-box", lineHeight: 1.6,
-                        background: pasteSubmitting ? "#F3F4F6" : "#fff", color: "#1F2937",
-                      }}
-                    />
-                    <button
-                      onClick={submitManualTranscript}
-                      disabled={!pasteText.trim() || pasteSubmitting}
-                      style={{
-                        marginTop: 8, padding: "9px 18px", borderRadius: 10, border: "none",
-                        background: pasteText.trim() && !pasteSubmitting ? "linear-gradient(135deg, #0EA5E9, #0284C7)" : "#E5E7EB",
-                        color: pasteText.trim() && !pasteSubmitting ? "#fff" : "#9CA3AF",
-                        fontWeight: 800, fontSize: 14,
-                        cursor: pasteText.trim() && !pasteSubmitting ? "pointer" : "not-allowed",
-                      }}
-                    >
-                      {pasteSubmitting ? "번역 중…" : "🌐 번역해서 올리기"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ── Text ── */}
-        {cardType === "text" && (
-          <>
-            <div style={{
-              fontSize: 17, fontWeight: 500, color: "#1F2937", lineHeight: 1.65,
-              padding: "12px 14px",
-              background: "#fff",
-              borderRadius: 12, border: "1px solid " + p.accent + "22",
-              display: "flex", gap: 10, alignItems: "flex-start",
-            }}>
-              <span style={{ flex: 1 }}>{card.originalText}</span>
-              <button
-                onClick={() => speakText(card.originalText, card.authorLang)}
-                aria-label="원문 읽어주기"
-                style={{ background: p.accent + "14", border: `1.5px solid ${p.accent}33`, cursor: "pointer", fontSize: 13, color: p.accent, flexShrink: 0, padding: "4px 8px", transition: "all 0.15s", borderRadius: 10, fontWeight: 700 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = p.accent + "22"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.08)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = p.accent + "14"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
-              >🔊</button>
-            </div>
-
-            {card.loading && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9CA3AF", marginTop: 8 }}>
-                <span style={{ display: "inline-block", animation: "pulse 1.2s ease-in-out infinite" }}>● ● ●</span>
-              </div>
-            )}
-
-            {!card.loading && card.translations?.[viewerLang] && viewerLang !== card.authorLang && (
-              <div style={{ paddingTop: 2 }}>
-                <TranslationRow lang={viewerLang} text={card.translations[viewerLang]} accent={colColor} />
-              </div>
-            )}
-
-            {card.translateError && (
-              <div style={{
-                background: "#FEF2F2", color: "#B91C1C",
-                borderLeft: "3px solid #EF4444",
-                padding: "6px 10px", borderRadius: 6, fontSize: 12,
-                marginTop: 6,
-              }}>⚠️ 번역 실패</div>
-            )}
-
-            {otherLangs.length > 0 && (
-              <div>
-                <button
-                  onClick={() => setOpen((v) => !v)}
-                  style={{
-                    background: "rgba(255,255,255,0.7)", border: `1.5px dashed ${p.accent}55`, cursor: "pointer",
-                    fontSize: 13, color: p.accent, fontWeight: 800,
-                    padding: "8px 14px", marginTop: 8, borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 4,
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = p.accent + "14")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.7)")}
-                >
-                  {open ? "▲ 접기" : `▼ +${otherLangs.length}개 언어 더보기`}
-                </button>
-                {open && otherLangs.map((l) =>
-                  card.translations[l] ? (
-                    <TranslationRow key={l} lang={l} text={card.translations[l]} accent={p.accent} />
-                  ) : null
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* ── Action row: 🔊 들어봐 · ❤️ 좋아요 · 💬 댓글 ── */}
-      <div
-        style={{
-          display: "flex", gap: 8, padding: "10px 12px",
-          borderTop: `1px solid ${p.accent}22`,
-          background: "rgba(255,255,255,0.5)",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => speakText(
-            cardType === "text" ? card.originalText :
-            (card.originalText || card.translations?.[viewerLang] || ""),
-            card.authorLang
-          )}
-          aria-label="원문 읽어주기"
-          style={{
-            flex: 1, minHeight: 56, borderRadius: 12,
-            background: "#fff", border: `2px solid ${p.accent}44`,
-            color: p.accent, fontSize: 14, fontWeight: 900,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-            transition: "all 0.15s",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = p.accent + "14"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; }}
-        >🔊 들어봐</button>
-
-        <button
-          type="button"
-          onClick={toggleLike}
-          disabled={!myClientId}
-          aria-pressed={likedByMe}
-          aria-label={likedByMe ? "좋아요 취소" : "좋아요"}
-          style={{
-            flex: 1, minHeight: 56, borderRadius: 12,
-            background: likedByMe ? "#FEE2E2" : "#fff",
-            border: `2px solid ${likedByMe ? "#FB7185" : "#FECDD3"}`,
-            color: likedByMe ? "#BE123C" : "#FB7185", fontSize: 14, fontWeight: 900,
-            cursor: myClientId ? "pointer" : "not-allowed",
-            opacity: myClientId ? 1 : 0.6,
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-            transition: "all 0.15s",
-            animation: likeBump > 0 ? "likeBump 0.45s ease" : undefined,
-          }}
-          onAnimationEnd={() => setLikeBump(0)}
-        >{likedByMe ? "❤️" : "🤍"} <span style={{ fontSize: 13 }}>{likeCount > 0 ? likeCount : "좋아요"}</span></button>
-
-        <button
-          type="button"
-          onClick={() => setCommentsOpen((v) => !v)}
-          aria-expanded={commentsOpen}
-          aria-label="댓글"
-          style={{
-            flex: 1, minHeight: 56, borderRadius: 12,
-            background: commentsOpen ? "#EDE9FE" : "#fff",
-            border: `2px solid ${commentsOpen ? "#A78BFA" : "#DDD6FE"}`,
-            color: commentsOpen ? "#6D28D9" : "#8B5CF6", fontSize: 14, fontWeight: 900,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-            transition: "all 0.15s",
-          }}
-        >💬 <span>{commentCount > 0 ? commentCount : "댓글"}</span></button>
-      </div>
-
-      {/* ── Expanded comments section ── */}
-      {commentsOpen && (
-        <div style={{
-          padding: "14px 16px",
-          background: "#FFFBEB",
-          borderTop: `1px solid ${p.accent}22`,
-        }}>
-          {/* Header */}
-          <div style={{ fontWeight: 700, fontSize: 12, color: "#374151", marginBottom: 10 }}>
-            💬 {comments.filter((c) => !c.status || c.status === "approved").length > 0
-              ? `댓글 (${comments.filter((c) => !c.status || c.status === "approved").length})`
-              : t("noComments", viewerLang)
-            }
-          </div>
-
-          {/* Comments list */}
-          {comments.length === 0 && (
-            <div style={{ fontSize: 12, color: "#9CA3AF", textAlign: "center", padding: "10px 0" }}>
-              {t("noComments", viewerLang)}
-            </div>
-          )}
-          {comments.map((comment) => {
-            const isPendingComment = comment.status === "pending";
-            const canDeleteThis =
-              isTeacher ||
-              (myClientId &&
-                comment.authorClientId === myClientId &&
-                Date.now() - comment.timestamp < 5 * 60 * 1000);
-            const displayText = comment.translations?.[viewerLang] || comment.text;
-            return (
-              <div key={comment.id} style={{
-                padding: "10px 12px",
-                borderBottom: "1px solid rgba(0,0,0,0.05)",
-                background: isPendingComment ? "#FFFBEB" : "transparent",
-                borderLeft: isPendingComment ? "3px solid #F59E0B" : "3px solid transparent",
-                borderRadius: 6,
-                marginBottom: 4,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>
-                    {comment.isTeacher ? "👩‍🏫 " : ""}{comment.authorName}
-                  </span>
-                  <span style={{ fontSize: 10, color: "#9CA3AF" }}>
-                    {LANGUAGES[comment.authorLang]?.flag} · {timeAgo(comment.timestamp)}
-                  </span>
-                  {isPendingComment && (
-                    <span style={{ fontSize: 9, background: "#FEF3C7", color: "#D97706", borderRadius: 4, padding: "1px 5px", fontWeight: 700 }}>
-                      {t("commentPending", viewerLang)}
-                    </span>
-                  )}
-                  <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                    {isTeacher && isPendingComment && (
-                      <>
-                        <button
-                          onClick={() => approveComment(comment.id)}
-                          style={{ fontSize: 10, padding: "2px 7px", borderRadius: 5, border: "none", background: "#D1FAE5", color: "#065F46", cursor: "pointer", fontWeight: 700 }}
-                        >
-                          ✓
-                        </button>
-                        <button
-                          onClick={() => {
-                            const db = getClientDb();
-                            remove(ref(db, `rooms/${roomCode}/cards/${card.id}/comments/${comment.id}`));
-                          }}
-                          style={{ fontSize: 10, padding: "2px 7px", borderRadius: 5, border: "none", background: "#FEE2E2", color: "#991B1B", cursor: "pointer", fontWeight: 700 }}
-                        >
-                          ✕
-                        </button>
-                      </>
-                    )}
-                    {canDeleteThis && !isPendingComment && (
-                      <button
-                        onClick={() => deleteComment(comment.id, comment)}
-                        aria-label={t("deleteComment", viewerLang)}
-                        style={{ fontSize: 11, background: "none", border: "none", cursor: "pointer", color: "#D1D5DB", padding: "0 2px" }}
-                        onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#EF4444")}
-                        onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#D1D5DB")}
-                      >🗑</button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Original text (if different from display) */}
-                {comment.authorLang !== viewerLang && (
-                  <div style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.6, marginBottom: 3 }}>
-                    {comment.text}
-                  </div>
-                )}
-                {/* Translated text */}
-                <div style={{
-                  fontSize: 13, color: "#111827", lineHeight: 1.6, fontWeight: 500,
-                  background: `${colColor}0A`, borderLeft: `3px solid ${colColor}`,
-                  padding: "4px 8px", borderRadius: "0 4px 4px 0",
-                }}>
-                  {displayText}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Comment error */}
-          {commentError && (
-            <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 8, padding: "4px 8px", background: "#FEF2F2", borderRadius: 6 }}>
-              {commentError}
-            </div>
-          )}
-
-          {/* Input area */}
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <input
-              value={commentInput}
-              onChange={(e) => {
-                setCommentInput(e.target.value);
-                const key = `draft:comment:${roomCode}:${card.id}`;
-                if (commentDraftTimer.current) clearTimeout(commentDraftTimer.current);
-                commentDraftTimer.current = setTimeout(() => {
-                  if (e.target.value) localStorage.setItem(key, e.target.value);
-                }, 500);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  submitComment();
-                }
-              }}
-              placeholder={t("commentPlaceholder", viewerLang)}
-              disabled={submittingComment}
-              style={{
-                flex: 1, height: 48, borderRadius: 24, padding: "0 18px",
-                border: "2px solid #FDE68A", fontSize: 15, outline: "none",
-                background: submittingComment ? "#F3F4F6" : "#fff",
-                color: "#1F2937", fontWeight: 500,
-              }}
-              onFocus={(e) => (e.target.style.borderColor = colColor)}
-              onBlur={(e) => (e.target.style.borderColor = "#FDE68A")}
-            />
-            <button
-              onClick={submitComment}
-              disabled={!commentInput.trim() || submittingComment}
-              aria-busy={submittingComment}
-              style={{
-                padding: "0 20px", height: 48, borderRadius: 24, border: "none",
-                background: commentInput.trim() && !submittingComment ? `linear-gradient(135deg, ${colColor}, ${colColor}dd)` : "#E5E7EB",
-                color: commentInput.trim() && !submittingComment ? "#fff" : "#9CA3AF",
-                fontWeight: 800, fontSize: 15,
-                cursor: commentInput.trim() && !submittingComment ? "pointer" : "not-allowed",
-                whiteSpace: "nowrap", transition: "all 0.15s", flexShrink: 0,
-                boxShadow: commentInput.trim() && !submittingComment ? `0 6px 16px ${colColor}44` : "none",
-              }}
-            >
-              {submittingComment ? t("commentTranslating", viewerLang) : t("submitComment", viewerLang)}
-            </button>
-          </div>
         </div>
       )}
-    </div>
+
+      {/* ── 3. 내 언어 본문 ── */}
+      {readingText && (
+        <div className="pc-read">
+          {!sameLang && (
+            <span data-ux-role="secondary" className="pc-read-tag">
+              {translating || translateFailed ? LANGUAGES[card.authorLang]?.label : LANGUAGES[viewerLang]?.label}
+            </span>
+          )}
+
+          {/* '번역 중' / '번역 실패' / '원문 보기' 는 서로 다른 상태다. 어떤 경우에도 카드가 비지 않는다. */}
+          {translating && (
+            <p data-ux-role="body" className="pc-state" role="status">{t("cardTranslating", viewerLang)}</p>
+          )}
+          {translateFailed && (
+            <div className="pc-state warn">
+              <p data-ux-role="body" className="pc-state-text">{t("cardTranslateFailed", viewerLang)}</p>
+              <button
+                type="button"
+                data-ux-role="control"
+                className="pc-btn"
+                aria-disabled={retryState === "loading"}
+                onClick={retryTranslate}
+              >{retryState === "loading" ? t("cardTranslating", viewerLang) : t("cardRetryTranslate", viewerLang)}</button>
+            </div>
+          )}
+
+          <p
+            data-ux-role="body"
+            data-ux-reading
+            lang={translating || translateFailed ? card.authorLang : viewerLang}
+            className={isLong && !expanded ? "pc-body clamp" : "pc-body"}
+          >{translating || translateFailed ? card.originalText : readingText}</p>
+
+          {/* 긴 글은 줄 수로 잘라 없애지 않고 펼칠 수 있게 둔다. */}
+          {isLong && (
+            <button type="button" data-ux-role="control" className="pc-btn" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
+              {expanded ? t("cardReadLess", viewerLang) : t("cardReadMore", viewerLang)}
+            </button>
+          )}
+
+          {/* ── 4. 원문 보기 ── */}
+          {!sameLang && !translating && !translateFailed && (
+            <div className="pc-sub">
+              <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={showOriginal} onClick={() => setShowOriginal((v) => !v)}>
+                {showOriginal ? t("cardHideOriginal", viewerLang) : t("cardShowOriginal", viewerLang)}
+              </button>
+              {showOriginal && (
+                <div className="pc-alt">
+                  <span data-ux-role="secondary" className="pc-read-tag">{LANGUAGES[card.authorLang]?.label}</span>
+                  <p data-ux-role="body" data-ux-reading lang={card.authorLang} className="pc-body">{card.originalText}</p>
+                  <ListenButton id="orig" text={card.originalText} lang={card.authorLang} withLang />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 한국어 학습 보기 — 자동으로 쌓지 않고 아이가 고를 때만 함께 보여준다. */}
+          {viewerLang !== "ko" && koText && koText !== card.originalText && (
+            <div className="pc-sub">
+              <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={showKorean} onClick={() => setShowKorean((v) => !v)}>
+                {showKorean ? t("cardHideKorean", viewerLang) : t("cardAlsoKorean", viewerLang)}
+              </button>
+              {showKorean && (
+                <div className="pc-alt">
+                  <span data-ux-role="secondary" className="pc-read-tag">{LANGUAGES.ko?.label}</span>
+                  <p data-ux-role="body" data-ux-reading lang="ko" className="pc-body">{koText}</p>
+                  <ListenButton id="ko" text={koText} lang="ko" withLang />
+                </div>
+              )}
+            </div>
+          )}
+
+          {otherLangs.length > 0 && (
+            <div className="pc-sub">
+              <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={showOthers} onClick={() => setShowOthers((v) => !v)}>
+                {t("cardOtherLangs", viewerLang)}
+              </button>
+              {showOthers && otherLangs.map((l) => (
+                <div key={l} className="pc-alt">
+                  <span data-ux-role="secondary" className="pc-read-tag">{LANGUAGES[l]?.label}</span>
+                  <p data-ux-role="body" data-ux-reading lang={l} className="pc-body">{card.translations[l]}</p>
+                  <ListenButton id={`tr:${l}`} text={card.translations[l]} lang={l} withLang />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── YouTube 자막 (교사 붙여넣기 폴백 포함) ── */}
+      {cardType === "youtube" && card.youtubeId && (
+        <div className="pc-sub">
+          <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={transcriptOpen} onClick={toggleTranscript}>
+            {transcriptOpen ? t("captionHide", viewerLang) : t("captionShow", viewerLang)}
+          </button>
+
+          {transcriptOpen && (
+            <div className="pc-alt">
+              {transcriptLoading && (
+                <p data-ux-role="body" className="pc-state" role="status">{t("captionLoading", viewerLang)}</p>
+              )}
+              {!transcriptLoading && transcriptErr && (
+                <p data-ux-role="body" className="pc-state warn">{transcriptErr}</p>
+              )}
+              {!transcriptLoading && transcript && !transcript.available && (
+                <p data-ux-role="body" className="pc-state warn">{transcript.reason || t("captionNone", viewerLang)}</p>
+              )}
+
+              {!transcriptLoading && transcript && transcript.available && (() => {
+                const src = transcript.sourceLang;
+                const viewerText = viewerLang === src
+                  ? transcript.original
+                  : (transcript.translations?.[viewerLang] || transcript.original);
+                const others = roomLangs.filter(
+                  (l) => l !== viewerLang && l !== src && transcript.translations?.[l],
+                );
+                return (
+                  <>
+                    <p data-ux-role="body" data-ux-reading lang={viewerLang} className="pc-body pre">{viewerText}</p>
+                    <ListenButton id="cap" text={viewerText} lang={viewerLang} />
+                    {src && src !== viewerLang && (
+                      <>
+                        <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={transcriptOrigOpen} onClick={() => setTranscriptOrigOpen((v) => !v)}>
+                          {t("captionOriginal", viewerLang)}
+                        </button>
+                        {transcriptOrigOpen && (
+                          <p data-ux-role="body" data-ux-reading lang={src} className="pc-body pre">{transcript.original}</p>
+                        )}
+                      </>
+                    )}
+                    {others.length > 0 && (
+                      <>
+                        <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={transcriptOtherOpen} onClick={() => setTranscriptOtherOpen((v) => !v)}>
+                          {t("cardOtherLangs", viewerLang)}
+                        </button>
+                        {transcriptOtherOpen && others.map((l) => (
+                          <p key={l} data-ux-role="body" data-ux-reading lang={l} className="pc-body pre">{transcript.translations[l]}</p>
+                        ))}
+                      </>
+                    )}
+                    {transcript.truncated && (
+                      <p data-ux-role="secondary" className="pc-note">긴 영상이라 앞부분만 번역했어요</p>
+                    )}
+                  </>
+                );
+              })()}
+
+              {isTeacher && !transcriptLoading && (!transcript || !transcript.available) && (
+                <div className="pc-alt">
+                  <label data-ux-role="label" htmlFor={`pc-paste-${card.id}`} className="pc-label">
+                    선생님용 · 자막 직접 붙여넣기
+                  </label>
+                  <p data-ux-role="secondary" className="pc-note">
+                    자동 자막을 가져올 수 없을 때 스크립트를 붙여넣으면 모든 학생 언어로 번역돼요.
+                  </p>
+                  <textarea
+                    id={`pc-paste-${card.id}`}
+                    className="pc-textarea"
+                    value={pasteText}
+                    onChange={(e) => setPasteText(e.target.value)}
+                    rows={4}
+                    readOnly={pasteSubmitting}
+                  />
+                  <button
+                    type="button"
+                    data-ux-role="control"
+                    className="pc-btn"
+                    aria-disabled={!pasteText.trim() || pasteSubmitting}
+                    onClick={submitManualTranscript}
+                  >{pasteSubmitting ? "번역 중…" : "번역해서 올리기"}</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 5. 듣기 · 답장 ── */}
+      <div className="pc-actions">
+        <ListenButton
+          id="mine"
+          text={translating || translateFailed ? card.originalText : readingText}
+          lang={translating || translateFailed ? card.authorLang : viewerLang}
+        />
+        <button
+          type="button"
+          data-ux-role="control"
+          className="pc-btn"
+          aria-expanded={commentsOpen}
+          onClick={() => setCommentsOpen((v) => !v)}
+        >{t("cardReply", viewerLang)}{commentCount > 0 ? ` ${commentCount}` : ""}</button>
+      </div>
+
+      {/* ── 반응: 순위가 아니라 하고 싶은 말 ── */}
+      <div className="pc-reactions" role="group" aria-label={t("cardReactions", viewerLang)}>
+        {REACTIONS.map((r) => {
+          const on = mine === r.id;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              data-ux-role="control"
+              className={on ? "pc-btn on" : "pc-btn"}
+              aria-pressed={on}
+              aria-disabled={!myClientId}
+              onClick={() => pickReaction(r.id)}
+            >
+              {t(r.key, viewerLang)}{on ? " ✓" : ""}{counts[r.id] > 0 ? ` ${counts[r.id]}` : ""}
+            </button>
+          );
+        })}
+      </div>
+      {legacy > 0 && (
+        <p data-ux-role="secondary" className="pc-note">{tFmt("cardLegacyLikes", viewerLang, { n: legacy })}</p>
+      )}
+
+      {/* ── 답장 목록 ── */}
+      {commentsOpen && (
+        <div className="pc-comments">
+          {comments.length === 0 ? (
+            <p data-ux-role="body" className="pc-note">{t("noComments", viewerLang)}</p>
+          ) : (
+            comments.map((comment) => {
+              const isPendingComment = comment.status === "pending";
+              const canDeleteThis =
+                isTeacher ||
+                (myClientId &&
+                  comment.authorClientId === myClientId &&
+                  Date.now() - comment.timestamp < 5 * 60 * 1000);
+              const displayText = comment.translations?.[viewerLang] || comment.text;
+              return (
+                <div key={comment.id} className="pc-comment">
+                  <p data-ux-role="secondary" className="pc-comment-who">
+                    <bdi>{comment.authorName}</bdi> · {timeAgo(comment.timestamp)}
+                    {isPendingComment ? ` · ${t("commentPending", viewerLang)}` : ""}
+                  </p>
+                  <p data-ux-role="body" data-ux-reading className="pc-body">{displayText}</p>
+                  <div className="pc-actions">
+                    <ListenButton id={`c:${comment.id}`} text={displayText} lang={viewerLang} />
+                    {isTeacher && isPendingComment && (
+                      <button type="button" data-ux-role="control" className="pc-btn" onClick={() => approveComment(comment.id)}>{t("approve", viewerLang)}</button>
+                    )}
+                    {canDeleteThis && (
+                      <button type="button" data-ux-role="control" className="pc-btn danger" onClick={() => deleteComment(comment.id, comment)}>{t("deleteComment", viewerLang)}</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          {commentError && (
+            <p data-ux-role="body" className="pc-state warn" role="alert">{commentError}</p>
+          )}
+
+          <label data-ux-role="label" className="pc-label" htmlFor={`pc-reply-${card.id}`}>{t("cardReply", viewerLang)}</label>
+          <input
+            id={`pc-reply-${card.id}`}
+            className="pc-input"
+            value={commentInput}
+            onChange={(e) => {
+              const value = e.target.value;
+              setCommentInput(value);
+              const key = `draft:comment:${roomCode}:${card.id}`;
+              if (commentDraftTimer.current) clearTimeout(commentDraftTimer.current);
+              commentDraftTimer.current = setTimeout(() => {
+                if (value) localStorage.setItem(key, value);
+              }, 500);
+            }}
+            onKeyDown={enterUnlessComposing(submitComment)}
+            placeholder={t("commentPlaceholder", viewerLang)}
+            readOnly={submittingComment}
+          />
+          <button
+            type="button"
+            data-ux-role="control"
+            className="pc-btn"
+            aria-disabled={!commentInput.trim() || submittingComment}
+            aria-busy={submittingComment}
+            onClick={submitComment}
+          >{submittingComment ? t("commentTranslating", viewerLang) : t("submitComment", viewerLang)}</button>
+        </div>
+      )}
+    </article>
   );
 }
+
+/* ── 읽기 카드 규칙 ───────────────────────────────────────────────────
+   카드는 가용 폭 전체를 쓰고, 읽는 글줄만 42ch 로 묶는다. 글자 크기는 토큰이
+   정한다 — 여기서 px 을 새로 만들지 않는다 (README §6.2). */
+export const CARD_CSS = `
+.pc-card{
+  display: grid; gap: var(--ux-space-3);
+  width: 100%; box-sizing: border-box;
+  background: var(--ux-surface);
+  border: 2px solid var(--ux-primary-border);
+  border-inline-start: 8px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-4);
+  box-shadow: 0 4px 14px rgba(137,83,0,.10);
+  /* 카드로 스크롤할 때 고정 헤더·하단 버튼에 가리지 않게 한다. */
+  scroll-margin-top: 6rem; scroll-margin-bottom: 6rem;
+}
+.pc-card.pending{ border-style: dashed; }
+.pc-who{ display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap; }
+.pc-avatar{
+  width: 44px; height: 44px; border-radius: var(--ux-radius-pill); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ux-primary-ink); font-weight: 900;
+}
+.pc-who-text{ display: grid; gap: 2px; min-width: 0; flex: 1; }
+.pc-name{ font-weight: 900; color: var(--ux-ink); overflow-wrap: anywhere; }
+.pc-meta{ overflow-wrap: anywhere; }
+.pc-owner-tools{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+
+.pc-img-btn{ padding: 0; border: none; background: none; cursor: zoom-in; width: 100%; }
+.pc-img{ width: 100%; height: auto; display: block; border-radius: var(--ux-radius-surface); }
+.pc-video{ position: relative; width: 100%; padding-bottom: 56.25%; height: 0; border-radius: var(--ux-radius-surface); overflow: hidden; }
+.pc-video iframe{ position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+
+.pc-read{ display: grid; gap: var(--ux-space-2); }
+/* 그리드 자식이라고 버튼을 카드 폭만큼 늘리지 않는다. */
+.pc-read > button, .pc-alt > button{ justify-self: start; }
+.pc-read-tag{ font-weight: 800; }
+.pc-body{
+  margin: 0; color: var(--ux-ink);
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.pc-body.pre{ white-space: pre-wrap; }
+.pc-body.clamp{
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6;
+  overflow: hidden;
+}
+.pc-sub{ display: grid; gap: var(--ux-space-2); justify-items: start; }
+.pc-alt{
+  display: grid; gap: var(--ux-space-2); justify-items: start; width: 100%; box-sizing: border-box;
+  background: var(--ux-surface-sunk); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3);
+}
+.pc-state{
+  margin: 0; display: grid; gap: var(--ux-space-2); justify-items: start;
+  color: var(--ux-ink-soft); font-weight: 700;
+}
+.pc-state.warn{
+  color: var(--ux-error);
+  border: 2px dashed var(--ux-error); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3); word-break: keep-all; overflow-wrap: anywhere;
+}
+.pc-state-text{ margin: 0; }
+.pc-note{ margin: 0; word-break: keep-all; overflow-wrap: anywhere; }
+.pc-label{ font-weight: 800; color: var(--ux-ink); }
+
+.pc-actions, .pc-reactions{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+.pc-btn{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+  white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--ux-space-2);
+  box-sizing: border-box; max-width: 100%;
+}
+.pc-btn.danger{ border-color: var(--ux-error); color: var(--ux-error); }
+.pc-btn[aria-pressed="true"], .pc-btn.on{ border: 3px solid var(--ux-selected-border); background: var(--ux-surface-sunk); }
+.pc-btn[aria-disabled="true"]{ border-style: dashed; color: var(--ux-ink-soft); }
+
+.pc-comments{ display: grid; gap: var(--ux-space-3); border-top: 2px solid var(--ux-surface-sunk); padding-top: var(--ux-space-3); }
+.pc-comment{ display: grid; gap: var(--ux-space-2); background: var(--ux-surface-sunk); border-radius: var(--ux-radius-surface); padding: var(--ux-space-3); }
+.pc-comment-who{ margin: 0; overflow-wrap: anywhere; }
+.pc-input, .pc-textarea{
+  width: 100%; box-sizing: border-box; min-height: var(--ux-control-min);
+  font-family: inherit; font-size: var(--ux-font-body); font-weight: 600;
+  color: var(--ux-ink); background: var(--ux-surface);
+  border: 2px solid var(--ux-ink-soft); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-2) var(--ux-space-3);
+}
+.pc-textarea{ line-height: var(--ux-lh-reading); resize: vertical; }
+`;

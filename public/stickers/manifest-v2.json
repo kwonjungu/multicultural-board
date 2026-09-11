@@ -1,0 +1,7867 @@
+{
+  "meta": {
+    "version": 2,
+    "generatedBy": "scripts/build-sticker-manifest.mjs",
+    "sourceCommitNote": "원본 PNG 는 읽기 전용. 이 파일은 이미지에서 재생성할 수 있다.",
+    "coordinateSpace": "그 파일의 최종 trim 캔버스 픽셀. 퍼센트는 contain 변환 뒤에만 쓴다.",
+    "alphaThreshold": 8,
+    "anchorConversion": "anchors.json 은 PNG 폭/높이 대비 퍼센트다. x = headXPct/100 * sourceWidth, y = (headTopYPct|faceYPct|neckYPct)/100 * sourceHeight.",
+    "anchorSources": {
+      "measured:alpha-bbox": "알파 경계에서 결정적으로 계산. ground = (알파 경계 좌우 중앙, 경계 하단+1).",
+      "measured:anchors.json": "사람이 트림 이미지에서 잰 퍼센트를 px 로 환산. stage 기본 5종만.",
+      "derived:bbox-transfer": "같은 단계 기본 자산과 실루엣 IoU ≥ 0.9 일 때만 알파 bbox 정규화로 이식."
+    },
+    "unmeasured": {
+      "grips": "leftGrip/rightGrip 은 어떤 자산에서도 측정할 수 없다. 그래서 전부 비어 있다.",
+      "headOnRepaints": "skins/ 와 합성본은 재채색이 아니라 다시 그린 그림이라(IoU 0.45~0.96) 대부분 머리/눈/목 앵커를 옮길 수 없다.",
+      "authoredViewLight": "authoredView / lightDirection 은 실측하지 않았다. 타입이 필수라 중립값을 넣었을 뿐 미술 승인 근거가 아니다."
+    },
+    "heldPlacement": "몸 자산에 손 접점이 없으므로 held 는 손에 쥐지 않는다. 캐릭터 접지선 옆에 서는 바닥 소품으로만 배치한다(README §7.3).",
+    "approvedMeans": "기계 무결성(파일 존재·sha256 일치·알파 경계 유효) + 그 자산을 쓰는 데 필요한 자체 앵커가 실측으로 채워짐. 시각 승인은 별개이며 이 값이 아니다.",
+    "attachSupport": "몸 자산에 액세서리를 붙이려면 eyes/neck 앵커가 있어야 한다. 현재 37/168 종만 가능하다.",
+    "counts": {
+      "total": 193
+    },
+    "notes": []
+  },
+  "assets": [
+    {
+      "assetId": "acc/cape",
+      "version": 2,
+      "sha256": "5600944ce4cdb9b29e3402a0f73f2e361713b187e59256b63e53833bbca4c665",
+      "file": "/stickers/acc-cape.png",
+      "sourceWidth": 372,
+      "sourceHeight": 299,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 292
+      },
+      "anchors": {
+        "ground": {
+          "x": 186,
+          "y": 293
+        },
+        "neck": {
+          "x": 186,
+          "y": 6
+        }
+      },
+      "slots": [
+        "cape"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "neck": "measured:alpha-bbox(top-center)"
+      },
+      "attachTo": "neck",
+      "grip": "neck",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "acc/glasses",
+      "version": 2,
+      "sha256": "0ceba9145742e5f367905bd468a24a64dd5cb9756c69b16328b4d00ff001d77d",
+      "file": "/stickers/acc-glasses.png",
+      "sourceWidth": 372,
+      "sourceHeight": 169,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 162
+      },
+      "anchors": {
+        "ground": {
+          "x": 186,
+          "y": 163
+        },
+        "eyes": {
+          "x": 186,
+          "y": 84.5
+        }
+      },
+      "slots": [
+        "acc"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "eyes": "measured:alpha-bbox(center)"
+      },
+      "attachTo": "eyes",
+      "grip": "eyes",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "acc/necklace",
+      "version": 2,
+      "sha256": "f55b47156ab6178696750c1307b64ddde3a18748a64a456d7fdd60d31e80d119",
+      "file": "/stickers/acc-necklace.png",
+      "sourceWidth": 372,
+      "sourceHeight": 226,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 219
+      },
+      "anchors": {
+        "ground": {
+          "x": 186,
+          "y": 220
+        },
+        "neck": {
+          "x": 186,
+          "y": 6
+        }
+      },
+      "slots": [
+        "acc"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "neck": "measured:alpha-bbox(top-center)"
+      },
+      "attachTo": "neck",
+      "grip": "neck",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "acc/scarf",
+      "version": 2,
+      "sha256": "c6e6e0b06430fbf8cc56837194dd43320f7801be859d2a63692cc4c033aac53f",
+      "file": "/stickers/acc-scarf.png",
+      "sourceWidth": 297,
+      "sourceHeight": 372,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 290,
+        "bottom": 365
+      },
+      "anchors": {
+        "ground": {
+          "x": 148.5,
+          "y": 366
+        },
+        "neck": {
+          "x": 148.5,
+          "y": 6
+        }
+      },
+      "slots": [
+        "acc"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "neck": "measured:alpha-bbox(top-center)"
+      },
+      "attachTo": "neck",
+      "grip": "neck",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "aura/heart",
+      "version": 2,
+      "sha256": "3f65693ac28abe71bad1d7dbca53e34f5ebb7c8d6d98746f4f53fdda6c8773dd",
+      "file": "/stickers/aura-heart.png",
+      "sourceWidth": 524,
+      "sourceHeight": 481,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 517,
+        "bottom": 474
+      },
+      "anchors": {},
+      "slots": [
+        "aura"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "aura/prism",
+      "version": 2,
+      "sha256": "b50564fb1ee870c906507515fceaade096899c4b36f5363f3e9456eb1d641f68",
+      "file": "/stickers/aura-prism.png",
+      "sourceWidth": 524,
+      "sourceHeight": 510,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 517,
+        "bottom": 503
+      },
+      "anchors": {},
+      "slots": [
+        "aura"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "aura/royal",
+      "version": 2,
+      "sha256": "8d9208879fb902c377381c36a771c7db88e92153556178b2de18a52c83a22567",
+      "file": "/stickers/aura-royal.png",
+      "sourceWidth": 524,
+      "sourceHeight": 523,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 517,
+        "bottom": 516
+      },
+      "anchors": {},
+      "slots": [
+        "aura"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "aura/sparkle",
+      "version": 2,
+      "sha256": "4afb23700e2fc0c69691a506cf37f1d4cca81382851d616f3b7bb4b93d6a96be",
+      "file": "/stickers/aura-sparkle.png",
+      "sourceWidth": 524,
+      "sourceHeight": 519,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 517,
+        "bottom": 512
+      },
+      "anchors": {},
+      "slots": [
+        "aura"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "aura/stardust",
+      "version": 2,
+      "sha256": "c644864f9fffc169291a5745e928d46082b104b202c896f4ec1287b179d7d56e",
+      "file": "/stickers/aura-stardust.png",
+      "sourceWidth": 524,
+      "sourceHeight": 507,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 517,
+        "bottom": 500
+      },
+      "anchors": {},
+      "slots": [
+        "aura"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "backdrop/flower",
+      "version": 2,
+      "sha256": "869e1e7fc16796181a26466f3f12d386e4a6c6fe0831b3fa4d0b21598469bf87",
+      "file": "/stickers/backdrop-flower.png",
+      "sourceWidth": 768,
+      "sourceHeight": 768,
+      "alphaBounds": {
+        "left": 0,
+        "top": 0,
+        "right": 767,
+        "bottom": 767
+      },
+      "anchors": {},
+      "slots": [
+        "backdrop"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "backdrop/galaxy",
+      "version": 2,
+      "sha256": "15ed846945a28a209573c644d83109d9ed6b6af55c82c6f7b54f02bdff347e1e",
+      "file": "/stickers/backdrop-galaxy.png",
+      "sourceWidth": 768,
+      "sourceHeight": 768,
+      "alphaBounds": {
+        "left": 0,
+        "top": 0,
+        "right": 767,
+        "bottom": 767
+      },
+      "anchors": {},
+      "slots": [
+        "backdrop"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "backdrop/hive",
+      "version": 2,
+      "sha256": "6f6384379dd829f5a40d61c893f59b5b60959144809b90cd972f5c8f94ba9740",
+      "file": "/stickers/backdrop-hive.png",
+      "sourceWidth": 768,
+      "sourceHeight": 768,
+      "alphaBounds": {
+        "left": 0,
+        "top": 0,
+        "right": 767,
+        "bottom": 767
+      },
+      "anchors": {},
+      "slots": [
+        "backdrop"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "backdrop/night",
+      "version": 2,
+      "sha256": "e7248afec31985abdf98d31b22c828c32448f76fcba5a78a525a76be348c3794",
+      "file": "/stickers/backdrop-night.png",
+      "sourceWidth": 768,
+      "sourceHeight": 768,
+      "alphaBounds": {
+        "left": 0,
+        "top": 0,
+        "right": 767,
+        "bottom": 767
+      },
+      "anchors": {},
+      "slots": [
+        "backdrop"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "backdrop/rainbow",
+      "version": 2,
+      "sha256": "1c587685f06adb9fdce7c85f364029201ee787cf04af57d5be9c3b759b210b04",
+      "file": "/stickers/backdrop-rainbow.png",
+      "sourceWidth": 768,
+      "sourceHeight": 768,
+      "alphaBounds": {
+        "left": 0,
+        "top": 0,
+        "right": 767,
+        "bottom": 767
+      },
+      "anchors": {},
+      "slots": [
+        "backdrop"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "backdrop/throne",
+      "version": 2,
+      "sha256": "0d872c8407cc73f12cc7ac35952aebe73621277a1e965658c917f6c106a1786a",
+      "file": "/stickers/backdrop-throne.png",
+      "sourceWidth": 768,
+      "sourceHeight": 768,
+      "alphaBounds": {
+        "left": 0,
+        "top": 0,
+        "right": 767,
+        "bottom": 767
+      },
+      "anchors": {},
+      "slots": [
+        "backdrop"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {},
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "body/stage-1-egg",
+      "version": 2,
+      "sha256": "d401635d0798a9a8e5d72133221edf07741070c5fb9cf8b9a0addf971c98f49e",
+      "file": "/stickers/stage-1-egg.png",
+      "sourceWidth": 360,
+      "sourceHeight": 418,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 353,
+        "bottom": 411
+      },
+      "anchors": {
+        "ground": {
+          "x": 180,
+          "y": 412
+        },
+        "headTop": {
+          "x": 180,
+          "y": 12.54
+        },
+        "eyes": {
+          "x": 180,
+          "y": 158.84
+        },
+        "neck": {
+          "x": 180,
+          "y": 284.24
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "measured:anchors.json",
+        "eyes": "measured:anchors.json",
+        "neck": "measured:anchors.json"
+      },
+      "stage": "egg",
+      "skin": "classic",
+      "hat": null,
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "body/stage-1-egg+classic+cap",
+      "version": 2,
+      "sha256": "c78a34b09028e3790cb1f0fda845419caed91c2c9456d0f1d8a5125d765bbb3e",
+      "file": "/stickers/stage-hats/stage-1-egg-cap.png",
+      "sourceWidth": 1001,
+      "sourceHeight": 1001,
+      "alphaBounds": {
+        "left": 6,
+        "top": 28,
+        "right": 994,
+        "bottom": 973
+      },
+      "anchors": {
+        "ground": {
+          "x": 500.5,
+          "y": 974
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "classic",
+      "hat": "cap",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.51
+    },
+    {
+      "assetId": "body/stage-1-egg+classic+crown",
+      "version": 2,
+      "sha256": "b01f89854d9f851ebb30a3ba7ef741ea91be4ac2d7092abb29a597da9803b821",
+      "file": "/stickers/stage-hats/stage-1-egg-crown.png",
+      "sourceWidth": 999,
+      "sourceHeight": 999,
+      "alphaBounds": {
+        "left": 6,
+        "top": 40,
+        "right": 992,
+        "bottom": 958
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 959
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "classic",
+      "hat": "crown",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.626
+    },
+    {
+      "assetId": "body/stage-1-egg+classic+party",
+      "version": 2,
+      "sha256": "05d3bb42fdb9dc944a2773743174e9769e0240d41ea3ba0233075d301bc33723",
+      "file": "/stickers/stage-hats/stage-1-egg-party.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 6,
+        "top": 13,
+        "right": 990,
+        "bottom": 983
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 984
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "classic",
+      "hat": "party",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.617
+    },
+    {
+      "assetId": "body/stage-1-egg+classic+top",
+      "version": 2,
+      "sha256": "dbd4dd4dcbafa3d00dba69f2e0223bad226a2e0cda84b22d13a33cffbbb5e921",
+      "file": "/stickers/stage-hats/stage-1-egg-top.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 6,
+        "top": 26,
+        "right": 990,
+        "bottom": 970
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 971
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "classic",
+      "hat": "top",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.646
+    },
+    {
+      "assetId": "body/stage-1-egg+green",
+      "version": 2,
+      "sha256": "d38f07267913b801703484b3f130b24fce890a9a253a6eb240f57a819ea22876",
+      "file": "/stickers/skins/stage-1-egg-green.png",
+      "sourceWidth": 1003,
+      "sourceHeight": 1003,
+      "alphaBounds": {
+        "left": 6,
+        "top": 38,
+        "right": 996,
+        "bottom": 965
+      },
+      "anchors": {
+        "ground": {
+          "x": 501.5,
+          "y": 966
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "green",
+      "hat": null,
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.448
+    },
+    {
+      "assetId": "body/stage-1-egg+green+cap",
+      "version": 2,
+      "sha256": "9e6daa3f33240e1793ede32583518bb06f5da6535cd26fe7d16254adc2609c6e",
+      "file": "/stickers/skin-hats/stage-1-egg-green-cap.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 6,
+        "top": 39,
+        "right": 991,
+        "bottom": 959
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 960
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "green",
+      "hat": "cap",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.652
+    },
+    {
+      "assetId": "body/stage-1-egg+green+crown",
+      "version": 2,
+      "sha256": "a20e6a260ad6f794ddbad8cc2b98ec7bd8f9f42ea3cc682cf8c11cf426927db3",
+      "file": "/stickers/skin-hats/stage-1-egg-green-crown.png",
+      "sourceWidth": 1004,
+      "sourceHeight": 1004,
+      "alphaBounds": {
+        "left": 6,
+        "top": 30,
+        "right": 997,
+        "bottom": 974
+      },
+      "anchors": {
+        "ground": {
+          "x": 502,
+          "y": 975
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "green",
+      "hat": "crown",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.468
+    },
+    {
+      "assetId": "body/stage-1-egg+green+party",
+      "version": 2,
+      "sha256": "f014a865b2ef0bad2a9715e8b7b5d15828d1706ebae9dd7bdb087667f80d32d1",
+      "file": "/stickers/skin-hats/stage-1-egg-green-party.png",
+      "sourceWidth": 999,
+      "sourceHeight": 999,
+      "alphaBounds": {
+        "left": 6,
+        "top": 15,
+        "right": 992,
+        "bottom": 983
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 984
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "green",
+      "hat": "party",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.61
+    },
+    {
+      "assetId": "body/stage-1-egg+green+top",
+      "version": 2,
+      "sha256": "b12067ea9705d1072a70ab6514d478cb8b2d9f7bc1f28b237006c10fe616507b",
+      "file": "/stickers/skin-hats/stage-1-egg-green-top.png",
+      "sourceWidth": 1004,
+      "sourceHeight": 1004,
+      "alphaBounds": {
+        "left": 6,
+        "top": 27,
+        "right": 997,
+        "bottom": 976
+      },
+      "anchors": {
+        "ground": {
+          "x": 502,
+          "y": 977
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "green",
+      "hat": "top",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.412
+    },
+    {
+      "assetId": "body/stage-1-egg+orange",
+      "version": 2,
+      "sha256": "13c4f2dfe1fb5fa400fbfee203125c198bab1a13810d53e78a5657c74709d027",
+      "file": "/stickers/skins/stage-1-egg-orange.png",
+      "sourceWidth": 1002,
+      "sourceHeight": 1002,
+      "alphaBounds": {
+        "left": 6,
+        "top": 40,
+        "right": 995,
+        "bottom": 962
+      },
+      "anchors": {
+        "ground": {
+          "x": 501,
+          "y": 963
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "orange",
+      "hat": null,
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.451
+    },
+    {
+      "assetId": "body/stage-1-egg+orange+cap",
+      "version": 2,
+      "sha256": "e7a22da2748bb7e5224093ff2afd7f77435a530155b15858ebef0523b18abb28",
+      "file": "/stickers/skin-hats/stage-1-egg-orange-cap.png",
+      "sourceWidth": 999,
+      "sourceHeight": 999,
+      "alphaBounds": {
+        "left": 6,
+        "top": 31,
+        "right": 992,
+        "bottom": 967
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 968
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "orange",
+      "hat": "cap",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.518
+    },
+    {
+      "assetId": "body/stage-1-egg+orange+crown",
+      "version": 2,
+      "sha256": "817949907ab913ddb2932a61676e9615ac97462bbfb6259117be0e1af51f026a",
+      "file": "/stickers/skin-hats/stage-1-egg-orange-crown.png",
+      "sourceWidth": 1002,
+      "sourceHeight": 1002,
+      "alphaBounds": {
+        "left": 6,
+        "top": 36,
+        "right": 995,
+        "bottom": 965
+      },
+      "anchors": {
+        "ground": {
+          "x": 501,
+          "y": 966
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "orange",
+      "hat": "crown",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.472
+    },
+    {
+      "assetId": "body/stage-1-egg+orange+party",
+      "version": 2,
+      "sha256": "ab614af70b5e049bf374b7d1ef0315c6a29859a484522cbfd116e63da10cc6ca",
+      "file": "/stickers/skin-hats/stage-1-egg-orange-party.png",
+      "sourceWidth": 1002,
+      "sourceHeight": 1002,
+      "alphaBounds": {
+        "left": 6,
+        "top": 18,
+        "right": 995,
+        "bottom": 984
+      },
+      "anchors": {
+        "ground": {
+          "x": 501,
+          "y": 985
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "orange",
+      "hat": "party",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.461
+    },
+    {
+      "assetId": "body/stage-1-egg+orange+top",
+      "version": 2,
+      "sha256": "00a5fa1a968358babf4c85c26260b8bf53f2084c1e20d83c5b1cb86c41a424e9",
+      "file": "/stickers/skin-hats/stage-1-egg-orange-top.png",
+      "sourceWidth": 1002,
+      "sourceHeight": 1002,
+      "alphaBounds": {
+        "left": 6,
+        "top": 23,
+        "right": 995,
+        "bottom": 978
+      },
+      "anchors": {
+        "ground": {
+          "x": 501,
+          "y": 979
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "orange",
+      "hat": "top",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.417
+    },
+    {
+      "assetId": "body/stage-1-egg+pink",
+      "version": 2,
+      "sha256": "0ddf8fce20a08cc6ec7d94bfd8bcb76fedc2ffaa442fb1db4c3de8045b6e2a31",
+      "file": "/stickers/skins/stage-1-egg-pink.png",
+      "sourceWidth": 999,
+      "sourceHeight": 999,
+      "alphaBounds": {
+        "left": 6,
+        "top": 40,
+        "right": 992,
+        "bottom": 958
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 959
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "pink",
+      "hat": null,
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.606
+    },
+    {
+      "assetId": "body/stage-1-egg+pink+cap",
+      "version": 2,
+      "sha256": "ab61a482bcae0778c560760217d6e218cc5dd2d10a1ced293ef085af621ef370",
+      "file": "/stickers/skin-hats/stage-1-egg-pink-cap.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 6,
+        "top": 29,
+        "right": 991,
+        "bottom": 969
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 970
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "pink",
+      "hat": "cap",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.663
+    },
+    {
+      "assetId": "body/stage-1-egg+pink+crown",
+      "version": 2,
+      "sha256": "a58e31407bc16c9bdc1af146764b7b8432c3119a8ce1f5655ff062f5464c2d97",
+      "file": "/stickers/skin-hats/stage-1-egg-pink-crown.png",
+      "sourceWidth": 996,
+      "sourceHeight": 996,
+      "alphaBounds": {
+        "left": 6,
+        "top": 30,
+        "right": 989,
+        "bottom": 965
+      },
+      "anchors": {
+        "ground": {
+          "x": 498,
+          "y": 966
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "pink",
+      "hat": "crown",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.623
+    },
+    {
+      "assetId": "body/stage-1-egg+pink+party",
+      "version": 2,
+      "sha256": "774976245767d749ccc0842e386f0bdcf77ee23e161d980d3dd3fa02a656940d",
+      "file": "/stickers/skin-hats/stage-1-egg-pink-party.png",
+      "sourceWidth": 999,
+      "sourceHeight": 999,
+      "alphaBounds": {
+        "left": 6,
+        "top": 14,
+        "right": 992,
+        "bottom": 984
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 985
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "pink",
+      "hat": "party",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.615
+    },
+    {
+      "assetId": "body/stage-1-egg+pink+top",
+      "version": 2,
+      "sha256": "2b822a481eebfea2cce7654f7ccc44baab4d8905f51dac8d7e5dc6633c0ce2a3",
+      "file": "/stickers/skin-hats/stage-1-egg-pink-top.png",
+      "sourceWidth": 977,
+      "sourceHeight": 977,
+      "alphaBounds": {
+        "left": 20,
+        "top": 6,
+        "right": 956,
+        "bottom": 970
+      },
+      "anchors": {
+        "ground": {
+          "x": 488.5,
+          "y": 971
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "pink",
+      "hat": "top",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.645
+    },
+    {
+      "assetId": "body/stage-1-egg+purple",
+      "version": 2,
+      "sha256": "ccb3e73f6d6a0ddf19d2ca56eeaf595e7c825a2dd72c19d7d0a2ecd036fcad54",
+      "file": "/stickers/skins/stage-1-egg-purple.png",
+      "sourceWidth": 1003,
+      "sourceHeight": 1003,
+      "alphaBounds": {
+        "left": 6,
+        "top": 41,
+        "right": 996,
+        "bottom": 962
+      },
+      "anchors": {
+        "ground": {
+          "x": 501.5,
+          "y": 963
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "purple",
+      "hat": null,
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.446
+    },
+    {
+      "assetId": "body/stage-1-egg+purple+cap",
+      "version": 2,
+      "sha256": "8173a68eba8311d22c5f8aba95ff43b67ece7d59da60bf8231e0e843ebb0fa8a",
+      "file": "/stickers/skin-hats/stage-1-egg-purple-cap.png",
+      "sourceWidth": 1003,
+      "sourceHeight": 1003,
+      "alphaBounds": {
+        "left": 6,
+        "top": 39,
+        "right": 996,
+        "bottom": 964
+      },
+      "anchors": {
+        "ground": {
+          "x": 501.5,
+          "y": 965
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "purple",
+      "hat": "cap",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.505
+    },
+    {
+      "assetId": "body/stage-1-egg+purple+crown",
+      "version": 2,
+      "sha256": "ea541e78087cea2ef6bb242420e7ea6d5969fdcf7b7dcc5c94784975f4d1df28",
+      "file": "/stickers/skin-hats/stage-1-egg-purple-crown.png",
+      "sourceWidth": 1003,
+      "sourceHeight": 1003,
+      "alphaBounds": {
+        "left": 6,
+        "top": 23,
+        "right": 996,
+        "bottom": 980
+      },
+      "anchors": {
+        "ground": {
+          "x": 501.5,
+          "y": 981
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "purple",
+      "hat": "crown",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.467
+    },
+    {
+      "assetId": "body/stage-1-egg+purple+party",
+      "version": 2,
+      "sha256": "aeb53f9998f81846d932f486748d3f7ce25cd86ee43dbed8f515ba89892a6f97",
+      "file": "/stickers/skin-hats/stage-1-egg-purple-party.png",
+      "sourceWidth": 1003,
+      "sourceHeight": 1003,
+      "alphaBounds": {
+        "left": 6,
+        "top": 26,
+        "right": 996,
+        "bottom": 976
+      },
+      "anchors": {
+        "ground": {
+          "x": 501.5,
+          "y": 977
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "purple",
+      "hat": "party",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.451
+    },
+    {
+      "assetId": "body/stage-1-egg+purple+top",
+      "version": 2,
+      "sha256": "e1cd1ff17ef4010a29d867f24d6a304b011923dcc0217f1f490af214f828d42f",
+      "file": "/stickers/skin-hats/stage-1-egg-purple-top.png",
+      "sourceWidth": 999,
+      "sourceHeight": 999,
+      "alphaBounds": {
+        "left": 6,
+        "top": 28,
+        "right": 992,
+        "bottom": 971
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 972
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "purple",
+      "hat": "top",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.648
+    },
+    {
+      "assetId": "body/stage-1-egg+sky",
+      "version": 2,
+      "sha256": "4da78323b313867501f7c01a8a571c38c4dfbfd4b884a2be732bf77226bf8782",
+      "file": "/stickers/skins/stage-1-egg-sky.png",
+      "sourceWidth": 1000,
+      "sourceHeight": 1000,
+      "alphaBounds": {
+        "left": 6,
+        "top": 40,
+        "right": 993,
+        "bottom": 960
+      },
+      "anchors": {
+        "ground": {
+          "x": 500,
+          "y": 961
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "sky",
+      "hat": null,
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.607
+    },
+    {
+      "assetId": "body/stage-1-egg+sky+cap",
+      "version": 2,
+      "sha256": "ef60b0c11dfc9d06828eaaa227278e0bd1b28234d6e3ac97fe505297086f5f30",
+      "file": "/stickers/skin-hats/stage-1-egg-sky-cap.png",
+      "sourceWidth": 1000,
+      "sourceHeight": 1000,
+      "alphaBounds": {
+        "left": 6,
+        "top": 31,
+        "right": 993,
+        "bottom": 968
+      },
+      "anchors": {
+        "ground": {
+          "x": 500,
+          "y": 969
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "sky",
+      "hat": "cap",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.661
+    },
+    {
+      "assetId": "body/stage-1-egg+sky+crown",
+      "version": 2,
+      "sha256": "e42cbaa180b5ef28ea465a2daf2f72092be892676ad4db39454e104e837b96b2",
+      "file": "/stickers/skin-hats/stage-1-egg-sky-crown.png",
+      "sourceWidth": 1000,
+      "sourceHeight": 1000,
+      "alphaBounds": {
+        "left": 6,
+        "top": 33,
+        "right": 993,
+        "bottom": 966
+      },
+      "anchors": {
+        "ground": {
+          "x": 500,
+          "y": 967
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "sky",
+      "hat": "crown",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.625
+    },
+    {
+      "assetId": "body/stage-1-egg+sky+party",
+      "version": 2,
+      "sha256": "3cbdf87f992391a49dceda58dd4558dc0e28b3b277bdf2e34fc75d85d5da4644",
+      "file": "/stickers/skin-hats/stage-1-egg-sky-party.png",
+      "sourceWidth": 996,
+      "sourceHeight": 996,
+      "alphaBounds": {
+        "left": 6,
+        "top": 13,
+        "right": 989,
+        "bottom": 982
+      },
+      "anchors": {
+        "ground": {
+          "x": 498,
+          "y": 983
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "sky",
+      "hat": "party",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.602
+    },
+    {
+      "assetId": "body/stage-1-egg+sky+top",
+      "version": 2,
+      "sha256": "591fbbdf2d381dcfdf054af41bb38db5ac3d07dd3d379c0d004aa063905aa84d",
+      "file": "/stickers/skin-hats/stage-1-egg-sky-top.png",
+      "sourceWidth": 1000,
+      "sourceHeight": 1000,
+      "alphaBounds": {
+        "left": 6,
+        "top": 21,
+        "right": 993,
+        "bottom": 978
+      },
+      "anchors": {
+        "ground": {
+          "x": 500,
+          "y": 979
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "egg"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "egg",
+      "skin": "sky",
+      "hat": "top",
+      "accScalePct": 46,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.65
+    },
+    {
+      "assetId": "body/stage-2-larva",
+      "version": 2,
+      "sha256": "88646d2f8de4a523d86d50fc508cadbbade8ea7bfe13fe8cf10776d17eca143f",
+      "file": "/stickers/stage-2-larva.png",
+      "sourceWidth": 524,
+      "sourceHeight": 524,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 517,
+        "bottom": 517
+      },
+      "anchors": {
+        "ground": {
+          "x": 262,
+          "y": 518
+        },
+        "headTop": {
+          "x": 220.08,
+          "y": 41.92
+        },
+        "eyes": {
+          "x": 220.08,
+          "y": 125.76
+        },
+        "neck": {
+          "x": 220.08,
+          "y": 220.08
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "measured:anchors.json",
+        "eyes": "measured:anchors.json",
+        "neck": "measured:anchors.json"
+      },
+      "stage": "larva",
+      "skin": "classic",
+      "hat": null,
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "body/stage-2-larva+classic+cap",
+      "version": 2,
+      "sha256": "1a6d680ce5299b44a088b15d77009c79b47c3e225c6c418e6942935be6864964",
+      "file": "/stickers/stage-hats/stage-2-larva-cap.png",
+      "sourceWidth": 1009,
+      "sourceHeight": 1009,
+      "alphaBounds": {
+        "left": 37,
+        "top": 6,
+        "right": 971,
+        "bottom": 1002
+      },
+      "anchors": {
+        "ground": {
+          "x": 504.5,
+          "y": 1003
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "classic",
+      "hat": "cap",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.641
+    },
+    {
+      "assetId": "body/stage-2-larva+classic+crown",
+      "version": 2,
+      "sha256": "1a6f0347913288f08b0b262280b10f5aad52a9ac0b0cfec8b7e7f3c1bc84d283",
+      "file": "/stickers/stage-hats/stage-2-larva-crown.png",
+      "sourceWidth": 920,
+      "sourceHeight": 920,
+      "alphaBounds": {
+        "left": 12,
+        "top": 6,
+        "right": 907,
+        "bottom": 913
+      },
+      "anchors": {
+        "ground": {
+          "x": 460,
+          "y": 914
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "classic",
+      "hat": "crown",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.476
+    },
+    {
+      "assetId": "body/stage-2-larva+classic+party",
+      "version": 2,
+      "sha256": "be94e95d3726e24c3a1c68ceb4cbd6658c39d6117fe0b87e602ac8fd0162319f",
+      "file": "/stickers/stage-hats/stage-2-larva-party.png",
+      "sourceWidth": 1008,
+      "sourceHeight": 1008,
+      "alphaBounds": {
+        "left": 54,
+        "top": 6,
+        "right": 954,
+        "bottom": 1001
+      },
+      "anchors": {
+        "ground": {
+          "x": 504.5,
+          "y": 1002
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "classic",
+      "hat": "party",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.634
+    },
+    {
+      "assetId": "body/stage-2-larva+classic+top",
+      "version": 2,
+      "sha256": "ac39c6debc9358e4ddf71a66bba8bd6a8fc720c835ee3de1d5de234152828936",
+      "file": "/stickers/stage-hats/stage-2-larva-top.png",
+      "sourceWidth": 1002,
+      "sourceHeight": 1002,
+      "alphaBounds": {
+        "left": 34,
+        "top": 6,
+        "right": 968,
+        "bottom": 995
+      },
+      "anchors": {
+        "ground": {
+          "x": 501.5,
+          "y": 996
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "classic",
+      "hat": "top",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.636
+    },
+    {
+      "assetId": "body/stage-2-larva+green",
+      "version": 2,
+      "sha256": "512ec42a1f1c5210a6097cb7f0b31879d5b99b49a327b085c611bfc41e74f040",
+      "file": "/stickers/skins/stage-2-larva-green.png",
+      "sourceWidth": 1004,
+      "sourceHeight": 1004,
+      "alphaBounds": {
+        "left": 34,
+        "top": 6,
+        "right": 969,
+        "bottom": 997
+      },
+      "anchors": {
+        "ground": {
+          "x": 502,
+          "y": 998
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "green",
+      "hat": null,
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.63
+    },
+    {
+      "assetId": "body/stage-2-larva+green+cap",
+      "version": 2,
+      "sha256": "6a18ff7e5221d5f2015a25702935e726611536c41aeaac85d26631534946188c",
+      "file": "/stickers/skin-hats/stage-2-larva-green-cap.png",
+      "sourceWidth": 1020,
+      "sourceHeight": 1020,
+      "alphaBounds": {
+        "left": 43,
+        "top": 6,
+        "right": 977,
+        "bottom": 1013
+      },
+      "anchors": {
+        "ground": {
+          "x": 510.5,
+          "y": 1014
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "green",
+      "hat": "cap",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.638
+    },
+    {
+      "assetId": "body/stage-2-larva+green+crown",
+      "version": 2,
+      "sha256": "b91b0792d6f609c8b3226736449c6f5587c63f908c3d5587cf63ac18c776f465",
+      "file": "/stickers/skin-hats/stage-2-larva-green-crown.png",
+      "sourceWidth": 1006,
+      "sourceHeight": 1006,
+      "alphaBounds": {
+        "left": 36,
+        "top": 6,
+        "right": 970,
+        "bottom": 999
+      },
+      "anchors": {
+        "ground": {
+          "x": 503.5,
+          "y": 1000
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "green",
+      "hat": "crown",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.639
+    },
+    {
+      "assetId": "body/stage-2-larva+green+party",
+      "version": 2,
+      "sha256": "6bffe0e02ec40032b05c0d0c935cbe6907df5b9543c33ce5b5f498258cd1b604",
+      "file": "/stickers/skin-hats/stage-2-larva-green-party.png",
+      "sourceWidth": 1020,
+      "sourceHeight": 1020,
+      "alphaBounds": {
+        "left": 43,
+        "top": 6,
+        "right": 977,
+        "bottom": 1013
+      },
+      "anchors": {
+        "ground": {
+          "x": 510.5,
+          "y": 1014
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "green",
+      "hat": "party",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.622
+    },
+    {
+      "assetId": "body/stage-2-larva+green+top",
+      "version": 2,
+      "sha256": "911afdbf3e8ddbe218b35b4ef1559a1af1fb090fb31b265a89581533b1021b66",
+      "file": "/stickers/skin-hats/stage-2-larva-green-top.png",
+      "sourceWidth": 1015,
+      "sourceHeight": 1015,
+      "alphaBounds": {
+        "left": 40,
+        "top": 6,
+        "right": 974,
+        "bottom": 1008
+      },
+      "anchors": {
+        "ground": {
+          "x": 507.5,
+          "y": 1009
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "green",
+      "hat": "top",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.641
+    },
+    {
+      "assetId": "body/stage-2-larva+orange",
+      "version": 2,
+      "sha256": "aa840481eb078eef326584ca011cc23703a78c19d33d24b3e1938af641f387e9",
+      "file": "/stickers/skins/stage-2-larva-orange.png",
+      "sourceWidth": 1004,
+      "sourceHeight": 1004,
+      "alphaBounds": {
+        "left": 34,
+        "top": 6,
+        "right": 969,
+        "bottom": 997
+      },
+      "anchors": {
+        "ground": {
+          "x": 502,
+          "y": 998
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "orange",
+      "hat": null,
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.631
+    },
+    {
+      "assetId": "body/stage-2-larva+orange+cap",
+      "version": 2,
+      "sha256": "73644bff8a3f7651a29c010cc2148411b9d09271d084ba2f5bba06d734e3305c",
+      "file": "/stickers/skin-hats/stage-2-larva-orange-cap.png",
+      "sourceWidth": 1005,
+      "sourceHeight": 1005,
+      "alphaBounds": {
+        "left": 35,
+        "top": 6,
+        "right": 970,
+        "bottom": 998
+      },
+      "anchors": {
+        "ground": {
+          "x": 503,
+          "y": 999
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "orange",
+      "hat": "cap",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.643
+    },
+    {
+      "assetId": "body/stage-2-larva+orange+crown",
+      "version": 2,
+      "sha256": "2c06fc9d42768e2cd942ae97a444b388378eba2e9f573eb9f907008bd811fcc5",
+      "file": "/stickers/skin-hats/stage-2-larva-orange-crown.png",
+      "sourceWidth": 1004,
+      "sourceHeight": 1004,
+      "alphaBounds": {
+        "left": 34,
+        "top": 6,
+        "right": 969,
+        "bottom": 997
+      },
+      "anchors": {
+        "ground": {
+          "x": 502,
+          "y": 998
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "orange",
+      "hat": "crown",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.637
+    },
+    {
+      "assetId": "body/stage-2-larva+orange+party",
+      "version": 2,
+      "sha256": "b50dd97648042d4940603dacfb422048c10a1fe16a4c8c5b1826fe32104a33cf",
+      "file": "/stickers/skin-hats/stage-2-larva-orange-party.png",
+      "sourceWidth": 1020,
+      "sourceHeight": 1020,
+      "alphaBounds": {
+        "left": 42,
+        "top": 6,
+        "right": 977,
+        "bottom": 1013
+      },
+      "anchors": {
+        "ground": {
+          "x": 510,
+          "y": 1014
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "orange",
+      "hat": "party",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.651
+    },
+    {
+      "assetId": "body/stage-2-larva+orange+top",
+      "version": 2,
+      "sha256": "a252f496218fa08b6e39015308b32ed9ee30e899b00796357a7905296697adad",
+      "file": "/stickers/skin-hats/stage-2-larva-orange-top.png",
+      "sourceWidth": 1004,
+      "sourceHeight": 1004,
+      "alphaBounds": {
+        "left": 35,
+        "top": 6,
+        "right": 969,
+        "bottom": 997
+      },
+      "anchors": {
+        "ground": {
+          "x": 502.5,
+          "y": 998
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "orange",
+      "hat": "top",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.639
+    },
+    {
+      "assetId": "body/stage-2-larva+pink",
+      "version": 2,
+      "sha256": "fcc92a341b463fe922df6967080b8919c20ebe54e2b1fd5bc86df70af7317c9e",
+      "file": "/stickers/skins/stage-2-larva-pink.png",
+      "sourceWidth": 1004,
+      "sourceHeight": 1004,
+      "alphaBounds": {
+        "left": 35,
+        "top": 6,
+        "right": 969,
+        "bottom": 997
+      },
+      "anchors": {
+        "ground": {
+          "x": 502.5,
+          "y": 998
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "pink",
+      "hat": null,
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.631
+    },
+    {
+      "assetId": "body/stage-2-larva+pink+cap",
+      "version": 2,
+      "sha256": "ea1bc2d8158c2989c6bb2937701873e78beb8ac0019eeb191fa67f4feb35aa71",
+      "file": "/stickers/skin-hats/stage-2-larva-pink-cap.png",
+      "sourceWidth": 1008,
+      "sourceHeight": 1008,
+      "alphaBounds": {
+        "left": 37,
+        "top": 6,
+        "right": 971,
+        "bottom": 1001
+      },
+      "anchors": {
+        "ground": {
+          "x": 504.5,
+          "y": 1002
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "pink",
+      "hat": "cap",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.644
+    },
+    {
+      "assetId": "body/stage-2-larva+pink+crown",
+      "version": 2,
+      "sha256": "ce540cb4ff7471ac8c7e6057b37a3f242af90a3dba59b88fe952e2eb5b87a026",
+      "file": "/stickers/skin-hats/stage-2-larva-pink-crown.png",
+      "sourceWidth": 1008,
+      "sourceHeight": 1008,
+      "alphaBounds": {
+        "left": 37,
+        "top": 6,
+        "right": 971,
+        "bottom": 1001
+      },
+      "anchors": {
+        "ground": {
+          "x": 504.5,
+          "y": 1002
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "pink",
+      "hat": "crown",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.641
+    },
+    {
+      "assetId": "body/stage-2-larva+pink+party",
+      "version": 2,
+      "sha256": "4baf120ce4cc4607b5d133ecaba599d0dd5f3b09e0883fd9558fa285bf5e083f",
+      "file": "/stickers/skin-hats/stage-2-larva-pink-party.png",
+      "sourceWidth": 1020,
+      "sourceHeight": 1020,
+      "alphaBounds": {
+        "left": 43,
+        "top": 6,
+        "right": 977,
+        "bottom": 1013
+      },
+      "anchors": {
+        "ground": {
+          "x": 510.5,
+          "y": 1014
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "pink",
+      "hat": "party",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.636
+    },
+    {
+      "assetId": "body/stage-2-larva+pink+top",
+      "version": 2,
+      "sha256": "180ce5d8ac274636bdb5d9a2f79b1626356bb78a2d78ebc578dff6024815d6f8",
+      "file": "/stickers/skin-hats/stage-2-larva-pink-top.png",
+      "sourceWidth": 1014,
+      "sourceHeight": 1014,
+      "alphaBounds": {
+        "left": 40,
+        "top": 6,
+        "right": 974,
+        "bottom": 1007
+      },
+      "anchors": {
+        "ground": {
+          "x": 507.5,
+          "y": 1008
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "pink",
+      "hat": "top",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.644
+    },
+    {
+      "assetId": "body/stage-2-larva+purple",
+      "version": 2,
+      "sha256": "26baad988ed5e753812529302fd01a2c93e51573d98ea892b6753e3d29befd8f",
+      "file": "/stickers/skins/stage-2-larva-purple.png",
+      "sourceWidth": 1005,
+      "sourceHeight": 1005,
+      "alphaBounds": {
+        "left": 35,
+        "top": 6,
+        "right": 970,
+        "bottom": 998
+      },
+      "anchors": {
+        "ground": {
+          "x": 503,
+          "y": 999
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "purple",
+      "hat": null,
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.631
+    },
+    {
+      "assetId": "body/stage-2-larva+purple+cap",
+      "version": 2,
+      "sha256": "b25094b6388a06b7c7d36102ee7c5a08b2333cf8fbe89d14514ccf1091429ee8",
+      "file": "/stickers/skin-hats/stage-2-larva-purple-cap.png",
+      "sourceWidth": 1016,
+      "sourceHeight": 1016,
+      "alphaBounds": {
+        "left": 41,
+        "top": 6,
+        "right": 975,
+        "bottom": 1009
+      },
+      "anchors": {
+        "ground": {
+          "x": 508.5,
+          "y": 1010
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "purple",
+      "hat": "cap",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.637
+    },
+    {
+      "assetId": "body/stage-2-larva+purple+crown",
+      "version": 2,
+      "sha256": "3f16fcbe0e605d6c6587a0dfd513320a7df7af4f6210b9f4aeb0cefbcf157577",
+      "file": "/stickers/skin-hats/stage-2-larva-purple-crown.png",
+      "sourceWidth": 1005,
+      "sourceHeight": 1005,
+      "alphaBounds": {
+        "left": 35,
+        "top": 6,
+        "right": 970,
+        "bottom": 998
+      },
+      "anchors": {
+        "ground": {
+          "x": 503,
+          "y": 999
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "purple",
+      "hat": "crown",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.632
+    },
+    {
+      "assetId": "body/stage-2-larva+purple+party",
+      "version": 2,
+      "sha256": "0686b824a16ce186db03ecd0005e23947613df791bcb07cdf052c5e4a4db218e",
+      "file": "/stickers/skin-hats/stage-2-larva-purple-party.png",
+      "sourceWidth": 1020,
+      "sourceHeight": 1020,
+      "alphaBounds": {
+        "left": 42,
+        "top": 6,
+        "right": 977,
+        "bottom": 1013
+      },
+      "anchors": {
+        "ground": {
+          "x": 510,
+          "y": 1014
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "purple",
+      "hat": "party",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.642
+    },
+    {
+      "assetId": "body/stage-2-larva+purple+top",
+      "version": 2,
+      "sha256": "411d5156b26c63b16b34c3433a02b9ba2657cfdb5616c14cdb00ccb410750b1c",
+      "file": "/stickers/skin-hats/stage-2-larva-purple-top.png",
+      "sourceWidth": 1005,
+      "sourceHeight": 1005,
+      "alphaBounds": {
+        "left": 35,
+        "top": 6,
+        "right": 970,
+        "bottom": 998
+      },
+      "anchors": {
+        "ground": {
+          "x": 503,
+          "y": 999
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "purple",
+      "hat": "top",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.639
+    },
+    {
+      "assetId": "body/stage-2-larva+sky",
+      "version": 2,
+      "sha256": "778ee87bdffdedd54f932bd881a6fa9481804808c985e172850467b7446cf4c2",
+      "file": "/stickers/skins/stage-2-larva-sky.png",
+      "sourceWidth": 1006,
+      "sourceHeight": 1006,
+      "alphaBounds": {
+        "left": 35,
+        "top": 6,
+        "right": 970,
+        "bottom": 999
+      },
+      "anchors": {
+        "ground": {
+          "x": 503,
+          "y": 1000
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "sky",
+      "hat": null,
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.629
+    },
+    {
+      "assetId": "body/stage-2-larva+sky+cap",
+      "version": 2,
+      "sha256": "b59bc8d8ca6a1f324ae4f50c04fb864f22d4c1dd6ae6dd516e90e30cb9cc5bbe",
+      "file": "/stickers/skin-hats/stage-2-larva-sky-cap.png",
+      "sourceWidth": 1019,
+      "sourceHeight": 1019,
+      "alphaBounds": {
+        "left": 42,
+        "top": 6,
+        "right": 977,
+        "bottom": 1012
+      },
+      "anchors": {
+        "ground": {
+          "x": 510,
+          "y": 1013
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "sky",
+      "hat": "cap",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.644
+    },
+    {
+      "assetId": "body/stage-2-larva+sky+crown",
+      "version": 2,
+      "sha256": "35bfbb650fe34da122c90f83010a6c8678da6cd8c6b88b2f14b364890307c94c",
+      "file": "/stickers/skin-hats/stage-2-larva-sky-crown.png",
+      "sourceWidth": 1009,
+      "sourceHeight": 1009,
+      "alphaBounds": {
+        "left": 41,
+        "top": 6,
+        "right": 967,
+        "bottom": 1002
+      },
+      "anchors": {
+        "ground": {
+          "x": 504.5,
+          "y": 1003
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "sky",
+      "hat": "crown",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.639
+    },
+    {
+      "assetId": "body/stage-2-larva+sky+party",
+      "version": 2,
+      "sha256": "733cc9277f3bdf0778bab7efc7bad609910e08cb4ecea7b1d66abf3ae12749ac",
+      "file": "/stickers/skin-hats/stage-2-larva-sky-party.png",
+      "sourceWidth": 1020,
+      "sourceHeight": 1020,
+      "alphaBounds": {
+        "left": 42,
+        "top": 6,
+        "right": 977,
+        "bottom": 1013
+      },
+      "anchors": {
+        "ground": {
+          "x": 510,
+          "y": 1014
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "sky",
+      "hat": "party",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.629
+    },
+    {
+      "assetId": "body/stage-2-larva+sky+top",
+      "version": 2,
+      "sha256": "5e4e33b9ba33919fc26b7d022fba1d3b062f15e8b944fc9e034a83a8a6e0f0d4",
+      "file": "/stickers/skin-hats/stage-2-larva-sky-top.png",
+      "sourceWidth": 1011,
+      "sourceHeight": 1011,
+      "alphaBounds": {
+        "left": 38,
+        "top": 6,
+        "right": 973,
+        "bottom": 1004
+      },
+      "anchors": {
+        "ground": {
+          "x": 506,
+          "y": 1005
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "larva"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "larva",
+      "skin": "sky",
+      "hat": "top",
+      "accScalePct": 42,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.638
+    },
+    {
+      "assetId": "body/stage-3-pupa",
+      "version": 2,
+      "sha256": "997c74cc131f8d504aab3d5a950d8c4b5fc3cf80650bd24610ac640cae796110",
+      "file": "/stickers/stage-3-pupa.png",
+      "sourceWidth": 361,
+      "sourceHeight": 524,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 354,
+        "bottom": 517
+      },
+      "anchors": {
+        "ground": {
+          "x": 180.5,
+          "y": 518
+        },
+        "headTop": {
+          "x": 180.5,
+          "y": 199.12
+        },
+        "eyes": {
+          "x": 180.5,
+          "y": 131
+        },
+        "neck": {
+          "x": 180.5,
+          "y": 183.4
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "measured:anchors.json",
+        "eyes": "measured:anchors.json",
+        "neck": "measured:anchors.json"
+      },
+      "stage": "pupa",
+      "skin": "classic",
+      "hat": null,
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "body/stage-3-pupa+classic+cap",
+      "version": 2,
+      "sha256": "b4378b38ff58a831dd7e605240f083ca4e3ed5314ed8e2a74e8262df7d70b98b",
+      "file": "/stickers/stage-hats/stage-3-pupa-cap.png",
+      "sourceWidth": 977,
+      "sourceHeight": 977,
+      "alphaBounds": {
+        "left": 38,
+        "top": 6,
+        "right": 939,
+        "bottom": 970
+      },
+      "anchors": {
+        "ground": {
+          "x": 489,
+          "y": 971
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "classic",
+      "hat": "cap",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.72
+    },
+    {
+      "assetId": "body/stage-3-pupa+classic+crown",
+      "version": 2,
+      "sha256": "9cb47f8a5043e89c7f7f65a1bffb1dc63d3f400ca234cc033e4b1d9f9e92e8bb",
+      "file": "/stickers/stage-hats/stage-3-pupa-crown.png",
+      "sourceWidth": 987,
+      "sourceHeight": 987,
+      "alphaBounds": {
+        "left": 42,
+        "top": 6,
+        "right": 945,
+        "bottom": 980
+      },
+      "anchors": {
+        "ground": {
+          "x": 494,
+          "y": 981
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "classic",
+      "hat": "crown",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.688
+    },
+    {
+      "assetId": "body/stage-3-pupa+classic+party",
+      "version": 2,
+      "sha256": "4a413680182747ad2b9f66560835b995ba30fe389166182ad7fa2b003b3e902c",
+      "file": "/stickers/stage-hats/stage-3-pupa-party.png",
+      "sourceWidth": 989,
+      "sourceHeight": 989,
+      "alphaBounds": {
+        "left": 44,
+        "top": 6,
+        "right": 945,
+        "bottom": 982
+      },
+      "anchors": {
+        "ground": {
+          "x": 495,
+          "y": 983
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "classic",
+      "hat": "party",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.681
+    },
+    {
+      "assetId": "body/stage-3-pupa+classic+top",
+      "version": 2,
+      "sha256": "55ab76a51aee857e730010d2725acdd16ed554e5e867339952b611c13306e971",
+      "file": "/stickers/stage-hats/stage-3-pupa-top.png",
+      "sourceWidth": 983,
+      "sourceHeight": 983,
+      "alphaBounds": {
+        "left": 41,
+        "top": 6,
+        "right": 942,
+        "bottom": 976
+      },
+      "anchors": {
+        "ground": {
+          "x": 492,
+          "y": 977
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "classic",
+      "hat": "top",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.707
+    },
+    {
+      "assetId": "body/stage-3-pupa+green",
+      "version": 2,
+      "sha256": "535b3712a3701e7d4e7a039862fea953c0bcda667be0ebc02e5b96287a78428d",
+      "file": "/stickers/skins/stage-3-pupa-green.png",
+      "sourceWidth": 984,
+      "sourceHeight": 984,
+      "alphaBounds": {
+        "left": 40,
+        "top": 6,
+        "right": 943,
+        "bottom": 977
+      },
+      "anchors": {
+        "ground": {
+          "x": 492,
+          "y": 978
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "green",
+      "hat": null,
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.673
+    },
+    {
+      "assetId": "body/stage-3-pupa+green+cap",
+      "version": 2,
+      "sha256": "2866a04735cc7f6539879e4b74901b4f7c6434aa546b9e72257940f5ebc046ea",
+      "file": "/stickers/skin-hats/stage-3-pupa-green-cap.png",
+      "sourceWidth": 986,
+      "sourceHeight": 986,
+      "alphaBounds": {
+        "left": 41,
+        "top": 6,
+        "right": 944,
+        "bottom": 979
+      },
+      "anchors": {
+        "ground": {
+          "x": 493,
+          "y": 980
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "green",
+      "hat": "cap",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.724
+    },
+    {
+      "assetId": "body/stage-3-pupa+green+crown",
+      "version": 2,
+      "sha256": "7436c60ff4eb0b4c0a6ec511113933f7f98887227f66e6ece9d7bf29ec06cdb8",
+      "file": "/stickers/skin-hats/stage-3-pupa-green-crown.png",
+      "sourceWidth": 985,
+      "sourceHeight": 985,
+      "alphaBounds": {
+        "left": 41,
+        "top": 6,
+        "right": 944,
+        "bottom": 978
+      },
+      "anchors": {
+        "ground": {
+          "x": 493,
+          "y": 979
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "green",
+      "hat": "crown",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.692
+    },
+    {
+      "assetId": "body/stage-3-pupa+green+party",
+      "version": 2,
+      "sha256": "85d7d7ed1b53e9f55382844dc48c30b86395fc85795a87d7d820803aaf29bb9a",
+      "file": "/stickers/skin-hats/stage-3-pupa-green-party.png",
+      "sourceWidth": 999,
+      "sourceHeight": 999,
+      "alphaBounds": {
+        "left": 49,
+        "top": 6,
+        "right": 950,
+        "bottom": 992
+      },
+      "anchors": {
+        "ground": {
+          "x": 500,
+          "y": 993
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "green",
+      "hat": "party",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.683
+    },
+    {
+      "assetId": "body/stage-3-pupa+green+top",
+      "version": 2,
+      "sha256": "126287f9d81fe3789027ebb159e9b97eec3e691befa17aa5195128f9aa78ca1e",
+      "file": "/stickers/skin-hats/stage-3-pupa-green-top.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 47,
+        "top": 6,
+        "right": 950,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "green",
+      "hat": "top",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.707
+    },
+    {
+      "assetId": "body/stage-3-pupa+orange",
+      "version": 2,
+      "sha256": "8cf167d879e9742ffff9b1786a5809554874746f86db144e190edc2732aee8dd",
+      "file": "/stickers/skins/stage-3-pupa-orange.png",
+      "sourceWidth": 979,
+      "sourceHeight": 979,
+      "alphaBounds": {
+        "left": 38,
+        "top": 6,
+        "right": 941,
+        "bottom": 972
+      },
+      "anchors": {
+        "ground": {
+          "x": 490,
+          "y": 973
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "orange",
+      "hat": null,
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.667
+    },
+    {
+      "assetId": "body/stage-3-pupa+orange+cap",
+      "version": 2,
+      "sha256": "950532803bd871438bed0b17652c990d4f4db028d690c42cde07e8d28e589ed2",
+      "file": "/stickers/skin-hats/stage-3-pupa-orange-cap.png",
+      "sourceWidth": 977,
+      "sourceHeight": 977,
+      "alphaBounds": {
+        "left": 36,
+        "top": 6,
+        "right": 940,
+        "bottom": 970
+      },
+      "anchors": {
+        "ground": {
+          "x": 488.5,
+          "y": 971
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "orange",
+      "hat": "cap",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.712
+    },
+    {
+      "assetId": "body/stage-3-pupa+orange+crown",
+      "version": 2,
+      "sha256": "5e0f6ee43b6f79add9f5bf12514e7c572947615990b2a442f48df25426695ec6",
+      "file": "/stickers/skin-hats/stage-3-pupa-orange-crown.png",
+      "sourceWidth": 981,
+      "sourceHeight": 981,
+      "alphaBounds": {
+        "left": 39,
+        "top": 6,
+        "right": 942,
+        "bottom": 974
+      },
+      "anchors": {
+        "ground": {
+          "x": 491,
+          "y": 975
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "orange",
+      "hat": "crown",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.682
+    },
+    {
+      "assetId": "body/stage-3-pupa+orange+party",
+      "version": 2,
+      "sha256": "f5d9cc2b1e4428741b062208033c674cec9baed6aa63a77127edd9f350f2fdc0",
+      "file": "/stickers/skin-hats/stage-3-pupa-orange-party.png",
+      "sourceWidth": 992,
+      "sourceHeight": 992,
+      "alphaBounds": {
+        "left": 44,
+        "top": 6,
+        "right": 947,
+        "bottom": 985
+      },
+      "anchors": {
+        "ground": {
+          "x": 496,
+          "y": 986
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "orange",
+      "hat": "party",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.68
+    },
+    {
+      "assetId": "body/stage-3-pupa+orange+top",
+      "version": 2,
+      "sha256": "674aa60d0f117a6ec26b638dec78c00d5561231733a0c3c38a9f398f49d63b11",
+      "file": "/stickers/skin-hats/stage-3-pupa-orange-top.png",
+      "sourceWidth": 989,
+      "sourceHeight": 989,
+      "alphaBounds": {
+        "left": 43,
+        "top": 6,
+        "right": 946,
+        "bottom": 982
+      },
+      "anchors": {
+        "ground": {
+          "x": 495,
+          "y": 983
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "orange",
+      "hat": "top",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.699
+    },
+    {
+      "assetId": "body/stage-3-pupa+pink",
+      "version": 2,
+      "sha256": "782bc99b2e73b794a576f32836a5d3eb7e02df57a4044e0a160388b417f16be5",
+      "file": "/stickers/skins/stage-3-pupa-pink.png",
+      "sourceWidth": 981,
+      "sourceHeight": 981,
+      "alphaBounds": {
+        "left": 39,
+        "top": 6,
+        "right": 942,
+        "bottom": 974
+      },
+      "anchors": {
+        "ground": {
+          "x": 491,
+          "y": 975
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "pink",
+      "hat": null,
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.669
+    },
+    {
+      "assetId": "body/stage-3-pupa+pink+cap",
+      "version": 2,
+      "sha256": "bdcc9a9163a8c84732186f86718125a6410d5b6951baeebb9237752d1dab9267",
+      "file": "/stickers/skin-hats/stage-3-pupa-pink-cap.png",
+      "sourceWidth": 994,
+      "sourceHeight": 994,
+      "alphaBounds": {
+        "left": 45,
+        "top": 6,
+        "right": 948,
+        "bottom": 987
+      },
+      "anchors": {
+        "ground": {
+          "x": 497,
+          "y": 988
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "pink",
+      "hat": "cap",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.725
+    },
+    {
+      "assetId": "body/stage-3-pupa+pink+crown",
+      "version": 2,
+      "sha256": "8805edc63262201a7d25554700bbc224bb782c802cb27a7e56906f8a766fc2dc",
+      "file": "/stickers/skin-hats/stage-3-pupa-pink-crown.png",
+      "sourceWidth": 984,
+      "sourceHeight": 984,
+      "alphaBounds": {
+        "left": 40,
+        "top": 6,
+        "right": 943,
+        "bottom": 977
+      },
+      "anchors": {
+        "ground": {
+          "x": 492,
+          "y": 978
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "pink",
+      "hat": "crown",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.689
+    },
+    {
+      "assetId": "body/stage-3-pupa+pink+party",
+      "version": 2,
+      "sha256": "744235079a2a67258034227ed1c819743494f643325fdeb4d01ea78a9319a602",
+      "file": "/stickers/skin-hats/stage-3-pupa-pink-party.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 47,
+        "top": 6,
+        "right": 950,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "pink",
+      "hat": "party",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.671
+    },
+    {
+      "assetId": "body/stage-3-pupa+pink+top",
+      "version": 2,
+      "sha256": "f51ae1cb215000e8c80f3c33d4c8c6483a1c93460b4f9fcf7b7ecd1231819a3d",
+      "file": "/stickers/skin-hats/stage-3-pupa-pink-top.png",
+      "sourceWidth": 995,
+      "sourceHeight": 995,
+      "alphaBounds": {
+        "left": 46,
+        "top": 6,
+        "right": 949,
+        "bottom": 988
+      },
+      "anchors": {
+        "ground": {
+          "x": 498,
+          "y": 989
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "pink",
+      "hat": "top",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.708
+    },
+    {
+      "assetId": "body/stage-3-pupa+purple",
+      "version": 2,
+      "sha256": "8ecafc7507e01c0dc7563d156301f5d4e72424c9a6c3c6a8f34365b8b7df6df4",
+      "file": "/stickers/skins/stage-3-pupa-purple.png",
+      "sourceWidth": 980,
+      "sourceHeight": 980,
+      "alphaBounds": {
+        "left": 38,
+        "top": 6,
+        "right": 941,
+        "bottom": 973
+      },
+      "anchors": {
+        "ground": {
+          "x": 490,
+          "y": 974
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "purple",
+      "hat": null,
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.669
+    },
+    {
+      "assetId": "body/stage-3-pupa+purple+cap",
+      "version": 2,
+      "sha256": "d6687c239845a4c8bcf95844634671e6bc12674b983abb204dfc5faa1e004d6a",
+      "file": "/stickers/skin-hats/stage-3-pupa-purple-cap.png",
+      "sourceWidth": 989,
+      "sourceHeight": 989,
+      "alphaBounds": {
+        "left": 43,
+        "top": 6,
+        "right": 945,
+        "bottom": 982
+      },
+      "anchors": {
+        "ground": {
+          "x": 494.5,
+          "y": 983
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "purple",
+      "hat": "cap",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.724
+    },
+    {
+      "assetId": "body/stage-3-pupa+purple+crown",
+      "version": 2,
+      "sha256": "de51c52898115a91e7ed5946228621a05c3407ffeb0a37baa8d04ace74bba042",
+      "file": "/stickers/skin-hats/stage-3-pupa-purple-crown.png",
+      "sourceWidth": 980,
+      "sourceHeight": 980,
+      "alphaBounds": {
+        "left": 39,
+        "top": 6,
+        "right": 941,
+        "bottom": 973
+      },
+      "anchors": {
+        "ground": {
+          "x": 490.5,
+          "y": 974
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "purple",
+      "hat": "crown",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.688
+    },
+    {
+      "assetId": "body/stage-3-pupa+purple+party",
+      "version": 2,
+      "sha256": "f7ea8812310d683c3181eebda8480c71aa0b4a04dd028f3f5e3c060b3a6055cd",
+      "file": "/stickers/skin-hats/stage-3-pupa-purple-party.png",
+      "sourceWidth": 995,
+      "sourceHeight": 995,
+      "alphaBounds": {
+        "left": 46,
+        "top": 6,
+        "right": 949,
+        "bottom": 988
+      },
+      "anchors": {
+        "ground": {
+          "x": 498,
+          "y": 989
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "purple",
+      "hat": "party",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.688
+    },
+    {
+      "assetId": "body/stage-3-pupa+purple+top",
+      "version": 2,
+      "sha256": "51687b0d5ddb44c83e0b5534148679832c99ba9855a1eeea5d0f00c6358070a6",
+      "file": "/stickers/skin-hats/stage-3-pupa-purple-top.png",
+      "sourceWidth": 985,
+      "sourceHeight": 985,
+      "alphaBounds": {
+        "left": 41,
+        "top": 6,
+        "right": 944,
+        "bottom": 978
+      },
+      "anchors": {
+        "ground": {
+          "x": 493,
+          "y": 979
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "purple",
+      "hat": "top",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.703
+    },
+    {
+      "assetId": "body/stage-3-pupa+sky",
+      "version": 2,
+      "sha256": "fdd468ed76ae74bf055610704c0c083497cdb8c6536526e752fa84cc21492191",
+      "file": "/stickers/skins/stage-3-pupa-sky.png",
+      "sourceWidth": 979,
+      "sourceHeight": 979,
+      "alphaBounds": {
+        "left": 39,
+        "top": 6,
+        "right": 940,
+        "bottom": 972
+      },
+      "anchors": {
+        "ground": {
+          "x": 490,
+          "y": 973
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "sky",
+      "hat": null,
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.668
+    },
+    {
+      "assetId": "body/stage-3-pupa+sky+cap",
+      "version": 2,
+      "sha256": "d84ceab12be4de40559397304896cb95b7fe6aecd5f3f0d6780f32c4f1aa6330",
+      "file": "/stickers/skin-hats/stage-3-pupa-sky-cap.png",
+      "sourceWidth": 992,
+      "sourceHeight": 992,
+      "alphaBounds": {
+        "left": 45,
+        "top": 6,
+        "right": 947,
+        "bottom": 985
+      },
+      "anchors": {
+        "ground": {
+          "x": 496.5,
+          "y": 986
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "sky",
+      "hat": "cap",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.728
+    },
+    {
+      "assetId": "body/stage-3-pupa+sky+crown",
+      "version": 2,
+      "sha256": "14bd4d58cecf1f4af70851d4d6a48a21e0e8f7a7defc459d0ab7b326d5436813",
+      "file": "/stickers/skin-hats/stage-3-pupa-sky-crown.png",
+      "sourceWidth": 981,
+      "sourceHeight": 981,
+      "alphaBounds": {
+        "left": 40,
+        "top": 6,
+        "right": 941,
+        "bottom": 974
+      },
+      "anchors": {
+        "ground": {
+          "x": 491,
+          "y": 975
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "sky",
+      "hat": "crown",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.686
+    },
+    {
+      "assetId": "body/stage-3-pupa+sky+party",
+      "version": 2,
+      "sha256": "a4a86dc2b703eb6fb658db3d170c9ed2d54232e4148bbcdce5e3fd75a49e65d8",
+      "file": "/stickers/skin-hats/stage-3-pupa-sky-party.png",
+      "sourceWidth": 989,
+      "sourceHeight": 989,
+      "alphaBounds": {
+        "left": 78,
+        "top": 6,
+        "right": 911,
+        "bottom": 982
+      },
+      "anchors": {
+        "ground": {
+          "x": 495,
+          "y": 983
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "sky",
+      "hat": "party",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.668
+    },
+    {
+      "assetId": "body/stage-3-pupa+sky+top",
+      "version": 2,
+      "sha256": "27cb3dafc76d7491d56acadae4bb3b9398478deffcf5df7999c6ea04c8b6a763",
+      "file": "/stickers/skin-hats/stage-3-pupa-sky-top.png",
+      "sourceWidth": 985,
+      "sourceHeight": 985,
+      "alphaBounds": {
+        "left": 42,
+        "top": 6,
+        "right": 943,
+        "bottom": 978
+      },
+      "anchors": {
+        "ground": {
+          "x": 493,
+          "y": 979
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "pupa"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "pupa",
+      "skin": "sky",
+      "hat": "top",
+      "accScalePct": 38,
+      "hatScalePct": 40,
+      "silhouetteIoU": 0.698
+    },
+    {
+      "assetId": "body/stage-4-bee",
+      "version": 2,
+      "sha256": "9e412191d0b918d38b8a666900d68f5a5e36eb6ceb94d3c939bd1d48b90cb0d6",
+      "file": "/stickers/stage-4-bee.png",
+      "sourceWidth": 399,
+      "sourceHeight": 399,
+      "alphaBounds": {
+        "left": 16,
+        "top": 6,
+        "right": 382,
+        "bottom": 392
+      },
+      "anchors": {
+        "ground": {
+          "x": 199.5,
+          "y": 393
+        },
+        "headTop": {
+          "x": 199.5,
+          "y": 47.88
+        },
+        "eyes": {
+          "x": 199.5,
+          "y": 159.6
+        },
+        "neck": {
+          "x": 199.5,
+          "y": 215.46
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "measured:anchors.json",
+        "eyes": "measured:anchors.json",
+        "neck": "measured:anchors.json"
+      },
+      "stage": "bee",
+      "skin": "classic",
+      "hat": null,
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "body/stage-4-bee+classic+cap",
+      "version": 2,
+      "sha256": "be8be48b82d5cbaebe741b648e28d83e2d64d5d3d72583613e35ee678f887493",
+      "file": "/stickers/stage-hats/stage-4-bee-cap.png",
+      "sourceWidth": 897,
+      "sourceHeight": 897,
+      "alphaBounds": {
+        "left": 17,
+        "top": 6,
+        "right": 879,
+        "bottom": 890
+      },
+      "anchors": {
+        "ground": {
+          "x": 448.5,
+          "y": 891
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "classic",
+      "hat": "cap",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.748
+    },
+    {
+      "assetId": "body/stage-4-bee+classic+crown",
+      "version": 2,
+      "sha256": "c99aaf2e2bf0efb8649294b105cfcabd227486799f007b066ec985fd1e50b406",
+      "file": "/stickers/stage-hats/stage-4-bee-crown.png",
+      "sourceWidth": 914,
+      "sourceHeight": 914,
+      "alphaBounds": {
+        "left": 10,
+        "top": 6,
+        "right": 903,
+        "bottom": 907
+      },
+      "anchors": {
+        "ground": {
+          "x": 457,
+          "y": 908
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "classic",
+      "hat": "crown",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.792
+    },
+    {
+      "assetId": "body/stage-4-bee+classic+party",
+      "version": 2,
+      "sha256": "2bd9455b6d3bce416e2931deb24fd2bfadccb4f2ac88bf19fe21d82e067c616a",
+      "file": "/stickers/stage-hats/stage-4-bee-party.png",
+      "sourceWidth": 934,
+      "sourceHeight": 934,
+      "alphaBounds": {
+        "left": 80,
+        "top": 6,
+        "right": 853,
+        "bottom": 927
+      },
+      "anchors": {
+        "ground": {
+          "x": 467,
+          "y": 928
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "classic",
+      "hat": "party",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.635
+    },
+    {
+      "assetId": "body/stage-4-bee+classic+top",
+      "version": 2,
+      "sha256": "f1be5d92f62d06e0f6301958d793601c1aa093c27053dd33889f3fd5f715fec1",
+      "file": "/stickers/stage-hats/stage-4-bee-top.png",
+      "sourceWidth": 994,
+      "sourceHeight": 994,
+      "alphaBounds": {
+        "left": 32,
+        "top": 6,
+        "right": 962,
+        "bottom": 987
+      },
+      "anchors": {
+        "ground": {
+          "x": 497.5,
+          "y": 988
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "classic",
+      "hat": "top",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.539
+    },
+    {
+      "assetId": "body/stage-4-bee+green",
+      "version": 2,
+      "sha256": "3142b986c6c7146e998647ac82267888b98b699fd517135b0cf5b1037df96981",
+      "file": "/stickers/skins/stage-4-bee-green.png",
+      "sourceWidth": 917,
+      "sourceHeight": 917,
+      "alphaBounds": {
+        "left": 11,
+        "top": 6,
+        "right": 905,
+        "bottom": 910
+      },
+      "anchors": {
+        "ground": {
+          "x": 458.5,
+          "y": 911
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "green",
+      "hat": null,
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.798
+    },
+    {
+      "assetId": "body/stage-4-bee+green+cap",
+      "version": 2,
+      "sha256": "0a088a02194513ecc35272de4aab0c0a7664cfefd277201009f600d94ab12ed1",
+      "file": "/stickers/skin-hats/stage-4-bee-green-cap.png",
+      "sourceWidth": 924,
+      "sourceHeight": 924,
+      "alphaBounds": {
+        "left": 15,
+        "top": 6,
+        "right": 909,
+        "bottom": 917
+      },
+      "anchors": {
+        "ground": {
+          "x": 462.5,
+          "y": 918
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "green",
+      "hat": "cap",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.767
+    },
+    {
+      "assetId": "body/stage-4-bee+green+crown",
+      "version": 2,
+      "sha256": "f899e18a4d4c6ebb662c907d5365fbfbffc5a813e1e097b5f5c3a49bb486e510",
+      "file": "/stickers/skin-hats/stage-4-bee-green-crown.png",
+      "sourceWidth": 917,
+      "sourceHeight": 917,
+      "alphaBounds": {
+        "left": 11,
+        "top": 6,
+        "right": 905,
+        "bottom": 910
+      },
+      "anchors": {
+        "ground": {
+          "x": 458.5,
+          "y": 911
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "green",
+      "hat": "crown",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.792
+    },
+    {
+      "assetId": "body/stage-4-bee+green+party",
+      "version": 2,
+      "sha256": "96097cfb622d447012af1cfc4d69f84f0af86a645d2d71c750e513dd1bbab8de",
+      "file": "/stickers/skin-hats/stage-4-bee-green-party.png",
+      "sourceWidth": 922,
+      "sourceHeight": 922,
+      "alphaBounds": {
+        "left": 27,
+        "top": 6,
+        "right": 894,
+        "bottom": 915
+      },
+      "anchors": {
+        "ground": {
+          "x": 461,
+          "y": 916
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "green",
+      "hat": "party",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.757
+    },
+    {
+      "assetId": "body/stage-4-bee+green+top",
+      "version": 2,
+      "sha256": "0058355841794cb2cdbe2741f5220f810aa29079464f217d5f8a1d45cc09a1f9",
+      "file": "/stickers/skin-hats/stage-4-bee-green-top.png",
+      "sourceWidth": 938,
+      "sourceHeight": 938,
+      "alphaBounds": {
+        "left": 22,
+        "top": 6,
+        "right": 916,
+        "bottom": 931
+      },
+      "anchors": {
+        "ground": {
+          "x": 469.5,
+          "y": 932
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "green",
+      "hat": "top",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.758
+    },
+    {
+      "assetId": "body/stage-4-bee+orange",
+      "version": 2,
+      "sha256": "41037350b9b89ff5cd052a023b5b81b525ab6513e0be1f9d2bbc1a753c6b4684",
+      "file": "/stickers/skins/stage-4-bee-orange.png",
+      "sourceWidth": 917,
+      "sourceHeight": 917,
+      "alphaBounds": {
+        "left": 11,
+        "top": 6,
+        "right": 905,
+        "bottom": 910
+      },
+      "anchors": {
+        "ground": {
+          "x": 458.5,
+          "y": 911
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "orange",
+      "hat": null,
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.797
+    },
+    {
+      "assetId": "body/stage-4-bee+orange+cap",
+      "version": 2,
+      "sha256": "92629c18a0575ae1bc0dda13d035ec272d6ce7478d061dffdcd3bb2a1f672e19",
+      "file": "/stickers/skin-hats/stage-4-bee-orange-cap.png",
+      "sourceWidth": 930,
+      "sourceHeight": 930,
+      "alphaBounds": {
+        "left": 18,
+        "top": 6,
+        "right": 912,
+        "bottom": 923
+      },
+      "anchors": {
+        "ground": {
+          "x": 465.5,
+          "y": 924
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "orange",
+      "hat": "cap",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.763
+    },
+    {
+      "assetId": "body/stage-4-bee+orange+crown",
+      "version": 2,
+      "sha256": "839dc05d50311f18fba14ce3807c09c60446124a18611143768aa9cb16e1c395",
+      "file": "/stickers/skin-hats/stage-4-bee-orange-crown.png",
+      "sourceWidth": 917,
+      "sourceHeight": 917,
+      "alphaBounds": {
+        "left": 12,
+        "top": 6,
+        "right": 905,
+        "bottom": 910
+      },
+      "anchors": {
+        "ground": {
+          "x": 459,
+          "y": 911
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "orange",
+      "hat": "crown",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.787
+    },
+    {
+      "assetId": "body/stage-4-bee+orange+party",
+      "version": 2,
+      "sha256": "7ce3db17a66f5b300cc69e0cb2286144b44156b8b096e9ed2dedcd1753917214",
+      "file": "/stickers/skin-hats/stage-4-bee-orange-party.png",
+      "sourceWidth": 932,
+      "sourceHeight": 932,
+      "alphaBounds": {
+        "left": 19,
+        "top": 6,
+        "right": 913,
+        "bottom": 925
+      },
+      "anchors": {
+        "ground": {
+          "x": 466.5,
+          "y": 926
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "orange",
+      "hat": "party",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.77
+    },
+    {
+      "assetId": "body/stage-4-bee+orange+top",
+      "version": 2,
+      "sha256": "dd300fad2c88e70439fd5a57e4ccb5cfb85a1880643d9a201533d51ff895baa7",
+      "file": "/stickers/skin-hats/stage-4-bee-orange-top.png",
+      "sourceWidth": 901,
+      "sourceHeight": 901,
+      "alphaBounds": {
+        "left": 36,
+        "top": 6,
+        "right": 865,
+        "bottom": 894
+      },
+      "anchors": {
+        "ground": {
+          "x": 451,
+          "y": 895
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "orange",
+      "hat": "top",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.727
+    },
+    {
+      "assetId": "body/stage-4-bee+pink",
+      "version": 2,
+      "sha256": "669873f6af54b720a1bb3f6f4e8c5da2236a854244998b593e54be9f11a51903",
+      "file": "/stickers/skins/stage-4-bee-pink.png",
+      "sourceWidth": 918,
+      "sourceHeight": 918,
+      "alphaBounds": {
+        "left": 12,
+        "top": 6,
+        "right": 906,
+        "bottom": 911
+      },
+      "anchors": {
+        "ground": {
+          "x": 459.5,
+          "y": 912
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "pink",
+      "hat": null,
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.798
+    },
+    {
+      "assetId": "body/stage-4-bee+pink+cap",
+      "version": 2,
+      "sha256": "2bc9134de57ef819ac223c61bde881fdeb74c613f28cfb8895af715afdb567b9",
+      "file": "/stickers/skin-hats/stage-4-bee-pink-cap.png",
+      "sourceWidth": 927,
+      "sourceHeight": 927,
+      "alphaBounds": {
+        "left": 16,
+        "top": 6,
+        "right": 910,
+        "bottom": 920
+      },
+      "anchors": {
+        "ground": {
+          "x": 463.5,
+          "y": 921
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "pink",
+      "hat": "cap",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.759
+    },
+    {
+      "assetId": "body/stage-4-bee+pink+crown",
+      "version": 2,
+      "sha256": "8779cfd1608b76ecffcb1c04e39f11e926b8aa6d90bb488aee45c8798f83b3e5",
+      "file": "/stickers/skin-hats/stage-4-bee-pink-crown.png",
+      "sourceWidth": 934,
+      "sourceHeight": 934,
+      "alphaBounds": {
+        "left": 29,
+        "top": 6,
+        "right": 904,
+        "bottom": 927
+      },
+      "anchors": {
+        "ground": {
+          "x": 467,
+          "y": 928
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "pink",
+      "hat": "crown",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.742
+    },
+    {
+      "assetId": "body/stage-4-bee+pink+party",
+      "version": 2,
+      "sha256": "345bf7d6fbe5f588b2523ae759f1559fb62c649c14c5451b8334340dad9afb01",
+      "file": "/stickers/skin-hats/stage-4-bee-pink-party.png",
+      "sourceWidth": 932,
+      "sourceHeight": 932,
+      "alphaBounds": {
+        "left": 19,
+        "top": 6,
+        "right": 913,
+        "bottom": 925
+      },
+      "anchors": {
+        "ground": {
+          "x": 466.5,
+          "y": 926
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "pink",
+      "hat": "party",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.756
+    },
+    {
+      "assetId": "body/stage-4-bee+pink+top",
+      "version": 2,
+      "sha256": "75f8a2e39600103273d0411cf4392074b5efb168573007896b2e40728667969c",
+      "file": "/stickers/skin-hats/stage-4-bee-pink-top.png",
+      "sourceWidth": 926,
+      "sourceHeight": 926,
+      "alphaBounds": {
+        "left": 16,
+        "top": 6,
+        "right": 910,
+        "bottom": 919
+      },
+      "anchors": {
+        "ground": {
+          "x": 463.5,
+          "y": 920
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "pink",
+      "hat": "top",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.773
+    },
+    {
+      "assetId": "body/stage-4-bee+purple",
+      "version": 2,
+      "sha256": "58c22b77d4b1a4f15bd766f0121ac244deb53fca2fb9fdfb2657f9f5b945f464",
+      "file": "/stickers/skins/stage-4-bee-purple.png",
+      "sourceWidth": 917,
+      "sourceHeight": 917,
+      "alphaBounds": {
+        "left": 11,
+        "top": 6,
+        "right": 905,
+        "bottom": 910
+      },
+      "anchors": {
+        "ground": {
+          "x": 458.5,
+          "y": 911
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "purple",
+      "hat": null,
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.8
+    },
+    {
+      "assetId": "body/stage-4-bee+purple+cap",
+      "version": 2,
+      "sha256": "58cc9e1d4d53ea2215e78647374289bc2bb849c988f366c3a9bd639933ba61cd",
+      "file": "/stickers/skin-hats/stage-4-bee-purple-cap.png",
+      "sourceWidth": 920,
+      "sourceHeight": 920,
+      "alphaBounds": {
+        "left": 13,
+        "top": 6,
+        "right": 906,
+        "bottom": 913
+      },
+      "anchors": {
+        "ground": {
+          "x": 460,
+          "y": 914
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "purple",
+      "hat": "cap",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.762
+    },
+    {
+      "assetId": "body/stage-4-bee+purple+crown",
+      "version": 2,
+      "sha256": "5f036af0cec18f68ddd4eb411bcc9c32344acb286ab184bc2e744d61c11f006f",
+      "file": "/stickers/skin-hats/stage-4-bee-purple-crown.png",
+      "sourceWidth": 917,
+      "sourceHeight": 917,
+      "alphaBounds": {
+        "left": 11,
+        "top": 6,
+        "right": 905,
+        "bottom": 910
+      },
+      "anchors": {
+        "ground": {
+          "x": 458.5,
+          "y": 911
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "purple",
+      "hat": "crown",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.79
+    },
+    {
+      "assetId": "body/stage-4-bee+purple+party",
+      "version": 2,
+      "sha256": "5a7e61cc34a8ef56831d3f4ab188ae711b0f6531310e15459b5875bfcc10b1ef",
+      "file": "/stickers/skin-hats/stage-4-bee-purple-party.png",
+      "sourceWidth": 945,
+      "sourceHeight": 945,
+      "alphaBounds": {
+        "left": 52,
+        "top": 6,
+        "right": 892,
+        "bottom": 938
+      },
+      "anchors": {
+        "ground": {
+          "x": 472.5,
+          "y": 939
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "purple",
+      "hat": "party",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.69
+    },
+    {
+      "assetId": "body/stage-4-bee+purple+top",
+      "version": 2,
+      "sha256": "c8e4542a5f8e0c4e984d1a82aca6646afe973c4c1cfea50452646b6c22c4d346",
+      "file": "/stickers/skin-hats/stage-4-bee-purple-top.png",
+      "sourceWidth": 918,
+      "sourceHeight": 918,
+      "alphaBounds": {
+        "left": 12,
+        "top": 6,
+        "right": 906,
+        "bottom": 911
+      },
+      "anchors": {
+        "ground": {
+          "x": 459.5,
+          "y": 912
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "purple",
+      "hat": "top",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.763
+    },
+    {
+      "assetId": "body/stage-4-bee+sky",
+      "version": 2,
+      "sha256": "fe31f10d2e765be732e853c0a4b25584157c7855f02d1984aa138e2b25e37922",
+      "file": "/stickers/skins/stage-4-bee-sky.png",
+      "sourceWidth": 915,
+      "sourceHeight": 915,
+      "alphaBounds": {
+        "left": 10,
+        "top": 6,
+        "right": 904,
+        "bottom": 908
+      },
+      "anchors": {
+        "ground": {
+          "x": 457.5,
+          "y": 909
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "sky",
+      "hat": null,
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.797
+    },
+    {
+      "assetId": "body/stage-4-bee+sky+cap",
+      "version": 2,
+      "sha256": "83152269b8d5b7e8173fb1a482c83bbe1cfb087fce976fc3e81f3758574afee0",
+      "file": "/stickers/skin-hats/stage-4-bee-sky-cap.png",
+      "sourceWidth": 919,
+      "sourceHeight": 919,
+      "alphaBounds": {
+        "left": 12,
+        "top": 6,
+        "right": 906,
+        "bottom": 912
+      },
+      "anchors": {
+        "ground": {
+          "x": 459.5,
+          "y": 913
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "sky",
+      "hat": "cap",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.764
+    },
+    {
+      "assetId": "body/stage-4-bee+sky+crown",
+      "version": 2,
+      "sha256": "47fd6f2d0ee84711daeff5207db4feadedead2fa65c050c8b285fde802d76162",
+      "file": "/stickers/skin-hats/stage-4-bee-sky-crown.png",
+      "sourceWidth": 915,
+      "sourceHeight": 915,
+      "alphaBounds": {
+        "left": 10,
+        "top": 6,
+        "right": 904,
+        "bottom": 908
+      },
+      "anchors": {
+        "ground": {
+          "x": 457.5,
+          "y": 909
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "sky",
+      "hat": "crown",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.792
+    },
+    {
+      "assetId": "body/stage-4-bee+sky+party",
+      "version": 2,
+      "sha256": "48de18f420bf4ce77cd5b2217923a8133c789a2dcbc2eb3dfca2ddf9ecd45c82",
+      "file": "/stickers/skin-hats/stage-4-bee-sky-party.png",
+      "sourceWidth": 949,
+      "sourceHeight": 949,
+      "alphaBounds": {
+        "left": 85,
+        "top": 6,
+        "right": 864,
+        "bottom": 942
+      },
+      "anchors": {
+        "ground": {
+          "x": 475,
+          "y": 943
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "sky",
+      "hat": "party",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.628
+    },
+    {
+      "assetId": "body/stage-4-bee+sky+top",
+      "version": 2,
+      "sha256": "a92daa47f7a00deb82a193563a8e21b555d855b116a1932e90838a49559461af",
+      "file": "/stickers/skin-hats/stage-4-bee-sky-top.png",
+      "sourceWidth": 913,
+      "sourceHeight": 913,
+      "alphaBounds": {
+        "left": 25,
+        "top": 6,
+        "right": 887,
+        "bottom": 906
+      },
+      "anchors": {
+        "ground": {
+          "x": 456.5,
+          "y": 907
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "bee"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "bee",
+      "skin": "sky",
+      "hat": "top",
+      "accScalePct": 50,
+      "hatScalePct": 42,
+      "silhouetteIoU": 0.747
+    },
+    {
+      "assetId": "body/stage-5-queen",
+      "version": 2,
+      "sha256": "931fd656b9ea29025732487ba53af791899c6b378b7bc5b71cbe2ed4ceb7423e",
+      "file": "/stickers/stage-5-queen.png",
+      "sourceWidth": 356,
+      "sourceHeight": 356,
+      "alphaBounds": {
+        "left": 13,
+        "top": 6,
+        "right": 343,
+        "bottom": 349
+      },
+      "anchors": {
+        "ground": {
+          "x": 178.5,
+          "y": 350
+        },
+        "headTop": {
+          "x": 178,
+          "y": 85.44
+        },
+        "eyes": {
+          "x": 178,
+          "y": 131.72
+        },
+        "neck": {
+          "x": 178,
+          "y": 199.36
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "measured:anchors.json",
+        "eyes": "measured:anchors.json",
+        "neck": "measured:anchors.json"
+      },
+      "stage": "queen",
+      "skin": "classic",
+      "hat": null,
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "body/stage-5-queen+classic+cap",
+      "version": 2,
+      "sha256": "41482915b09f3062d17aa830be2e2973fad35cf70056d3fe65861be7f9e72f1f",
+      "file": "/stickers/stage-hats/stage-5-queen-cap.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 972,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.066,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.066,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.066,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.903)",
+        "eyes": "derived:bbox-transfer(IoU 0.903)",
+        "neck": "derived:bbox-transfer(IoU 0.903)"
+      },
+      "stage": "queen",
+      "skin": "classic",
+      "hat": "cap",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.903
+    },
+    {
+      "assetId": "body/stage-5-queen+classic+crown",
+      "version": 2,
+      "sha256": "ad41767764b5eafe2f5244837d855aa7ea998e7f9b7b2a7e999c2c1aadb4b45f",
+      "file": "/stickers/stage-hats/stage-5-queen-crown.png",
+      "sourceWidth": 356,
+      "sourceHeight": 356,
+      "alphaBounds": {
+        "left": 13,
+        "top": 3,
+        "right": 343,
+        "bottom": 349
+      },
+      "anchors": {
+        "ground": {
+          "x": 178.5,
+          "y": 350
+        },
+        "headTop": {
+          "x": 178,
+          "y": 83.133
+        },
+        "eyes": {
+          "x": 178,
+          "y": 129.816
+        },
+        "neck": {
+          "x": 178,
+          "y": 198.046
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.931)",
+        "eyes": "derived:bbox-transfer(IoU 0.931)",
+        "neck": "derived:bbox-transfer(IoU 0.931)"
+      },
+      "stage": "queen",
+      "skin": "classic",
+      "hat": "crown",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.931
+    },
+    {
+      "assetId": "body/stage-5-queen+classic+crown-honey",
+      "version": 2,
+      "sha256": "86cde0355f839d7de5be898a2f4c70e34392b26add0580b41d184fb2f6e80463",
+      "file": "/stickers/stage-hats/stage-5-queen-crown-honey.png",
+      "sourceWidth": 356,
+      "sourceHeight": 356,
+      "alphaBounds": {
+        "left": 13,
+        "top": 2,
+        "right": 343,
+        "bottom": 349
+      },
+      "anchors": {
+        "ground": {
+          "x": 178.5,
+          "y": 350
+        },
+        "headTop": {
+          "x": 178,
+          "y": 82.364
+        },
+        "eyes": {
+          "x": 178,
+          "y": 129.182
+        },
+        "neck": {
+          "x": 178,
+          "y": 197.608
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.928)",
+        "eyes": "derived:bbox-transfer(IoU 0.928)",
+        "neck": "derived:bbox-transfer(IoU 0.928)"
+      },
+      "stage": "queen",
+      "skin": "classic",
+      "hat": "crown-honey",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.928
+    },
+    {
+      "assetId": "body/stage-5-queen+classic+crown-rose",
+      "version": 2,
+      "sha256": "317aec0825780118ce563049821ff6f2bd0237a6f309c9f5a79a7722df8a0b7d",
+      "file": "/stickers/stage-hats/stage-5-queen-crown-rose.png",
+      "sourceWidth": 356,
+      "sourceHeight": 356,
+      "alphaBounds": {
+        "left": 13,
+        "top": 6,
+        "right": 343,
+        "bottom": 349
+      },
+      "anchors": {
+        "ground": {
+          "x": 178.5,
+          "y": 350
+        },
+        "headTop": {
+          "x": 178,
+          "y": 85.44
+        },
+        "eyes": {
+          "x": 178,
+          "y": 131.72
+        },
+        "neck": {
+          "x": 178,
+          "y": 199.36
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.971)",
+        "eyes": "derived:bbox-transfer(IoU 0.971)",
+        "neck": "derived:bbox-transfer(IoU 0.971)"
+      },
+      "stage": "queen",
+      "skin": "classic",
+      "hat": "crown-rose",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.971
+    },
+    {
+      "assetId": "body/stage-5-queen+classic+crown-sapphire",
+      "version": 2,
+      "sha256": "daecd737c9be90cd7158664e837495dfa0763620edb465f8546fd914ff52c635",
+      "file": "/stickers/stage-hats/stage-5-queen-crown-sapphire.png",
+      "sourceWidth": 356,
+      "sourceHeight": 356,
+      "alphaBounds": {
+        "left": 13,
+        "top": 6,
+        "right": 343,
+        "bottom": 349
+      },
+      "anchors": {
+        "ground": {
+          "x": 178.5,
+          "y": 350
+        },
+        "headTop": {
+          "x": 178,
+          "y": 85.44
+        },
+        "eyes": {
+          "x": 178,
+          "y": 131.72
+        },
+        "neck": {
+          "x": 178,
+          "y": 199.36
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.963)",
+        "eyes": "derived:bbox-transfer(IoU 0.963)",
+        "neck": "derived:bbox-transfer(IoU 0.963)"
+      },
+      "stage": "queen",
+      "skin": "classic",
+      "hat": "crown-sapphire",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.963
+    },
+    {
+      "assetId": "body/stage-5-queen+classic+party",
+      "version": 2,
+      "sha256": "415dd388dc63162f3b05ea90ccd272d47ad8b7d0414030090f24a4610705a614",
+      "file": "/stickers/stage-hats/stage-5-queen-party.png",
+      "sourceWidth": 1003,
+      "sourceHeight": 1003,
+      "alphaBounds": {
+        "left": 27,
+        "top": 6,
+        "right": 976,
+        "bottom": 996
+      },
+      "anchors": {
+        "ground": {
+          "x": 502,
+          "y": 997
+        },
+        "headTop": {
+          "x": 500.565,
+          "y": 234.852
+        },
+        "eyes": {
+          "x": 500.565,
+          "y": 368.176
+        },
+        "neck": {
+          "x": 500.565,
+          "y": 563.034
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.928)",
+        "eyes": "derived:bbox-transfer(IoU 0.928)",
+        "neck": "derived:bbox-transfer(IoU 0.928)"
+      },
+      "stage": "queen",
+      "skin": "classic",
+      "hat": "party",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.928
+    },
+    {
+      "assetId": "body/stage-5-queen+classic+top",
+      "version": 2,
+      "sha256": "5a150cf58ac632564c3550791e2831979d28d36c0f604af05c85f4485dff1c9b",
+      "file": "/stickers/stage-hats/stage-5-queen-top.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.913)",
+        "eyes": "derived:bbox-transfer(IoU 0.913)",
+        "neck": "derived:bbox-transfer(IoU 0.913)"
+      },
+      "stage": "queen",
+      "skin": "classic",
+      "hat": "top",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.913
+    },
+    {
+      "assetId": "body/stage-5-queen+green",
+      "version": 2,
+      "sha256": "2ea6acd78a1f18e410b94c2081ec8ddf1445e76210fd398aab568d72a6691cf1",
+      "file": "/stickers/skins/stage-5-queen-green.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 23,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.063,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.063,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.063,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.953)",
+        "eyes": "derived:bbox-transfer(IoU 0.953)",
+        "neck": "derived:bbox-transfer(IoU 0.953)"
+      },
+      "stage": "queen",
+      "skin": "green",
+      "hat": null,
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.953
+    },
+    {
+      "assetId": "body/stage-5-queen+green+cap",
+      "version": 2,
+      "sha256": "667992995b959ad22ee914e2c8f71018de2be51a29bcbf2ef34e25d51052f53d",
+      "file": "/stickers/skin-hats/stage-5-queen-green-cap.png",
+      "sourceWidth": 1000,
+      "sourceHeight": 1000,
+      "alphaBounds": {
+        "left": 25,
+        "top": 6,
+        "right": 974,
+        "bottom": 993
+      },
+      "anchors": {
+        "ground": {
+          "x": 500,
+          "y": 994
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "green",
+      "hat": "cap",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.897
+    },
+    {
+      "assetId": "body/stage-5-queen+green+crown",
+      "version": 2,
+      "sha256": "98e4c5c68b869ca9afeec5043762402467b23268fca882345399843ded0ab91c",
+      "file": "/stickers/skin-hats/stage-5-queen-green-crown.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.939)",
+        "eyes": "derived:bbox-transfer(IoU 0.939)",
+        "neck": "derived:bbox-transfer(IoU 0.939)"
+      },
+      "stage": "queen",
+      "skin": "green",
+      "hat": "crown",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.939
+    },
+    {
+      "assetId": "body/stage-5-queen+green+crown-honey",
+      "version": 2,
+      "sha256": "976513314983df0903e40137dc985fd521ea5532f389d2d94ced5ff722b02455",
+      "file": "/stickers/skin-hats/stage-5-queen-green-crown-honey.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 23,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.063,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.063,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.063,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.938)",
+        "eyes": "derived:bbox-transfer(IoU 0.938)",
+        "neck": "derived:bbox-transfer(IoU 0.938)"
+      },
+      "stage": "queen",
+      "skin": "green",
+      "hat": "crown-honey",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.938
+    },
+    {
+      "assetId": "body/stage-5-queen+green+crown-rose",
+      "version": 2,
+      "sha256": "b1034751103cad6ebd378e7a1f0dec676b6697c96434b1187c682df487906fa8",
+      "file": "/stickers/skin-hats/stage-5-queen-green-crown-rose.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 23,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.063,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.063,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.063,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.935)",
+        "eyes": "derived:bbox-transfer(IoU 0.935)",
+        "neck": "derived:bbox-transfer(IoU 0.935)"
+      },
+      "stage": "queen",
+      "skin": "green",
+      "hat": "crown-rose",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.935
+    },
+    {
+      "assetId": "body/stage-5-queen+green+crown-sapphire",
+      "version": 2,
+      "sha256": "543626fd69092dda69c1e8fb222e40fb27312b0505126217c4fd51f4a19accbc",
+      "file": "/stickers/skin-hats/stage-5-queen-green-crown-sapphire.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 23,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.063,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.063,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.063,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.927)",
+        "eyes": "derived:bbox-transfer(IoU 0.927)",
+        "neck": "derived:bbox-transfer(IoU 0.927)"
+      },
+      "stage": "queen",
+      "skin": "green",
+      "hat": "crown-sapphire",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.927
+    },
+    {
+      "assetId": "body/stage-5-queen+green+party",
+      "version": 2,
+      "sha256": "a1c3bc4a1192dc1a228522911cb93c4715ebaa5ac84ad011ee99354ac848c0d0",
+      "file": "/stickers/skin-hats/stage-5-queen-green-party.png",
+      "sourceWidth": 1016,
+      "sourceHeight": 1016,
+      "alphaBounds": {
+        "left": 33,
+        "top": 6,
+        "right": 983,
+        "bottom": 1009
+      },
+      "anchors": {
+        "ground": {
+          "x": 508.5,
+          "y": 1010
+        },
+        "headTop": {
+          "x": 507.063,
+          "y": 237.854
+        },
+        "eyes": {
+          "x": 507.063,
+          "y": 372.927
+        },
+        "neck": {
+          "x": 507.063,
+          "y": 570.341
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.906)",
+        "eyes": "derived:bbox-transfer(IoU 0.906)",
+        "neck": "derived:bbox-transfer(IoU 0.906)"
+      },
+      "stage": "queen",
+      "skin": "green",
+      "hat": "party",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.906
+    },
+    {
+      "assetId": "body/stage-5-queen+green+top",
+      "version": 2,
+      "sha256": "3629f5204a61e45bff9e28dd80a5c629aedb306e9e2d7796589b673159c0a4fc",
+      "file": "/stickers/skin-hats/stage-5-queen-green-top.png",
+      "sourceWidth": 1016,
+      "sourceHeight": 1016,
+      "alphaBounds": {
+        "left": 33,
+        "top": 6,
+        "right": 983,
+        "bottom": 1009
+      },
+      "anchors": {
+        "ground": {
+          "x": 508.5,
+          "y": 1010
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "green",
+      "hat": "top",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.896
+    },
+    {
+      "assetId": "body/stage-5-queen+orange",
+      "version": 2,
+      "sha256": "42eaa7d8b752a922543d2d18708b609f1480b416cf309674b70d37a5d8835688",
+      "file": "/stickers/skins/stage-5-queen-orange.png",
+      "sourceWidth": 987,
+      "sourceHeight": 987,
+      "alphaBounds": {
+        "left": 31,
+        "top": 6,
+        "right": 956,
+        "bottom": 980
+      },
+      "anchors": {
+        "ground": {
+          "x": 494,
+          "y": 981
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "orange",
+      "hat": null,
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.853
+    },
+    {
+      "assetId": "body/stage-5-queen+orange+cap",
+      "version": 2,
+      "sha256": "3be3d98c14f6b70759cc0a1eaca33a8b7d083c1fff4867f20b0eb38d1f88dcca",
+      "file": "/stickers/skin-hats/stage-5-queen-orange-cap.png",
+      "sourceWidth": 970,
+      "sourceHeight": 970,
+      "alphaBounds": {
+        "left": 22,
+        "top": 6,
+        "right": 948,
+        "bottom": 963
+      },
+      "anchors": {
+        "ground": {
+          "x": 485.5,
+          "y": 964
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "orange",
+      "hat": "cap",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.825
+    },
+    {
+      "assetId": "body/stage-5-queen+orange+crown",
+      "version": 2,
+      "sha256": "df247b5b831208ffe979bae5a23c8b82a48c8be314e957ca1b29b3ebd88c0392",
+      "file": "/stickers/skin-hats/stage-5-queen-orange-crown.png",
+      "sourceWidth": 988,
+      "sourceHeight": 988,
+      "alphaBounds": {
+        "left": 31,
+        "top": 6,
+        "right": 956,
+        "bottom": 981
+      },
+      "anchors": {
+        "ground": {
+          "x": 494,
+          "y": 982
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "orange",
+      "hat": "crown",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.858
+    },
+    {
+      "assetId": "body/stage-5-queen+orange+crown-honey",
+      "version": 2,
+      "sha256": "79abbca2cf393db79d1b50f3e93d87978a78b7a5cd484f2d2d3e5d2ff661fe43",
+      "file": "/stickers/skin-hats/stage-5-queen-orange-crown-honey.png",
+      "sourceWidth": 987,
+      "sourceHeight": 987,
+      "alphaBounds": {
+        "left": 31,
+        "top": 6,
+        "right": 956,
+        "bottom": 980
+      },
+      "anchors": {
+        "ground": {
+          "x": 494,
+          "y": 981
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "orange",
+      "hat": "crown-honey",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.851
+    },
+    {
+      "assetId": "body/stage-5-queen+orange+crown-rose",
+      "version": 2,
+      "sha256": "82c5cea5982e8499f0bc3daeec5c4da19dd226cc9800aeb02b66786c41599bef",
+      "file": "/stickers/skin-hats/stage-5-queen-orange-crown-rose.png",
+      "sourceWidth": 987,
+      "sourceHeight": 987,
+      "alphaBounds": {
+        "left": 31,
+        "top": 6,
+        "right": 956,
+        "bottom": 980
+      },
+      "anchors": {
+        "ground": {
+          "x": 494,
+          "y": 981
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "orange",
+      "hat": "crown-rose",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.848
+    },
+    {
+      "assetId": "body/stage-5-queen+orange+crown-sapphire",
+      "version": 2,
+      "sha256": "5bef973b48d7bf046d486953a20f66c023b5dda10e3f38968605b4e024f282f5",
+      "file": "/stickers/skin-hats/stage-5-queen-orange-crown-sapphire.png",
+      "sourceWidth": 987,
+      "sourceHeight": 987,
+      "alphaBounds": {
+        "left": 31,
+        "top": 6,
+        "right": 956,
+        "bottom": 980
+      },
+      "anchors": {
+        "ground": {
+          "x": 494,
+          "y": 981
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "orange",
+      "hat": "crown-sapphire",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.84
+    },
+    {
+      "assetId": "body/stage-5-queen+orange+party",
+      "version": 2,
+      "sha256": "7e69665f3841611e19c72cda97da2fb14969cf92a1fb2178c5025f15668e3e08",
+      "file": "/stickers/skin-hats/stage-5-queen-orange-party.png",
+      "sourceWidth": 1036,
+      "sourceHeight": 1036,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 993,
+        "bottom": 1009
+      },
+      "anchors": {
+        "ground": {
+          "x": 500,
+          "y": 1010
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "orange",
+      "hat": "party",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.811
+    },
+    {
+      "assetId": "body/stage-5-queen+orange+top",
+      "version": 2,
+      "sha256": "aa4cc7adc8d4475ca1e2fdf7036e47e3f62fae7adc52d8d6e38a3e21d08c3e08",
+      "file": "/stickers/skin-hats/stage-5-queen-orange-top.png",
+      "sourceWidth": 996,
+      "sourceHeight": 996,
+      "alphaBounds": {
+        "left": 23,
+        "top": 6,
+        "right": 972,
+        "bottom": 989
+      },
+      "anchors": {
+        "ground": {
+          "x": 498,
+          "y": 990
+        },
+        "headTop": {
+          "x": 496.565,
+          "y": 233.235
+        },
+        "eyes": {
+          "x": 496.565,
+          "y": 365.618
+        },
+        "neck": {
+          "x": 496.565,
+          "y": 559.1
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.909)",
+        "eyes": "derived:bbox-transfer(IoU 0.909)",
+        "neck": "derived:bbox-transfer(IoU 0.909)"
+      },
+      "stage": "queen",
+      "skin": "orange",
+      "hat": "top",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.909
+    },
+    {
+      "assetId": "body/stage-5-queen+pink",
+      "version": 2,
+      "sha256": "d20d165c1dfa2b81e8f7aa1c7c0b312f851ab0d6ca5e42d4edf7c7adcf61aa45",
+      "file": "/stickers/skins/stage-5-queen-pink.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 974,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 992
+        },
+        "headTop": {
+          "x": 498.063,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 498.063,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 498.063,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.956)",
+        "eyes": "derived:bbox-transfer(IoU 0.956)",
+        "neck": "derived:bbox-transfer(IoU 0.956)"
+      },
+      "stage": "queen",
+      "skin": "pink",
+      "hat": null,
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.956
+    },
+    {
+      "assetId": "body/stage-5-queen+pink+cap",
+      "version": 2,
+      "sha256": "a4c7921b073d158f6afc537c88fb46212b7896cf55eb6c99812550bd2676fa17",
+      "file": "/stickers/skin-hats/stage-5-queen-pink-cap.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.903)",
+        "eyes": "derived:bbox-transfer(IoU 0.903)",
+        "neck": "derived:bbox-transfer(IoU 0.903)"
+      },
+      "stage": "queen",
+      "skin": "pink",
+      "hat": "cap",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.903
+    },
+    {
+      "assetId": "body/stage-5-queen+pink+crown",
+      "version": 2,
+      "sha256": "c8d2590f09f6e45e77848b4f37ad206539294cd83ad3156c0d57782408c62685",
+      "file": "/stickers/skin-hats/stage-5-queen-pink-crown.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.94)",
+        "eyes": "derived:bbox-transfer(IoU 0.94)",
+        "neck": "derived:bbox-transfer(IoU 0.94)"
+      },
+      "stage": "queen",
+      "skin": "pink",
+      "hat": "crown",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.94
+    },
+    {
+      "assetId": "body/stage-5-queen+pink+crown-honey",
+      "version": 2,
+      "sha256": "7ccb57fd23782cd9f31aade43fcadd75a2a02e8093f77530068893462c7c7362",
+      "file": "/stickers/skin-hats/stage-5-queen-pink-crown-honey.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 974,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 992
+        },
+        "headTop": {
+          "x": 498.063,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 498.063,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 498.063,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.939)",
+        "eyes": "derived:bbox-transfer(IoU 0.939)",
+        "neck": "derived:bbox-transfer(IoU 0.939)"
+      },
+      "stage": "queen",
+      "skin": "pink",
+      "hat": "crown-honey",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.939
+    },
+    {
+      "assetId": "body/stage-5-queen+pink+crown-rose",
+      "version": 2,
+      "sha256": "6b4179413724c491ad7477d340e40543c04b5debad625eba1372a02b6a633bd7",
+      "file": "/stickers/skin-hats/stage-5-queen-pink-crown-rose.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 974,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 992
+        },
+        "headTop": {
+          "x": 498.063,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 498.063,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 498.063,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.937)",
+        "eyes": "derived:bbox-transfer(IoU 0.937)",
+        "neck": "derived:bbox-transfer(IoU 0.937)"
+      },
+      "stage": "queen",
+      "skin": "pink",
+      "hat": "crown-rose",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.937
+    },
+    {
+      "assetId": "body/stage-5-queen+pink+crown-sapphire",
+      "version": 2,
+      "sha256": "f31a9aa3c884bc9810481a6271c5140d61819a196761ace2f7ed611bf72f177e",
+      "file": "/stickers/skin-hats/stage-5-queen-pink-crown-sapphire.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 974,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499.5,
+          "y": 992
+        },
+        "headTop": {
+          "x": 498.063,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 498.063,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 498.063,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.927)",
+        "eyes": "derived:bbox-transfer(IoU 0.927)",
+        "neck": "derived:bbox-transfer(IoU 0.927)"
+      },
+      "stage": "queen",
+      "skin": "pink",
+      "hat": "crown-sapphire",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.927
+    },
+    {
+      "assetId": "body/stage-5-queen+pink+party",
+      "version": 2,
+      "sha256": "0ed713f1404f0b67314a114182be87493f8a887c6ad3dc4d1bbc6ee3eef73571",
+      "file": "/stickers/skin-hats/stage-5-queen-pink-party.png",
+      "sourceWidth": 1036,
+      "sourceHeight": 1036,
+      "alphaBounds": {
+        "left": 74,
+        "top": 6,
+        "right": 962,
+        "bottom": 1029
+      },
+      "anchors": {
+        "ground": {
+          "x": 518.5,
+          "y": 1030
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "pink",
+      "hat": "party",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.785
+    },
+    {
+      "assetId": "body/stage-5-queen+pink+top",
+      "version": 2,
+      "sha256": "e885fdba27c057b782ad4bea8f03296c6f12a493426136bc18afc4aad6ac13fa",
+      "file": "/stickers/skin-hats/stage-5-queen-pink-top.png",
+      "sourceWidth": 1014,
+      "sourceHeight": 1014,
+      "alphaBounds": {
+        "left": 32,
+        "top": 6,
+        "right": 982,
+        "bottom": 1007
+      },
+      "anchors": {
+        "ground": {
+          "x": 507.5,
+          "y": 1008
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "pink",
+      "hat": "top",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.897
+    },
+    {
+      "assetId": "body/stage-5-queen+purple",
+      "version": 2,
+      "sha256": "c62b81136c07bc6f72612879a0a6f54013f49c0419a400322c48df87da61508f",
+      "file": "/stickers/skins/stage-5-queen-purple.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 23,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.063,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.063,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.063,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.954)",
+        "eyes": "derived:bbox-transfer(IoU 0.954)",
+        "neck": "derived:bbox-transfer(IoU 0.954)"
+      },
+      "stage": "queen",
+      "skin": "purple",
+      "hat": null,
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.954
+    },
+    {
+      "assetId": "body/stage-5-queen+purple+cap",
+      "version": 2,
+      "sha256": "2555e6f347baa99274fb35d40e4c1c50950bee9d9a9c358223e2738f18fe23ca",
+      "file": "/stickers/skin-hats/stage-5-queen-purple-cap.png",
+      "sourceWidth": 1000,
+      "sourceHeight": 1000,
+      "alphaBounds": {
+        "left": 25,
+        "top": 6,
+        "right": 975,
+        "bottom": 993
+      },
+      "anchors": {
+        "ground": {
+          "x": 500.5,
+          "y": 994
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "purple",
+      "hat": "cap",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.889
+    },
+    {
+      "assetId": "body/stage-5-queen+purple+crown",
+      "version": 2,
+      "sha256": "3b778183e48e55d54ed0cc9ad06e59cabd0dcbeb73cbac80ac40d5993858bcc3",
+      "file": "/stickers/skin-hats/stage-5-queen-purple-crown.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.939)",
+        "eyes": "derived:bbox-transfer(IoU 0.939)",
+        "neck": "derived:bbox-transfer(IoU 0.939)"
+      },
+      "stage": "queen",
+      "skin": "purple",
+      "hat": "crown",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.939
+    },
+    {
+      "assetId": "body/stage-5-queen+purple+crown-honey",
+      "version": 2,
+      "sha256": "bc5206881a6ff5b51a73aac4641dcdbfcc637bde4540541212d4f3c878afe852",
+      "file": "/stickers/skin-hats/stage-5-queen-purple-crown-honey.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 23,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.063,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.063,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.063,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.939)",
+        "eyes": "derived:bbox-transfer(IoU 0.939)",
+        "neck": "derived:bbox-transfer(IoU 0.939)"
+      },
+      "stage": "queen",
+      "skin": "purple",
+      "hat": "crown-honey",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.939
+    },
+    {
+      "assetId": "body/stage-5-queen+purple+crown-rose",
+      "version": 2,
+      "sha256": "5ebfbaf4f8bd67ce267592f6beab50d90eb72d38445ce2cd8718ef3175bacc33",
+      "file": "/stickers/skin-hats/stage-5-queen-purple-crown-rose.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 23,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.063,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.063,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.063,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.935)",
+        "eyes": "derived:bbox-transfer(IoU 0.935)",
+        "neck": "derived:bbox-transfer(IoU 0.935)"
+      },
+      "stage": "queen",
+      "skin": "purple",
+      "hat": "crown-rose",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.935
+    },
+    {
+      "assetId": "body/stage-5-queen+purple+crown-sapphire",
+      "version": 2,
+      "sha256": "a5074dc9c3bab1d0765d9e28912e0160d963dc7df98d7c1307417e5c90a542e1",
+      "file": "/stickers/skin-hats/stage-5-queen-purple-crown-sapphire.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 23,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 498.5,
+          "y": 991
+        },
+        "headTop": {
+          "x": 497.063,
+          "y": 233.466
+        },
+        "eyes": {
+          "x": 497.063,
+          "y": 365.983
+        },
+        "neck": {
+          "x": 497.063,
+          "y": 559.662
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.927)",
+        "eyes": "derived:bbox-transfer(IoU 0.927)",
+        "neck": "derived:bbox-transfer(IoU 0.927)"
+      },
+      "stage": "queen",
+      "skin": "purple",
+      "hat": "crown-sapphire",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.927
+    },
+    {
+      "assetId": "body/stage-5-queen+purple+party",
+      "version": 2,
+      "sha256": "cd82fe5015182598d96ecc46dbf84851f5725059fea0b80bdcd59864681d06bf",
+      "file": "/stickers/skin-hats/stage-5-queen-purple-party.png",
+      "sourceWidth": 1017,
+      "sourceHeight": 1017,
+      "alphaBounds": {
+        "left": 33,
+        "top": 6,
+        "right": 983,
+        "bottom": 1010
+      },
+      "anchors": {
+        "ground": {
+          "x": 508.5,
+          "y": 1011
+        },
+        "headTop": {
+          "x": 507.063,
+          "y": 238.085
+        },
+        "eyes": {
+          "x": 507.063,
+          "y": 373.292
+        },
+        "neck": {
+          "x": 507.063,
+          "y": 570.903
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.903)",
+        "eyes": "derived:bbox-transfer(IoU 0.903)",
+        "neck": "derived:bbox-transfer(IoU 0.903)"
+      },
+      "stage": "queen",
+      "skin": "purple",
+      "hat": "party",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.903
+    },
+    {
+      "assetId": "body/stage-5-queen+purple+top",
+      "version": 2,
+      "sha256": "1d9823eb73a40228f642db2785e4e6d8002eef5b245ec1303030b09bb27ee11e",
+      "file": "/stickers/skin-hats/stage-5-queen-purple-top.png",
+      "sourceWidth": 1018,
+      "sourceHeight": 1018,
+      "alphaBounds": {
+        "left": 34,
+        "top": 6,
+        "right": 983,
+        "bottom": 1011
+      },
+      "anchors": {
+        "ground": {
+          "x": 509,
+          "y": 1012
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "purple",
+      "hat": "top",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.893
+    },
+    {
+      "assetId": "body/stage-5-queen+sky",
+      "version": 2,
+      "sha256": "b0bd64511b92bfc40e2f51f4f8b8700cef77bd6f1d42e214e761c754ff63bcc5",
+      "file": "/stickers/skins/stage-5-queen-sky.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.954)",
+        "eyes": "derived:bbox-transfer(IoU 0.954)",
+        "neck": "derived:bbox-transfer(IoU 0.954)"
+      },
+      "stage": "queen",
+      "skin": "sky",
+      "hat": null,
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.954
+    },
+    {
+      "assetId": "body/stage-5-queen+sky+cap",
+      "version": 2,
+      "sha256": "4498969ac4fd101b97f1ca88118e837da4f170d18ab28f04a3b1ebc84cdd9c49",
+      "file": "/stickers/skin-hats/stage-5-queen-sky-cap.png",
+      "sourceWidth": 997,
+      "sourceHeight": 997,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 990
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 991
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "sky",
+      "hat": "cap",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.898
+    },
+    {
+      "assetId": "body/stage-5-queen+sky+crown",
+      "version": 2,
+      "sha256": "1631d37151cc3ee210d0ab29a70e5b547e4da021e617e89063bb6b23e99ccc2d",
+      "file": "/stickers/skin-hats/stage-5-queen-sky-crown.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.943)",
+        "eyes": "derived:bbox-transfer(IoU 0.943)",
+        "neck": "derived:bbox-transfer(IoU 0.943)"
+      },
+      "stage": "queen",
+      "skin": "sky",
+      "hat": "crown",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.943
+    },
+    {
+      "assetId": "body/stage-5-queen+sky+crown-honey",
+      "version": 2,
+      "sha256": "7bc51f0c37f7f4681bbcfb4be84e4a4c19b72da2567c686b738fe618b12b8c81",
+      "file": "/stickers/skin-hats/stage-5-queen-sky-crown-honey.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.938)",
+        "eyes": "derived:bbox-transfer(IoU 0.938)",
+        "neck": "derived:bbox-transfer(IoU 0.938)"
+      },
+      "stage": "queen",
+      "skin": "sky",
+      "hat": "crown-honey",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.938
+    },
+    {
+      "assetId": "body/stage-5-queen+sky+crown-rose",
+      "version": 2,
+      "sha256": "79358cbaefa9e13d9e00b1a0954208dd19cf59d51ec8f322c01f4c899425d393",
+      "file": "/stickers/skin-hats/stage-5-queen-sky-crown-rose.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.937)",
+        "eyes": "derived:bbox-transfer(IoU 0.937)",
+        "neck": "derived:bbox-transfer(IoU 0.937)"
+      },
+      "stage": "queen",
+      "skin": "sky",
+      "hat": "crown-rose",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.937
+    },
+    {
+      "assetId": "body/stage-5-queen+sky+crown-sapphire",
+      "version": 2,
+      "sha256": "0984dbb782fb0ce36ae71f561cc8a7323d7272aca2d21f8b96b6ad1319a2a4d2",
+      "file": "/stickers/skin-hats/stage-5-queen-sky-crown-sapphire.png",
+      "sourceWidth": 998,
+      "sourceHeight": 998,
+      "alphaBounds": {
+        "left": 24,
+        "top": 6,
+        "right": 973,
+        "bottom": 991
+      },
+      "anchors": {
+        "ground": {
+          "x": 499,
+          "y": 992
+        },
+        "headTop": {
+          "x": 497.565,
+          "y": 233.697
+        },
+        "eyes": {
+          "x": 497.565,
+          "y": 366.349
+        },
+        "neck": {
+          "x": 497.565,
+          "y": 560.224
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.928)",
+        "eyes": "derived:bbox-transfer(IoU 0.928)",
+        "neck": "derived:bbox-transfer(IoU 0.928)"
+      },
+      "stage": "queen",
+      "skin": "sky",
+      "hat": "crown-sapphire",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.928
+    },
+    {
+      "assetId": "body/stage-5-queen+sky+party",
+      "version": 2,
+      "sha256": "f0bdcf0e02e2d719ac64fefd321954e1ab9c8afdeaf5f84f7f48278f99c2074e",
+      "file": "/stickers/skin-hats/stage-5-queen-sky-party.png",
+      "sourceWidth": 1017,
+      "sourceHeight": 1017,
+      "alphaBounds": {
+        "left": 34,
+        "top": 6,
+        "right": 983,
+        "bottom": 1010
+      },
+      "anchors": {
+        "ground": {
+          "x": 509,
+          "y": 1011
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "stage": "queen",
+      "skin": "sky",
+      "hat": "party",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.876
+    },
+    {
+      "assetId": "body/stage-5-queen+sky+top",
+      "version": 2,
+      "sha256": "eebe672f9f9fbd2190d22654a842899930f8020842d9013c5c2f294fd4a0a7fa",
+      "file": "/stickers/skin-hats/stage-5-queen-sky-top.png",
+      "sourceWidth": 1009,
+      "sourceHeight": 1009,
+      "alphaBounds": {
+        "left": 30,
+        "top": 6,
+        "right": 979,
+        "bottom": 1002
+      },
+      "anchors": {
+        "ground": {
+          "x": 505,
+          "y": 1003
+        },
+        "headTop": {
+          "x": 503.565,
+          "y": 236.237
+        },
+        "eyes": {
+          "x": 503.565,
+          "y": 370.369
+        },
+        "neck": {
+          "x": 503.565,
+          "y": 566.407
+        }
+      },
+      "slots": [
+        "body"
+      ],
+      "compatibleStages": [
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox",
+        "headTop": "derived:bbox-transfer(IoU 0.901)",
+        "eyes": "derived:bbox-transfer(IoU 0.901)",
+        "neck": "derived:bbox-transfer(IoU 0.901)"
+      },
+      "stage": "queen",
+      "skin": "sky",
+      "hat": "top",
+      "accScalePct": 44,
+      "hatScalePct": 34,
+      "silhouetteIoU": 0.901
+    },
+    {
+      "assetId": "hat/cap",
+      "version": 2,
+      "sha256": "6b34f19327736adbad986b71d572c9fd70103f9ed659b0ccab72388ffb172da7",
+      "file": "/stickers/hat-cap.png",
+      "sourceWidth": 166,
+      "sourceHeight": 166,
+      "alphaBounds": {
+        "left": 6,
+        "top": 21,
+        "right": 159,
+        "bottom": 144
+      },
+      "anchors": {
+        "ground": {
+          "x": 83,
+          "y": 145
+        }
+      },
+      "slots": [
+        "hat"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "headTop",
+      "grip": "ground",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "hat/crown",
+      "version": 2,
+      "sha256": "d70d01fa68fd4e714c07784bdc5546345c4fb20b76ab69d3fbee8ba1d7150dbf",
+      "file": "/stickers/hat-crown.png",
+      "sourceWidth": 162,
+      "sourceHeight": 162,
+      "alphaBounds": {
+        "left": 6,
+        "top": 26,
+        "right": 155,
+        "bottom": 135
+      },
+      "anchors": {
+        "ground": {
+          "x": 81,
+          "y": 136
+        }
+      },
+      "slots": [
+        "hat"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "headTop",
+      "grip": "ground",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "hat/crown-honey",
+      "version": 2,
+      "sha256": "47c194aafea68e3b69c3f32595f97681137d8a825b98aba79e5e14ad8faed49d",
+      "file": "/stickers/hat-crown-honey.png",
+      "sourceWidth": 372,
+      "sourceHeight": 346,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 339
+      },
+      "anchors": {
+        "ground": {
+          "x": 186,
+          "y": 340
+        }
+      },
+      "slots": [
+        "hat"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "headTop",
+      "grip": "ground",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "hat/crown-rose",
+      "version": 2,
+      "sha256": "36e73d986faff9a6613f558fe8af393eb963f7f0f963c7b5859bfe48edc2df5a",
+      "file": "/stickers/hat-crown-rose.png",
+      "sourceWidth": 372,
+      "sourceHeight": 297,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 290
+      },
+      "anchors": {
+        "ground": {
+          "x": 186,
+          "y": 291
+        }
+      },
+      "slots": [
+        "hat"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "headTop",
+      "grip": "ground",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "hat/crown-sapphire",
+      "version": 2,
+      "sha256": "c9edfb07a2df6eff04beff8c27cf53f54c52b5abd79cf56a124bd7dedf0adbaa",
+      "file": "/stickers/hat-crown-sapphire.png",
+      "sourceWidth": 372,
+      "sourceHeight": 266,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 259
+      },
+      "anchors": {
+        "ground": {
+          "x": 186,
+          "y": 260
+        }
+      },
+      "slots": [
+        "hat"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "headTop",
+      "grip": "ground",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "hat/party",
+      "version": 2,
+      "sha256": "aacc3e596e78e490fe2121af0953ba5b2f32eb5fbc8850d9173da043ab0426b7",
+      "file": "/stickers/hat-party.png",
+      "sourceWidth": 560,
+      "sourceHeight": 560,
+      "alphaBounds": {
+        "left": 81,
+        "top": 6,
+        "right": 479,
+        "bottom": 553
+      },
+      "anchors": {
+        "ground": {
+          "x": 280.5,
+          "y": 554
+        }
+      },
+      "slots": [
+        "hat"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "headTop",
+      "grip": "ground",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "hat/top",
+      "version": 2,
+      "sha256": "184771205d8fa939dd02e8623dc158bb1d6e16313a0bb794ef685739622392fb",
+      "file": "/stickers/hat-top.png",
+      "sourceWidth": 166,
+      "sourceHeight": 166,
+      "alphaBounds": {
+        "left": 6,
+        "top": 23,
+        "right": 159,
+        "bottom": 143
+      },
+      "anchors": {
+        "ground": {
+          "x": 83,
+          "y": 144
+        }
+      },
+      "slots": [
+        "hat"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "headTop",
+      "grip": "ground",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "held/book",
+      "version": 2,
+      "sha256": "e9e8173d9034f1c73c54b106a5765bb9073c5fa3b207efa0c3f3b3cd79e4ce17",
+      "file": "/stickers/held-book.png",
+      "sourceWidth": 372,
+      "sourceHeight": 257,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 365,
+        "bottom": 250
+      },
+      "anchors": {
+        "ground": {
+          "x": 186,
+          "y": 251
+        }
+      },
+      "slots": [
+        "held"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "ground",
+      "grip": "ground",
+      "placement": "ground-prop",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "held/flag",
+      "version": 2,
+      "sha256": "ff6ccae6599339d4c5c6f1a8ae6e4ae0807d98c430c6f2fe7db1bfc6d2475f7b",
+      "file": "/stickers/held-flag.png",
+      "sourceWidth": 246,
+      "sourceHeight": 372,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 239,
+        "bottom": 365
+      },
+      "anchors": {
+        "ground": {
+          "x": 123,
+          "y": 366
+        }
+      },
+      "slots": [
+        "held"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "ground",
+      "grip": "ground",
+      "placement": "ground-prop",
+      "silhouetteIoU": null
+    },
+    {
+      "assetId": "held/honeypot",
+      "version": 2,
+      "sha256": "a6244fd48657d3ab441f1cb289bf4f051165787b78e3a971f9961ccd7fab084c",
+      "file": "/stickers/held-honeypot.png",
+      "sourceWidth": 300,
+      "sourceHeight": 372,
+      "alphaBounds": {
+        "left": 6,
+        "top": 6,
+        "right": 293,
+        "bottom": 365
+      },
+      "anchors": {
+        "ground": {
+          "x": 150,
+          "y": 366
+        }
+      },
+      "slots": [
+        "held"
+      ],
+      "compatibleStages": [
+        "egg",
+        "larva",
+        "pupa",
+        "bee",
+        "queen"
+      ],
+      "authoredView": "front",
+      "lightDirection": "front",
+      "approved": true,
+      "anchorSources": {
+        "ground": "measured:alpha-bbox"
+      },
+      "attachTo": "ground",
+      "grip": "ground",
+      "placement": "ground-prop",
+      "silhouetteIoU": null
+    }
+  ]
+}

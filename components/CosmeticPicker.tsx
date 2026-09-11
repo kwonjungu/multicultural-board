@@ -18,7 +18,8 @@ import {
   royalProgress,
   type CosmeticKind,
 } from "@/lib/stage";
-import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
+import CharacterComposite, { planNoticeText } from "./CharacterComposite";
+import { buildCharacterRenderPlan } from "@/lib/characterRenderPlan";
 import type {
   StudentCosmetics, SkinId, HatId, PetId, TrophyId, BackdropId, AuraId, HeldId, AccId,
 } from "@/lib/types";
@@ -97,6 +98,26 @@ export default function CosmeticPicker({
   const uHeld = useMemo(() => new Set<NonNullable<HeldId>>(unlockedHeld(stickerCount)), [stickerCount]);
   const uAccs = useMemo(() => new Set<NonNullable<AccId>>(unlockedAccs(stickerCount)), [stickerCount]);
   const royal = useMemo(() => royalProgress(stickerCount), [stickerCount]);
+
+  // 미리보기와 **같은 plan** 으로 상태 문구를 만든다. 고른 장식이 화면에
+  // 나타나지 않는데 아무 말도 없으면 아이는 고장으로 받아들인다(README §7.3).
+  const previewNotice = useMemo(
+    () =>
+      planNoticeText(
+        buildCharacterRenderPlan({
+          stage,
+          skin: draft.skin,
+          hat: draft.hat ?? null,
+          held: draft.held ?? null,
+          acc: draft.acc ?? null,
+          backdrop: draft.backdrop ?? null,
+          aura: draft.aura ?? null,
+          size: 180,
+          reducedMotion: true,
+        }),
+      ),
+    [stage, draft],
+  );
 
   // 잠긴 타일 힌트: 필요 스티커 수를 그대로 보여준다 (여왕벌 문턱 15 이상은 👑)
   function lockedHintFor(kind: CosmeticKind, id: string): string {
@@ -264,9 +285,16 @@ export default function CosmeticPicker({
                 margin: "10px 22px 14px",
               }}
             >
-              <CosmeticFrame backdrop={draft.backdrop} aura={draft.aura} />
-              <CharacterImage stage={stage} skin={draft.skin} hat={draft.hat} />
-              <AccessoryLayer stage={stage} held={draft.held} acc={draft.acc} />
+              <CharacterComposite
+                stage={stage}
+                skin={draft.skin}
+                hat={draft.hat}
+                held={draft.held}
+                acc={draft.acc}
+                backdrop={draft.backdrop}
+                aura={draft.aura}
+                size={180}
+              />
               {/* Trophy (bottom-left, slightly outside box) */}
               {draft.trophy && (
                 <img
@@ -297,6 +325,21 @@ export default function CosmeticPicker({
                 />
               )}
             </div>
+            {previewNotice && (
+              <div
+                data-ux-role="secondary"
+                style={{
+                  marginTop: 2,
+                  fontSize: "var(--ux-font-secondary)",
+                  fontWeight: 700,
+                  color: "#92400E",
+                  textAlign: "center",
+                  lineHeight: "var(--ux-lh-reading)",
+                }}
+              >
+                {previewNotice}
+              </div>
+            )}
           </div>
 
           {/* 🖼 배경 section — Phase 3 (pupa+, 왕좌는 queen 전용) */}

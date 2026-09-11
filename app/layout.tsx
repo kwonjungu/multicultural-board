@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { childUxCss } from "@/lib/childUx/tokens";
+import ChildUxBoot from "@/components/ui/child/ChildUxBoot";
 
 export const metadata: Metadata = {
   title: "🐝 꿀벌 소통창",
@@ -30,14 +32,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         background: "var(--bg)",
         WebkitFontSmoothing: "antialiased" as const,
       }}>
+        <ChildUxBoot />
         {children}
         {/* 텍스트 자식으로 넣으면 SSR 이 "…" 를 &quot; 로 이스케이프해
             (style 은 raw-text 요소라 브라우저가 복원 안 함) 하이드레이션
             불일치 + [data-theme="dark"] 선택자 파손 → __html 로 주입 */}
-        <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{ __html: childUxCss() + `
           /* ── 1~2학년 친화판 디자인 토큰 (단일 소스) ── */
           :root{
-            --bg:#FFFBEB; --surface:#FFFFFF; --ink:#2B2A33; --ink-soft:#5B5566;
+            /* 아동 친화 토큰이 단일 소스. 아래 legacy 변수는 그 값을 가리키기만 한다. */
+            --bg:var(--ux-bg); --surface:var(--ux-surface); --ink:var(--ux-ink); --ink-soft:var(--ux-ink-soft);
             --honey-fill:#F59E0B; --honey-text:#B45309;
             --accent-fill:#FB6E3A; --accent-text:#C2410C;
             --c-board:#F59E0B; --c-interp:#3B82F6; --c-games:#FB7185;
@@ -54,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           *, *::before, *::after { box-sizing: border-box; }
           body { color: var(--ink); }
           button, input, textarea, select { font-family: inherit; }
-          *:focus-visible { outline: 3px solid var(--accent-text); outline-offset: 2px; border-radius: 4px; }
+          *:focus-visible { outline: 3px solid var(--ux-focus); outline-offset: 2px; border-radius: 4px; }
 
           @keyframes shake {
             0%, 100% { transform: translateX(0); }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import BeeMascot from "../BeeMascot";
+import ScopedStyle from "../ui/child/ScopedStyle";
 import { gt, UI, type LangMap } from "./uiText";
 
 // 게임 고유 UI 문구 (제목·설명)
@@ -23,6 +24,33 @@ const NT: Record<string, LangMap> = {
     ru: "Сядьте напротив и нажмите услышанное число первым!",
     hi: "आमने-सामने बैठो, सुना हुआ नंबर पहले दबाओ!",
     ar: "اجلسا متقابلين واضغطا الرقم المسموع أولًا!",
+  },
+  // 소리가 안 나올 때 — 아이 탓으로 쓰지 않고 지금 할 일만 말한다 (README §3-5).
+  audioFail: {
+    ko: "소리가 안 나왔어요. 글자를 보고 눌러도 되고, 다시 듣기를 눌러도 돼요.",
+    en: "The sound did not play. Read the word below, or try listening again.",
+    vi: "Âm thanh chưa phát. Hãy đọc chữ bên dưới hoặc nghe lại nhé.",
+    zh: "声音没有播放。可以看下面的文字，或再听一次。",
+    fil: "Hindi tumunog. Basahin ang salita sa ibaba o pakinggan ulit.",
+    ja: "おとが でませんでした。したの もじを みるか、もういちど きいてね。",
+    th: "เสียงไม่ดัง อ่านคำด้านล่างหรือฟังอีกครั้งได้เลย",
+    id: "Suaranya tidak keluar. Baca katanya di bawah atau dengarkan lagi.",
+    ru: "Звук не воспроизвёлся. Прочитай слово ниже или послушай ещё раз.",
+    hi: "आवाज़ नहीं चली। नीचे का शब्द पढ़ो या फिर से सुनो।",
+    ar: "لم يعمل الصوت. اقرأ الكلمة بالأسفل أو استمع مرة أخرى.",
+  },
+  firstWins: {
+    ko: "먼저 누른 친구만 1점을 받아요",
+    en: "Only the first correct tap scores",
+    vi: "Chỉ người bấm đúng trước được điểm",
+    zh: "只有先按对的人得分",
+    fil: "Ang unang tamang pindot lang ang may puntos",
+    ja: "さきに おした ひとだけ 1てん",
+    th: "คนที่กดถูกก่อนได้แต้ม",
+    id: "Hanya yang menekan benar lebih dulu yang dapat poin",
+    ru: "Очко получает тот, кто нажал первым",
+    hi: "पहले सही दबाने वाले को अंक",
+    ar: "النقطة لمن ضغط أولًا",
   },
 };
 
@@ -48,183 +76,207 @@ const ROUND_COUNT = 10;
 const WRONG_LOCK_MS = 500;
 
 type Phase = "ready" | "play" | "done";
+type Player = "A" | "B";
+interface Target { n: number; lang: string; round: number }
 
 export default function NumberTap({ langA, langB }: { langA: string; langB: string }) {
   const [phase, setPhase] = useState<Phase>("ready");
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
   const [round, setRound] = useState(0);
-  const [target, setTarget] = useState<{ n: number; lang: string } | null>(null);
+  const [target, setTarget] = useState<Target | null>(null);
+  const [winner, setWinner] = useState<Player | null>(null);
   const [flashA, setFlashA] = useState<"ok" | "bad" | null>(null);
   const [flashB, setFlashB] = useState<"ok" | "bad" | null>(null);
   const [lockA, setLockA] = useState(0);
   const [lockB, setLockB] = useState(0);
   const [nowTs, setNowTs] = useState(0);
+  const [audioFailed, setAudioFailed] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  /** 예약된 타이머 전부. unmount·재시작 때 한 곳에서 정리한다. */
+  const timersRef = useRef<number[]>([]);
+  const aliveRef = useRef(true);
+  /** 이번 라운드의 선착순 승자. 두 번째 정답은 점수를 받지 못한다. */
   const solvedRef = useRef(false);
 
+  const clearTimers = useCallback(() => {
+    for (const id of timersRef.current) window.clearTimeout(id);
+    timersRef.current = [];
+  }, []);
+
+  const later = useCallback((fn: () => void, ms: number) => {
+    const id = window.setTimeout(() => {
+      timersRef.current = timersRef.current.filter((t) => t !== id);
+      if (aliveRef.current) fn();
+    }, ms);
+    timersRef.current.push(id);
+  }, []);
+
+  const stopAudio = useCallback(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    try { a.pause(); a.currentTime = 0; } catch { /* 이미 정리된 엘리먼트 */ }
+    a.onended = null;
+    audioRef.current = null;
+  }, []);
+
+  // 시작 직후 종료해도 예약된 pickTarget/flash 타이머와 음성이 남지 않는다.
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      clearTimers();
+      stopAudio();
+    };
+  }, [clearTimers, stopAudio]);
+
+  // 오답 잠금 표시용 시계. 잠금이 걸려 있을 때만 돈다.
   useEffect(() => {
     if (phase !== "play") return;
-    const id = setInterval(() => setNowTs(Date.now()), 100);
-    return () => clearInterval(id);
+    const id = window.setInterval(() => setNowTs(Date.now()), 100);
+    return () => window.clearInterval(id);
   }, [phase]);
 
-  function pickTarget(nextRound: number) {
+  const speak = useCallback((n: number, lang: string) => {
+    const word = NUMBERS_WORDS[lang]?.[n] ?? String(n);
+    stopAudio();                       // 새 음성 전에 이전 음성을 반드시 멈춘다
+    setAudioFailed(false);
+    const audio = new Audio(`/api/tts?text=${encodeURIComponent(word)}&lang=${lang}`);
+    audioRef.current = audio;
+    audio.onerror = () => { if (aliveRef.current) setAudioFailed(true); };
+    audio.play().catch(() => { if (aliveRef.current) setAudioFailed(true); });
+  }, [stopAudio]);
+
+  const pickTarget = useCallback((nextRound: number) => {
     const n = Math.floor(Math.random() * 10);
     const lang = Math.random() < 0.5 ? langA : langB;
-    setTarget({ n, lang });
     solvedRef.current = false;
-    const word = NUMBERS_WORDS[lang]?.[n] || String(n);
-    try { audioRef.current?.pause(); } catch {}
-    const a = new Audio(`/api/tts?text=${encodeURIComponent(word)}&lang=${lang}`);
-    audioRef.current = a;
-    a.play().catch(() => {});
+    setWinner(null);
+    setTarget({ n, lang, round: nextRound });
     setRound(nextRound);
-  }
+    speak(n, lang);
+  }, [langA, langB, speak]);
 
-  function replayTts() {
-    if (!target) return;
-    const word = NUMBERS_WORDS[target.lang]?.[target.n] || String(target.n);
-    try { audioRef.current?.pause(); } catch {}
-    const a = new Audio(`/api/tts?text=${encodeURIComponent(word)}&lang=${target.lang}`);
-    audioRef.current = a;
-    a.play().catch(() => {});
-  }
+  const replayTts = useCallback(() => {
+    if (target) speak(target.n, target.lang);
+  }, [target, speak]);
 
-  function start() {
+  const start = useCallback(() => {
+    clearTimers();
+    stopAudio();
+    solvedRef.current = false;
     setScoreA(0); setScoreB(0);
     setLockA(0); setLockB(0);
     setFlashA(null); setFlashB(null);
+    setWinner(null); setAudioFailed(false);
     setPhase("play");
-    setTimeout(() => pickTarget(1), 200);
-  }
+    later(() => pickTarget(1), 200);
+  }, [clearTimers, stopAudio, later, pickTarget]);
 
-  function advance() {
-    if (round >= ROUND_COUNT) {
-      setPhase("done");
-      return;
-    }
-    setTimeout(() => pickTarget(round + 1), 600);
-  }
+  const stop = useCallback(() => {
+    clearTimers();
+    stopAudio();
+    solvedRef.current = true;
+    setPhase("done");
+  }, [clearTimers, stopAudio]);
 
-  function handleTap(player: "A" | "B", n: number) {
-    if (!target || phase !== "play" || solvedRef.current) return;
+  function handleTap(player: Player, n: number) {
+    if (!target || phase !== "play") return;
+    // 선착순 — 첫 정답이 ref 를 즉시 잠그므로 같은 라운드의 두 번째 정답은 점수가 없다.
+    if (solvedRef.current) return;
     const now = Date.now();
     const locked = player === "A" ? lockA : lockB;
     if (now < locked) return;
 
+    const setFlash = player === "A" ? setFlashA : setFlashB;
+
     if (n === target.n) {
       solvedRef.current = true;
-      if (player === "A") {
-        setScoreA((s) => s + 1);
-        setFlashA("ok");
-        setTimeout(() => setFlashA(null), 250);
-      } else {
-        setScoreB((s) => s + 1);
-        setFlashB("ok");
-        setTimeout(() => setFlashB(null), 250);
-      }
-      advance();
+      setWinner(player);
+      if (player === "A") setScoreA((s) => s + 1); else setScoreB((s) => s + 1);
+      setFlash("ok");
+      later(() => setFlash(null), 250);
+      stopAudio();
+      if (target.round >= ROUND_COUNT) later(stop, 600);
+      else later(() => pickTarget(target.round + 1), 600);
     } else {
-      const until = now + WRONG_LOCK_MS;
-      if (player === "A") {
-        setLockA(until);
-        setFlashA("bad");
-        setTimeout(() => setFlashA(null), 250);
-      } else {
-        setLockB(until);
-        setFlashB("bad");
-        setTimeout(() => setFlashB(null), 250);
-      }
+      // 틀려도 흔들거나 경고음을 내지 않는다. 잠깐 쉬었다가 다시 들어보게 한다.
+      if (player === "A") setLockA(now + WRONG_LOCK_MS); else setLockB(now + WRONG_LOCK_MS);
+      setFlash("bad");
+      later(() => setFlash(null), 250);
     }
   }
 
+  const targetWord = target ? (NUMBERS_WORDS[target.lang]?.[target.n] ?? String(target.n)) : "";
+
   if (phase === "ready") {
     return (
-      <div style={{ textAlign: "center", padding: 40 }}>
+      <div data-ux-root className="nt-root nt-center">
+        <ScopedStyle css={NT_CSS} />
         <BeeMascot size={120} mood="happy" />
-        <div style={{ fontSize: 22, fontWeight: 900, margin: "18px 0 10px" }}>🔢 {gt(NT.title, langA)}</div>
-        <div style={{ color: "#6B7280", marginBottom: 20, fontSize: 14 }}>
-          {gt(NT.howto, langA)} ({ROUND_COUNT} {gt(UI.round, langA)})
-        </div>
-        <div style={{ color: "#6B7280", marginBottom: 20, fontSize: 13 }}>
-          A: {langA.toUpperCase()} · B: {langB.toUpperCase()}
-        </div>
-        <button onClick={start} style={primaryBtn}>▶ {gt(UI.start, langA)}</button>
+        <h1 data-ux-role="title">🔢 {gt(NT.title, langA)}</h1>
+        <p data-ux-role="body">{gt(NT.howto, langA)} ({ROUND_COUNT} {gt(UI.round, langA)})</p>
+        <p data-ux-role="secondary">{gt(NT.firstWins, langA)}</p>
+        <p data-ux-role="secondary">A: {langA.toUpperCase()} · B: {langB.toUpperCase()}</p>
+        <button data-ux-role="action" className="nt-primary" onClick={start}>
+          ▶ {gt(UI.start, langA)}
+        </button>
       </div>
     );
   }
 
   if (phase === "done") {
-    const winner = scoreA === scoreB
+    const result = scoreA === scoreB
       ? gt(UI.draw, langA)
       : scoreA > scoreB ? `Player A ${gt(UI.win, langA)}` : `Player B ${gt(UI.win, langA)}`;
     return (
-      <div style={{ textAlign: "center", padding: 40 }}>
+      <div data-ux-root className="nt-root nt-center">
+        <ScopedStyle css={NT_CSS} />
         <BeeMascot size={120} mood="cheer" />
-        <div style={{ fontSize: 26, fontWeight: 900, color: "#111827", margin: "18px 0 6px" }}>
-          🏆 {winner}
-        </div>
-        <div style={{ color: "#6B7280", fontSize: 15, marginBottom: 20 }}>
-          A: {scoreA} · B: {scoreB}
-        </div>
-        <button onClick={start} style={primaryBtn}>🔁 {gt(UI.playAgain, langA)}</button>
+        <h1 data-ux-role="title">🏆 {result}</h1>
+        <p data-ux-role="body">A: {scoreA} · B: {scoreB}</p>
+        <button data-ux-role="action" className="nt-primary" onClick={start}>
+          🔁 {gt(UI.playAgain, langA)}
+        </button>
       </div>
     );
   }
 
-  const targetWord = target ? (NUMBERS_WORDS[target.lang]?.[target.n] || String(target.n)) : "";
-
   return (
-    <div style={{
-      display: "flex", flexDirection: "column",
-      minHeight: "100vh", maxWidth: 480, margin: "0 auto",
-      background: "#F9FAFB",
-    }}>
+    <div data-ux-root className="nt-root nt-play">
+      <ScopedStyle css={NT_CSS} />
       <PlayerArea
-        player="B"
-        lang={langB}
-        score={scoreB}
-        rotated
-        flash={flashB}
-        locked={nowTs < lockB}
-        onTap={(n) => handleTap("B", n)}
+        player="B" lang={langB} score={scoreB} rotated
+        flash={flashB} locked={nowTs < lockB} onTap={(n) => handleTap("B", n)}
       />
 
-      <div style={{
-        background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
-        color: "#fff", padding: "14px 16px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        gap: 10, borderTop: "3px solid #fff", borderBottom: "3px solid #fff",
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 800 }}>
-          <div style={{ opacity: 0.85 }}>{gt(UI.round, langA)} {round}/{ROUND_COUNT}</div>
-          <div style={{ fontSize: 15, marginTop: 2 }}>
-            🎧 {target?.lang.toUpperCase()} · {targetWord}
-          </div>
+      <div className="nt-bar">
+        <div className="nt-barinfo">
+          <span data-ux-role="secondary">{gt(UI.round, langA)} {round}/{ROUND_COUNT}</span>
+          <span data-ux-role="label">🎧 {target?.lang.toUpperCase()} · {targetWord}</span>
         </div>
-        <div style={{ fontSize: 13, fontWeight: 900, textAlign: "center", flex: 1 }}>
-          A: {scoreA} · B: {scoreB}
-        </div>
+        <span data-ux-role="label" className="nt-score">A: {scoreA} · B: {scoreB}</span>
         <button
-          onClick={replayTts}
-          aria-label={gt(UI.replay, langA)}
-          style={{
-            background: "rgba(255,255,255,0.25)", border: "none", color: "#fff",
-            padding: "8px 14px", borderRadius: 99, cursor: "pointer",
-            fontSize: 13, fontWeight: 800, whiteSpace: "nowrap",
-          }}
+          data-ux-role="control" className="nt-replay"
+          onClick={replayTts} aria-label={gt(UI.replay, langA)}
         >🔊 {gt(UI.replay, langA)}</button>
       </div>
 
+      {audioFailed && (
+        <p data-ux-role="body" className="nt-audiofail" role="status">
+          🔇 {gt(NT.audioFail, langA)}
+        </p>
+      )}
+      {winner && (
+        <p data-ux-role="secondary" className="nt-winner" role="status">
+          ⭐ Player {winner} · {gt(NT.firstWins, langA)}
+        </p>
+      )}
+
       <PlayerArea
-        player="A"
-        lang={langA}
-        score={scoreA}
-        rotated={false}
-        flash={flashA}
-        locked={nowTs < lockA}
-        onTap={(n) => handleTap("A", n)}
+        player="A" lang={langA} score={scoreA} rotated={false}
+        flash={flashA} locked={nowTs < lockA} onTap={(n) => handleTap("A", n)}
       />
     </div>
   );
@@ -233,7 +285,7 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
 function PlayerArea({
   player, lang, score, rotated, flash, locked, onTap,
 }: {
-  player: "A" | "B";
+  player: Player;
   lang: string;
   score: number;
   rotated: boolean;
@@ -241,45 +293,25 @@ function PlayerArea({
   locked: boolean;
   onTap: (n: number) => void;
 }) {
-  const bg =
-    flash === "ok" ? "#DCFCE7" :
-    flash === "bad" ? "#FEE2E2" :
-    "#fff";
-
   return (
-    <div style={{
-      flex: 1, padding: "16px 16px 20px",
-      background: bg, transition: "background 0.15s",
-      transform: rotated ? "rotate(180deg)" : "none",
-      display: "flex", flexDirection: "column",
-    }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        marginBottom: 10, fontSize: 13, fontWeight: 800, color: "#374151",
-      }}>
-        <span>Player {player} · {lang.toUpperCase()}</span>
-        <span style={{ color: "#16A34A" }}>⭐ {score}</span>
+    <div
+      className="nt-area"
+      data-flash={flash ?? undefined}
+      data-rotated={rotated ? "" : undefined}
+    >
+      <div className="nt-areatop">
+        <span data-ux-role="label">Player {player} · {lang.toUpperCase()}</span>
+        <span data-ux-role="label" className="nt-areascore">⭐ {score}</span>
       </div>
-
-      <div style={{
-        display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8,
-        flex: 1, alignContent: "center",
-      }}>
+      <div className="nt-grid">
         {Array.from({ length: 10 }, (_, i) => (
           <button
             key={i}
+            data-ux-role="control"
+            className="nt-num"
             onClick={() => onTap(i)}
             disabled={locked}
-            aria-label={`Player ${player} 숫자 ${i}`}
-            style={{
-              aspectRatio: "1 / 1", borderRadius: 14,
-              border: "2px solid #E5E7EB", background: "#fff",
-              fontSize: 24, fontWeight: 900,
-              cursor: locked ? "not-allowed" : "pointer",
-              color: "#111827",
-              opacity: locked ? 0.5 : 1,
-              transition: "opacity 0.15s",
-            }}
+            aria-label={`Player ${player} ${i}`}
           >{locked ? "⏳" : i}</button>
         ))}
       </div>
@@ -287,9 +319,65 @@ function PlayerArea({
   );
 }
 
-const primaryBtn: React.CSSProperties = {
-  background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
-  color: "#fff", border: "none", padding: "14px 32px",
-  borderRadius: 99, fontSize: 15, fontWeight: 800, cursor: "pointer",
-  boxShadow: "0 8px 20px rgba(245,158,11,0.4)",
-};
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const NT_CSS = `
+.nt-root{ color: var(--ux-ink); max-width: 480px; margin: 0 auto; }
+.nt-center{
+  display: grid; justify-items: center; gap: var(--ux-space-3);
+  padding: var(--ux-space-8) var(--ux-space-4);
+  text-align: center;
+}
+.nt-center p{ margin: 0; }
+.nt-primary{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+  margin-top: var(--ux-space-3);
+}
+.nt-play{
+  display: flex; flex-direction: column; min-height: 100vh;
+  background: var(--ux-bg);
+}
+.nt-area{
+  flex: 1; display: flex; flex-direction: column;
+  padding: var(--ux-space-4);
+  background: var(--ux-surface);
+  transition: background var(--ux-motion-state) var(--ux-motion-ease);
+}
+.nt-area[data-flash="ok"]{ background: color-mix(in srgb, var(--ux-success) 14%, var(--ux-surface)); }
+.nt-area[data-flash="bad"]{ background: var(--ux-surface-sunk); }
+.nt-area[data-rotated]{ transform: rotate(180deg); }
+.nt-areatop{ display: flex; justify-content: space-between; gap: var(--ux-space-2); margin-bottom: var(--ux-space-3); }
+.nt-areascore{ color: var(--ux-success); }
+.nt-grid{
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--ux-space-2); flex: 1; align-content: center;
+}
+.nt-num{
+  aspect-ratio: 1 / 1;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
+  font-family: inherit; font-weight: 900;
+  font-size: var(--ux-font-title);
+  padding: 0;
+}
+.nt-num:disabled{ opacity: .5; cursor: not-allowed; }
+.nt-bar{
+  display: flex; align-items: center; gap: var(--ux-space-3);
+  flex-wrap: wrap;
+  padding: var(--ux-space-3) var(--ux-space-4);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border-top: 3px solid var(--ux-surface); border-bottom: 3px solid var(--ux-surface);
+}
+.nt-barinfo{ display: grid; gap: var(--ux-space-1); min-width: 0; }
+.nt-barinfo [data-ux-role="secondary"]{ color: inherit; }
+.nt-score{ flex: 1; text-align: center; }
+.nt-replay{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
+  font-family: inherit; font-weight: 800; white-space: nowrap;
+}
+.nt-audiofail, .nt-winner{
+  margin: 0; padding: var(--ux-space-3) var(--ux-space-4);
+  background: var(--ux-surface-sunk); text-align: center;
+}
+`;

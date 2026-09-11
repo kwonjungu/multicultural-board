@@ -3,28 +3,38 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LANGUAGES } from "@/lib/constants";
-import BeeMascot from "@/components/BeeMascot";
 import BeeBanner from "@/components/BeeBanner";
 import FlyingBees from "@/components/ui/FlyingBees";
-import { PATTERN } from "@/lib/assets";
+import ScopedStyle from "@/components/ui/child/ScopedStyle";
 
 const DEFAULT_LANGS = ["ko", "en", "vi", "zh", "fil"];
 
-const selectStyle: React.CSSProperties = {
-  padding: "8px 12px", borderRadius: 10,
-  border: "1.5px solid #E5E7EB", fontSize: 13,
-  background: "#F9FAFB", color: "#111827",
-  outline: "none", cursor: "pointer", fontWeight: 600,
-  fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", flex: 1,
-};
+/**
+ * 루트 `/` 진입 — 작업 B-01.
+ *
+ * 아이가 여기서 할 일은 하나다: **우리 교실 번호를 눌러 들어가기**(README §5.1).
+ * 그래서 기본 화면에는 제목 · 번호 입력 · 들어가기만 둔다. 방 만들기 · 문서 번역 ·
+ * 관리자는 교사 도구라 아래쪽 보조 링크로 내려간다.
+ *
+ * `/1111` 처럼 번호가 이미 주어진 QR 진입은 이 화면을 거치지 않는다 — 그 경로와
+ * `/^\d{4}$/` 방 번호 규칙은 종전 그대로다.
+ */
+type JoinState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "missing"; code: string }
+  | { kind: "offline"; code: string };
 
 export default function Home() {
   const router = useRouter();
   const [tab, setTab] = useState<"join" | "create" | "pptx">("join");
-  const [view, setView] = useState<"hero" | "sub">("hero");
+  const [view, setView] = useState<"join" | "sub">("join");
 
   // ── Join ──────────────────────────────────────────────────────────
   const [joinCode, setJoinCode] = useState("");
+  const [joinState, setJoinState] = useState<JoinState>({ kind: "idle" });
+  /** 연타로 확인 요청이 여러 번 나가지 않게 한다 (ENTRY-02 와 같은 규칙). */
+  const checking = useRef(false);
 
   // ── Create ────────────────────────────────────────────────────────
   const [createCode, setCreateCode] = useState("");
@@ -33,7 +43,7 @@ export default function Home() {
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  // ── PPTX ──────────────────────────────────────────────────────────
+  // ── PPTX / HWPX ───────────────────────────────────────────────────
   const [pptxFrom, setPptxFrom] = useState("ko");
   const [pptxTo,   setPptxTo]   = useState("en");
   const [pptxProcessing, setPptxProcessing] = useState(false);
@@ -45,9 +55,50 @@ export default function Home() {
   const pptxRef = useRef<HTMLInputElement>(null);
 
   // ── Handlers ─────────────────────────────────────────────────────
-  function handleJoin() {
+  /**
+   * 방이 실제로 있는지 먼저 확인한다. 확인 결과는 세 가지로 갈라진다:
+   *   찾는 중 / 그런 방 없음 / 확인 자체를 못 함(연결 실패).
+   * 확인을 못 한 경우에는 아이를 막지 않는다 — 못 들어가는 게 아니라
+   * '확인을 못 했을 뿐'이므로 그대로 들어가는 길을 함께 준다.
+   * Firebase 는 여기서만 필요하니 지연 로드한다(랜딩 번들 보호).
+   */
+  async function handleJoin() {
     const room = joinCode.replace(/\D/g, "").slice(0, 4);
-    if (room.length === 4) router.push(`/${room}`);
+    if (!/^\d{4}$/.test(room)) return;
+    if (checking.current) return;
+    checking.current = true;
+    setJoinState({ kind: "checking" });
+    try {
+      const [{ getClientDb }, { ref, get }] = await Promise.all([
+        import("@/lib/firebase-client"),
+        import("firebase/database"),
+      ]);
+      const db = getClientDb();
+      // config 가 정석이지만, 옛 방은 meta 만 있을 수 있어 둘 다 본다.
+      const [config, meta] = await Promise.all([
+        get(ref(db, `rooms/${room}/config`)),
+        get(ref(db, `rooms/${room}/meta`)),
+      ]);
+      checking.current = false;
+      if (config.exists() || meta.exists()) {
+        router.push(`/${room}`);
+        return;
+      }
+      setJoinState({ kind: "missing", code: room });
+    } catch {
+      checking.current = false;
+      setJoinState({ kind: "offline", code: room });
+    }
+  }
+
+  /** 확인 없이 그대로 들어간다 — 연결 실패 때만 보여 준다. */
+  function joinAnyway(code: string) {
+    router.push(`/${code}`);
+  }
+
+  function editCode(next: (c: string) => string) {
+    setJoinState({ kind: "idle" });
+    setJoinCode((c) => next(c));
   }
 
   function parsedRoster(): string[] {
@@ -225,517 +276,500 @@ export default function Home() {
     const url = URL.createObjectURL(pptxResult.blob);
     const a = document.createElement("a");
     a.href = url; a.download = pptxResult.fileName;
-    document.body.appendChild(a); a.click(); a.remove();
+    document.body.appendChild(a); a.click();
+    a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   const joinReady   = joinCode.replace(/\D/g, "").length === 4;
   const createReady = createCode.length === 4 && createLangs.length > 0 && parsedRoster().length >= 1;
 
-  function enterView(next: "join" | "create" | "pptx") {
+  function enterView(next: "create" | "pptx") {
     setTab(next);
     setView("sub");
     setCreateMsg(null);
     setPptxError(null);
   }
-  function backToHero() {
-    setView("hero");
+  function backToJoin() {
+    setView("join");
+    setTab("join");
     setCreateMsg(null);
     setPptxError(null);
   }
 
-  const SUB_TITLE: Record<"join" | "create" | "pptx", string> = {
-    join: "🚪 방에 들어가기",
-    create: "✨ 새 방 만들기",
-    pptx: "📄 문서 번역하기",
+  /** 한국어·일본어·중국어 조합 중 Enter 는 확정용이다 — 전송으로 쓰지 않는다. */
+  const enterUnlessComposing = (run: () => void) => (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    if ((e.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return;
+    run();
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#FCEFB0",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif", padding: 20,
-      position: "relative", overflow: "hidden",
-    }}>
-      {/* 🐝 꿀벌·꽃·허니컴 일러스트 배경 (전체 화면 고정) */}
-      <div aria-hidden="true" style={{
-        position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
-        backgroundImage: "url('/landing/landing-bees.webp')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      }} />
+    <div data-ux-root className="root-page">
+      <ScopedStyle css={ROOT_CSS} />
+      <div aria-hidden="true" className="root-backdrop" />
       <FlyingBees />
 
-      {/* 🐝 상단 배너 — 주아체 무지개 (설계서 항목 10) */}
-      <BeeBanner />
+      <div className="root-shell">
+        <BeeBanner />
 
-      <div style={{
-        background: "#fff", borderRadius: 28, padding: view === "hero" ? "40px 28px 28px" : "22px 28px 28px",
-        maxWidth: "min(480px, 92vw)", width: "100%",
-        boxShadow: "0 30px 80px rgba(180,83,9,0.18), 0 0 0 1px rgba(253,230,138,0.6)",
-        animation: "fadeSlideIn 0.4s ease", position: "relative", zIndex: 1,
-        overflow: "hidden",
-      }}>
-        {view === "hero" && (
-          <div aria-hidden="true" style={{
-            position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
-            opacity: 0.18,
-            backgroundImage: `url(${PATTERN.flowers})`,
-            backgroundPosition: "center bottom",
-            backgroundSize: "85% auto",
-            backgroundRepeat: "no-repeat",
-          }} />
-        )}
-        {view === "hero" ? (
-          <>
-            {/* Hero: big mascot + 2 CTAs */}
-            <div style={{ textAlign: "center", marginBottom: 28, position: "relative", zIndex: 1 }}>
-              <div style={{ display: "inline-block", position: "relative", marginBottom: 10 }}>
-                <img
-                  src="/mascot/bee-welcome.png"
-                  alt=""
-                  aria-hidden="true"
-                  style={{
-                    width: 180, height: 180, display: "block",
-                    filter: "drop-shadow(0 10px 24px rgba(245,158,11,0.35))",
-                    animation: "heroBeeFloat 3s ease-in-out infinite",
-                  }}
-                />
-                <div style={{
-                  position: "absolute", top: 8, right: -60,
-                  background: "#fff", padding: "10px 16px", borderRadius: 20,
-                  borderBottomLeftRadius: 4,
-                  boxShadow: "0 6px 20px rgba(180,83,9,0.18)",
-                  border: "2px solid #FDE68A",
-                  fontSize: 15, fontWeight: 900, color: "#B45309",
-                  whiteSpace: "nowrap",
-                }}>안녕, 친구야! 👋</div>
+        <main className="root-panel" data-ux-surface="panel">
+          {/* ── 기본 화면: 우리 교실에 들어가요 ─────────────────────── */}
+          {view === "join" && (
+            <>
+              <div className="root-hero">
+                <img src="/mascot/bee-welcome.png" alt="" aria-hidden="true" className="root-hero-bee" />
+                <h1 data-ux-role="title" className="root-title">우리 교실에 들어가요</h1>
+                <p data-ux-role="body" className="root-sub">교실 번호 네 자리를 눌러 주세요</p>
               </div>
-              <h1 style={{ margin: "8px 0 0", fontSize: 28, fontWeight: 900, color: "#1F2937", letterSpacing: -0.6, lineHeight: 1.25 }}>
-                우리 반에<br/>놀러 갈까?
-              </h1>
-              <p style={{ margin: "10px 0 0", fontSize: 15, color: "#92400E", fontWeight: 700 }}>
-                방 번호를 눌러서 들어가요
-              </p>
-            </div>
 
-            {/* Two giant CTAs */}
-            <button
-              onClick={() => enterView("join")}
-              style={{
-                width: "100%", minHeight: 76, borderRadius: 22, border: "none",
-                background: "linear-gradient(135deg, #F59E0B, #D97706)",
-                color: "#fff", fontSize: 22, fontWeight: 900,
-                boxShadow: "0 10px 28px rgba(245,158,11,0.4), inset 0 -4px 0 rgba(0,0,0,0.15)",
-                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
-                marginBottom: 12, transition: "transform 0.12s",
-                position: "relative", zIndex: 1,
-              }}
-              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
-              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            >
-              <span style={{ fontSize: 30 }}>🚪</span> 방에 들어가기
-            </button>
-
-            <button
-              onClick={() => enterView("create")}
-              style={{
-                width: "100%", minHeight: 66, borderRadius: 20,
-                background: "#fff", border: "3px solid #FDE68A",
-                color: "#B45309", fontSize: 18, fontWeight: 900,
-                boxShadow: "0 6px 16px rgba(180,83,9,0.1)",
-                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                transition: "transform 0.12s, background 0.15s, border-color 0.15s",
-                position: "relative", zIndex: 1,
-              }}
-              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
-              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF3C7"; e.currentTarget.style.borderColor = "#F59E0B"; }}
-            >
-              ✨ 새 방 만들기
-              <span style={{ fontSize: 12, background: "#FEF3C7", padding: "3px 10px", borderRadius: 999, color: "#92400E", fontWeight: 800 }}>선생님</span>
-            </button>
-
-            <button
-              onClick={() => enterView("pptx")}
-              style={{
-                width: "100%", marginTop: 14, background: "none", border: "none",
-                color: "#92400E", fontSize: 14, fontWeight: 800, cursor: "pointer",
-                textDecoration: "underline", textUnderlineOffset: 4, padding: "6px 0",
-                position: "relative", zIndex: 1,
-              }}
-            >📄 문서 번역하기</button>
-          </>
-        ) : (
-          <>
-            {/* Sub header with back button */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-              <button
-                onClick={backToHero}
-                aria-label="뒤로"
-                style={{
-                  width: 44, height: 44, borderRadius: 14, flexShrink: 0,
-                  background: "#fff", border: "2px solid #FDE68A",
-                  fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF3C7"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#F59E0B"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#FDE68A"; }}
-              >←</button>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-                  {SUB_TITLE[tab]}
-                </div>
-              </div>
-              <img
-                src={`/mascot/bee-${tab === "pptx" ? "loading" : tab === "create" ? "shh" : "cheer"}.png`}
-                alt=""
-                aria-hidden="true"
-                style={{ width: 52, height: 52, flexShrink: 0, filter: "drop-shadow(0 4px 12px rgba(245,158,11,0.3))" }}
-              />
-            </div>
-          </>
-        )}
-
-
-        {/* ── 방 입장: 터치 키패드 ── */}
-        {view === "sub" && tab === "join" && (
-          <div
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key >= "0" && e.key <= "9" && joinCode.length < 4) {
-                setJoinCode((c) => (c + e.key).slice(0, 4));
-              } else if (e.key === "Backspace") {
-                setJoinCode((c) => c.slice(0, -1));
-              } else if (e.key === "Enter" && joinReady) {
-                handleJoin();
-              }
-            }}
-            style={{ outline: "none" }}
-          >
-            <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, color: "#92400E", textAlign: "center" }}>
-              방 번호 4자리를 눌러 주세요
-            </p>
-
-            {/* 4 digit display boxes */}
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 22 }}>
-              {[0, 1, 2, 3].map((i) => {
-                const d = joinCode[i];
-                const filled = !!d;
-                const nextSlot = !filled && i === joinCode.length;
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      width: 56, height: 68, borderRadius: 16,
-                      background: filled ? "#fff" : nextSlot ? "rgba(255,255,255,0.85)" : "rgba(255,251,235,0.6)",
-                      border: `3px solid ${filled ? "#F59E0B" : nextSlot ? "#FBBF24" : "#FDE68A"}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 34, fontWeight: 900, color: "#B45309",
-                      boxShadow: filled ? "0 4px 0 rgba(180,83,9,0.15)" : "none",
-                      transition: "all 0.12s",
-                    }}
-                  >
-                    {d || (nextSlot ? <span style={{ width: 4, height: 36, background: "#FBBF24", borderRadius: 2, animation: "pulse 1s ease-in-out infinite" }}/> : "")}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* 3×4 touch keypad */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
-              {([1, 2, 3, 4, 5, 6, 7, 8, 9, "clear", 0, "del"] as const).map((k) => {
-                const label = k === "del" ? "⌫" : k === "clear" ? "초기화" : String(k);
-                const isAction = k === "del" || k === "clear";
-                return (
-                  <button
-                    key={String(k)}
-                    onClick={() => {
-                      if (k === "del") setJoinCode((c) => c.slice(0, -1));
-                      else if (k === "clear") setJoinCode("");
-                      else if (joinCode.length < 4) setJoinCode((c) => (c + k).slice(0, 4));
-                    }}
-                    aria-label={k === "del" ? "지우기" : k === "clear" ? "모두 지우기" : `숫자 ${k}`}
-                    style={{
-                      minHeight: 64, borderRadius: 20,
-                      background: isAction ? "#FEF3C7" : "#fff",
-                      border: `2px solid ${isAction ? "#FBBF24" : "#FDE68A"}`,
-                      fontSize: isAction ? 14 : 26, fontWeight: 900, color: "#B45309",
-                      cursor: "pointer",
-                      boxShadow: "0 3px 0 rgba(180,83,9,0.12)",
-                      transition: "transform 0.1s, background 0.12s",
-                    }}
-                    onMouseDown={(e) => (e.currentTarget.style.transform = "translateY(2px)")}
-                    onMouseUp={(e) => (e.currentTarget.style.transform = "translateY(0)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
-                  >{label}</button>
-                );
-              })}
-            </div>
-
-            <button
-              onClick={handleJoin}
-              disabled={!joinReady}
-              style={{
-                width: "100%", minHeight: 68, borderRadius: 22, fontSize: 22,
-                background: joinReady ? "linear-gradient(135deg, #F59E0B, #D97706)" : "#F3F4F6",
-                color: joinReady ? "#fff" : "#D1D5DB",
-                fontWeight: 900, border: "none",
-                cursor: joinReady ? "pointer" : "not-allowed",
-                boxShadow: joinReady ? "0 10px 28px rgba(245,158,11,0.45), inset 0 -4px 0 rgba(0,0,0,0.15)" : "none",
-                transition: "all 0.15s",
-              }}
-            >🐝 들어가기 →</button>
-          </div>
-        )}
-
-        {/* ── 방 만들기 ── */}
-        {view === "sub" && tab === "create" && (
-          <>
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
-                방 번호 (4자리 숫자)
-              </p>
-              <input
-                value={createCode}
-                onChange={(e) => setCreateCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                onKeyDown={(e) => e.key === "Enter" && createReady && handleCreate()}
-                placeholder="예: 1234"
-                maxLength={4}
-                autoFocus
-                style={{
-                  width: "100%", padding: "14px 0", borderRadius: 14,
-                  border: "2px solid #E5E7EB", fontSize: 28, fontWeight: 900,
-                  textAlign: "center", letterSpacing: 12, color: "#111827",
-                  background: "#F9FAFB", outline: "none", transition: "all 0.18s",
-                  boxSizing: "border-box",
-                }}
-                onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(245,158,11,0.18)"; }}
-                onBlur={(e)  => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; e.target.style.boxShadow = "none"; }}
-              />
-            </div>
-
-            <div style={{ marginBottom: 22 }}>
-              <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1 }}>
-                우리 반 언어 선택 ({createLangs.length}개)
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 7, maxHeight: 152, overflowY: "auto", padding: "2px 0" }}>
-                {Object.entries(LANGUAGES).map(([code, info]) => {
-                  const active = createLangs.includes(code);
+              {/* 네 자리 표시 — 지금 어디를 누르는지 보이게 한다 */}
+              <div className="root-digits" role="status" aria-label={`교실 번호 ${joinCode || "없음"}`}>
+                {[0, 1, 2, 3].map((i) => {
+                  const d = joinCode[i];
+                  const nextSlot = !d && i === joinCode.length;
                   return (
-                    <button
-                      key={code}
-                      onClick={() => toggleLang(code)}
-                      style={{
-                        padding: "6px 12px", borderRadius: 20, fontSize: 12,
-                        border: `1.5px solid ${active ? "#F59E0B" : "#E5E7EB"}`,
-                        background: active ? "#FEF3C7" : "#F9FAFB",
-                        color: active ? "#F59E0B" : "#6B7280",
-                        fontWeight: active ? 700 : 400, cursor: "pointer",
-                        transition: "all 0.12s", whiteSpace: "nowrap",
-                      }}
-                    >{info.flag} {info.label}</button>
+                    <span key={i} className={d ? "root-digit filled" : nextSlot ? "root-digit next" : "root-digit"}>
+                      {d || ""}
+                    </span>
                   );
                 })}
               </div>
-              <p style={{ margin: "8px 0 0", fontSize: 11, color: "#9CA3AF" }}>
-                학생 입장 시 선택한 언어만 표시됩니다
-              </p>
-            </div>
 
-            {/* Roster — 최소 1명 필수 */}
-            <div style={{ marginBottom: 22 }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#B45309", letterSpacing: 1 }}>
-                학생 이름 (최소 1명, 쉼표 또는 줄바꿈으로 구분)
-              </p>
-              <textarea
-                value={createRosterText}
-                onChange={(e) => setCreateRosterText(e.target.value)}
-                placeholder="예시:&#10;김민지&#10;응우엔 란&#10;웨이"
-                rows={4}
-                style={{
-                  width: "100%", padding: "12px 14px", borderRadius: 14,
-                  border: "2px solid #FDE68A", fontSize: 15, color: "#1F2937",
-                  background: "#FFFBEB", outline: "none", resize: "vertical",
-                  boxSizing: "border-box", fontFamily: "inherit", lineHeight: 1.55,
-                  fontWeight: 500,
+              <div
+                className="root-keypad"
+                role="group"
+                aria-label="교실 번호 누르기"
+                onKeyDown={enterUnlessComposing(() => { if (joinReady) void handleJoin(); })}
+              >
+                {([1, 2, 3, 4, 5, 6, 7, 8, 9, "clear", 0, "del"] as const).map((k) => {
+                  const isEdit = k === "del" || k === "clear";
+                  const label = k === "del" ? "지우기" : k === "clear" ? "모두 지우기" : String(k);
+                  return (
+                    <button
+                      key={String(k)}
+                      type="button"
+                      data-ux-role="control"
+                      className={isEdit ? "root-key edit" : "root-key"}
+                      onClick={() => {
+                        if (k === "del") editCode((c) => c.slice(0, -1));
+                        else if (k === "clear") editCode(() => "");
+                        else editCode((c) => (c.length < 4 ? (c + k).slice(0, 4) : c));
+                      }}
+                    >
+                      {/* 아이콘만 두지 않는다 — 지우기 버튼에는 글자 라벨을 붙이고,
+                          숫자는 그 숫자 자체가 이름이므로 aria-hidden 으로 가리지 않는다.
+                          (실측: 가려 두었더니 숫자 키에 접근 가능한 이름이 아예 없었다.) */}
+                      <span aria-hidden={isEdit} className="root-key-glyph">
+                        {k === "del" ? "⌫" : k === "clear" ? "✕" : k}
+                      </span>
+                      {isEdit && <span className="root-key-label">{label}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 상태 — 로딩 / 방 없음 / 연결 실패를 각각 다르게 말한다 */}
+              {joinState.kind === "checking" && (
+                <p data-ux-role="body" className="root-state" role="status">
+                  <span aria-hidden>🐝</span> 우리 교실을 찾는 중이에요…
+                </p>
+              )}
+              {joinState.kind === "missing" && (
+                <div className="root-state warn" role="alert">
+                  <p data-ux-role="body" className="root-state-line">
+                    {joinState.code}번 교실을 찾지 못했어요. 번호를 다시 확인해 주세요.
+                  </p>
+                  <button type="button" data-ux-role="control" className="root-retry" onClick={() => void handleJoin()}>
+                    다시 찾아보기
+                  </button>
+                </div>
+              )}
+              {joinState.kind === "offline" && (
+                <div className="root-state warn" role="alert">
+                  <p data-ux-role="body" className="root-state-line">
+                    연결이 잠깐 끊겼어요. 누른 번호는 그대로 있어요.
+                  </p>
+                  <div className="root-state-actions">
+                    <button type="button" data-ux-role="control" className="root-retry" onClick={() => void handleJoin()}>
+                      다시 시도하기
+                    </button>
+                    <button
+                      type="button"
+                      data-ux-role="control"
+                      className="root-retry"
+                      onClick={() => joinAnyway(joinState.code)}
+                    >
+                      그래도 들어가기
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 못 누르는 버튼도 읽히게 둔다 — disabled 대신 이유를 말한다. */}
+              <button
+                type="button"
+                data-ux-role="action"
+                className="root-cta"
+                aria-disabled={!joinReady || joinState.kind === "checking"}
+                aria-describedby="root-cta-hint"
+                onClick={() => {
+                  if (!joinReady) return;
+                  void handleJoin();
                 }}
-                onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(245,158,11,0.18)"; }}
-                onBlur={(e) => { e.target.style.borderColor = "#FDE68A"; e.target.style.background = "#FFFBEB"; e.target.style.boxShadow = "none"; }}
-              />
-              <p style={{ margin: "6px 0 0", fontSize: 11, color: parsedRoster().length >= 1 ? "#10B981" : "#92400E", fontWeight: 700 }}>
-                {parsedRoster().length >= 1 ? `✓ ${parsedRoster().length}명 등록됨` : "⚠ 최소 1명의 학생 이름이 필요해요"}
+              >{joinState.kind === "checking" ? "들어가는 중…" : "🐝 들어가기"}</button>
+              <p id="root-cta-hint" data-ux-role="secondary" className="root-cta-hint">
+                {joinReady ? "교실 번호가 다 채워졌어요" : "네 자리를 모두 눌러야 들어갈 수 있어요"}
               </p>
-            </div>
 
-            <button
-              onClick={handleCreate}
-              disabled={!createReady || creating}
-              style={{
-                width: "100%", padding: "15px 0", borderRadius: 14, fontSize: 15,
-                background: createReady ? "linear-gradient(135deg, #F59E0B, #D97706)" : "#F3F4F6",
-                color: createReady ? "#fff" : "#D1D5DB",
-                fontWeight: 800, border: "none",
-                cursor: createReady ? "pointer" : "not-allowed",
-                boxShadow: createReady ? "0 6px 24px rgba(245,158,11,0.4)" : "none",
-                transition: "all 0.2s",
-              }}
-            >{creating ? "⟳ 생성 중..." : "방 만들기 →"}</button>
-
-            {createMsg && (
-              <div style={{ marginTop: 12, fontSize: 13, fontWeight: 600, textAlign: "center", color: createMsg.ok ? "#10B981" : "#EF4444" }}>
-                {createMsg.ok ? "✅" : "❌"} {createMsg.text}
+              {/* 교사 도구는 아이의 흐름에서 비켜난 보조 링크다. */}
+              <div className="root-teacher-links">
+                <button type="button" data-ux-role="control" className="root-link" onClick={() => enterView("create")}>
+                  ✨ 새 교실 만들기 <span data-ux-role="secondary">선생님</span>
+                </button>
+                <button type="button" data-ux-role="control" className="root-link" onClick={() => enterView("pptx")}>
+                  📄 문서 번역하기 <span data-ux-role="secondary">선생님</span>
+                </button>
+                <button type="button" data-ux-role="control" className="root-link quiet" onClick={() => router.push("/admin")}>
+                  🔧 관리자 패널
+                </button>
               </div>
-            )}
-          </>
-        )}
+            </>
+          )}
 
-        {/* ── PPTX 번역 ── */}
-        {view === "sub" && tab === "pptx" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-
-            {/* 언어 방향 */}
-            <div style={{ background: "#FFFBEB", borderRadius: 14, padding: "14px 16px", border: "1px solid #FDE68A" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: 1, marginBottom: 10 }}>
-                번역 방향
+          {/* ── 보조 화면: 교사 도구 ───────────────────────────────── */}
+          {view === "sub" && (
+            <>
+              <div className="root-subhead">
+                <button type="button" data-ux-role="control" className="root-back" onClick={backToJoin}>
+                  <span aria-hidden>←</span> <span>뒤로</span>
+                </button>
+                <h1 data-ux-role="title" className="root-title small">
+                  {tab === "create" ? "새 교실 만들기" : "문서 번역하기"}
+                </h1>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <select value={pptxFrom} onChange={(e) => setPptxFrom(e.target.value)} style={selectStyle}>
-                  {Object.entries(LANGUAGES).map(([code, info]) => (
-                    <option key={code} value={code}>{info.flag} {info.label}</option>
-                  ))}
-                </select>
-                <div style={{ fontSize: 20, color: "#9CA3AF", fontWeight: 900, flexShrink: 0 }}>→</div>
-                <select value={pptxTo} onChange={(e) => setPptxTo(e.target.value)} style={selectStyle}>
-                  {Object.entries(LANGUAGES).map(([code, info]) => (
-                    <option key={code} value={code}>{info.flag} {info.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
 
-            {/* 업로드 영역 */}
-            {!pptxResult && !pptxProcessing && (
-              <>
-                <input
-                  ref={pptxRef}
-                  type="file"
-                  accept=".pptx,.hwpx"
-                  style={{ display: "none" }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handlePptxFile(file);
-                    e.target.value = "";
-                  }}
-                />
-                <div
-                  onClick={() => pptxRef.current?.click()}
-                  onDragOver={(e) => { e.preventDefault(); (e.currentTarget as HTMLDivElement).style.borderColor = "#F59E0B"; }}
-                  onDragLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#D1D5DB"; }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    (e.currentTarget as HTMLDivElement).style.borderColor = "#D1D5DB";
-                    const file = e.dataTransfer.files[0];
-                    if (file) handlePptxFile(file);
-                  }}
-                  style={{
-                    border: "2px dashed #D1D5DB", borderRadius: 14,
-                    padding: "40px 20px", textAlign: "center", cursor: "pointer",
-                    transition: "all 0.18s",
-                  }}
-                  onMouseEnter={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#F59E0B"; el.style.background = "rgba(245,158,11,0.06)"; }}
-                  onMouseLeave={(e) => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#D1D5DB"; el.style.background = "transparent"; }}
-                >
-                  <img
-                    src="/interpreter/drag-drop.png"
-                    alt=""
-                    aria-hidden="true"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).outerHTML = '<div style="font-size:36px;margin-bottom:10px">📤</div>'; }}
-                    style={{ width: 88, height: 88, objectFit: "contain", margin: "0 auto 10px", display: "block" }}
+              {tab === "create" && (
+                <>
+                  <label data-ux-role="label" className="root-label" htmlFor="root-create-code">
+                    교실 번호 (숫자 네 자리)
+                  </label>
+                  <input
+                    id="root-create-code"
+                    className="root-input code"
+                    value={createCode}
+                    onChange={(e) => setCreateCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    onKeyDown={enterUnlessComposing(() => { if (createReady) void handleCreate(); })}
+                    placeholder="1234"
+                    inputMode="numeric"
+                    maxLength={4}
                   />
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "#374151", marginBottom: 4 }}>
-                    문서 파일을 올리세요
+
+                  <p data-ux-role="label" className="root-label">
+                    우리 반 언어 ({createLangs.length}개)
+                  </p>
+                  <div className="root-langs" role="group" aria-label="우리 반 언어 고르기">
+                    {Object.entries(LANGUAGES).map(([code, info]) => {
+                      const active = createLangs.includes(code);
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          data-ux-role="control"
+                          className={active ? "root-lang on" : "root-lang"}
+                          aria-pressed={active}
+                          onClick={() => toggleLang(code)}
+                        >
+                          <span aria-hidden>{info.flag}</span>
+                          <span data-ux-role="label" lang={code} className="root-lang-name">{info.label}</span>
+                          <span aria-hidden className="root-check">{active ? "✓" : ""}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.7 }}>
-                    클릭하거나 드래그 앤 드롭<br />
-                    <span style={{ fontWeight: 600, color: "#6B7280" }}>.pptx</span>
-                    {" · "}
-                    <span style={{ fontWeight: 600, color: "#6B7280" }}>.hwpx</span>
+                  <p data-ux-role="secondary" className="root-note">학생 입장 화면에는 고른 언어만 보여요</p>
+
+                  <label data-ux-role="label" className="root-label" htmlFor="root-roster">
+                    학생 이름 (쉼표 또는 줄바꿈으로 구분, 최소 1명)
+                  </label>
+                  <textarea
+                    id="root-roster"
+                    className="root-input area"
+                    value={createRosterText}
+                    onChange={(e) => setCreateRosterText(e.target.value)}
+                    rows={4}
+                    placeholder={"학생 01\n학생 02"}
+                  />
+                  <p data-ux-role="secondary" className={parsedRoster().length >= 1 ? "root-note ok" : "root-note warn"}>
+                    {parsedRoster().length >= 1
+                      ? `${parsedRoster().length}명 등록됨`
+                      : "최소 1명의 학생 이름이 필요해요"}
+                  </p>
+
+                  <button
+                    type="button"
+                    data-ux-role="action"
+                    className="root-cta"
+                    aria-disabled={!createReady || creating}
+                    onClick={() => { if (createReady && !creating) void handleCreate(); }}
+                  >{creating ? "만드는 중…" : "교실 만들기"}</button>
+
+                  {createMsg && (
+                    <p data-ux-role="body" className={createMsg.ok ? "root-state ok" : "root-state warn"} role="status">
+                      {createMsg.text}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {tab === "pptx" && (
+                <>
+                  <p data-ux-role="label" className="root-label">번역 방향</p>
+                  <div className="root-dir">
+                    <select
+                      className="root-select"
+                      aria-label="원본 언어"
+                      value={pptxFrom}
+                      onChange={(e) => setPptxFrom(e.target.value)}
+                    >
+                      {Object.entries(LANGUAGES).map(([code, info]) => (
+                        <option key={code} value={code}>{info.flag} {info.label}</option>
+                      ))}
+                    </select>
+                    <span aria-hidden className="root-dir-arrow">→</span>
+                    <select
+                      className="root-select"
+                      aria-label="바꿀 언어"
+                      value={pptxTo}
+                      onChange={(e) => setPptxTo(e.target.value)}
+                    >
+                      {Object.entries(LANGUAGES).map(([code, info]) => (
+                        <option key={code} value={code}>{info.flag} {info.label}</option>
+                      ))}
+                    </select>
                   </div>
-                </div>
-                <div style={{ padding: "10px 14px", background: "#FEF3C7", borderRadius: 10, fontSize: 11, color: "#92400E", lineHeight: 1.6 }}>
-                  💡 텍스트만 번역됩니다. 이미지 속 글자·차트 데이터는 원본 그대로 유지돼요.
-                </div>
-              </>
-            )}
 
-            {/* 처리 중 */}
-            {pptxProcessing && (
-              <div style={{ textAlign: "center", padding: "36px 20px", background: "#FFFBEB", borderRadius: 14, border: "1px solid #FDE68A" }}>
-                <div style={{ width: 40, height: 40, borderRadius: "50%", margin: "0 auto 14px", border: "3px solid #E5E7EB", borderTopColor: "#F59E0B", animation: "spin 0.8s linear infinite" }} />
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#374151" }}>{pptxStatus}</div>
-                <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 6, lineHeight: 1.7 }}>
-                  문서 크기에 따라 10~60초 걸릴 수 있어요
-                </div>
-              </div>
-            )}
+                  {!pptxResult && !pptxProcessing && (
+                    <>
+                      <input
+                        ref={pptxRef}
+                        type="file"
+                        accept=".pptx,.hwpx"
+                        className="root-file"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void handlePptxFile(file);
+                          e.target.value = "";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        data-ux-role="action"
+                        className="root-cta"
+                        onClick={() => pptxRef.current?.click()}
+                      >📤 문서 파일 고르기</button>
+                      <p data-ux-role="secondary" className="root-note">
+                        .pptx · .hwpx 만 됩니다. 글자만 번역되고 이미지 속 글자·차트 값은 그대로 둡니다.
+                      </p>
+                    </>
+                  )}
 
-            {/* 오류 */}
-            {pptxError && (
-              <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#EF4444", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                ❌ {pptxError}
-                <button onClick={() => setPptxError(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#EF4444" }}>↩</button>
-              </div>
-            )}
+                  {pptxProcessing && (
+                    <p data-ux-role="body" className="root-state" role="status">
+                      {pptxStatus} — 문서 크기에 따라 10~60초 걸릴 수 있어요
+                    </p>
+                  )}
 
-            {/* 완료 */}
-            {pptxResult && (
-              <div style={{ background: "linear-gradient(135deg, #FEF3C7, #FFF7ED)", borderRadius: 14, padding: "20px 18px", border: "1px solid #FDE68A", textAlign: "center" }}>
-                <img
-                  src="/interpreter/success.png"
-                  alt=""
-                  aria-hidden="true"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).outerHTML = '<div style="font-size:38px;margin-bottom:8px">✅</div>'; }}
-                  style={{ width: 72, height: 72, objectFit: "contain", margin: "0 auto 8px", display: "block" }}
-                />
-                <div style={{ fontWeight: 800, fontSize: 15, color: "#B45309", marginBottom: 6 }}>번역 완료</div>
-                <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 4 }}>
-                  {LANGUAGES[pptxFrom]?.flag} {LANGUAGES[pptxFrom]?.label} → {LANGUAGES[pptxTo]?.flag} {LANGUAGES[pptxTo]?.label}
-                </div>
-                <div style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 14 }}>
-                  {pptxResult.segments > 0 ? `${pptxResult.segments}개 텍스트 조각 번역 · ` : ""}
-                  {pptxResult.kind === "pptx" ? "PowerPoint" : "한글(HWPX)"} · Groq Llama
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    onClick={() => { setPptxResult(null); setPptxError(null); }}
-                    style={{ flex: 1, padding: "11px 0", borderRadius: 11, border: "1.5px solid #E5E7EB", background: "#fff", color: "#6B7280", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                  >↩ 다른 파일</button>
-                  <button
-                    onClick={pptxDownload}
-                    style={{ flex: 2, padding: "11px 0", borderRadius: 11, border: "none", background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 16px rgba(245,158,11,0.35)" }}
-                  >📥 번역 파일 다운로드</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+                  {pptxError && (
+                    <div className="root-state warn" role="alert">
+                      <p data-ux-role="body" className="root-state-line">{pptxError}</p>
+                      <button type="button" data-ux-role="control" className="root-retry" onClick={() => setPptxError(null)}>
+                        다시 해보기
+                      </button>
+                    </div>
+                  )}
 
-        {/* 관리자 링크 */}
-        <div style={{ textAlign: "center", marginTop: 22 }}>
-          <button
-            onClick={() => router.push("/admin")}
-            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#C4C4C4", fontWeight: 500, transition: "color 0.15s" }}
-            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#C4C4C4")}
-          >🔧 관리자 패널</button>
-        </div>
+                  {pptxResult && (
+                    <div className="root-done">
+                      <p data-ux-role="body" className="root-state ok">
+                        번역 완료 — {LANGUAGES[pptxFrom]?.label} → {LANGUAGES[pptxTo]?.label}
+                        {pptxResult.segments > 0 ? ` · 텍스트 ${pptxResult.segments}조각` : ""}
+                      </p>
+                      <button type="button" data-ux-role="action" className="root-cta" onClick={pptxDownload}>
+                        📥 번역 파일 내려받기
+                      </button>
+                      <button
+                        type="button"
+                        data-ux-role="control"
+                        className="root-link"
+                        onClick={() => { setPptxResult(null); setPptxError(null); }}
+                      >다른 파일 번역하기</button>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </main>
       </div>
     </div>
   );
 }
+
+/* ── 루트 진입 화면 전용 규칙 ───────────────────────────────────────
+   크기·색은 전부 토큰에서 온다. 여기서 px 글자 크기를 새로 만들지 않는다.
+   100vh 로 잠그지 않고 문서가 스크롤되게 둔다 — 모바일 키보드가 올라와도
+   입력과 CTA 가 스크롤로 닿아야 한다(README §5.1). */
+const ROOT_CSS = `
+.root-page{
+  position: relative;
+  min-height: 100svh;
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-12);
+  background: var(--ux-bg);
+  display: flex; justify-content: center;
+}
+.root-backdrop{
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: url('/landing/landing-bees.webp') center / cover no-repeat;
+  opacity: .35;
+}
+.root-shell{ position: relative; z-index: 1; width: 100%; max-width: 560px; align-self: center; }
+.root-panel{
+  background: var(--ux-surface);
+  border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-6) var(--ux-space-4);
+  box-shadow: 0 10px 30px rgba(137,83,0,.14);
+  display: grid; gap: var(--ux-space-4);
+}
+.root-hero{ text-align: center; display: grid; gap: var(--ux-space-2); justify-items: center; }
+.root-hero-bee{ width: 96px; height: 96px; object-fit: contain; }
+.root-title{ margin: 0; color: var(--ux-ink); font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
+.root-title.small{ flex: 1; min-width: 0; text-align: left; }
+.root-sub{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }
+
+/* 네 자리 표시 */
+.root-digits{ display: flex; gap: var(--ux-space-3); justify-content: center; }
+.root-digit{
+  width: 56px; min-height: 72px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--ux-radius-surface);
+  border: 3px solid var(--ux-ink-soft); background: var(--ux-surface-sunk);
+  color: var(--ux-ink); font-weight: 900; font-size: var(--ux-font-title);
+  line-height: var(--ux-lh-tight);
+}
+.root-digit.filled{ border-color: var(--ux-selected-border); background: var(--ux-surface); }
+.root-digit.next{ border-style: dashed; border-color: var(--ux-selected-border); }
+
+/* 키패드 — 한 칸도 56px 아래로 내려가지 않는다 */
+.root-keypad{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--ux-control-gap); }
+.root-key{
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+}
+/* 전역 [data-ux-role] 규칙이 layout 의 <style> 에서 더 뒤에 오므로 클래스 하나로는
+   min-height 를 못 이긴다 — 속성까지 함께 걸어야 실제로 64px 이 된다. */
+.root-key[data-ux-role="control"]{ min-height: 64px; }
+.root-key-glyph{ font-size: var(--ux-font-body-emphasis); line-height: 1; }
+.root-key-label{
+  font-size: var(--ux-font-secondary); font-weight: 700;
+  /* 어절 가운데서 접히면 '모두 지 / 우기' 가 된다 — 어절은 지킨다. */
+  word-break: keep-all;
+}
+.root-key.edit{ background: var(--ux-surface-sunk); }
+.root-key.edit .root-key-glyph{ font-size: var(--ux-font-label); }
+
+/* 상태 — 로딩 / 방 없음 / 연결 실패 */
+.root-state{
+  margin: 0; display: grid; gap: var(--ux-space-2); justify-items: center;
+  text-align: center; color: var(--ux-ink); word-break: keep-all;
+}
+.root-state-line{ margin: 0; }
+.root-state-actions{ display: flex; flex-wrap: wrap; gap: var(--ux-control-gap); justify-content: center; }
+.root-state.warn{
+  color: var(--ux-error); font-weight: 700;
+  background: var(--ux-surface-sunk); border: 2px dashed var(--ux-error);
+  border-radius: var(--ux-radius-surface); padding: var(--ux-space-3);
+}
+.root-state.ok{ color: var(--ux-success); font-weight: 700; }
+.root-retry{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+}
+
+.root-cta{
+  width: 100%; font-family: inherit; font-weight: 900;
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border);
+}
+/* 아직 누를 수 없는 상태도 읽히게 둔다. 회색 위 회색 글자는 쓰지 않는다. */
+.root-cta[aria-disabled="true"]{
+  background: var(--ux-surface-sunk); color: var(--ux-ink-soft);
+  border: 2px dashed var(--ux-ink-soft);
+}
+.root-cta-hint{ margin: 0; text-align: center; }
+
+.root-teacher-links{
+  display: grid; gap: var(--ux-space-2);
+  border-top: 2px dashed var(--ux-surface-sunk); padding-top: var(--ux-space-4);
+}
+.root-link{
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--ux-space-2);
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+  word-break: keep-all;
+}
+.root-link.quiet{ border: 2px solid transparent; color: var(--ux-ink-soft); }
+
+/* 보조 화면 */
+.root-subhead{ display: flex; align-items: center; gap: var(--ux-space-3); }
+.root-back{
+  display: inline-flex; align-items: center; gap: var(--ux-space-2); flex-shrink: 0;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 700;
+}
+.root-label{ font-weight: 800; color: var(--ux-ink); margin: 0; }
+.root-note{ margin: 0; }
+.root-note.ok{ color: var(--ux-success); font-weight: 700; }
+.root-note.warn{ color: var(--ux-error); font-weight: 700; }
+.root-input{
+  width: 100%; min-height: var(--ux-action-min);
+  font-family: inherit; font-size: var(--ux-font-body-emphasis); font-weight: 700;
+  color: var(--ux-ink); background: var(--ux-surface);
+  border: 2px solid var(--ux-ink-soft); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3) var(--ux-space-4); box-sizing: border-box;
+}
+.root-input.code{ text-align: center; letter-spacing: .4em; }
+.root-input.area{ resize: vertical; line-height: var(--ux-lh-reading); }
+.root-input:focus{ border-color: var(--ux-selected-border); }
+
+.root-langs{ display: grid; grid-template-columns: 1fr; gap: var(--ux-space-2); }
+@media (min-width: 600px){ .root-langs{ grid-template-columns: 1fr 1fr; } }
+.root-lang{
+  display: flex; align-items: center; gap: var(--ux-space-3); width: 100%;
+  background: var(--ux-surface); color: var(--ux-ink); text-align: left;
+  border: 2px solid var(--ux-ink-soft); font-family: inherit; font-weight: 700;
+}
+.root-lang.on{ border: 3px solid var(--ux-selected-border); background: var(--ux-surface-sunk); }
+.root-lang-name{ flex: 1; min-width: 0; font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
+.root-check{ font-weight: 900; color: var(--ux-selected-border); flex-shrink: 0; }
+
+.root-dir{ display: flex; align-items: center; gap: var(--ux-space-3); }
+.root-select{
+  flex: 1; min-width: 0; min-height: var(--ux-control-min);
+  font-family: inherit; font-size: var(--ux-font-label); font-weight: 700;
+  color: var(--ux-ink); background: var(--ux-surface);
+  border: 2px solid var(--ux-primary-border); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-2) var(--ux-space-3);
+}
+.root-dir-arrow{ font-weight: 900; color: var(--ux-ink-soft); flex-shrink: 0; }
+.root-file{ display: none; }
+.root-done{ display: grid; gap: var(--ux-space-3); }
+
+@media (min-width: 1024px){
+  .root-shell{ max-width: 640px; }
+  .root-panel{ padding: var(--ux-space-8) var(--ux-space-6); }
+  .root-hero-bee{ width: 140px; height: 140px; }
+}
+`;

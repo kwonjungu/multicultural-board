@@ -2,15 +2,22 @@
 
 // 앱 전역 플로팅 "AI 튜터 꿀비" 챗 위젯.
 // 모든 허브 화면(소통창/게임/단어/그림책/칭찬)에서 우하단 버튼으로 열 수 있다.
-// 서버: /api/tutor-chat (SSE 스트리밍, 안전 레이어 포함)
+// 서버: /api/tutor-chat (SSE 스트리밍, 안전 레이어 포함) — 이 계약은 바꾸지 않는다.
 // 대화는 sessionStorage 에만 보관 — 탭 닫으면 사라진다 (Firebase 미사용).
+//
+// 튜터는 '보조 도움'이고 소통창은 '친구에게 보내는 글'이다. 두 가지를 같은
+// 것으로 보이게 하지 않는다 (README §6.4). 여기의 답은 어디에도 공유되지 않으며,
+// 친구에게 보여주려면 소통창에 직접 올려야 한다.
 
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { readChatStream } from "@/lib/chatStreamClient";
 import { raiseAlert } from "@/lib/storybook";
+import { t } from "@/lib/i18n";
 import type { UserConfig } from "@/lib/types";
 import MicButton from "./MicButton";
+import ScopedStyle from "./ui/child/ScopedStyle";
 
 interface TutorMsg {
   role: "user" | "assistant";
@@ -100,13 +107,36 @@ export default function TutorChat({
   const lang = user.myLang;
   const storageKey = `tutorChat:${roomCode}:${myClientId}`;
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [messages, setMessages] = useState<TutorMsg[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [streamText, setStreamText] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [blockHint, setBlockHint] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef(false);
   const vp = useVisualViewport();
+
+  /** 가장 최근 요청의 번호. 이보다 오래된 응답은 버린다 (STREAM-01). */
+  const reqSeqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  /** 실패했을 때 다시 보낼 질문. 아이가 다시 타이핑하게 만들지 않는다. */
+  const lastAskRef = useRef<string | null>(null);
+  const aliveRef = useRef(true);
+
+  useEffect(() => {
+    // StrictMode 의 mount→cleanup→mount 에서 aliveRef 가 false 로 굳지 않게 되살린다.
+    aliveRef.current = true;
+    setMounted(true);
+    return () => {
+      aliveRef.current = false;
+      // unmount 하면 진행 중인 스트림도 끝난다.
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, []);
 
   // 세션 내 대화 복원 (탭 단위)
   useEffect(() => {
@@ -130,14 +160,40 @@ export default function TutorChat({
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, streamText, open]);
+  }, [messages, streamText, open, collapsed]);
 
-  async function handleSend() {
-    const text = draft.trim();
-    if (!text || busy) return;
-    setDraft("");
+  /** 진행 중인 생성을 멈춘다. 닫기·숨김·unmount·'멈추기' 가 같은 경로를 쓴다. */
+  function stopStream() {
+    reqSeqRef.current += 1;   // 이 다음에 도착하는 응답은 전부 오래된 것이 된다
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setBusy(false);
+    setStreamText(null);
+  }
+
+  function closePanel() {
+    stopStream();
+    setOpen(false);
+    setCollapsed(false);
+  }
+
+  // hidden 으로 숨겨질 때도 생성을 남겨 두지 않는다.
+  useEffect(() => {
+    if (hidden) stopStream();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hidden]);
+
+  async function ask(text: string) {
+    const mySeq = reqSeqRef.current + 1;
+    reqSeqRef.current = mySeq;
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    lastAskRef.current = text;
+    setFailed(false);
+    setBlockHint(null);
     setBusy(true);
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
 
     // 클라이언트 사전 안전검사 (서버에도 동일 검사 있음)
     const pre = checkSafety(text);
@@ -161,6 +217,7 @@ export default function TutorChat({
       const res = await fetch("/api/tutor-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
         body: JSON.stringify({
           studentLang: lang,
           studentName: user.myName,
@@ -168,181 +225,297 @@ export default function TutorChat({
           studentText: text,
         }),
       });
-      const final = await readChatStream(res, (acc) => setStreamText(acc));
+      const final = await readChatStream(res, (acc) => {
+        // 멈추기·교체 이후에 흘러들어온 조각은 화면에 쓰지 않는다.
+        if (reqSeqRef.current !== mySeq || !aliveRef.current) return;
+        setStreamText(acc);
+      });
+      // 최신 요청이 아니면 이 응답은 버린다 — 늦게 도착한 A 가 B 를 덮지 않는다.
+      if (reqSeqRef.current !== mySeq || !aliveRef.current) return;
       if (final.kind === "distress") {
         raiseAlert(roomCode, {
           clientId: myClientId, studentName: user.myName,
           timestamp: Date.now(), kind: "distress",
         }).catch(() => {});
       }
-      setMessages((prev) => [...prev, {
-        role: "assistant",
-        // 빈 응답/통신 실패는 콘텐츠 차단이 아니므로 "error" 문구 — "block" 을 쓰면
-        // 정상 질문이 부적절 판정받은 것처럼 보인다.
-        content: final.reply || replyForSafety(lang, "error"),
-      }]);
+      if (!final.reply) {
+        // 빈 응답/통신 실패는 콘텐츠 차단이 아니다 — 다시 물어볼 수 있게 둔다.
+        setFailed(true);
+      } else {
+        setMessages((prev) => [...prev, { role: "assistant", content: final.reply }]);
+      }
     } catch (err) {
+      if (reqSeqRef.current !== mySeq || !aliveRef.current) return;
+      if ((err as { name?: string })?.name === "AbortError") return;
       console.error("tutor chat failed", err);
-      setMessages((prev) => [...prev, { role: "assistant", content: replyForSafety(lang, "error") }]);
+      setFailed(true);
     }
+    if (reqSeqRef.current !== mySeq || !aliveRef.current) return;
     setStreamText(null);
     setBusy(false);
+    abortRef.current = null;
   }
 
-  if (hidden) return null;
+  function handleSend() {
+    const text = draft.trim();
+    if (busy) { setBlockHint(t("postBusyWait", lang)); return; }
+    if (!text) { setBlockHint(t("tutorNeedQuestion", lang)); return; }
+    setDraft("");
+    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    void ask(text);
+  }
 
-  return (
-    <>
-      {/* 플로팅 버튼 — HubTutorialBootstrap(bottom 20/right 20) 위에 쌓는다 */}
+  function handleRetry() {
+    const text = lastAskRef.current;
+    if (!text || busy) return;
+    void ask(text);
+  }
+
+  /** 조합 중 Enter 는 확정용이다 — 전송으로 쓰지 않는다 (IME-01). */
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter") return;
+    if ((e.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return;
+    if (e.shiftKey) return;   // 줄바꿈은 그대로 둔다
+    e.preventDefault();
+    handleSend();
+  }
+
+  if (hidden || !mounted) return null;
+
+  const panelHeight = vp.height > 0
+    ? `min(560px, ${Math.max(vp.height - 32, 240)}px)`
+    : "min(560px, calc(100dvh - 90px))";
+
+  const widget = (
+    <div data-ux-root className="tc-root">
+      <ScopedStyle css={TC_CSS} />
+
+      {/* 플로팅 버튼 — 아이콘 단독이 아니라 글자 라벨을 같이 둔다 */}
       {!open && (
         <button
-          onClick={() => setOpen(true)}
-          aria-label={pickL(L_TITLE, lang)}
-          style={{
-            // zIndex 는 전체화면 뷰(게임룸 460·토론 450·모달 400)보다 낮게 —
-            // 그 위에 떠서 게임 버튼 탭을 가로채던 버그의 재발 방지
-            position: "fixed", bottom: 84 + vp.bottomInset, right: 18, zIndex: 300,
-            width: 60, height: 60, borderRadius: "50%",
-            border: "3px solid #FDE68A",
-            background: "linear-gradient(135deg, #F59E0B, #D97706)",
-            boxShadow: "0 8px 20px rgba(180,83,9,0.4)",
-            fontSize: 28, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 4,
-          }}
+          type="button"
+          data-ux-role="control"
+          className="tc-fab"
+          style={{ bottom: 84 + vp.bottomInset }}
+          onClick={() => { setOpen(true); setCollapsed(false); }}
         >
           <img
             src="/mascot/bee-tutor.png"
             alt=""
             aria-hidden="true"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).outerHTML = "🐝"; }}
-            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            className="tc-fab-img"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
+          <span data-ux-role="label" className="tc-fab-label">{t("tutorOpenLabel", lang)}</span>
         </button>
       )}
 
-      {/* 챗 패널 */}
       {open && (
-        <div style={{
-          position: "fixed", bottom: 16 + vp.bottomInset, right: 12, zIndex: 320,
-          width: "min(380px, calc(100vw - 24px))",
-          height: vp.height > 0 ? `min(540px, ${Math.max(vp.height - 32, 260)}px)` : "min(540px, calc(100dvh - 90px))",
-          background: "#fff",
-          borderRadius: 20, border: "3px solid #FDE68A",
-          boxShadow: "0 16px 40px rgba(0,0,0,0.28)",
-          display: "flex", flexDirection: "column", overflow: "hidden",
-          fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
-          transition: "bottom 0.15s ease-out",
-        }}>
-          {/* 헤더 */}
-          <div style={{
-            background: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
-            padding: "10px 14px",
-            display: "flex", alignItems: "center", gap: 10,
-            borderBottom: "2px solid #F59E0B33",
-          }}>
-            <img
-              src="/mascot/bee-tutor.png"
-              alt=""
-              aria-hidden="true"
-              style={{ width: 40, height: 40, objectFit: "contain", flexShrink: 0 }}
-            />
-            <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 900, color: "#1F2937" }}>
-              {pickL(L_TITLE, lang)}
-            </div>
+        <section
+          className="tc-panel"
+          aria-label={pickL(L_TITLE, lang)}
+          style={{ bottom: 16 + vp.bottomInset, height: collapsed ? "auto" : panelHeight }}
+        >
+          <header className="tc-head">
+            <img src="/mascot/bee-tutor.png" alt="" aria-hidden="true" className="tc-head-img" />
+            <h2 data-ux-role="label" className="tc-title">{pickL(L_TITLE, lang)}</h2>
             <button
-              onClick={() => setOpen(false)}
-              aria-label="close"
-              style={{
-                background: "transparent", border: "none", cursor: "pointer",
-                fontSize: 20, fontWeight: 900, color: "#92400E", padding: 4,
-              }}
-            >✕</button>
-          </div>
+              type="button"
+              data-ux-role="control"
+              className="tc-quiet"
+              aria-expanded={!collapsed}
+              onClick={() => setCollapsed((c) => !c)}
+            >{collapsed ? t("tutorExpand", lang) : t("tutorCollapse", lang)}</button>
+            <button type="button" data-ux-role="control" className="tc-quiet" onClick={closePanel}>
+              <span aria-hidden>✕</span> {t("postCloseLabel", lang)}
+            </button>
+          </header>
 
-          {/* 메시지 */}
-          <div ref={scrollRef} style={{
-            flex: 1, padding: 12, overflowY: "auto",
-            display: "flex", flexDirection: "column", gap: 8,
-            background: "#FFFBEB",
-          }}>
-            {/* 인사말 — 저장하지 않는 가상 첫 메시지 */}
-            <TutorBubble role="assistant" content={pickL(L_GREETING, lang)} />
-            {messages.map((m, i) => (
-              <TutorBubble key={i} role={m.role} content={m.content} />
-            ))}
-            {busy && (
-              <TutorBubble role="assistant" content={streamText || "···"} dimmed={!streamText} />
-            )}
-          </div>
+          {/* 소통창과 튜터의 경계 — 여기 답은 친구에게 가지 않는다 */}
+          <p data-ux-role="secondary" className="tc-private">🔒 {t("tutorPrivateNote", lang)}</p>
 
-          {/* 입력 */}
-          <div style={{
-            padding: "8px 10px 10px", background: "#fff",
-            borderTop: "2px solid #FDE68A", display: "flex", gap: 8, alignItems: "center",
-          }}>
-            <MicButton
-              lang={lang}
-              disabled={busy}
-              size={42}
-              onText={(text) => setDraft((d) => (d ? `${d} ${text}` : text))}
-            />
-            <input
-              type="text"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
-              onFocus={() => setTimeout(() => scrollRef.current && (scrollRef.current.scrollTop = scrollRef.current.scrollHeight), 250)}
-              placeholder={pickL(L_PLACEHOLDER, lang)}
-              disabled={busy}
-              maxLength={200}
-              style={{
-                flex: 1, minHeight: 42, padding: "8px 12px",
-                border: "2px solid #FDE68A", borderRadius: 12,
-                fontSize: 14, fontWeight: 600, color: "#1F2937",
-                fontFamily: "inherit", outline: "none", background: "#FFFBEB",
-              }}
-            />
-            <button
-              onClick={handleSend}
-              disabled={busy || !draft.trim()}
-              style={{
-                minWidth: 56, borderRadius: 12, border: "none",
-                cursor: busy || !draft.trim() ? "default" : "pointer",
-                background: !draft.trim() || busy
-                  ? "#E5E7EB"
-                  : "linear-gradient(135deg, #F59E0B, #D97706)",
-                color: !draft.trim() || busy ? "#9CA3AF" : "#fff",
-                fontSize: 16, fontWeight: 900,
-              }}
-            >➤</button>
-          </div>
-        </div>
+          {!collapsed && (
+            <>
+              <div ref={scrollRef} className="tc-log" role="log">
+                {/* 인사말 — 저장하지 않는 가상 첫 메시지 */}
+                <TutorBubble role="assistant" content={pickL(L_GREETING, lang)} />
+                {messages.map((m, i) => (
+                  <TutorBubble key={i} role={m.role} content={m.content} />
+                ))}
+                {busy && (
+                  <TutorBubble role="assistant" content={streamText || `⟳ ${t("tutorAsking", lang)}`} />
+                )}
+                {failed && (
+                  <div className="tc-failed" role="alert">
+                    <p data-ux-role="body">{t("tutorFailed", lang)}</p>
+                    <button type="button" data-ux-role="control" className="tc-secondary" onClick={handleRetry}>
+                      {t("tutorRetry", lang)}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <p data-ux-role="secondary" className="tc-share-note">{t("tutorPrivateLong", lang)}</p>
+
+              {blockHint && <p data-ux-role="body" className="tc-blockhint" role="status">{blockHint}</p>}
+
+              <div className="tc-input-row">
+                <MicButton
+                  lang={lang}
+                  size={56}
+                  onText={(text) => setDraft((d) => (d ? `${d} ${text}` : text))}
+                />
+                <textarea
+                  data-ux-role="body"
+                  className="tc-input"
+                  value={draft}
+                  rows={2}
+                  lang={lang}
+                  onChange={(e) => { setDraft(e.target.value); setBlockHint(null); }}
+                  onKeyDown={onKeyDown}
+                  placeholder={pickL(L_PLACEHOLDER, lang)}
+                  maxLength={400}
+                  aria-label={pickL(L_PLACEHOLDER, lang)}
+                />
+              </div>
+              <div className="tc-actions">
+                {busy ? (
+                  <button type="button" data-ux-role="action" className="tc-secondary tc-wide" onClick={stopStream}>
+                    ⏹ {t("tutorStop", lang)}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    data-ux-role="action"
+                    className="tc-primary tc-wide"
+                    aria-disabled={!draft.trim()}
+                    onClick={handleSend}
+                  >{t("tutorSend", lang)}</button>
+                )}
+              </div>
+            </>
+          )}
+        </section>
       )}
-    </>
+    </div>
   );
+
+  // 화면 본체와 data-ux-root 가 겹치지 않도록 body 로 띄운다.
+  return createPortal(widget, document.body);
 }
 
-function TutorBubble({ role, content, dimmed }: {
+function TutorBubble({ role, content }: {
   role: "user" | "assistant";
   content: string;
-  dimmed?: boolean;
 }) {
   const isUser = role === "user";
   return (
-    <div style={{
-      alignSelf: isUser ? "flex-end" : "flex-start",
-      maxWidth: "85%",
-      padding: "9px 13px",
-      background: isUser ? "linear-gradient(135deg, #3B82F6, #2563EB)" : "#fff",
-      color: isUser ? "#fff" : dimmed ? "#92400E" : "#1F2937",
-      borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-      border: isUser ? "none" : "2px solid #FDE68A",
-      fontSize: 14, fontWeight: 600, lineHeight: 1.45,
-      wordBreak: "break-word", whiteSpace: "pre-wrap",
-      boxShadow: isUser ? "0 4px 10px rgba(59,130,246,0.25)" : "0 2px 8px rgba(180,83,9,0.1)",
-    }}>
+    <p data-ux-role="body" data-ux-reading className={isUser ? "tc-bubble me" : "tc-bubble bee"}>
       {content}
-    </div>
+    </p>
   );
 }
+
+/* ── 튜터 패널 전용 규칙 ───────────────────────────────────────────
+   대화문은 --ux-font-body(기본 20px 상당), 입력창도 같은 크기다. 패널 높이는
+   visualViewport 로 잡아 키보드가 올라와도 입력과 보내기가 가려지지 않는다. */
+const TC_CSS = `
+.tc-root{ position: static; }
+.tc-fab{
+  position: fixed; right: 12px; z-index: 300;
+  display: inline-flex; align-items: center; gap: var(--ux-space-2);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-pill);
+  font-family: inherit; font-weight: 800;
+  box-shadow: 0 6px 18px rgba(137,83,0,.28);
+}
+.tc-fab-img{ width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+.tc-fab-label{ white-space: nowrap; }
+
+.tc-panel{
+  position: fixed; right: 8px; left: 8px; z-index: 320;
+  max-width: 420px; margin-left: auto;
+  display: flex; flex-direction: column; gap: var(--ux-space-2);
+  background: var(--ux-surface);
+  border: 3px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-3);
+  box-shadow: 0 16px 40px rgba(41,37,31,.28);
+  box-sizing: border-box;
+}
+.tc-head{ display: flex; align-items: center; gap: var(--ux-space-2); flex-wrap: wrap; }
+.tc-head-img{ width: 40px; height: 40px; object-fit: contain; flex-shrink: 0; }
+.tc-title{
+  flex: 1 1 8ch; min-width: 0; margin: 0; color: var(--ux-ink); font-weight: 900;
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.tc-private{
+  margin: 0; padding: var(--ux-space-2) var(--ux-space-3);
+  background: var(--ux-surface-sunk); border-radius: var(--ux-radius-pill);
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.tc-share-note{ margin: 0; word-break: keep-all; overflow-wrap: anywhere; }
+.tc-log{
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--ux-space-2);
+  background: var(--ux-bg); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3);
+}
+.tc-bubble{
+  margin: 0; max-width: 90%;
+  padding: var(--ux-space-2) var(--ux-space-3);
+  border-radius: var(--ux-radius-surface);
+  white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere;
+}
+.tc-bubble.bee{ align-self: flex-start; background: var(--ux-surface); border: 2px solid var(--ux-primary-border); color: var(--ux-ink); }
+.tc-bubble.me{ align-self: flex-end; background: var(--ux-surface-sunk); border: 2px solid var(--ux-selected-border); color: var(--ux-ink); }
+.tc-failed{
+  display: grid; gap: var(--ux-space-2);
+  border: 2px dashed var(--ux-error); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3);
+}
+.tc-failed p{ margin: 0; color: var(--ux-error); font-weight: 800; }
+.tc-blockhint{
+  margin: 0; color: var(--ux-ink); font-weight: 700;
+  background: var(--ux-surface-sunk); border: 2px dashed var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface); padding: var(--ux-space-2) var(--ux-space-3);
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.tc-input-row{ display: flex; gap: var(--ux-space-2); align-items: stretch; }
+.tc-input{
+  flex: 1; min-width: 0; box-sizing: border-box; font-family: inherit;
+  font-size: var(--ux-font-body); line-height: var(--ux-lh-reading);
+  font-weight: 600; color: var(--ux-ink); background: var(--ux-surface);
+  border: 2px solid var(--ux-ink-soft); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-2) var(--ux-space-3);
+  min-height: var(--ux-action-min); resize: none;
+}
+.tc-input:focus{ border-color: var(--ux-selected-border); }
+.tc-actions{ display: flex; gap: var(--ux-space-2); }
+.tc-wide{ width: 100%; }
+.tc-primary{
+  font-family: inherit; font-weight: 900;
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border);
+}
+.tc-primary[aria-disabled="true"]{
+  background: var(--ux-surface-sunk); color: var(--ux-ink-soft);
+  border: 2px dashed var(--ux-ink-soft);
+}
+.tc-secondary{
+  font-family: inherit; font-weight: 800;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
+}
+.tc-quiet{
+  font-family: inherit; font-weight: 800; flex-shrink: 0;
+  background: transparent; color: var(--ux-ink-soft);
+  border: 2px solid transparent;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--ux-space-2);
+}
+@media (min-width: 700px){
+  .tc-panel{ left: auto; width: 420px; right: 16px; }
+  .tc-fab{ right: 18px; }
+}
+`;

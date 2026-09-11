@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   UserConfig,
   RoomConfig,
@@ -18,7 +18,7 @@ import {
   progressInStage,
   royalProgress,
 } from "@/lib/stage";
-import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
+import CharacterComposite from "./CharacterComposite";
 import BeeVillage from "./BeeVillage";
 import { type QuestEventType } from "@/lib/quests";
 import { TutorialBus } from "@/lib/tutorial/bus";
@@ -457,8 +457,8 @@ function MyHiveTab({
       ? "bee"
       : "queen";
 
-  // Character box size (px). Keep square.
-  const CHAR_BOX = 240;
+  // Character box size (px). Keep square. README §7.1 은 240~320px 를 요구한다.
+  const CHAR_BOX = 260;
 
   // My sticker type counts (for per-type stats)
   const myTypeCounts: Record<StickerType, number> = {
@@ -470,6 +470,10 @@ function MyHiveTab({
 
   // Stickers in chronological order — each fills one hex cell.
   const received = [...list].sort((a, b) => a.timestamp - b.timestamp);
+  /** 가장 최근 칭찬 — 히어로 상단의 “칭찬 이유” 문장. */
+  const latestPraise = received.length > 0 ? received[received.length - 1] : null;
+  /** ‘칭찬 모아보기’가 지정하는 목적지. */
+  const hiveRef = useRef<HTMLDivElement>(null);
 
   // Honeycomb — pointy-top hex tiling with exact √3/2 ratio (no rounding).
   // Adjacent rows overlap vertically by exactly H/4 and odd rows shift by W/2.
@@ -485,7 +489,8 @@ function MyHiveTab({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Hero character card */}
+      {/* Hero character card — README §7.1: 위에 칭찬 이유, 가운데 내 꿀벌,
+          아래에 ‘꾸미기’·‘칭찬 모아보기’. 스티커 수는 보조 정보다. */}
       <div
         style={{
           background: "#fff",
@@ -496,6 +501,54 @@ function MyHiveTab({
           textAlign: "center",
         }}
       >
+        {/* 칭찬받은 이유 — 선생님이 쓴 메모가 있으면 그 문장 그대로. */}
+        <div
+          style={{
+            display: "flex", gap: 10, alignItems: "center",
+            textAlign: "left", marginBottom: 14,
+            padding: "12px 14px",
+            background: `linear-gradient(135deg, ${HONEY.h50}, #fff)`,
+            border: `1.5px solid ${HONEY.h200}`,
+            borderRadius: 16,
+          }}
+        >
+          <img
+            src={latestPraise ? `/stickers/sticker-${latestPraise.type}.png` : "/mascot/bee-welcome.png"}
+            alt=""
+            aria-hidden="true"
+            style={{ width: 56, height: 56, objectFit: "contain", flexShrink: 0 }}
+          />
+          <div style={{ minWidth: 0 }}>
+            <p
+              data-ux-role="body-emphasis"
+              style={{
+                margin: 0,
+                fontSize: "var(--ux-font-body-emphasis)",
+                lineHeight: "var(--ux-lh-reading)",
+                fontWeight: 800,
+                color: "#29251F",
+                wordBreak: "break-word",
+              }}
+            >
+              {latestPraise
+                ? latestPraise.memo?.trim()
+                  ? latestPraise.memo
+                  : t(TYPE_LABEL_KEY[latestPraise.type], lang)
+                : t("phNoStickersYet", lang)}
+            </p>
+            {latestPraise && (
+              <span
+                data-ux-role="secondary"
+                style={{ fontSize: "var(--ux-font-secondary)", color: HONEY.h700, fontWeight: 700 }}
+              >
+                {latestPraise.source === "mission"
+                  ? t("phFromMission", lang)
+                  : latestPraise.fromTeacherName || t("phFromTeacher", lang)}
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Character wrapper — character exactly centered; hat positioned via measured anchor */}
         <div
           style={{
@@ -522,17 +575,18 @@ function MyHiveTab({
               }}
             />
           )}
-          {/* 배경(뒤) + 오라(앞) — Phase 3 */}
-          <CosmeticFrame backdrop={cosmetics.backdrop} aura={cosmetics.aura} />
-          {/* Main character fills the wrapper — 다단계 폴백:
-              skin+hat 합성 → skin 단독 → stage 기본 */}
-          <CharacterImage
+          {/* 꿈미기 미리보기·마을과 **같은 render plan** — 좌표는 전부
+              lib/characterRenderPlan.ts 가 정한다 (ART-01·ART-04). */}
+          <CharacterComposite
             stage={stage}
             skin={cosmetics.skin}
             hat={cosmetics.hat}
+            held={cosmetics.held}
+            acc={cosmetics.acc}
+            backdrop={cosmetics.backdrop}
+            aura={cosmetics.aura}
+            size={CHAR_BOX}
           />
-          {/* 소지품 + 액세서리 — 꿀벌 마을 확장 */}
-          <AccessoryLayer stage={stage} held={cosmetics.held} acc={cosmetics.acc} />
           {/* Pet (bottom-right, slightly outside box) */}
           {cosmetics.pet && (
             <img
@@ -554,19 +608,23 @@ function MyHiveTab({
           )}
         </div>
 
-        {/* Stage label */}
+        {/* Stage label — 스티커 수는 보조 정보로 내린다(README §7.1). */}
         <div
+          data-ux-role="title"
           style={{
-            fontSize: 22,
+            fontSize: "var(--ux-font-title)",
             fontWeight: 900,
             color: HONEY.h800,
-            marginTop: 6,
+            marginTop: 8,
             letterSpacing: -0.3,
           }}
         >
           {t(STAGE_LABEL_KEY[stage], lang)}
         </div>
-        <div style={{ fontSize: 14, color: HONEY.h700, fontWeight: 700, marginTop: 2 }}>
+        <div
+          data-ux-role="secondary"
+          style={{ fontSize: "var(--ux-font-secondary)", color: HONEY.h700, fontWeight: 700, marginTop: 2 }}
+        >
           {tFmt("phCountLabel", lang, { n: count })}
         </div>
 
@@ -603,26 +661,55 @@ function MyHiveTab({
             : t("phMaxStage", lang)}
         </div>
 
-        {/* Customize button */}
-        <button
-          onClick={onOpenCosmetics}
+        {/* 두 가지 행동 — 꾸미기 / 칭찬 모아보기 (README §7.1) */}
+        <div
           style={{
-            marginTop: 14,
-            minHeight: 56,
-            padding: "10px 22px",
-            background: `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`,
-            color: "#fff",
-            border: "none",
-            borderRadius: 14,
-            fontSize: 16,
-            fontWeight: 900,
-            cursor: "pointer",
-            boxShadow: "0 6px 16px rgba(245,158,11,0.3)",
-            letterSpacing: -0.2,
+            marginTop: 16,
+            display: "flex",
+            gap: 12,
+            justifyContent: "center",
+            flexWrap: "wrap",
           }}
         >
-          {t("phCustomize", lang)}
-        </button>
+          <button
+            data-ux-role="action"
+            onClick={onOpenCosmetics}
+            style={{
+              minHeight: 64,
+              minWidth: 56,
+              padding: "10px 22px",
+              background: "#FFD35C",
+              color: "#38280D",
+              border: "2px solid #895300",
+              borderRadius: 16,
+              fontSize: "var(--ux-font-label)",
+              fontWeight: 900,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            {t("phCustomize", lang)}
+          </button>
+          <button
+            data-ux-role="control"
+            onClick={() => hiveRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            style={{
+              minHeight: 64,
+              minWidth: 56,
+              padding: "10px 22px",
+              background: "#fff",
+              color: "#29251F",
+              border: "2px solid #895300",
+              borderRadius: 16,
+              fontSize: "var(--ux-font-label)",
+              fontWeight: 900,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            {t("phRecentPraise", lang)}
+          </button>
+        </div>
       </div>
 
       {/* Recent praise feed — latest 3 received stickers, big cards */}
@@ -633,6 +720,7 @@ function MyHiveTab({
 
       {/* Real honeycomb — absolute-positioned pointy-top hex tiling (pixel-perfect, no flex overlap) */}
       <div
+        ref={hiveRef}
         style={{
           background: "#fff",
           borderRadius: 22,
@@ -888,7 +976,19 @@ function RaceTab({
     }));
     arr.sort((a, b) => b.count - a.count);
     return arr;
+    // 주의: 이 배열은 순위 표시(퍼디움)용이다. 전시장 그리드는
+    // 점수 내림차순을 기본으로 쓰지 않는다(README §7.1) → galleryOrder.
   }, [counts, allCosmetics, myClientId, user.myName, lang, roomConfig.roster]);
+
+  /** 전시장 순서 — 친구끼리 점수를 줄 세우지 않는다. 이름 순(내 벌이 먼저). */
+  const galleryOrder = useMemo(() => {
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    return [...entries].sort((a, b) => {
+      if (a.id === myClientId) return -1;
+      if (b.id === myClientId) return 1;
+      return collator.compare(a.name, b.name);
+    });
+  }, [entries, myClientId]);
 
   const focusEntry = galleryFocus ? entries.find((e) => e.id === galleryFocus) ?? null : null;
 
@@ -930,7 +1030,7 @@ function RaceTab({
             gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
             gap: 10,
           }}>
-            {entries.map((e) => {
+            {galleryOrder.map((e) => {
               const g: GalleryEntry | undefined = gallery[e.id];
               const nLikes = likeTotal(g);
               const nComments = g?.comments ? Object.keys(g.comments).length : 0;
@@ -958,9 +1058,16 @@ function RaceTab({
                   onMouseLeave={(ev) => (ev.currentTarget.style.transform = "scale(1)")}
                 >
                   <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto" }}>
-                    <CosmeticFrame backdrop={e.cosmetics.backdrop} aura={e.cosmetics.aura} />
-                    <CharacterImage stage={st} skin={e.cosmetics.skin} hat={e.cosmetics.hat} />
-                    <AccessoryLayer stage={st} held={e.cosmetics.held} acc={e.cosmetics.acc} />
+                    <CharacterComposite
+                      stage={st}
+                      skin={e.cosmetics.skin}
+                      hat={e.cosmetics.hat}
+                      held={e.cosmetics.held}
+                      acc={e.cosmetics.acc}
+                      backdrop={e.cosmetics.backdrop}
+                      aura={e.cosmetics.aura}
+                      size={96}
+                    />
                     {e.cosmetics.trophy && (
                       <img
                         src={`/stickers/trophy-${e.cosmetics.trophy}.png`}
@@ -2404,9 +2511,16 @@ function GalleryPopover({
 
         {/* 캐릭터 — 현재 꾸밈 상태 그대로 */}
         <div style={{ position: "relative", width: 170, height: 170, margin: "4px auto 0" }}>
-          <CosmeticFrame backdrop={target.cosmetics.backdrop} aura={target.cosmetics.aura} />
-          <CharacterImage stage={st} skin={target.cosmetics.skin} hat={target.cosmetics.hat} />
-          <AccessoryLayer stage={st} held={target.cosmetics.held} acc={target.cosmetics.acc} />
+          <CharacterComposite
+            stage={st}
+            skin={target.cosmetics.skin}
+            hat={target.cosmetics.hat}
+            held={target.cosmetics.held}
+            acc={target.cosmetics.acc}
+            backdrop={target.cosmetics.backdrop}
+            aura={target.cosmetics.aura}
+            size={170}
+          />
           {target.cosmetics.trophy && (
             <img
               src={`/stickers/trophy-${target.cosmetics.trophy}.png`}

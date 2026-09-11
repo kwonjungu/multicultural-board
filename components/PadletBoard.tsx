@@ -1,19 +1,21 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ref, onValue, off, set, remove, update } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
-import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES, BRAND_GRADIENT } from "@/lib/constants";
+import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES } from "@/lib/constants";
 import { CardData, UserConfig, PostData, RoomConfig, CardStatus, CommentData } from "@/lib/types";
 import { useBackLayer } from "@/lib/backStack";
-import { t } from "@/lib/i18n";
-import PadletCard from "./PadletCard";
+import { t, tFmt } from "@/lib/i18n";
+import PadletCard, { CARD_CSS } from "./PadletCard";
 import PostModal from "./PostModal";
 import PptxTranslateModal from "./PptxTranslateModal";
 import DiscussionCreateModal from "./DiscussionCreateModal";
 import DiscussionSession from "./DiscussionSession";
 import SentencePracticeModal from "./SentencePracticeModal";
 import EmotionCardDeck from "./EmotionCardDeck";
+import ScopedStyle from "./ui/child/ScopedStyle";
+import TextSizeMenu from "./ui/child/TextSizeMenu";
 import { pushEmotion, awardEmotionStickerOncePerDay, type EmotionId } from "@/lib/emotions";
 import { pushExpressionDedup } from "@/lib/expressionLog";
 import { reportQuestEvent } from "@/lib/quests";
@@ -32,6 +34,15 @@ interface FirebaseColumn {
   order: number;
 }
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않는다. 운영 방 명단·게시글을 fixture 로 복제하지 않는다.
+ */
+export interface BoardFixture {
+  columns: FirebaseColumn[];
+  cards: CardData[];
+}
+
 interface Props {
   user: UserConfig;
   roomCode: string;
@@ -40,6 +51,7 @@ interface Props {
   roomConfig: RoomConfig;
   myClientId: string;
   onPraiseStudent?: (clientId: string, name: string) => void;
+  fixture?: BoardFixture;
 }
 
 const COL_COLORS = [
@@ -47,11 +59,24 @@ const COL_COLORS = [
   "#D97706", "#EC4899", "#14B8A6", "#F97316", "#10B981",
 ];
 
-export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomConfig, myClientId, onPraiseStudent }: Props) {
-  const [cards, setCards] = useState<CardData[]>([]);
+/** 색 선택을 색동그라미(아이콘) 하나로 두지 않기 위한 이름표. */
+const COL_COLOR_NAMES: Record<string, string> = {
+  "#F59E0B": "노랑", "#FF6584": "분홍", "#43C59E": "민트", "#3B82F6": "파랑",
+  "#D97706": "주황", "#EC4899": "진분홍", "#14B8A6": "청록", "#F97316": "살구", "#10B981": "초록",
+};
+
+/** 컬럼 제목 앞의 이모지·장식 문자를 떼어 읽을 제목만 남긴다. */
+function cleanTitle(title: string) {
+  return title.replace(/^[^A-Za-z가-힣]+/, "").trim() || title;
+}
+
+export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomConfig, myClientId, onPraiseStudent, fixture }: Props) {
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
+  const [cards, setCards] = useState<CardData[]>(fixture?.cards ?? []);
   const [practiceOpen, setPracticeOpen] = useState(false);
   const [columns, setColumns] = useState<FirebaseColumn[]>(
-    COLUMNS_DEFAULT.map((col, i) => ({ ...col, order: i }))
+    fixture?.columns ?? COLUMNS_DEFAULT.map((col, i) => ({ ...col, order: i }))
   );
   const [modal, setModal] = useState<{ colId: string; colTitle: string; colColor: string } | null>(null);
   const [emotionOpen, setEmotionOpen] = useState(false);
@@ -83,9 +108,31 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const [sessionMinimized, setSessionMinimized] = useState(false);
   const [editModal, setEditModal] = useState<{ card: CardData; colTitle: string; colColor: string } | null>(null);
 
-  const boardRef = useRef<HTMLDivElement>(null);
-  // 보드 내 컬럼 관리 팝오버 (이름/색/순서/삭제) — 관리 모달에서 이전됨 (설계서 항목 2)
+  // ── 아이의 기본 화면은 '지금 주제' 하나다 (README §6.1) ───────────────
+  // 옆으로 미는 전체 컬럼 보기는 데스크톱 교사에게만 선택지로 남긴다.
+  const [wide, setWide] = useState(false);
+  const [teacherView, setTeacherView] = useState<"topic" | "all">("all");
+  const view: "topic" | "all" = isTeacher && wide ? teacherView : "topic";
+  const [activeColId, setActiveColId] = useState<string | null>(fixture?.columns?.[0]?.id ?? null);
+  /** 교사 전용 주제 관리 패널. 학생 화면에는 렌더되지 않는다. */
   const [colManageOpen, setColManageOpen] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const apply = () => setWide(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  // 컬럼이 바뀌어도(추가·삭제·정렬) 보고 있던 주제를 잃지 않는다.
+  useEffect(() => {
+    if (columns.length === 0) { setActiveColId(null); return; }
+    setActiveColId((prev) => (prev && columns.some((c) => c.id === prev) ? prev : columns[0].id));
+  }, [columns]);
+
+  const activeCol = columns.find((c) => c.id === activeColId) ?? columns[0] ?? null;
 
   // Undo snackbar
   const [undoToast, setUndoToast] = useState<{
@@ -117,6 +164,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
   // ── Firebase: rooms/${roomCode}/columns ──
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const colsRef = ref(db, `rooms/${roomCode}/columns`);
     onValue(colsRef, (snap) => {
@@ -140,10 +188,11 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       }
     });
     return () => off(colsRef);
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   // ── Firebase: rooms/${roomCode}/config (full config listener) ──
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const configRef = ref(db, `rooms/${roomCode}/config`);
     onValue(configRef, (snap) => {
@@ -161,7 +210,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       }
     });
     return () => off(configRef);
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   // ── ESC key handler for modals ──
   useEffect(() => {
@@ -181,6 +230,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
   // ── Firebase: rooms/${roomCode}/activeSession ──
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const aRef = ref(db, `rooms/${roomCode}/activeSession`);
     const cb = onValue(aRef, (snap) => {
@@ -189,10 +239,11 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       if (id) setSessionMinimized(false);
     });
     return () => off(aRef, "value", cb);
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   // ── Firebase: rooms/${roomCode}/cards ──
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const cardsRef = ref(db, `rooms/${roomCode}/cards`);
     onValue(cardsRef, (snapshot) => {
@@ -230,28 +281,31 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       setPendingItems(pending);
     });
     return () => off(cardsRef);
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   // Card visibility
   const visibleCards = isTeacher ? cards : cards.filter((c) => !c.status || c.status === "approved");
   const pendingCount = pendingItems.length;
+  const cardsOf = (colId: string) => visibleCards.filter((c) => c.colId === colId);
+  const activeCards = activeCol ? cardsOf(activeCol.id) : [];
 
   // ── Column management ──
   function saveColTitle(colId: string) {
     const title = editTitle[colId]?.trim();
-    if (!title) return;
+    if (!title || offline) return;
     const db = getClientDb();
     set(ref(db, `rooms/${roomCode}/columns/${colId}/title`), title);
   }
 
   function changeColColor(colId: string, color: string) {
+    if (offline || !color) return;
     const db = getClientDb();
     set(ref(db, `rooms/${roomCode}/columns/${colId}/color`), color);
   }
 
   function deleteCol(colId: string) {
     const col = columns.find((c) => c.id === colId);
-    if (!col) return;
+    if (!col || offline) return;
     const db = getClientDb();
     const { id: _id, ...colData } = col;
     remove(ref(db, `rooms/${roomCode}/columns/${colId}`));
@@ -260,13 +314,12 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     });
   }
 
-  // 삭제 모드에서 컬럼의 ✕ 클릭 — 안전장치: 카드가 있으면 개수까지 알리고 확인받는다.
-  // 삭제 후엔 deleteCol 의 되돌리기(undo) 토스트가 한 번 더 안전망이 된다.
+  // 삭제는 카드 개수까지 알리고 확인받는다. 삭제 뒤엔 되돌리기 토스트가 한 번 더 안전망.
   function confirmDeleteCol(colId: string) {
     const col = columns.find((c) => c.id === colId);
     if (!col) return;
     const cardCount = cards.filter((c) => c.colId === colId).length;
-    const title = col.title.replace(/^[^A-Za-z가-힣]+/, "").trim() || col.title;
+    const title = cleanTitle(col.title);
     const msg = cardCount > 0
       ? `"${title}" 칸을 삭제할까요?\n안에 있는 카드 ${cardCount}개도 함께 사라집니다.`
       : `"${title}" 칸을 삭제할까요?`;
@@ -277,7 +330,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   function moveCol(colId: string, direction: "up" | "down") {
     const idx = columns.findIndex((c) => c.id === colId);
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= columns.length) return;
+    if (swapIdx < 0 || swapIdx >= columns.length || offline) return;
     const db = getClientDb();
     const myOrder = columns[idx].order;
     const theirOrder = columns[swapIdx].order;
@@ -286,6 +339,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   }
 
   async function deleteCard(cardId: string) {
+    if (offline) return;
     const db = getClientDb();
     const { get: dbGet, ref: dbRef } = await import("firebase/database");
     const snap = await dbGet(dbRef(db, `rooms/${roomCode}/cards/${cardId}`));
@@ -301,8 +355,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     );
   }
 
-  // 패들렛식 즉시 추가 — 이름 입력 없이 + 만 누르면 칸이 바로 생긴다(교사가 제목을 인라인 편집).
+  // 패들렛식 즉시 추가 — 누르면 칸이 바로 생기고 교사가 제목을 인라인 편집한다.
   function createColumn(title: string, color: string): void {
+    if (offline) return;
     const db = getClientDb();
     const newId = `col_${Date.now()}`;
     const maxOrder = columns.length > 0 ? Math.max(...columns.map((c) => c.order)) : -1;
@@ -320,21 +375,25 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
   // ── Approval actions ──
   async function approveCard(cardId: string) {
+    if (offline) return;
     const db = getClientDb();
     await update(ref(db, `rooms/${roomCode}/cards/${cardId}`), { status: "approved" as CardStatus });
   }
 
   async function rejectCard(cardId: string) {
+    if (offline) return;
     const db = getClientDb();
     await remove(ref(db, `rooms/${roomCode}/cards/${cardId}`));
   }
 
   async function approveComment(cardId: string, commentId: string) {
+    if (offline) return;
     const db = getClientDb();
     await set(ref(db, `rooms/${roomCode}/cards/${cardId}/comments/${commentId}/status`), "approved" as CardStatus);
   }
 
   async function rejectComment(cardId: string, commentId: string) {
+    if (offline) return;
     const db = getClientDb();
     await remove(ref(db, `rooms/${roomCode}/cards/${cardId}/comments/${commentId}`));
   }
@@ -372,6 +431,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       ...(authorClientId ? { authorClientId } : {}),
     };
     setCards((prev) => [tempCard, ...prev]);
+    // 올린 글이 어느 주제로 갔는지 눈으로 확인되도록 그 주제로 이동한다.
+    setActiveColId(modal.colId);
     setModal(null);
 
     try {
@@ -492,713 +553,446 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     setEditModal(null);
   }, [editModal, posting, user, isTeacher, teacherLangs, roomCode]);
 
-  // 뒤로 가기: 열려 있는 모달(글쓰기·학습하기·통역·감정·편집)을 한 단계씩 닫는다
+  // 뒤로 가기: 열려 있는 모달(글쓰기·연습·감정·편집)을 한 단계씩 닫는다
   // (소통창에서 바로 나가지 않음). 중앙 백스택이 가장 안쪽 모달부터 닫는다.
   useBackLayer(!!modal, () => setModal(null));
   useBackLayer(!!editModal, () => setEditModal(null));
   useBackLayer(practiceOpen, () => setPracticeOpen(false));
   useBackLayer(emotionOpen, () => setEmotionOpen(false));
 
-  return (
-    <div style={{
-      height: "100vh", display: "flex", flexDirection: "column",
-      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
-      // 🐝 꽃밭 풍경 배경을 흰 반투명(82%) 오버레이 아래 은은하게 깔아 카드 가독성 유지
-      background: "linear-gradient(rgba(255,253,243,0.82), rgba(255,251,232,0.82)), url('/landing/board-meadow.webp') center / cover no-repeat",
-      backgroundAttachment: "fixed",
-      overflow: "hidden",
-    }}>
-      {/* ── Header ── */}
-      <header data-tutorial-id="board-header" style={{
-        minHeight: 72, flexShrink: 0,
-        background: "#fff",
-        borderBottom: "1px solid #F3EAD0",
-        display: "flex", alignItems: "center", padding: "10px 22px",
-        gap: 14, boxShadow: "0 2px 10px rgba(245,158,11,0.06)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <img
-            src="/mascot/bee-cheer.png"
-            alt=""
-            aria-hidden="true"
-            style={{ width: 52, height: 52, flexShrink: 0, filter: "drop-shadow(0 6px 14px rgba(245,158,11,0.35))" }}
-          />
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 19, color: "#111827", letterSpacing: -0.4, lineHeight: 1.1 }}>
-              꿀벌 소통창
-            </div>
-            <div style={{ fontSize: 13, color: "#92400E", marginTop: 3, fontWeight: 700 }}>
-              우리 방 <span style={{ color: "#B45309", fontWeight: 900, letterSpacing: 2, marginLeft: 4 }}>{roomCode}</span>
-            </div>
-          </div>
+  const practiceCards = (() => {
+    if (isTeacher) return [];
+    const byId: Record<string, CardData> = {};
+    for (const c of cards) byId[c.id] = c;
+    return filterPracticeCards(byId);
+  })();
+
+  function openCompose(col: FirebaseColumn) {
+    // columnId 계약: 글쓰기 대상은 언제나 지금 보고 있는 주제의 실제 id 다.
+    setModal({ colId: col.id, colTitle: col.title, colColor: col.color });
+  }
+
+  /** 카드 한 장. 주제 보기와 전체 보기가 같은 계약(카드 ID·columnId)을 쓴다. */
+  function renderCard(card: CardData, col: FirebaseColumn) {
+    return (
+      <PadletCard
+        key={card.id}
+        card={card}
+        viewerLang={lang}
+        colColor={col.color}
+        isTeacher={isTeacher}
+        myClientId={myClientId}
+        authorName={user.myName}
+        isPending={isTeacher && card.status === "pending"}
+        onEdit={() => setEditModal({ card, colTitle: col.title, colColor: col.color })}
+        onDelete={isTeacher ? () => deleteCard(card.id) : undefined}
+        onPraise={
+          isTeacher && onPraiseStudent && !card.isTeacher
+            ? () => onPraiseStudent(card.authorClientId || card.authorName, card.authorName)
+            : undefined
+        }
+        roomCode={roomCode}
+        roomLangs={teacherLangs}
+        approvalMode={roomConfigState.approvalMode}
+        fixture={offline}
+      />
+    );
+  }
+
+  /** 교사 전용 주제 관리 (이름·색·순서·삭제). 권한 검사는 그대로 두고 UI 만 숨긴다. */
+  function ColumnAdmin({ col }: { col: FirebaseColumn }) {
+    if (!isTeacher) return null;
+    return (
+      <div className="bd-admin" data-ux-surface>
+        <label data-ux-role="label" className="bd-admin-label" htmlFor={`bd-title-${col.id}`}>주제 이름</label>
+        <input
+          id={`bd-title-${col.id}`}
+          className="bd-input"
+          value={editTitle[col.id] ?? col.title}
+          onChange={(e) => setEditTitle((prev) => ({ ...prev, [col.id]: e.target.value }))}
+          onBlur={() => saveColTitle(col.id)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            if ((e.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return;
+            saveColTitle(col.id);
+          }}
+        />
+        <label data-ux-role="label" className="bd-admin-label" htmlFor={`bd-color-${col.id}`}>주제 색</label>
+        <select
+          id={`bd-color-${col.id}`}
+          data-ux-role="control"
+          className="bd-select"
+          value={COL_COLORS.includes(col.color) ? col.color : ""}
+          onChange={(e) => changeColColor(col.id, e.target.value)}
+        >
+          {!COL_COLORS.includes(col.color) && <option value="">지금 색 그대로</option>}
+          {COL_COLORS.map((c, i) => (
+            <option key={`${c}-${i}`} value={c}>{COL_COLOR_NAMES[c] ?? c}</option>
+          ))}
+        </select>
+        <div className="bd-admin-row">
+          <button type="button" data-ux-role="control" className="bd-btn" onClick={() => moveCol(col.id, "up")}>앞으로</button>
+          <button type="button" data-ux-role="control" className="bd-btn" onClick={() => moveCol(col.id, "down")}>뒤로</button>
+          <button type="button" data-ux-role="control" className="bd-btn danger" onClick={() => { setColManageOpen(null); confirmDeleteCol(col.id); }}>주제 삭제</button>
         </div>
+      </div>
+    );
+  }
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          {/* User badge */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 10,
-            background: "#FEF3C7", border: "2px solid #FDE68A",
-            borderRadius: 24, padding: "6px 16px 6px 6px",
-          }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: "50%",
-              background: BRAND_GRADIENT,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: isTeacher ? 16 : 14, fontWeight: 800, color: "#fff",
-            }}>
-              {isTeacher ? "👩‍🏫" : user.myName.charAt(0).toUpperCase()}
-            </div>
-            <span style={{ color: "#92400E", fontWeight: 800, fontSize: 15 }}>{user.myName}</span>
-            {isTeacher && (
-              <span style={{ fontSize: 12, background: "#F59E0B", color: "#fff", borderRadius: 10, padding: "2px 9px", fontWeight: 800 }}>
-                {t("teacherTag", lang)}
-              </span>
-            )}
-          </div>
+  return (
+    <div data-ux-root className="bd-root">
+      <ScopedStyle css={BOARD_CSS + CARD_CSS} />
 
-          {/* 🎙️ 통역 도우미는 앱 전역 좌하단 플로팅 아이콘(InterpreterFab)으로 이동 — 여기서는 제거 */}
+      {/* ── 상단: 뒤로 · 소통창 · 설정 (README §6.1) ── */}
+      <header data-tutorial-id="board-header" className="bd-bar">
+        <button type="button" data-ux-role="control" className="bd-btn" onClick={onLogout}>
+          <span aria-hidden>←</span> {t("boardLeave", lang)}
+        </button>
+        <div className="bd-id">
+          <span data-ux-role="label" className="bd-id-name">꿀벌 소통창</span>
+          <span data-ux-role="secondary" className="bd-id-sub">
+            <bdi>{user.myName}</bdi> · {roomCode}
+            {isTeacher ? ` · ${t("teacherTag", lang)}` : ""}
+          </span>
+        </div>
+        <TextSizeMenu />
+      </header>
 
-          {/* 📖 학습하기 — student-only. 오늘 카드 우선, 없으면 누적 카드로 복습 (#2) */}
-          {!isTeacher && (() => {
-            const cardsById: Record<string, CardData> = {};
-            for (const c of cards) cardsById[c.id] = c;
-            const practiceCards = filterPracticeCards(cardsById);
-            if (practiceCards.length === 0) return null;
-            return (
+      <main className="bd-main">
+        {/* ── 선생님 도구 — 아이의 일상 행동과 시각적으로 분리한다 (README §3.7) ── */}
+        {isTeacher && (
+          <section className="bd-teacher" aria-label="선생님 도구">
+            <h2 data-ux-role="label" className="bd-teacher-title">선생님 도구</h2>
+            <div className="bd-teacher-row">
+              {wide && (
+                <>
+                  <button
+                    type="button"
+                    data-ux-role="control"
+                    className="bd-btn"
+                    aria-pressed={teacherView === "topic"}
+                    onClick={() => setTeacherView("topic")}
+                  >{t("boardOneTopic", lang)}{teacherView === "topic" ? " ✓" : ""}</button>
+                  <button
+                    type="button"
+                    data-ux-role="control"
+                    className="bd-btn"
+                    aria-pressed={teacherView === "all"}
+                    onClick={() => setTeacherView("all")}
+                  >{t("boardAllTopics", lang)}{teacherView === "all" ? " ✓" : ""}</button>
+                </>
+              )}
               <button
-                onClick={() => setPracticeOpen(true)}
-                aria-label="오늘의 문장 연습"
-                style={{
-                  background: "linear-gradient(135deg, #8B5CF6, #6D28D9)",
-                  border: "none", color: "#fff",
-                  borderRadius: 16, padding: "10px 16px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 56,
-                  boxShadow: "0 6px 18px rgba(139,92,246,0.4)",
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  transition: "transform 0.12s",
+                type="button"
+                data-ux-role="control"
+                className="bd-btn"
+                aria-pressed={!!roomConfigState.approvalMode}
+                onClick={() => {
+                  if (offline) return;
+                  const db = getClientDb();
+                  set(ref(db, `rooms/${roomCode}/config/approvalMode`), !roomConfigState.approvalMode);
                 }}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                📖 학습하기
-                <span style={{
-                  fontSize: 11, fontWeight: 900, background: "rgba(255,255,255,0.25)", color: "#fff",
-                  padding: "2px 8px", borderRadius: 999,
-                }}>{practiceCards.length}</span>
-              </button>
-            );
-          })()}
-
-          {/* Teacher-only buttons */}
-          {isTeacher && (
-            <>
-              {/* 게시 전 교사 승인 토글 — 관리 패널과 같은 설정을 헤더에서 바로 조작 (config onValue 구독으로 자동 동기화) */}
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8,
-                background: "#FFFBEB", border: "2px solid #FDE68A",
-                borderRadius: 16, padding: "0 14px", minHeight: 56,
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#92400E", whiteSpace: "nowrap" }}>
-                  {t("approvalMode", lang)}
-                </span>
-                <button
-                  onClick={() => {
-                    const db = getClientDb();
-                    set(ref(db, `rooms/${roomCode}/config/approvalMode`), !roomConfigState.approvalMode);
-                  }}
-                  aria-label={t("approvalMode", lang)}
-                  aria-pressed={!!roomConfigState.approvalMode}
-                  title="켜면 학생 게시물이 교사 승인 후에 표시됩니다"
-                  style={{
-                    width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                    background: roomConfigState.approvalMode ? "#F59E0B" : "#E5E7EB",
-                    position: "relative", transition: "background 0.2s", flexShrink: 0, padding: 0,
-                  }}
-                >
-                  <div style={{
-                    position: "absolute", top: 3, left: roomConfigState.approvalMode ? 25 : 3,
-                    width: 20, height: 20, borderRadius: "50%", background: "#fff",
-                    transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                  }} />
-                </button>
-              </div>
-
-              {/* QR button */}
-              <button
-                onClick={() => setShowQR(true)}
-                style={{
-                  background: "#ECFDF5", border: "2px solid #A7F3D0",
-                  color: "#047857", borderRadius: 16, padding: "10px 16px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
-                  transition: "transform 0.12s",
-                }}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                📱 QR
-              </button>
-
-              {/* Pending badge */}
+              >{t("approvalMode", lang)}{roomConfigState.approvalMode ? " ✓" : ""}</button>
               {pendingCount > 0 && (
-                <button
-                  onClick={() => setShowApproval(true)}
-                  style={{
-                    background: "#FEF3C7", border: "2px solid #FBBF24",
-                    color: "#92400E", borderRadius: 16, padding: "10px 16px",
-                    fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
-                  }}
-                >
-                  🔔 {t("approvalPending", lang)} {pendingCount}
+                <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setShowApproval(true)}>
+                  {t("approvalPending", lang)} {pendingCount}
                 </button>
               )}
-
-              {/* 의견 나누기 button */}
+              <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setShowQR(true)}>QR</button>
               <button
+                type="button"
+                data-ux-role="control"
+                className="bd-btn"
                 onClick={() => {
                   if (activeSessionId) setSessionMinimized(false);
                   else setShowDiscussionCreate(true);
                 }}
-                style={{
-                  background: activeSessionId ? "#FEE2E2" : "#F5F3FF",
-                  border: `2px solid ${activeSessionId ? "#FCA5A5" : "#DDD6FE"}`,
-                  color: activeSessionId ? "#B91C1C" : "#6D28D9",
-                  borderRadius: 16, padding: "10px 16px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
-                  transition: "transform 0.12s",
-                }}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                {activeSessionId ? "🔴 진행 중" : "💭 의견 나누기"}
-              </button>
-
-              {/* PPTX 번역 button */}
+              >{activeSessionId ? "진행 중인 의견 나누기" : "의견 나누기"}</button>
+              <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setShowPptx(true)}>PPTX 번역</button>
               <button
-                onClick={() => setShowPptx(true)}
-                style={{
-                  background: "#FDF2F8", border: "2px solid #FBCFE8",
-                  color: "#BE185D", borderRadius: 16, padding: "10px 16px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
-                  transition: "transform 0.12s",
-                }}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                📊 PPTX 번역
-              </button>
-
-              {/* 📢 모두 부르기 — 학생들이 어느 화면에 있든 1회 소통창으로 (이후 자유) */}
-              <button
+                type="button"
+                data-ux-role="control"
+                className="bd-btn"
                 onClick={() => {
+                  if (offline) return;
                   const db = getClientDb();
                   set(ref(db, `rooms/${roomCode}/summon`), { target: "board", ts: Date.now() })
-                    .then(() => { setEmotionToast("📢 모두 불렀어요 — 학생 화면이 소통창으로 이동합니다"); setTimeout(() => setEmotionToast(null), 2600); })
+                    .then(() => { setEmotionToast("모두 불렀어요 — 학생 화면이 소통창으로 이동합니다"); setTimeout(() => setEmotionToast(null), 2600); })
                     .catch(() => { setEmotionToast("호출에 실패했어요. 다시 눌러주세요."); setTimeout(() => setEmotionToast(null), 2600); });
                 }}
-                title="학생들을 소통창으로 1회 데려옵니다 (이후 이동 자유)"
-                style={{
-                  background: "linear-gradient(135deg, #6366F1, #4F46E5)",
-                  border: "none", color: "#fff",
-                  borderRadius: 16, padding: "10px 16px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 900, minHeight: 56,
-                  boxShadow: "0 6px 18px rgba(99,102,241,0.35)",
-                  transition: "transform 0.12s",
-                }}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                📢 모두 부르기
-              </button>
-
-              {/* Manage button */}
+              >모두 부르기</button>
               <button
+                type="button"
+                data-ux-role="control"
+                className="bd-btn"
                 onClick={() => {
                   setRosterText((roomConfigState.roster || []).join("\n"));
                   setShowManage(true);
                 }}
-                style={{
-                  background: "#FEF3C7", border: "2px solid #FDE68A",
-                  color: "#B45309", borderRadius: 16, padding: "10px 18px",
-                  fontSize: 15, cursor: "pointer", fontWeight: 800, minHeight: 56,
-                  transition: "transform 0.12s",
-                }}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              >
-                ⚙ {t("manage", lang)}
-              </button>
-            </>
-          )}
+              >{t("manage", lang)}</button>
+            </div>
+          </section>
+        )}
+        {view === "topic" && (
+          <>
+            <h1 data-ux-role="title" className="bd-ask">{t("boardAskToday", lang)}</h1>
 
-          <button
-            onClick={onLogout}
-            style={{
-              background: "#F9FAFB", border: "2px solid #E5E7EB",
-              color: "#6B7280", borderRadius: 16, padding: "10px 16px",
-              fontSize: 15, cursor: "pointer", fontWeight: 700, minHeight: 56,
-              transition: "transform 0.12s",
-            }}
-            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          >
-            🚪 나가기
-          </button>
-        </div>
-      </header>
-
-      {/* ── Board ── */}
-      <main
-        ref={boardRef}
-        onClick={() => { if (colManageOpen) setColManageOpen(null); }}
-        style={{
-          flex: 1, overflowX: "auto", overflowY: "hidden",
-          display: "flex", gap: 14, padding: "16px 18px",
-          alignItems: "flex-start",
-          scrollSnapType: "x mandatory",
-        }}
-      >
-        {columns.map((col) => {
-          const colCards = visibleCards.filter((c) => c.colId === col.id);
-          return (
-            <div key={col.id} style={{
-              width: "clamp(270px, 28vw, 330px)", flexShrink: 0, display: "flex", flexDirection: "column",
-              height: "calc(100vh - 90px)", borderRadius: 22, overflow: "hidden",
-              boxShadow: "0 4px 18px rgba(245,158,11,0.12), 0 1px 3px rgba(0,0,0,0.05)",
-              background: "#fff", border: "2px solid #FEF3C7",
-              scrollSnapAlign: "start",
-            }}>
-              <div
-                onDoubleClick={() => {
-                  // 교사: 컬럼 헤더 더블클릭 → 삭제 (confirm 경고 + undo 토스트, 설계서 항목 2)
-                  if (isTeacher) { setColManageOpen(null); confirmDeleteCol(col.id); }
-                }}
-                title={isTeacher ? "더블클릭: 컬럼 삭제" : undefined}
-                style={{
-                padding: "14px 18px 12px",
-                display: "flex", alignItems: "center", gap: 12, flexShrink: 0,
-                background: `linear-gradient(135deg, ${col.color}, ${col.color}dd)`,
-                color: "#fff",
-                boxShadow: `0 6px 16px ${col.color}55`,
-              }}>
-                {(() => {
-                  const iconSrc = columnIconFor(col.title);
-                  if (iconSrc) {
-                    return (
-                      <img
-                        src={iconSrc}
-                        alt=""
-                        aria-hidden="true"
-                        style={{
-                          width: 42, height: 42, flexShrink: 0,
-                          background: "rgba(255,255,255,0.9)", borderRadius: 12,
-                          padding: 4, boxShadow: "0 3px 8px rgba(0,0,0,0.1)",
-                        }}
-                      />
-                    );
-                  }
-                  return null;
-                })()}
-                <span style={{ flex: 1, fontWeight: 900, fontSize: 18, color: "#fff", letterSpacing: -0.3, lineHeight: 1.3, textShadow: "0 1px 2px rgba(0,0,0,0.12)" }}>{col.title.replace(/^[^A-Za-z가-힣]+/, "").trim()}</span>
-                <span style={{ background: "rgba(255,255,255,0.3)", color: "#fff", borderRadius: 999, fontSize: 14, fontWeight: 900, padding: "4px 12px", minWidth: 32, textAlign: "center" }}>
-                  {colCards.length}
-                </span>
-                {isTeacher && (
+            {/* 주제 선택 — 색 말고 체크와 테두리로도 선택을 알린다. */}
+            <div className="bd-topics" role="group" aria-label={t("boardPickTopic", lang)}>
+              {columns.map((col) => {
+                const active = activeCol?.id === col.id;
+                const icon = columnIconFor(col.title);
+                return (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setColManageOpen((prev) => (prev === col.id ? null : col.id));
-                    }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                    aria-label={`"${col.title}" 컬럼 관리`}
-                    title="컬럼 관리 (이름·색·순서·삭제)"
-                    style={{
-                      width: 32, height: 32, borderRadius: 9, border: "none", flexShrink: 0,
-                      background: colManageOpen === col.id ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.25)",
-                      color: "#fff", fontSize: 15, cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >⚙</button>
+                    key={col.id}
+                    type="button"
+                    data-ux-role="control"
+                    className={active ? "bd-topic on" : "bd-topic"}
+                    aria-pressed={active}
+                    onClick={() => setActiveColId(col.id)}
+                  >
+                    {icon && <img src={icon} alt="" aria-hidden="true" className="bd-topic-art" />}
+                    <span className="bd-topic-text">
+                      <span data-ux-role="label" className="bd-topic-name">{cleanTitle(col.title)}</span>
+                      <span data-ux-role="secondary" className="bd-topic-count">
+                        {tFmt("boardStoryCount", lang, { n: cardsOf(col.id).length })}
+                      </span>
+                    </span>
+                    <span aria-hidden className="bd-check">{active ? "✓" : ""}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {activeCol ? (
+              <section className="bd-stream" aria-label={cleanTitle(activeCol.title)}>
+                <h2 data-ux-role="label" className="bd-now" aria-label={`${t("boardNowTopic", lang)}: ${cleanTitle(activeCol.title)}`}>
+                  {cleanTitle(activeCol.title)}
+                </h2>
+
+                {isTeacher && (
+                  <div className="bd-admin-wrap">
+                    <button
+                      type="button"
+                      data-ux-role="control"
+                      className="bd-btn"
+                      aria-pressed={colManageOpen === activeCol.id}
+                      onClick={() => setColManageOpen((prev) => (prev === activeCol.id ? null : activeCol.id))}
+                    >주제 관리</button>
+                    {colManageOpen === activeCol.id && <ColumnAdmin col={activeCol} />}
+                  </div>
                 )}
-              </div>
 
-              {/* ── 컬럼 관리 팝오버 (관리 모달에서 이전, 설계서 항목 2) ── */}
-              {isTeacher && colManageOpen === col.id && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    padding: "12px 14px", background: "#FFFBEB",
-                    borderBottom: "1px solid #FDE68A", flexShrink: 0,
-                    display: "flex", flexDirection: "column", gap: 10,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <input
-                      value={editTitle[col.id] ?? col.title}
-                      onChange={(e) => setEditTitle((prev) => ({ ...prev, [col.id]: e.target.value }))}
-                      onBlur={() => saveColTitle(col.id)}
-                      onKeyDown={(e) => e.key === "Enter" && saveColTitle(col.id)}
-                      aria-label="컬럼 이름"
-                      style={{
-                        flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 9,
-                        border: "1.5px solid #E5E7EB", fontSize: 13, fontWeight: 700,
-                        color: "#111827", background: "#fff", outline: "none",
-                      }}
-                      onFocus={(e) => (e.target.style.borderColor = col.color)}
-                    />
+                {activeCards.length === 0 ? (
+                  <div className="bd-empty" data-ux-surface>
+                    <img src="/mascot/bee-sleep.png" alt="" aria-hidden="true" className="bd-empty-bee" />
+                    <p data-ux-role="body-emphasis" data-ux-reading className="bd-empty-title">{t("boardEmptyExample", lang)}</p>
                     <button
-                      onClick={() => moveCol(col.id, "up")}
-                      aria-label="왼쪽으로 이동"
-                      title="왼쪽으로"
-                      style={{
-                        width: 32, height: 32, borderRadius: 8, border: "1px solid #E5E7EB",
-                        background: "#fff", cursor: "pointer", fontSize: 12, color: "#6B7280", flexShrink: 0,
-                      }}
-                    >◀</button>
-                    <button
-                      onClick={() => moveCol(col.id, "down")}
-                      aria-label="오른쪽으로 이동"
-                      title="오른쪽으로"
-                      style={{
-                        width: 32, height: 32, borderRadius: 8, border: "1px solid #E5E7EB",
-                        background: "#fff", cursor: "pointer", fontSize: 12, color: "#6B7280", flexShrink: 0,
-                      }}
-                    >▶</button>
-                    <button
-                      onClick={() => { setColManageOpen(null); confirmDeleteCol(col.id); }}
-                      aria-label="컬럼 삭제"
-                      title="컬럼 삭제"
-                      style={{
-                        width: 32, height: 32, borderRadius: 8, border: "none",
-                        background: "#FEF2F2", color: "#EF4444", cursor: "pointer", fontSize: 14, flexShrink: 0,
-                      }}
-                    >🗑</button>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {COL_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => changeColColor(col.id, color)}
-                        aria-label={`색상 ${color}`}
-                        style={{
-                          width: 22, height: 22, borderRadius: "50%", background: color, border: "none",
-                          cursor: "pointer", transition: "transform 0.12s",
-                          outline: col.color === color ? `3px solid ${color}` : "none",
-                          outlineOffset: 2,
-                          transform: col.color === color ? "scale(1.2)" : "scale(1)",
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── 글추가 버튼 — 컬럼 관리 팝오버 아래, 카드 목록 위 ── */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setModal({ colId: col.id, colTitle: col.title, colColor: col.color });
-                }}
-                style={{
-                  flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  background: col.color + "14",
-                  border: "none",
-                  borderBottom: "1px solid #FEF3C7",
-                  padding: "12px 0", cursor: "pointer",
-                  color: col.color,
-                  fontWeight: 900, fontSize: 14,
-                  transition: "background 0.15s",
-                  userSelect: "none",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = col.color + "26"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = col.color + "14"; }}
-              >
-                <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 700 }}>＋</span> {t("addHere", lang)}
-              </button>
-
-              <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px 6px", background: "#FFFEF7", scrollbarWidth: "thin", scrollbarColor: "#FDE68A transparent" }}>
-                {colCards.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "44px 16px", color: "#D1D5DB" }}>
-                    <img
-                      src="/mascot/bee-sleep.png"
-                      alt=""
-                      aria-hidden="true"
-                      style={{ width: 92, height: 92, display: "block", margin: "0 auto 12px", opacity: 0.85 }}
-                    />
-                    <div style={{ fontWeight: 800, color: "#6B7280", fontSize: 16 }}>{t("noPosts", lang)}</div>
-                    <div style={{ fontSize: 14, marginTop: 6, color: "#9CA3AF", fontWeight: 600 }}>{t("addBelowHint", lang)}</div>
+                      type="button"
+                      data-ux-role="action"
+                      className="bd-cta"
+                      data-tutorial-id="board-fab"
+                      onClick={() => openCompose(activeCol)}
+                    >{t("boardWriteMine", lang)}</button>
                   </div>
                 ) : (
-                  colCards.map((card) => (
-                    <PadletCard
-                      key={card.id}
-                      card={card}
-                      viewerLang={lang}
-                      colColor={col.color}
-                      isTeacher={isTeacher}
-                      myClientId={myClientId}
-                      authorName={user.myName}
-                      isPending={isTeacher && card.status === "pending"}
-                      onEdit={() => setEditModal({ card, colTitle: col.title, colColor: col.color })}
-                      onDelete={isTeacher ? () => deleteCard(card.id) : undefined}
-                      onPraise={
-                        isTeacher && onPraiseStudent && !card.isTeacher
-                          ? () => onPraiseStudent(card.authorClientId || card.authorName, card.authorName)
-                          : undefined
-                      }
-                      roomCode={roomCode}
-                      roomLangs={teacherLangs}
-                      approvalMode={roomConfigState.approvalMode}
-                    />
-                  ))
+                  <div className="bd-cards">
+                    {activeCards.map((card) => renderCard(card, activeCol))}
+                  </div>
                 )}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* 패들렛식 + 컬럼 추가 — 교사만. 누르면 '새 칸'이 바로 생기고 헤더에서 이름 편집. */}
-        {isTeacher && (
-          <button
-            onClick={addColumnQuick}
-            aria-label="새 칸 추가"
-            title="새 칸 추가"
-            style={{
-              width: "clamp(150px, 16vw, 200px)", flexShrink: 0,
-              height: "calc(100vh - 90px)", borderRadius: 22,
-              border: "3px dashed #FCD34D", background: "rgba(255,251,235,0.6)",
-              color: "#B45309", cursor: "pointer", fontFamily: "inherit",
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              gap: 10, scrollSnapAlign: "start",
-            }}
-          >
-            <span style={{ fontSize: 44, fontWeight: 900, lineHeight: 1 }}>＋</span>
-            <span style={{ fontSize: 15, fontWeight: 900 }}>새 칸 추가</span>
-          </button>
+              </section>
+            ) : (
+              <p data-ux-role="body" className="bd-notice" role="status">{t("boardNoTopics", lang)}</p>
+            )}
+          </>
         )}
+
+        {/* ── 데스크톱 교사용 전체 컬럼 보기 (기존 보기 유지) ── */}
+        {view === "all" && (
+          <>
+          <h1 data-ux-role="title" className="bd-ask">{t("boardAllTopics", lang)}</h1>
+          <div className="bd-columns" onClick={() => { if (colManageOpen) setColManageOpen(null); }}>
+            {columns.map((col) => {
+              const colCards = cardsOf(col.id);
+              const icon = columnIconFor(col.title);
+              return (
+                <section key={col.id} className="bd-col" data-ux-surface="panel">
+                  <div className="bd-col-head" style={{ background: col.color }}>
+                    {icon && <img src={icon} alt="" aria-hidden="true" className="bd-col-art" />}
+                    <span data-ux-role="label" className="bd-col-title">{cleanTitle(col.title)}</span>
+                    <span data-ux-role="secondary" className="bd-col-count">
+                      {tFmt("boardStoryCount", lang, { n: colCards.length })}
+                    </span>
+                  </div>
+                  <div className="bd-col-tools">
+                    <button
+                      type="button"
+                      data-ux-role="control"
+                      className="bd-btn"
+                      onClick={(e) => { e.stopPropagation(); openCompose(col); }}
+                    >{t("addHere", lang)}</button>
+                    <button
+                      type="button"
+                      data-ux-role="control"
+                      className="bd-btn"
+                      aria-pressed={colManageOpen === col.id}
+                      onClick={(e) => { e.stopPropagation(); setColManageOpen((prev) => (prev === col.id ? null : col.id)); }}
+                    >주제 관리</button>
+                  </div>
+                  {colManageOpen === col.id && (
+                    <div onClick={(e) => e.stopPropagation()}><ColumnAdmin col={col} /></div>
+                  )}
+                  <div className="bd-col-body">
+                    {colCards.length === 0 ? (
+                      <p data-ux-role="body" className="bd-col-empty">{t("boardEmptyExample", lang)}</p>
+                    ) : (
+                      colCards.map((card) => renderCard(card, col))
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+            <button type="button" data-ux-role="control" className="bd-col-add" onClick={addColumnQuick}>
+              <span aria-hidden>＋</span> 새 주제 추가
+            </button>
+          </div>
+          </>
+        )}
+
+        {!isTeacher && (
+          <div className="bd-compose-side">
+            {practiceCards.length > 0 && (
+              <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setPracticeOpen(true)}>
+                문장 연습 {practiceCards.length}
+              </button>
+            )}
+            <button
+              type="button"
+              data-ux-role="control"
+              className="bd-btn"
+              data-tutorial-id="board-emotion-fab"
+              onClick={() => setEmotionOpen(true)}
+            >오늘 기분 보내기</button>
+          </div>
+        )}
+
       </main>
+
+      {/* ── 하단: 내 이야기 올리기 하나만. sticky 라 문서 스크롤을 막지 않는다.
+           빈 주제에서는 안내 카드 안의 버튼 하나로 끝낸다 — 같은 주 동작을
+           한 화면에 두 번 두지 않는다(README §3.1). ── */}
+      {activeCol && !(view === "topic" && activeCards.length === 0) && (
+        <div className="bd-compose">
+          <button
+            type="button"
+            data-ux-role="action"
+            className="bd-cta"
+            data-tutorial-id="board-fab"
+            onClick={() => openCompose(activeCol)}
+          >{t("boardWriteMine", lang)}</button>
+        </div>
+      )}
 
       {/* ── Management modal ── */}
       {showManage && isTeacher && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(9,7,30,0.8)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 400, backdropFilter: "blur(8px)", padding: 20,
-        }}
+        <div
+          className="bd-modal-back"
           role="dialog" aria-modal="true" aria-labelledby="modal-title-manage"
           onClick={(e) => { if (e.target === e.currentTarget) setShowManage(false); }}
         >
-          <div style={{
-            background: "#fff", borderRadius: 24, width: "100%", maxWidth: 520,
-            maxHeight: "88vh", overflowY: "auto",
-            boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
-            animation: "fadeSlideIn 0.25s ease",
-          }}>
-            {/* Modal header */}
-            <div style={{
-              display: "flex", alignItems: "center", padding: "20px 24px 16px",
-              borderBottom: "1px solid #FEF3C7", position: "sticky", top: 0, background: "#fff", zIndex: 1,
-            }}>
-              <div>
-                <div id="modal-title-manage" style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🛠 관리 패널</div>
-                <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>Room {roomCode}</div>
-              </div>
-              <button
-                onClick={() => setShowManage(false)}
-                style={{
-                  marginLeft: "auto", background: "#F3F4F6", border: "none", borderRadius: "50%",
-                  width: 32, height: 32, fontSize: 14, cursor: "pointer", color: "#6B7280",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-              >✕</button>
+          <div className="bd-modal" data-ux-surface="panel">
+            <div className="bd-modal-head">
+              <h2 id="modal-title-manage" data-ux-role="body-emphasis" className="bd-modal-title">관리 패널</h2>
+              <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setShowManage(false)}>닫기</button>
             </div>
 
-            <div style={{ padding: "20px 24px 28px" }}>
-              {/* Section: Room Settings */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 12 }}>
-                  방 설정
-                </div>
+            <div className="bd-modal-body">
+              <h3 data-ux-role="label" className="bd-admin-label">방 설정</h3>
+              <div className="bd-teacher-row">
+                <button
+                  type="button" data-ux-role="control" className="bd-btn"
+                  aria-pressed={!!roomConfigState.qrEntry}
+                  onClick={() => {
+                    if (offline) return;
+                    const db = getClientDb();
+                    set(ref(db, `rooms/${roomCode}/config/qrEntry`), !roomConfigState.qrEntry);
+                  }}
+                >{t("qrEntryToggle", lang)}{roomConfigState.qrEntry ? " ✓" : ""}</button>
+                <button
+                  type="button" data-ux-role="control" className="bd-btn"
+                  aria-pressed={!!roomConfigState.approvalMode}
+                  onClick={() => {
+                    if (offline) return;
+                    const db = getClientDb();
+                    set(ref(db, `rooms/${roomCode}/config/approvalMode`), !roomConfigState.approvalMode);
+                  }}
+                >{t("approvalMode", lang)}{roomConfigState.approvalMode ? " ✓" : ""}</button>
+                <button
+                  type="button" data-ux-role="control" className="bd-btn"
+                  aria-pressed={!!roomConfigState.rosterMode}
+                  onClick={() => {
+                    if (offline) return;
+                    const db = getClientDb();
+                    set(ref(db, `rooms/${roomCode}/config/rosterMode`), !roomConfigState.rosterMode);
+                  }}
+                >{t("rosterMode", lang)}{roomConfigState.rosterMode ? " ✓" : ""}</button>
+              </div>
 
-                {/* QR Entry Toggle */}
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 0", borderBottom: "1px solid #FEF3C7",
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{t("qrEntryToggle", lang)}</div>
-                  </div>
+              {roomConfigState.rosterMode && (
+                <div className="bd-admin-wrap">
+                  <label data-ux-role="label" className="bd-admin-label" htmlFor="bd-roster">
+                    {t("rosterSetup", lang)} (한 줄에 한 명)
+                  </label>
+                  <textarea
+                    id="bd-roster"
+                    className="bd-textarea"
+                    value={rosterText}
+                    onChange={(e) => setRosterText(e.target.value)}
+                    rows={5}
+                  />
                   <button
+                    type="button" data-ux-role="control" className="bd-btn"
                     onClick={() => {
+                      if (offline) return;
                       const db = getClientDb();
-                      set(ref(db, `rooms/${roomCode}/config/qrEntry`), !roomConfigState.qrEntry);
+                      const names = rosterText.split("\n").map((s) => s.trim()).filter(Boolean);
+                      set(ref(db, `rooms/${roomCode}/config/roster`), names);
                     }}
-                    style={{
-                      width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                      background: roomConfigState.qrEntry ? "#F59E0B" : "#E5E7EB",
-                      position: "relative", transition: "background 0.2s", flexShrink: 0,
-                    }}
-                  >
-                    <div style={{
-                      position: "absolute", top: 3, left: roomConfigState.qrEntry ? 25 : 3,
-                      width: 20, height: 20, borderRadius: "50%", background: "#fff",
-                      transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                    }} />
-                  </button>
+                  >명단 저장</button>
                 </div>
+              )}
 
-                {/* Approval Mode Toggle */}
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 0", borderBottom: "1px solid #FEF3C7",
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{t("approvalMode", lang)}</div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      const db = getClientDb();
-                      set(ref(db, `rooms/${roomCode}/config/approvalMode`), !roomConfigState.approvalMode);
-                    }}
-                    style={{
-                      width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                      background: roomConfigState.approvalMode ? "#F59E0B" : "#E5E7EB",
-                      position: "relative", transition: "background 0.2s", flexShrink: 0,
-                    }}
-                  >
-                    <div style={{
-                      position: "absolute", top: 3, left: roomConfigState.approvalMode ? 25 : 3,
-                      width: 20, height: 20, borderRadius: "50%", background: "#fff",
-                      transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                    }} />
-                  </button>
-                </div>
+              <p data-ux-role="body" className="bd-hint">
+                주제(컬럼) 관리는 소통창 안에서 합니다. 주제를 고른 뒤 ‘주제 관리’를 누르면 이름·색·순서·삭제를 할 수 있고,
+                지운 주제는 8초 안에 되돌릴 수 있습니다.
+              </p>
 
-                {/* Roster Mode Toggle */}
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 0", borderBottom: "1px solid #FEF3C7",
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{t("rosterMode", lang)}</div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      const db = getClientDb();
-                      set(ref(db, `rooms/${roomCode}/config/rosterMode`), !roomConfigState.rosterMode);
-                    }}
-                    style={{
-                      width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                      background: roomConfigState.rosterMode ? "#F59E0B" : "#E5E7EB",
-                      position: "relative", transition: "background 0.2s", flexShrink: 0,
-                    }}
-                  >
-                    <div style={{
-                      position: "absolute", top: 3, left: roomConfigState.rosterMode ? 25 : 3,
-                      width: 20, height: 20, borderRadius: "50%", background: "#fff",
-                      transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                    }} />
-                  </button>
-                </div>
-
-                {/* Roster textarea (when rosterMode is on) */}
-                {roomConfigState.rosterMode && (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 8 }}>
-                      {t("rosterSetup", lang)} (한 줄에 한 명)
-                    </div>
-                    <textarea
-                      value={rosterText}
-                      onChange={(e) => setRosterText(e.target.value)}
-                      placeholder={"홍길동\n김철수\n이영희"}
-                      rows={5}
-                      style={{
-                        width: "100%", padding: "12px 14px", borderRadius: 12,
-                        border: "2px solid #E5E7EB", fontSize: 14, resize: "vertical",
-                        boxSizing: "border-box", outline: "none", fontFamily: "inherit",
-                        color: "#111827", background: "#F9FAFB",
-                      }}
-                      onFocus={(e) => { e.target.style.borderColor = "#F59E0B"; e.target.style.background = "#fff"; }}
-                      onBlur={(e) => { e.target.style.borderColor = "#E5E7EB"; e.target.style.background = "#F9FAFB"; }}
-                    />
+              <h3 data-ux-role="label" className="bd-admin-label">언어 설정 (학생 입장 시 보이는 언어)</h3>
+              <div className="bd-teacher-row">
+                {Object.entries(LANGUAGES).map(([code, info]) => {
+                  const active = teacherLangs.includes(code);
+                  return (
                     <button
+                      key={code}
+                      type="button"
+                      data-ux-role="control"
+                      className="bd-btn"
+                      aria-pressed={active}
+                      lang={code}
                       onClick={() => {
+                        if (offline) return;
                         const db = getClientDb();
-                        const names = rosterText.split("\n").map((s) => s.trim()).filter(Boolean);
-                        set(ref(db, `rooms/${roomCode}/config/roster`), names);
+                        const next = active
+                          ? teacherLangs.filter((l) => l !== code)
+                          : [...teacherLangs, code];
+                        if (next.length === 0) return;
+                        set(ref(db, `rooms/${roomCode}/config/languages`), next);
                       }}
-                      style={{
-                        marginTop: 8, padding: "9px 20px", borderRadius: 10, border: "none",
-                        background: BRAND_GRADIENT, color: "#fff",
-                        fontWeight: 800, fontSize: 13, cursor: "pointer",
-                        boxShadow: "0 4px 14px rgba(245,158,11,0.35)",
-                      }}
-                    >
-                      저장
-                    </button>
-                  </div>
-                )}
+                    >{info.label}{active ? " ✓" : ""}</button>
+                  );
+                })}
               </div>
-
-              {/* 컬럼 관리는 소통판(보드) 안으로 완전 이전됨 (설계서 항목 2):
-                  각 컬럼 헤더 ⚙ = 이름·색·순서 / 헤더 더블클릭 = 삭제(경고 후) /
-                  보드 끝 ＋ = 새 컬럼 추가 */}
-              <div style={{
-                background: "#FFFBEB", border: "1px dashed #FDE68A", borderRadius: 12,
-                padding: "10px 14px", marginBottom: 20,
-                fontSize: 12, fontWeight: 700, color: "#92400E", lineHeight: 1.6,
-              }}>
-                💡 컬럼(주제) 관리는 이제 소통판에서 바로 해요.<br />
-                · 컬럼 위 <b>⚙</b> — 이름·색·순서 바꾸기<br />
-                · 컬럼 제목 <b>더블클릭</b> — 삭제 (경고 후, 8초 안에 되돌리기 가능)<br />
-                · 보드 맨 오른쪽 <b>＋</b> — 새 컬럼 추가
-              </div>
-
-              {/* Language management */}
-              <div style={{ borderTop: "1px dashed #E5E7EB", paddingTop: 18, marginBottom: 20 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", letterSpacing: 1, marginBottom: 10 }}>
-                  언어 설정 (학생 입장 시 보이는 언어)
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                  {Object.entries(LANGUAGES).map(([code, info]) => {
-                    const active = teacherLangs.includes(code);
-                    return (
-                      <button
-                        key={code}
-                        onClick={() => {
-                          const db = getClientDb();
-                          const next = active
-                            ? teacherLangs.filter((l) => l !== code)
-                            : [...teacherLangs, code];
-                          if (next.length === 0) return;
-                          set(ref(db, `rooms/${roomCode}/config/languages`), next);
-                        }}
-                        style={{
-                          padding: "5px 11px", borderRadius: 20, fontSize: 12,
-                          border: `1.5px solid ${active ? "#F59E0B" : "#E5E7EB"}`,
-                          background: active ? "#EEEEFF" : "#F9FAFB",
-                          color: active ? "#F59E0B" : "#9CA3AF",
-                          fontWeight: active ? 700 : 400, cursor: "pointer",
-                          transition: "all 0.12s",
-                        }}
-                      >
-                        {info.flag} {info.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 8 }}>
-                  선택된 언어: {teacherLangs.length}개 · 번역 대상 언어이기도 합니다
-                </div>
-              </div>
-
-              {/* 새 칸 추가는 소통판의 패들렛식 ＋ 버튼에서. 관리 패널에서는 제거됨. */}
+              <p data-ux-role="secondary" className="bd-hint">선택된 언어: {teacherLangs.length}개 · 번역 대상 언어이기도 합니다</p>
             </div>
           </div>
         </div>
@@ -1213,18 +1007,12 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         />
       )}
 
-      {/* 🎙️ 통역 도우미 Drawer 는 앱 전역 InterpreterFab(좌하단)로 이동 — 여기서는 제거 */}
-
-      {/* ── 📖 오늘의 문장 연습 (학생) ── */}
+      {/* ── 오늘의 문장 연습 (학생) ── */}
       {practiceOpen && !isTeacher && (
         <SentencePracticeModal
           user={user}
           roomCode={roomCode}
-          cards={(() => {
-            const byId: Record<string, CardData> = {};
-            for (const c of cards) byId[c.id] = c;
-            return filterPracticeCards(byId);
-          })()}
+          cards={practiceCards}
           onClose={() => setPracticeOpen(false)}
         />
       )}
@@ -1256,158 +1044,89 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
       {/* ── QR Modal ── */}
       {showQR && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(9,7,30,0.8)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 400, backdropFilter: "blur(8px)", padding: 20,
-        }}
+        <div
+          className="bd-modal-back"
           role="dialog" aria-modal="true" aria-labelledby="modal-title-qr"
           onClick={(e) => { if (e.target === e.currentTarget) setShowQR(false); }}
         >
-          <div style={{
-            background: "#fff", borderRadius: 24, padding: "36px 40px",
-            maxWidth: 460, width: "100%", textAlign: "center",
-            boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
-            animation: "fadeSlideIn 0.25s ease",
-          }}>
-            <h3 id="modal-title-qr" style={{ margin: "0 0 4px", fontWeight: 900, fontSize: 18, color: "#111827" }}>
-              {t("qrCode", lang)}
-            </h3>
-            <p style={{ margin: "0 0 24px", fontSize: 13, color: "#6B7280" }}>
-              {t("qrDescription", lang)}
-            </p>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+          <div className="bd-modal narrow" data-ux-surface="panel">
+            <h2 id="modal-title-qr" data-ux-role="body-emphasis" className="bd-modal-title">{t("qrCode", lang)}</h2>
+            <p data-ux-role="body" data-ux-reading className="bd-hint">{t("qrDescription", lang)}</p>
+            <div className="bd-qr">
               <QRCodeSVG
                 value={`${typeof window !== "undefined" ? window.location.origin : ""}/${roomCode}`}
                 size={260}
               />
             </div>
-            <p style={{ fontSize: 13, color: "#6B7280", wordBreak: "break-all", marginBottom: 24 }}>
+            <p data-ux-role="secondary" className="bd-qr-url">
               {typeof window !== "undefined" ? window.location.origin : ""}/{roomCode}
             </p>
-            <button
-              onClick={() => setShowQR(false)}
-              style={{
-                padding: "12px 32px", borderRadius: 12, background: BRAND_GRADIENT,
-                color: "#fff", fontWeight: 800, border: "none", cursor: "pointer", fontSize: 14,
-                boxShadow: "0 4px 16px rgba(245,158,11,0.4)",
-              }}
-            >닫기</button>
+            <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setShowQR(false)}>닫기</button>
           </div>
         </div>
       )}
 
       {/* ── Approval Modal ── */}
       {showApproval && isTeacher && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(9,7,30,0.8)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 400, backdropFilter: "blur(8px)", padding: 20,
-        }}
+        <div
+          className="bd-modal-back"
           role="dialog" aria-modal="true" aria-labelledby="modal-title-approval"
           onClick={(e) => { if (e.target === e.currentTarget) setShowApproval(false); }}
         >
-          <div style={{
-            background: "#fff", borderRadius: 24, width: "100%", maxWidth: 520,
-            maxHeight: "88vh", overflowY: "auto",
-            boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
-            animation: "fadeSlideIn 0.25s ease",
-          }}>
-            <div style={{
-              display: "flex", alignItems: "center", padding: "20px 24px 16px",
-              borderBottom: "1px solid #FEF3C7", position: "sticky", top: 0, background: "#fff", zIndex: 1,
-            }}>
-              <div>
-                <div id="modal-title-approval" style={{ fontWeight: 900, fontSize: 16, color: "#111827" }}>🔔 {t("approvalPending", lang)}</div>
-                <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>{pendingCount}개 대기 중</div>
-              </div>
-              <button
-                onClick={() => setShowApproval(false)}
-                style={{
-                  marginLeft: "auto", background: "#F3F4F6", border: "none", borderRadius: "50%",
-                  width: 32, height: 32, fontSize: 14, cursor: "pointer", color: "#6B7280",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-              >✕</button>
+          <div className="bd-modal" data-ux-surface="panel">
+            <div className="bd-modal-head">
+              <h2 id="modal-title-approval" data-ux-role="body-emphasis" className="bd-modal-title">
+                {t("approvalPending", lang)} {pendingCount}
+              </h2>
+              <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setShowApproval(false)}>닫기</button>
             </div>
-            <div style={{ padding: "16px 24px 24px" }}>
+            <div className="bd-modal-body">
               {pendingItems.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: "#9CA3AF" }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
-                  <div style={{ fontWeight: 600 }}>승인 대기 중인 게시물이 없습니다</div>
-                </div>
+                <p data-ux-role="body" className="bd-hint">승인 대기 중인 게시물이 없습니다</p>
               ) : (
                 pendingItems.map((item) => {
                   if (item.kind === "card") {
                     const card = item.data;
                     const col = columns.find((c) => c.id === card.colId);
                     return (
-                      <div key={`card-${card.id}`} style={{
-                        background: "#FFFBEB", border: "1px solid #FDE68A",
-                        borderRadius: 12, padding: "14px 16px", marginBottom: 12,
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{card.authorName}</div>
-                          <span style={{ fontSize: 11, color: "#9CA3AF" }}>→</span>
-                          <div style={{ fontSize: 11, color: "#6B7280" }}>{col?.title || card.colId}</div>
-                          <span style={{ fontSize: 10, background: "#FEF3C7", color: "#D97706", borderRadius: 6, padding: "1px 7px", fontWeight: 700, marginLeft: "auto" }}>
-                            {t("approvalPending", lang)}
-                          </span>
-                        </div>
+                      <div key={`card-${card.id}`} className="bd-pending" data-ux-surface>
+                        <p data-ux-role="label" className="bd-pending-who">
+                          <bdi>{card.authorName}</bdi> → {col ? cleanTitle(col.title) : card.colId}
+                        </p>
                         {card.cardType === "text" && (
-                          <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, marginBottom: 10 }}>{card.originalText}</div>
+                          <p data-ux-role="body" data-ux-reading className="bd-pending-text">{card.originalText}</p>
                         )}
                         {card.cardType === "image" && card.imageUrl && (
-                          <img src={card.imageUrl} alt="pending" style={{ width: "100%", borderRadius: 8, marginBottom: 10 }} />
+                          <img src={card.imageUrl} alt="" className="bd-pending-img" />
                         )}
                         {card.cardType === "youtube" && card.youtubeId && (
-                          <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 10 }}>
-                            YouTube: https://youtu.be/{card.youtubeId}
-                          </div>
+                          <p data-ux-role="secondary">YouTube: https://youtu.be/{card.youtubeId}</p>
                         )}
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => approveCard(card.id)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "none", background: "#10B981", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-                            ✅ {t("approve", lang)}
-                          </button>
-                          <button onClick={() => rejectCard(card.id)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "none", background: "#EF4444", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-                            ❌ {t("reject", lang)}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  } else {
-                    // comment item
-                    const comment = item.data;
-                    const parentCard = item.parentCard;
-                    const col = columns.find((c) => c.id === parentCard.colId);
-                    return (
-                      <div key={`comment-${comment.id}`} style={{
-                        background: "#F0F9FF", border: "1px solid #BAE6FD",
-                        borderRadius: 12, padding: "14px 16px", marginBottom: 12,
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>💬 {comment.authorName}</div>
-                          <span style={{ fontSize: 11, color: "#9CA3AF" }}>→</span>
-                          <div style={{ fontSize: 11, color: "#6B7280" }}>{col?.title || parentCard.colId}</div>
-                          <span style={{ fontSize: 10, background: "#DBEAFE", color: "#2563EB", borderRadius: 6, padding: "1px 7px", fontWeight: 700, marginLeft: "auto" }}>
-                            {t("pendingComment", lang)}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6, fontStyle: "italic" }}>
-                          ↳ {parentCard.authorName}: {(parentCard.originalText || "").slice(0, 50)}{(parentCard.originalText || "").length > 50 ? "…" : ""}
-                        </div>
-                        <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, marginBottom: 10 }}>{comment.text}</div>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => approveComment(parentCard.id, comment.id)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "none", background: "#10B981", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-                            ✅ {t("approve", lang)}
-                          </button>
-                          <button onClick={() => rejectComment(parentCard.id, comment.id)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "none", background: "#EF4444", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-                            ❌ {t("reject", lang)}
-                          </button>
+                        <div className="bd-admin-row">
+                          <button type="button" data-ux-role="control" className="bd-btn" onClick={() => approveCard(card.id)}>{t("approve", lang)}</button>
+                          <button type="button" data-ux-role="control" className="bd-btn danger" onClick={() => rejectCard(card.id)}>{t("reject", lang)}</button>
                         </div>
                       </div>
                     );
                   }
+                  const comment = item.data;
+                  const parentCard = item.parentCard;
+                  const col = columns.find((c) => c.id === parentCard.colId);
+                  return (
+                    <div key={`comment-${comment.id}`} className="bd-pending" data-ux-surface>
+                      <p data-ux-role="label" className="bd-pending-who">
+                        <bdi>{comment.authorName}</bdi> → {col ? cleanTitle(col.title) : parentCard.colId} · {t("pendingComment", lang)}
+                      </p>
+                      <p data-ux-role="secondary" className="bd-pending-quote">
+                        <bdi>{parentCard.authorName}</bdi>: {(parentCard.originalText || "").slice(0, 50)}{(parentCard.originalText || "").length > 50 ? "…" : ""}
+                      </p>
+                      <p data-ux-role="body" data-ux-reading className="bd-pending-text">{comment.text}</p>
+                      <div className="bd-admin-row">
+                        <button type="button" data-ux-role="control" className="bd-btn" onClick={() => approveComment(parentCard.id, comment.id)}>{t("approve", lang)}</button>
+                        <button type="button" data-ux-role="control" className="bd-btn danger" onClick={() => rejectComment(parentCard.id, comment.id)}>{t("reject", lang)}</button>
+                      </div>
+                    </div>
+                  );
                 })
               )}
             </div>
@@ -1433,58 +1152,10 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
       {/* ── Undo Snackbar ── */}
       {undoToast && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: "fixed", bottom: 24, left: "50%",
-            transform: "translateX(-50%)",
-            background: "#111827", color: "#fff",
-            borderRadius: 12, padding: "12px 14px 12px 18px",
-            display: "flex", alignItems: "center", gap: 12,
-            boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
-            zIndex: 600, minWidth: 280, maxWidth: "90vw",
-            fontSize: 14, fontWeight: 600,
-            animation: "fadeSlideIn 0.2s ease",
-          }}
-        >
-          <span style={{ fontSize: 16 }}>🗑</span>
-          <span style={{ flex: 1 }}>{undoToast.message}</span>
-          <button
-            onClick={handleUndo}
-            style={{
-              background: "rgba(245,158,11,0.25)",
-              border: "1px solid rgba(165,180,252,0.5)",
-              color: "#FDE68A", borderRadius: 8,
-              padding: "6px 12px", cursor: "pointer",
-              fontWeight: 800, fontSize: 13,
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(245,158,11,0.5)";
-              (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(245,158,11,0.25)";
-              (e.currentTarget as HTMLButtonElement).style.color = "#FDE68A";
-            }}
-          >
-            ↩ 되돌리기
-          </button>
-          <button
-            onClick={dismissToast}
-            aria-label="닫기"
-            style={{
-              background: "transparent", border: "none",
-              color: "#9CA3AF", cursor: "pointer",
-              fontSize: 14, padding: "4px 6px",
-              lineHeight: 1,
-            }}
-            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#fff")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF")}
-          >
-            ✕
-          </button>
+        <div role="status" aria-live="polite" className="bd-toast">
+          <span data-ux-role="body" className="bd-toast-text">{undoToast.message}</span>
+          <button type="button" data-ux-role="control" className="bd-btn" onClick={handleUndo}>되돌리기</button>
+          <button type="button" data-ux-role="control" className="bd-btn" onClick={dismissToast}>닫기</button>
         </div>
       )}
 
@@ -1503,94 +1174,18 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         />
       )}
 
-      {/* ── ✏️ FAB: 아무 칼럼에 글쓰기 ── */}
-      {!modal && !editModal && !showPptx && !showDiscussionCreate && !activeSessionId && columns.length > 0 && (
-        <button
-          onClick={() => {
-            const first = columns[0];
-            setModal({ colId: first.id, colTitle: first.title, colColor: first.color });
-          }}
-          aria-label="새 글 쓰기"
-          data-tutorial-id="board-fab"
-          style={{
-            position: "fixed", right: "clamp(16px, 3vw, 28px)", bottom: "clamp(16px, 3vw, 28px)",
-            width: 68, height: 68, borderRadius: "50%", border: "none",
-            background: "linear-gradient(135deg, #F59E0B, #D97706)",
-            color: "#fff", fontSize: 30, fontWeight: 900,
-            boxShadow: "0 12px 32px rgba(245,158,11,0.55), inset 0 -4px 0 rgba(0,0,0,0.15)",
-            cursor: "pointer", zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "transform 0.12s",
-          }}
-          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
-          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-        >
-          ✏️
-        </button>
-      )}
-
-      {/* ── 💗 FAB: 내 감정 표현하기 (학생 전용) ── */}
-      {!isTeacher && !modal && !editModal && !showPptx && !showDiscussionCreate && !activeSessionId && (
-        <button
-          onClick={() => setEmotionOpen(true)}
-          aria-label="내 감정 표현하기"
-          title="내 감정 표현하기"
-          data-tutorial-id="board-emotion-fab"
-          style={{
-            position: "fixed",
-            right: "clamp(16px, 3vw, 28px)",
-            bottom: "calc(clamp(16px, 3vw, 28px) + 80px)",
-            width: 56, height: 56, borderRadius: "50%", border: "none",
-            background: "linear-gradient(135deg, #F472B6, #DB2777)",
-            color: "#fff", fontSize: 24, fontWeight: 900,
-            boxShadow: "0 10px 24px rgba(219,39,119,0.45), inset 0 -3px 0 rgba(0,0,0,0.15)",
-            cursor: "pointer", zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "transform 0.12s",
-          }}
-          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}
-          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-        >
-          💗
-        </button>
-      )}
-
       {/* ── 감정 카드 데크 모달 ── */}
       {emotionOpen && (
-        <div
-          onClick={() => setEmotionOpen(false)}
-          style={{
-            position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)",
-            zIndex: 250, display: "flex", alignItems: "flex-end", justifyContent: "center",
-            padding: 16,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%", maxWidth: 420, background: "#fff", borderRadius: 22,
-              padding: "18px 18px 20px", boxShadow: "0 -8px 40px rgba(0,0,0,0.25)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 22 }}>💗</span>
-                <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937" }}>내 감정 표현하기</div>
-              </div>
-              <button
-                onClick={() => setEmotionOpen(false)}
-                aria-label="닫기"
-                style={{
-                  width: 32, height: 32, borderRadius: "50%", border: "none",
-                  background: "#F3F4F6", color: "#6B7280", fontSize: 16, fontWeight: 900, cursor: "pointer",
-                }}
-              >
-                ✕
-              </button>
+        <div className="bd-modal-back" onClick={(e) => { if (e.target === e.currentTarget) setEmotionOpen(false); }}>
+          <div className="bd-modal narrow" data-ux-surface="panel" role="dialog" aria-modal="true" aria-label="내 감정 표현하기">
+            <div className="bd-modal-head">
+              <h2 data-ux-role="body-emphasis" className="bd-modal-title">내 감정 표현하기</h2>
+              <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setEmotionOpen(false)}>닫기</button>
             </div>
             <EmotionCardDeck
               lang={lang}
               onPick={async (emotionId) => {
+                if (offline) { setEmotionOpen(false); return; }
                 try {
                   await pushEmotion({
                     roomCode,
@@ -1624,17 +1219,191 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       )}
 
       {emotionToast && (
-        <div
-          style={{
-            position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)",
-            background: "rgba(31,41,55,0.95)", color: "#fff",
-            padding: "10px 18px", borderRadius: 999, fontSize: 13, fontWeight: 800,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25)", zIndex: 300,
-          }}
-        >
-          {emotionToast}
+        <div role="status" aria-live="polite" className="bd-toast">
+          <span data-ux-role="body" className="bd-toast-text">{emotionToast}</span>
         </div>
       )}
     </div>
   );
 }
+
+/* ── 소통창 전용 규칙 ─────────────────────────────────────────────────
+   글자 크기·간격·색은 전부 토큰에서 온다. 여기서 px 글자 크기를 새로 만들지
+   않는다. 화면을 100vh + overflow:hidden 으로 잠그지 않고 문서가 스크롤하게
+   둔다 — 큰 글씨·긴 번역·모바일 키보드에서 하단 버튼이 사라지지 않는 유일한
+   방법이다 (README §5.1, §6.1). */
+const BOARD_CSS = `
+.bd-root{
+  min-height: 100svh;
+  background: var(--ux-bg);
+  display: flex; flex-direction: column;
+  font-family: 'Pretendard Variable','Pretendard','Noto Sans KR',sans-serif;
+}
+.bd-bar{
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: var(--ux-space-3);
+  padding: var(--ux-space-2) var(--ux-space-4);
+  background: var(--ux-surface);
+  border-bottom: 2px solid var(--ux-primary-border);
+}
+.bd-id{ display: grid; gap: 2px; min-width: 0; flex: 1; }
+/* 좁은 화면에서는 방 정보를 아랫줄로 내린다 — 가운데 칸이 좁아 낱말이 쪼개졌다. */
+@media (max-width: 599px){
+  .bd-bar{ flex-wrap: wrap; }
+  .bd-id{ order: 3; flex: 1 0 100%; }
+}
+.bd-id-name{ font-weight: 900; color: var(--ux-ink); word-break: keep-all; }
+.bd-id-sub{ overflow-wrap: anywhere; }
+.bd-main{
+  flex: 1; width: 100%; max-width: 760px; margin: 0 auto; box-sizing: border-box;
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-8);
+  display: grid; gap: var(--ux-space-4); align-content: start;
+}
+.bd-ask{ margin: 0; color: var(--ux-ink); font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
+
+/* 주제 선택 — 한 열이 기본, 넓어지면 두 열까지. */
+.bd-topics{ display: grid; grid-template-columns: 1fr; gap: var(--ux-space-3); }
+@media (min-width: 600px){ .bd-topics{ grid-template-columns: 1fr 1fr; } }
+.bd-topic{
+  display: flex; align-items: center; gap: var(--ux-space-3); width: 100%; box-sizing: border-box;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-ink-soft); text-align: left; font-family: inherit; font-weight: 700;
+}
+.bd-topic.on{ border: 3px solid var(--ux-selected-border); background: var(--ux-surface-sunk); }
+.bd-topic{ padding: var(--ux-space-2) var(--ux-space-3); }
+.bd-topic-art{ width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+.bd-topic-text{ display: grid; gap: 2px; min-width: 0; flex: 1; }
+.bd-topic-name{ font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
+.bd-check{ width: 1.5em; text-align: center; font-weight: 900; color: var(--ux-selected-border); flex-shrink: 0; }
+
+.bd-stream{ display: grid; gap: var(--ux-space-4); }
+.bd-now{ margin: 0; color: var(--ux-ink); font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
+.bd-cards{ display: grid; gap: var(--ux-space-4); }
+
+.bd-empty{
+  display: grid; justify-items: center; gap: var(--ux-space-4);
+  padding: var(--ux-space-6) var(--ux-space-4);
+  border: 2px dashed var(--ux-primary-border);
+  text-align: center;
+}
+.bd-empty-bee{ width: 96px; height: 96px; object-fit: contain; }
+.bd-empty-title{ margin: 0; color: var(--ux-ink); word-break: keep-all; }
+
+.bd-btn{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+  white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--ux-space-2);
+  box-sizing: border-box; max-width: 100%;
+}
+.bd-btn.danger{ border-color: var(--ux-error); color: var(--ux-error); }
+.bd-btn[aria-pressed="true"]{ border: 3px solid var(--ux-selected-border); background: var(--ux-surface-sunk); }
+.bd-cta{
+  width: 100%; box-sizing: border-box; font-family: inherit; font-weight: 900;
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border);
+  white-space: normal; word-break: keep-all;
+}
+
+.bd-compose{
+  position: sticky; bottom: 0; z-index: 20;
+  display: grid; gap: var(--ux-space-2);
+  padding: var(--ux-space-3) var(--ux-space-4) calc(var(--ux-space-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--ux-surface);
+  border-top: 2px solid var(--ux-primary-border);
+  box-sizing: border-box;
+}
+.bd-compose-side{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+.bd-compose .bd-cta{ max-width: 760px; margin: 0 auto; }
+
+/* 선생님 도구 — 아이 화면과 시각적으로 분리한다. */
+.bd-teacher{
+  border: 2px dashed var(--ux-ink-soft); border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-3); display: grid; gap: var(--ux-space-3);
+  background: var(--ux-surface-sunk);
+}
+.bd-teacher-title{ margin: 0; color: var(--ux-ink-soft); font-weight: 800; }
+.bd-teacher-row{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); }
+
+.bd-admin-wrap{ display: grid; gap: var(--ux-space-2); }
+.bd-admin{ display: grid; gap: var(--ux-space-2); padding: var(--ux-space-3); border: 2px solid var(--ux-primary-border); }
+.bd-admin-label{ font-weight: 800; color: var(--ux-ink); }
+.bd-admin-row{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); }
+.bd-input, .bd-textarea, .bd-select{
+  width: 100%; box-sizing: border-box;
+  min-height: var(--ux-control-min);
+  font-family: inherit; font-size: var(--ux-font-body); font-weight: 700;
+  color: var(--ux-ink); background: var(--ux-surface);
+  border: 2px solid var(--ux-ink-soft); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-2) var(--ux-space-3);
+}
+.bd-textarea{ line-height: var(--ux-lh-reading); resize: vertical; }
+.bd-hint{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; overflow-wrap: anywhere; }
+.bd-notice{
+  margin: 0; padding: var(--ux-space-3); border: 2px dashed var(--ux-error);
+  border-radius: var(--ux-radius-surface); color: var(--ux-error); font-weight: 700;
+}
+
+/* 전체 주제 보기 — 데스크톱 교사 전용. 가로 스크롤은 이 상자 안에서만 일어난다. */
+.bd-columns{
+  display: flex; gap: var(--ux-space-4); align-items: flex-start;
+  overflow-x: auto; padding-bottom: var(--ux-space-3);
+}
+.bd-col{
+  width: clamp(300px, 26vw, 360px); flex-shrink: 0;
+  display: flex; flex-direction: column; gap: var(--ux-space-2);
+  border: 2px solid var(--ux-primary-border); padding: var(--ux-space-2);
+  background: var(--ux-surface); box-sizing: border-box;
+}
+.bd-col-head{
+  display: flex; align-items: center; gap: var(--ux-space-2);
+  border-radius: var(--ux-radius-surface); padding: var(--ux-space-2) var(--ux-space-3);
+}
+.bd-col-art{ width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; background: var(--ux-surface); border-radius: var(--ux-radius-surface); }
+.bd-col-title{ flex: 1; min-width: 0; font-weight: 900; color: var(--ux-ink); word-break: keep-all; overflow-wrap: anywhere; }
+.bd-col-count{ flex-shrink: 0; color: var(--ux-ink); }
+.bd-col-tools{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+.bd-col-body{ display: grid; gap: var(--ux-space-3); max-height: clamp(320px, 62svh, 900px); overflow-y: auto; }
+.bd-col-empty{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }
+.bd-col-add{
+  width: clamp(180px, 16vw, 220px); flex-shrink: 0; align-self: stretch;
+  border: 3px dashed var(--ux-primary-border); background: var(--ux-surface-sunk);
+  color: var(--ux-ink); font-family: inherit; font-weight: 900;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ux-space-2);
+}
+
+/* 모달 — 안쪽만 스크롤하고 문서를 잠그지 않는다. */
+.bd-modal-back{
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(41,37,31,.62);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: var(--ux-space-4); overflow-y: auto;
+}
+.bd-modal{
+  background: var(--ux-surface); width: 100%; max-width: 620px; box-sizing: border-box;
+  display: grid; gap: var(--ux-space-4); padding: var(--ux-space-4);
+  box-shadow: 0 18px 48px rgba(41,37,31,.35);
+}
+.bd-modal.narrow{ max-width: 460px; justify-items: center; text-align: center; }
+.bd-modal-head{ display: flex; align-items: center; gap: var(--ux-space-3); width: 100%; }
+.bd-modal-title{ margin: 0; flex: 1; min-width: 0; font-weight: 900; color: var(--ux-ink); word-break: keep-all; }
+.bd-modal-body{ display: grid; gap: var(--ux-space-3); }
+.bd-qr{ display: flex; justify-content: center; max-width: 100%; }
+.bd-qr-url{ word-break: break-all; }
+.bd-pending{ display: grid; gap: var(--ux-space-2); padding: var(--ux-space-3); border: 2px solid var(--ux-primary-border); }
+.bd-pending-who{ margin: 0; font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
+.bd-pending-text{ margin: 0; word-break: keep-all; overflow-wrap: anywhere; }
+.bd-pending-quote{ margin: 0; word-break: keep-all; overflow-wrap: anywhere; }
+.bd-pending-img{ width: 100%; border-radius: var(--ux-radius-surface); }
+
+.bd-toast{
+  position: fixed; left: 50%; bottom: var(--ux-space-6); transform: translateX(-50%);
+  z-index: 600; display: flex; align-items: center; gap: var(--ux-space-3);
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 3px solid var(--ux-selected-border); border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-3) var(--ux-space-4);
+  box-shadow: 0 12px 32px rgba(41,37,31,.28);
+  max-width: min(92vw, 560px); flex-wrap: wrap; box-sizing: border-box;
+}
+.bd-toast-text{ word-break: keep-all; overflow-wrap: anywhere; }
+`;

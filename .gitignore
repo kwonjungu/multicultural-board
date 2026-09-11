@@ -62,3 +62,6 @@ scripts/.asset_batch_job.json
 .village-batch-out/
 .village3d-batch-out/
 .acc-preview/
+
+# UX 검증 스크린샷 (로컬 증거, 38MB — 커밋하지 않음)
+/reports/

@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { initialMemoryState, memoryReducer } from "@/lib/wordMemoryState";
 import { VOCAB, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
+import ScopedStyle from "../ui/child/ScopedStyle";
 import VocabImage from "./VocabImage";
 import { gt, UI, type LangMap } from "./uiText";
 
@@ -20,7 +22,21 @@ const WM: Record<string, LangMap> = {
     ko: "맞춘 쌍", en: "Matched", vi: "Cặp đúng", zh: "配对", fil: "Tugma",
     ja: "そろったペア", th: "คู่ที่ได้", id: "Pasangan", ru: "Пары", hi: "जोड़े", ar: "أزواج",
   },
+  howMany: {
+    ko: "카드 수를 골라요", en: "Choose how many cards", vi: "Chọn số thẻ",
+    zh: "选择卡片数量", fil: "Pumili ng bilang ng kard", ja: "カードのかずをえらぼう",
+    th: "เลือกจำนวนการ์ด", id: "Pilih jumlah kartu", ru: "Выбери число карточек",
+    hi: "कितने कार्ड?", ar: "اختر عدد البطاقات",
+  },
+  pairs: {
+    ko: "쌍", en: "pairs", vi: "cặp", zh: "对", fil: "pares", ja: "ペア",
+    th: "คู่", id: "pasang", ru: "пар", hi: "जोड़े", ar: "أزواج",
+  },
 };
+
+/** 4쌍(8장)은 저학년·짧은 시간용, 8쌍(16장)은 종전 기본값. */
+const PAIR_OPTIONS = [4, 8] as const;
+type PairCount = (typeof PAIR_OPTIONS)[number];
 
 type Card = {
   id: string;
@@ -47,10 +63,37 @@ function CardBack() {
 }
 
 export default function WordMemory({ langA, langB }: { langA: string; langB: string }) {
-  const pairCount = 8; // 16 cards total
-  const [flipped, setFlipped] = useState<string[]>([]);
-  const [matched, setMatched] = useState<Set<string>>(new Set());
-  const [moves, setMoves] = useState(0);
+  const [pairCount, setPairCount] = useState<PairCount>(8);
+  return (
+    <div data-ux-root className="wm-root">
+      <ScopedStyle css={WM_CSS} />
+      <div className="wm-sizebar">
+        <span data-ux-role="label">{gt(WM.howMany, langA)}</span>
+        <div className="wm-sizebtns">
+          {PAIR_OPTIONS.map((n) => (
+            <button
+              key={n}
+              data-ux-role="control"
+              className="wm-size"
+              aria-pressed={pairCount === n}
+              onClick={() => setPairCount(n)}
+            >{pairCount === n ? "✓ " : ""}{n} {gt(WM.pairs, langA)}</button>
+          ))}
+        </div>
+      </div>
+      {/* 쌍 수가 바뀌면 언어가 바뀔 때와 똑같이 라운드를 새로 마운트한다 —
+          공개된 카드/시도 수가 다른 덱으로 넘어오지 않게 하는 유일한 경로. */}
+      <MemoryRound
+        key={JSON.stringify([langA, langB, pairCount])}
+        langA={langA} langB={langB} pairCount={pairCount}
+      />
+    </div>
+  );
+}
+
+function MemoryRound({ langA, langB, pairCount }: { langA: string; langB: string; pairCount: PairCount }) {
+  const [{ flipped, matched, moves }, dispatch] = useReducer(memoryReducer, undefined, initialMemoryState);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const cards = useMemo<Card[]>(() => {
     const picked = pickN(VOCAB, pairCount);
@@ -60,86 +103,75 @@ export default function WordMemory({ langA, langB }: { langA: string; langB: str
       cs.push({ id: `${v.key}-b`, pairKey: v.key, emoji: v.emoji, word: tr(v.translations, langB), lang: langB });
     });
     return cs.sort(() => Math.random() - 0.5);
-  }, [langA, langB]);
+  }, [langA, langB, pairCount]);
 
   useEffect(() => {
     if (flipped.length !== 2) return;
-    const [a, b] = flipped.map((id) => cards.find((c) => c.id === id)!);
-    setMoves((m) => m + 1);
-    if (a.pairKey === b.pairKey) {
-      setMatched((prev) => new Set(prev).add(a.pairKey));
-      setTimeout(() => setFlipped([]), 500);
-    } else {
-      setTimeout(() => setFlipped([]), 900);
-    }
+    const [a, b] = flipped.map((id) => cards.find((c) => c.id === id));
+    const timer = window.setTimeout(() => dispatch({ type: "settle", ids: flipped }),
+      a && b && a.pairKey === b.pairKey ? 500 : 900);
+    return () => window.clearTimeout(timer);
   }, [flipped, cards]);
+
+  useEffect(() => () => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+  }, []);
 
   function playTts(text: string, lang: string) {
     const url = `/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`;
-    new Audio(url).play().catch(() => {});
+    audioRef.current?.pause();
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.play().catch(() => {});
   }
 
   function handleFlip(c: Card) {
-    if (matched.has(c.pairKey)) return;
+    if (matched.includes(c.pairKey)) return;
     if (flipped.includes(c.id)) return;
     if (flipped.length >= 2) return;
-    setFlipped((f) => [...f, c.id]);
+    dispatch({ type: "flip", id: c.id, cards });
     playTts(c.word, c.lang);
   }
 
-  const allMatched = matched.size === pairCount;
+  const allMatched = matched.length === pairCount;
 
   if (allMatched) {
     return (
-      <div style={{ textAlign: "center", padding: 40 }}>
+      <div className="wm-done">
         <BeeMascot size={120} mood="cheer" />
-        <div style={{ fontSize: 28, fontWeight: 900, color: "#111827", margin: "18px 0 6px" }}>
-          🎉 {gt(WM.allMatched, langA)}
-        </div>
-        <div style={{ color: "#6B7280", fontSize: 14 }}>{gt(WM.tries, langA)} {moves}</div>
+        <p data-ux-role="title">🎉 {gt(WM.allMatched, langA)}</p>
+        <p data-ux-role="body">{gt(WM.tries, langA)} {moves}</p>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: "16px 16px 40px", maxWidth: 520, margin: "0 auto" }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between",
-        marginBottom: 14, fontSize: 13, fontWeight: 700, color: "#6B7280",
-      }}>
-        <span>{gt(WM.tries, langA)} {moves}</span>
-        <span>{gt(WM.matchedPairs, langA)} {matched.size} / {pairCount}</span>
+    <div className="wm-board">
+      <div className="wm-hud">
+        <span data-ux-role="label">{gt(WM.tries, langA)} {moves}</span>
+        <span data-ux-role="label">{gt(WM.matchedPairs, langA)} {matched.length} / {pairCount}</span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+      <div className="wm-grid" data-pairs={pairCount}>
         {cards.map((c) => {
-          const isFlipped = flipped.includes(c.id) || matched.has(c.pairKey);
-          const isMatched = matched.has(c.pairKey);
+          const isFlipped = flipped.includes(c.id) || matched.includes(c.pairKey);
+          const isMatched = matched.includes(c.pairKey);
           return (
             <button
               key={c.id}
+              data-ux-role="control"
+              className="wm-card"
+              data-state={isMatched ? "matched" : isFlipped ? "open" : "back"}
               onClick={() => handleFlip(c)}
               disabled={isMatched}
-              style={{
-                aspectRatio: "1 / 1.2",
-                borderRadius: 14,
-                border: `2px solid ${isMatched ? "#16A34A" : "#E5E7EB"}`,
-                background: isFlipped
-                  ? (isMatched ? "#DCFCE7" : "#FEF3C7")
-                  : "linear-gradient(135deg,#FBBF24,#F59E0B)",
-                color: isFlipped ? "#111827" : "#fff",
-                fontSize: 13, fontWeight: 800, cursor: isMatched ? "default" : "pointer",
-                padding: 6, transition: "all 0.25s",
-                boxShadow: isFlipped ? "none" : "0 4px 12px rgba(245,158,11,0.35)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                textAlign: "center", lineHeight: 1.2,
-                wordBreak: "keep-all", overflow: "hidden",
-              }}
+              lang={isFlipped ? c.lang : undefined}
             >
               {isFlipped ? (
-                <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                <span className="wm-face">
                   <VocabImage vocabKey={c.pairKey} emoji={c.emoji} size={36} />
-                  <span>{c.word}</span>
+                  {/* 긴 단어는 잘라내지 않고 줄을 늘린다 — 카드가 세로로 자란다. */}
+                  <span className="wm-word">{c.word}</span>
                 </span>
               ) : (
                 <CardBack />
@@ -151,3 +183,58 @@ export default function WordMemory({ langA, langB }: { langA: string; langB: str
     </div>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const WM_CSS = `
+.wm-root{
+  max-width: 520px; margin: 0 auto;
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-8);
+  color: var(--ux-ink);
+  display: grid; gap: var(--ux-space-4);
+}
+.wm-sizebar{
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--ux-space-3);
+}
+.wm-sizebtns{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+.wm-size{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-ink-soft);
+  font-family: inherit; font-weight: 800;
+}
+.wm-size[aria-pressed="true"]{ border: 3px solid var(--ux-selected-border); }
+.wm-board{ display: grid; gap: var(--ux-space-3); }
+.wm-hud{ display: flex; justify-content: space-between; gap: var(--ux-space-3); flex-wrap: wrap; }
+.wm-grid{ display: grid; gap: var(--ux-space-2); }
+.wm-grid[data-pairs="4"]{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.wm-grid[data-pairs="8"]{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 360px){ .wm-grid{ grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.wm-card{
+  /* 정사각 비율을 '최소'로만 쓴다. 긴 단어가 오면 높이가 늘어나야 글자가 안 잘린다. */
+  min-height: max(var(--ux-control-min), 5.5rem);
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  padding: var(--ux-space-2);
+  border: 2px solid var(--ux-ink-soft);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  font-family: inherit; font-weight: 800;
+  transition: background var(--ux-motion-state) var(--ux-motion-ease);
+}
+.wm-card[data-state="open"]{ background: var(--ux-surface-sunk); color: var(--ux-ink); }
+.wm-card[data-state="matched"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 3px solid var(--ux-success); cursor: default;
+}
+.wm-face{ display: flex; flex-direction: column; align-items: center; gap: var(--ux-space-1); max-width: 100%; }
+.wm-word{
+  font-size: var(--ux-font-secondary);
+  line-height: var(--ux-lh-reading);
+  overflow-wrap: anywhere; word-break: normal; hyphens: auto;
+  max-width: 100%;
+}
+.wm-done{
+  display: grid; justify-items: center; gap: var(--ux-space-3);
+  padding: var(--ux-space-8) var(--ux-space-4); text-align: center;
+}
+.wm-done p{ margin: 0; }
+`;

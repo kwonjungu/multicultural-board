@@ -1,103 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { UserConfig } from "@/lib/types";
+import { LANGUAGES } from "@/lib/constants";
 import { t, tFmt } from "@/lib/i18n";
+import { subscribeSession } from "@/lib/storybook";
+import { subscribeWhiteboardMeta } from "@/lib/whiteboard";
 import BeeBanner from "./BeeBanner";
 import RoomManagePanel from "./RoomManagePanel";
 import FontSizeButton from "./FontSizeButton";
-import LangSwitchButton from "./LangSwitchButton";
 import FlyingBees from "./ui/FlyingBees";
+import ScopedStyle from "./ui/child/ScopedStyle";
 
+/** 라우팅 계약 — 이 문자열은 app/[roomCode]/page.tsx 의 hubView 와 1:1 이다. 바꾸지 말 것. */
 export type HubView = "board" | "whiteboard" | "games" | "dashboard" | "vocab" | "storybook";
 
-interface SectionMeta {
+/** 교사가 지금 열어 둔 수업. storybook 이 whiteboard 보다 우선(page.tsx 와 같은 순서). */
+export type HubLiveActivity = { kind: "storybook" | "whiteboard" } | null;
+
+interface ActivityMeta {
+  /** onSelect 로 나가는 값 = hubView 문자열. 절대 변경 금지. */
   id: HubView;
+  /** 아이가 할 일로 읽히는 이름 (README 5.2) */
   titleKey: string;
-  sub: string;
+  /** 한 문장 설명 */
   descKey: string;
   mascot: string;
-  color: string;
-  bg: string;
-  accent: string;
-  badge?: string;
+  tint: string;
+  /** 칭찬 표시는 육각형으로 — 벌집은 브랜드 장식과 칭찬에만 남긴다. */
+  hex?: boolean;
 }
 
-// ⭐ 소통의 별 — 화이트보드는 소통창/그림책으로 편입되어 타일에서 제외.
-// 배열 순서 = 별 꼭짓점 배치(12시부터 시계방향 72°씩):
-// 소통창(12시) → 그림책(2시) → 단어(5시) → 칭찬(7시) → 게임(10시)
-const SECTIONS: SectionMeta[] = [
-  {
-    id: "board",
-    titleKey: "hubSectionBoard",
-    sub: "Padlet",
-    descKey: "hubSectionBoardDesc",
-    mascot: "/mascot/bee-cheer.png",
-    color: "#F59E0B",
-    bg: "linear-gradient(135deg, #FEF3C7, #FDE68A)",
-    accent: "#B45309",
-  },
-  {
-    id: "storybook",
-    titleKey: "hubSectionStorybook",
-    sub: "Storybook",
-    descKey: "hubSectionStorybookDesc",
-    mascot: "/mascot/bee-welcome.png",
-    color: "#F97316",
-    bg: "linear-gradient(135deg, #FFF7ED, #FED7AA)",
-    accent: "#C2410C",
-  },
-  {
-    id: "vocab",
-    titleKey: "hubSectionVocab",
-    sub: "Word Cards",
-    descKey: "hubSectionVocabDesc",
-    mascot: "/mascot/bee-book.png",
-    color: "#8B5CF6",
-    bg: "linear-gradient(135deg, #F5F3FF, #DDD6FE)",
-    accent: "#6D28D9",
-  },
-  {
-    id: "dashboard",
-    titleKey: "hubSectionStickers",
-    sub: "Praise Hive",
-    descKey: "hubSectionStickersDesc",
-    mascot: "/mascot/bee-student.png",
-    color: "#10B981",
-    bg: "linear-gradient(135deg, #D1FAE5, #A7F3D0)",
-    accent: "#065F46",
-  },
-  {
-    id: "games",
-    titleKey: "hubSectionGames",
-    sub: "Games",
-    descKey: "hubSectionGamesDesc",
-    mascot: "/mascot/bee-celebrate.png",
-    color: "#FB7185",
-    bg: "linear-gradient(135deg, #FFE4E6, #FECDD3)",
-    accent: "#BE123C",
-  },
+/**
+ * 5개 활동. 순서는 아이의 하루 흐름(말하기 → 읽기 → 배우기 → 내 것 보기 → 놀기)이고
+ * 라우팅(id)은 종전 그대로다.
+ */
+const ACTIVITIES: ActivityMeta[] = [
+  { id: "board", titleKey: "hubActBoard", descKey: "hubSectionBoardDesc", mascot: "/mascot/bee-cheer.png", tint: "var(--ux-hint-apricot)" },
+  { id: "storybook", titleKey: "hubActStorybook", descKey: "hubSectionStorybookDesc", mascot: "/mascot/bee-welcome.png", tint: "var(--ux-hint-lavender)" },
+  { id: "vocab", titleKey: "hubActVocab", descKey: "hubSectionVocabDesc", mascot: "/mascot/bee-book.png", tint: "var(--ux-hint-mint)" },
+  { id: "dashboard", titleKey: "hubActBee", descKey: "hubSectionStickersDesc", mascot: "/mascot/bee-student.png", tint: "var(--ux-primary-fill)", hex: true },
+  { id: "games", titleKey: "hubActGames", descKey: "hubSectionGamesDesc", mascot: "/mascot/bee-celebrate.png", tint: "var(--ux-surface-sunk)" },
 ];
-
-// 별 꼭짓점 각도(도) — 12시(-90°)부터 시계방향 72° 간격
-const STAR_ANGLES = [-90, -18, 54, 126, 198];
-// 컨테이너(정사각, viewBox 100) 기준 기하
-const STAR_CX = 50;
-const STAR_CY = 52;          // 상단 원 라벨 여유를 위해 살짝 아래
-const STAR_R_OUTER = 38;     // 별 꼭짓점 반경 = 원 버튼 중심
-const STAR_R_INNER = STAR_R_OUTER * 0.382; // 정통 오각성 내경비
-
-/** 오각성(★) 실루엣 폴리곤 points (viewBox 100 기준) */
-function starPolygonPoints(): string {
-  const pts: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    const r = i % 2 === 0 ? STAR_R_OUTER : STAR_R_INNER;
-    const ang = ((-90 + i * 36) * Math.PI) / 180;
-    pts.push(`${(STAR_CX + r * Math.cos(ang)).toFixed(2)},${(STAR_CY + r * Math.sin(ang)).toFixed(2)}`);
-  }
-  return pts.join(" ");
-}
 
 interface Props {
   user: UserConfig;
@@ -106,330 +51,475 @@ interface Props {
   onLogout: () => void;
   onChangeLang: (lang: string) => void;
   availableLangs: string[];
+  /**
+   * 테스트·fixture 전용 주입구. 넘기지 않으면 방 노드를 직접 구독해서 알아낸다.
+   * fixture 는 반드시 값을 넘겨 Firebase 접속을 막는다(HARNESS 2).
+   */
+  liveActivity?: HubLiveActivity;
 }
 
-export default function HomeHub({ user, roomCode, onSelect, onLogout, onChangeLang, availableLangs }: Props) {
+/**
+ * 지금 열려 있는 수업을 읽는다. **읽기 전용** — 여기서 세션 경로에 쓰지 않는다.
+ * bookId 없는 세션은 유령(정리 코드가 wipe 뒤 남긴 잔여 노드)이므로 활성으로 치지
+ * 않는다. 이 판정은 app/[roomCode]/page.tsx 와 글자 그대로 같아야 한다 —
+ * 한쪽만 느슨해지면 2026-07-13 방 1111 처럼 학생이 대기 화면에 갇힌다.
+ */
+function useLiveActivity(roomCode: string, enabled: boolean): HubLiveActivity {
+  const [storybook, setStorybook] = useState(false);
+  const [whiteboard, setWhiteboard] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const unsubs: Array<() => void> = [];
+    try {
+      unsubs.push(subscribeSession(roomCode, (session) => {
+        setStorybook(!!session && !!session.bookId && session.phase !== "done");
+      }));
+      unsubs.push(subscribeWhiteboardMeta(roomCode, (meta) => setWhiteboard(!!meta.active)));
+    } catch {
+      /* 연결 설정이 없으면 '지금 함께할 활동' 칸만 비운다. 허브 자체는 계속 쓸 수 있어야 한다. */
+    }
+    return () => { for (const u of unsubs) { try { u(); } catch { /* 이미 해제됨 */ } } };
+  }, [roomCode, enabled]);
+
+  if (storybook) return { kind: "storybook" };
+  if (whiteboard) return { kind: "whiteboard" };
+  return null;
+}
+
+export default function HomeHub({
+  user, roomCode, onSelect, onLogout, onChangeLang, availableLangs, liveActivity,
+}: Props) {
   const lang = user.myLang;
   // 관리 패널은 기본 접힘 — 교사가 필요할 때 직접 펼친다 (자동 펼치기 안 함).
   const [manageOpen, setManageOpen] = useState(false);
-  // 교사용 QR 모달 (학생 입장 주소 공유)
+  const [langOpen, setLangOpen] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const qrCloseRef = useRef<HTMLButtonElement>(null);
+
+  const injected = liveActivity !== undefined;
+  const detected = useLiveActivity(roomCode, !injected);
+  const live = injected ? liveActivity : detected;
+
   const joinUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/${roomCode}`;
+  const langs = availableLangs.length ? availableLangs : Object.keys(LANGUAGES);
+
+  // 모달은 열리면 초점을 안으로 옮기고 Escape 로 닫힌다.
+  useEffect(() => {
+    if (!showQR) return;
+    qrCloseRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowQR(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showQR]);
+
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#FCEFB0",
-      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
-      position: "relative", overflow: "hidden",
-      padding: "24px 16px 40px",
-    }}>
-      {/* 🐝 입장 화면 꿀벌 일러스트 배경 (전체 화면 고정) */}
-      <div aria-hidden="true" style={{
-        position: "fixed", inset: 0,
-        backgroundImage: "url('/landing/landing-bees.webp')",
-        backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
-        pointerEvents: "none", zIndex: 0,
-      }} />
+    <div data-ux-root className="hub-root">
+      <ScopedStyle css={HUB_CSS} />
+      <div aria-hidden="true" className="hub-backdrop" />
       <FlyingBees />
 
-      <div style={{
-        maxWidth: 760, margin: "0 auto",
-        position: "relative", zIndex: 1,
-      }}>
-        {/* 🐝 상단 배너 — 주아체 무지개 (설계서 항목 10) */}
+      <div className="hub-shell">
         <BeeBanner compact />
 
-        {/* Header */}
-        <div data-tutorial-id="hub-header" style={{
-          display: "flex", alignItems: "center", gap: 14, marginBottom: 24,
-          background: "#fff", borderRadius: 24, padding: "14px 18px",
-          border: "2px solid #FDE68A",
-          boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
-        }}>
-          <img
-            src="/mascot/bee-welcome.png"
-            alt=""
-            aria-hidden="true"
-            style={{ width: 72, height: 72, flexShrink: 0, filter: "drop-shadow(0 4px 10px rgba(245,158,11,0.35))" }}
-          />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-              {tFmt("hubGreeting", lang, { name: user.myName })}
-            </div>
-            <div style={{ fontSize: 12, color: "#92400E", fontWeight: 700, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ background: "#FEF3C7", padding: "2px 8px", borderRadius: 999, fontWeight: 900, color: "#B45309" }}>
-                🚪 {roomCode}
-              </span>
-              {user.isTeacher ? (
-                <span style={{ background: "#ECFDF5", color: "#065F46", padding: "2px 8px", borderRadius: 999, fontWeight: 900 }}>
-                  👩‍🏫 {t("roleTeacher", lang)}
+        {/* 상단 설정 영역: 계정 · 언어 · 글자 크기를 한 곳에 모은다 */}
+        <header data-tutorial-id="hub-header" className="hub-head" data-ux-surface="panel">
+          <div className="hub-who">
+            <img src="/mascot/bee-welcome.png" alt="" aria-hidden="true" className="hub-who-bee" />
+            <div className="hub-who-text">
+              <p data-ux-role="body-emphasis" className="hub-hello">
+                {tFmt("hubGreeting", lang, { name: user.myName })}
+              </p>
+              <p className="hub-who-meta">
+                <span data-ux-role="secondary" className="hub-chip">
+                  <span aria-hidden>🚪</span> {t("roomBadge", lang)} {roomCode}
                 </span>
-              ) : (
-                <span>🎒 {t("roleStudent", lang)}</span>
-              )}
+                <span data-ux-role="secondary" className="hub-chip">
+                  <span aria-hidden>{user.isTeacher ? "👩‍🏫" : "🎒"}</span>{" "}
+                  {user.isTeacher ? t("roleTeacher", lang) : t("roleStudent", lang)}
+                </span>
+              </p>
             </div>
           </div>
-          {/* QR 코드 — 교사만. 학생 입장 주소를 바로 띄워 공유 */}
-          {user.isTeacher && (
-            <button
-              onClick={() => setShowQR(true)}
-              aria-label="입장 QR 코드"
-              style={{
-                width: 40, height: 40, borderRadius: 12, border: "2px solid #A7F3D0",
-                background: "#ECFDF5", fontSize: 14, fontWeight: 900, letterSpacing: 0.5,
-                color: "#047857", cursor: "pointer",
-                flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >QR</button>
-          )}
 
-          {/* 언어 설정 — 교사·학생 공통, 입장 후에도 변경 가능 */}
-          <LangSwitchButton
-            currentLang={user.myLang}
-            availableLangs={availableLangs}
-            onChange={onChangeLang}
-          />
+          <div className="hub-settings" role="group" aria-label={t("hubSettingsLabel", lang)}>
+            <span data-ux-role="secondary" className="hub-settings-label">{t("hubSettingsLabel", lang)}</span>
+            <div className="hub-settings-row">
+              {/* 아이콘만 있는 버튼을 두지 않는다 — 전부 글자 라벨이 붙는다. */}
+              <button
+                type="button"
+                data-ux-role="control"
+                className="hub-setting-btn"
+                aria-expanded={langOpen}
+                aria-controls="hub-lang-panel"
+                onClick={() => setLangOpen((v) => !v)}
+              >
+                <span aria-hidden className="hub-setting-icon">{LANGUAGES[lang]?.flag || "🌐"}</span>
+                <span className="hub-setting-text">{t("hubLangSetting", lang)}</span>
+              </button>
 
-          {/* 글자 크기 설정 — 교사·학생 공통 */}
-          <FontSizeButton />
+              {/* 글자 크기·움직임 — 구현은 공용 TextSizeMenu 한 곳에만 있다. */}
+              <FontSizeButton />
 
-          {/* 전원(로그아웃) — 학생에게는 아래에 "로그아웃" 글자 표시 */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
-            <button
-              onClick={onLogout}
-              aria-label="로그아웃"
-              style={{
-                width: 40, height: 40, borderRadius: 12, border: "2px solid #FDE68A",
-                background: "#fff", fontSize: 14, fontWeight: 900, color: "#92400E", cursor: "pointer",
-              }}
-            >⏻</button>
-            {!user.isTeacher && (
-              <span style={{ fontSize: 10, fontWeight: 800, color: "#92400E", lineHeight: 1 }}>로그아웃</span>
-            )}
+              {user.isTeacher && (
+                <button
+                  type="button"
+                  data-ux-role="control"
+                  className="hub-setting-btn"
+                  onClick={() => setShowQR(true)}
+                >
+                  <span aria-hidden className="hub-setting-icon">📱</span>
+                  <span className="hub-setting-text">{t("hubQrLabel", lang)}</span>
+                </button>
+              )}
+
+              {/* 로그아웃은 실수하기 쉬운 아이콘 단독이 아니라 라벨 있는 항목이다. */}
+              <button
+                type="button"
+                data-ux-role="control"
+                className="hub-setting-btn"
+                onClick={onLogout}
+              >
+                <span aria-hidden className="hub-setting-icon">⏻</span>
+                <span className="hub-setting-text">{t("logoutLabel", lang)}</span>
+              </button>
+            </div>
           </div>
+
+          {langOpen && (
+            <div id="hub-lang-panel" className="hub-lang-panel" role="group" aria-label={t("hubLangSetting", lang)}>
+              {langs.map((code) => {
+                const info = LANGUAGES[code];
+                if (!info) return null;
+                const active = code === lang;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    data-ux-role="control"
+                    className={active ? "hub-lang-choice on" : "hub-lang-choice"}
+                    aria-pressed={active}
+                    onClick={() => { onChangeLang(code); setLangOpen(false); }}
+                  >
+                    <span aria-hidden className="hub-setting-icon">{info.flag}</span>
+                    {/* 언어는 자국어 이름으로 고른다. 국기는 보조 장식이다. */}
+                    <span data-ux-role="label" lang={code} className="hub-lang-name">{info.label}</span>
+                    <span aria-hidden className="hub-check">{active ? "✓" : ""}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </header>
+
+        {/* 지금 함께할 활동 — 교사가 연 수업이 있을 때만 한 장 강조한다 */}
+        {live && (
+          <section className="hub-live" aria-label={t("hubNowTogether", lang)}>
+            <p data-ux-role="secondary" className="hub-live-tag">
+              <span aria-hidden>🔔</span> {t("hubNowTogether", lang)}
+            </p>
+            <button
+              type="button"
+              data-ux-role="action"
+              className="hub-live-btn"
+              onClick={() => onSelect(live.kind === "storybook" ? "storybook" : "whiteboard")}
+            >
+              <img
+                src={live.kind === "storybook" ? "/mascot/bee-book.png" : "/mascot/bee-cheer.png"}
+                alt="" aria-hidden="true" className="hub-live-bee"
+              />
+              <span className="hub-live-text">
+                <span data-ux-role="body-emphasis" className="hub-live-title">
+                  {t(live.kind === "storybook" ? "hubLiveStorybook" : "hubLiveWhiteboard", lang)}
+                </span>
+                <span data-ux-role="body" className="hub-live-sub">{t("hubJoinNow", lang)}</span>
+              </span>
+            </button>
+          </section>
+        )}
+
+        {/* 오늘 무엇을 할까 */}
+        <div className="hub-lead">
+          {/* 벌집 육각형은 브랜드 장식으로만 남는다 — 탐색은 아래 큰 카드가 맡는다. */}
+          <span aria-hidden="true" className="hub-comb">
+            <span className="hub-hex" /><span className="hub-hex mid" /><span className="hub-hex" />
+          </span>
+          <h1 data-ux-role="title" className="hub-title">{t("hubToday", lang)}</h1>
+          <p data-ux-role="body" className="hub-lead-sub">{t("hubPrompt", lang)}</p>
         </div>
 
-        {/* 교사 전용 관리 패널 — 로그인 직후 시작화면에서 바로 보임 */}
-        {user.isTeacher && (
-          <div style={{
-            background: "#fff", borderRadius: 24, marginBottom: 22,
-            border: "2px solid #FDE68A",
-            boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
-            overflow: "hidden",
-          }}>
+        <nav className="hub-grid" aria-label={t("hubToday", lang)}>
+          {ACTIVITIES.map((a) => (
             <button
-              onClick={() => setManageOpen((v) => !v)}
-              aria-expanded={manageOpen}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10,
-                padding: "16px 20px", background: "transparent", border: "none",
-                cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-              }}
+              key={a.id}
+              type="button"
+              data-tutorial-id={`hub-section-${a.id}`}
+              data-ux-role="control"
+              className="hub-card"
+              onClick={() => onSelect(a.id)}
             >
-              <span style={{ fontSize: 22 }}>🛠</span>
-              <span style={{ flex: 1 }}>
-                <span style={{ display: "block", fontSize: 17, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-                  {t("manage", lang)}
-                </span>
-                <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#92400E", marginTop: 2 }}>
-                  방 설정 · 컬럼 · 언어 · 명렬표
-                </span>
+              <span className={a.hex ? "hub-card-icon hex" : "hub-card-icon"} style={{ background: a.tint }}>
+                <img src={a.mascot} alt="" aria-hidden="true" className="hub-card-bee" />
               </span>
-              <span style={{
-                fontSize: 14, fontWeight: 900, color: "#B45309",
-                transform: manageOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s",
-              }}>▾</span>
+              <span className="hub-card-text">
+                <span data-ux-role="body-emphasis" className="hub-card-title">{t(a.titleKey, lang)}</span>
+                <span data-ux-role="body" className="hub-card-desc">{t(a.descKey, lang)}</span>
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        {/* 교사 도구는 아이의 일상 행동과 시각적으로 분리한다 */}
+        {user.isTeacher && (
+          <section className="hub-teacher" data-ux-surface="panel" aria-label={t("roleTeacher", lang)}>
+            <p data-ux-role="secondary" className="hub-teacher-tag">
+              <span aria-hidden>👩‍🏫</span> {t("roleTeacher", lang)}
+            </p>
+
+            <button
+              type="button"
+              data-ux-role="control"
+              className="hub-teacher-btn"
+              onClick={() => onSelect("whiteboard")}
+            >
+              <span aria-hidden className="hub-setting-icon">🖊</span>
+              <span className="hub-teacher-btn-text">
+                <span data-ux-role="label">{t("hubSectionWhiteboard", lang)}</span>
+                <span data-ux-role="secondary">{t("hubWhiteboardHint", lang)}</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              data-ux-role="control"
+              className="hub-teacher-btn"
+              aria-expanded={manageOpen}
+              aria-controls="hub-manage-panel"
+              onClick={() => setManageOpen((v) => !v)}
+            >
+              <span aria-hidden className="hub-setting-icon">🛠</span>
+              <span className="hub-teacher-btn-text">
+                <span data-ux-role="label">{t("manage", lang)}</span>
+                <span data-ux-role="secondary">{t("hubManageHint", lang)}</span>
+              </span>
+              <span aria-hidden className="hub-check">{manageOpen ? "▲" : "▼"}</span>
             </button>
             {manageOpen && (
-              <div style={{ padding: "4px 20px 22px", borderTop: "1px solid #FEF3C7" }}>
+              <div id="hub-manage-panel" className="hub-manage" data-ux-legacy>
                 <RoomManagePanel roomCode={roomCode} lang={lang} />
               </div>
             )}
-          </div>
-        )}
-
-        {/* Greeting */}
-        <div style={{ textAlign: "center", marginBottom: 22 }}>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: "#1F2937", letterSpacing: -0.4 }}>
-            {t("hubToday", lang)}
-          </h1>
-          <p style={{ margin: "6px 0 0", fontSize: 14, color: "#92400E", fontWeight: 700 }}>
-            {t("hubPrompt", lang)}
-          </p>
-          {/* 태그라인은 소통의 별 중앙("소통하는 우리" 아래)으로 이동 */}
-        </div>
-
-        {/* ⭐ 소통의 별 — 5개 섹션이 별 꼭짓점의 원, 중앙에 "소통하는 우리" */}
-        <div style={{
-          position: "relative",
-          width: "min(94vw, 620px)",
-          aspectRatio: "1",
-          margin: "0 auto",
-        }}>
-          {/* 별 실루엣 */}
-          <svg
-            viewBox="0 0 100 100"
-            aria-hidden="true"
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-          >
-            <defs>
-              <linearGradient id="starGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#FEF3C7" stopOpacity="0.95" />
-                <stop offset="55%" stopColor="#FDE68A" stopOpacity="0.9" />
-                <stop offset="100%" stopColor="#FBBF24" stopOpacity="0.85" />
-              </linearGradient>
-            </defs>
-            <polygon
-              points={starPolygonPoints()}
-              fill="url(#starGrad)"
-              stroke="#F59E0B"
-              strokeWidth="1.4"
-              strokeLinejoin="round"
-              style={{ filter: "drop-shadow(0 4px 6px rgba(180,83,9,0.25))" }}
-            />
-          </svg>
-
-          {/* 중앙 — 소통하는 우리 */}
-          <div style={{
-            position: "absolute",
-            left: `${STAR_CX}%`, top: `${STAR_CY}%`,
-            transform: "translate(-50%, -50%)",
-            textAlign: "center", pointerEvents: "none",
-            width: "36%",
-          }}>
-            <div style={{
-              fontFamily: "'Jua', 'Noto Sans KR', sans-serif",
-              fontSize: "clamp(22px, 5vw, 38px)",
-              color: "#92400E", lineHeight: 1.2,
-              textShadow: "0 1px 0 rgba(255,255,255,0.8), 0 3px 8px rgba(180,83,9,0.25)",
-              wordBreak: "keep-all",
-            }}>
-              소통하는<br />우리
-            </div>
-          </div>
-
-          {/* 꼭짓점 원형 버튼 5개 */}
-          {SECTIONS.map((s, i) => {
-            const ang = (STAR_ANGLES[i] * Math.PI) / 180;
-            const x = STAR_CX + STAR_R_OUTER * Math.cos(ang);
-            const y = STAR_CY + STAR_R_OUTER * Math.sin(ang);
-            return (
-              <button
-                key={s.id}
-                data-tutorial-id={`hub-section-${s.id}`}
-                onClick={() => onSelect(s.id)}
-                aria-label={`${t(s.titleKey, lang)} 열기`}
-                title={t(s.descKey, lang)}
-                style={{
-                  position: "absolute",
-                  left: `${x}%`, top: `${y}%`,
-                  transform: "translate(-50%, -50%)",
-                  width: "27%", aspectRatio: "1",
-                  borderRadius: "50%",
-                  background: s.bg,
-                  border: `3px solid ${s.color}`,
-                  boxShadow: `0 10px 24px ${s.color}44, inset 0 -4px 0 ${s.color}22`,
-                  cursor: "pointer",
-                  display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center",
-                  gap: 2, padding: "4%",
-                  fontFamily: "inherit",
-                  transition: "transform 0.15s, box-shadow 0.15s",
-                  zIndex: 2,
-                }}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "translate(-50%, -50%) scale(0.94)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "translate(-50%, -50%) scale(1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "translate(-50%, -50%) scale(1)")}
-                onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `0 14px 30px ${s.color}66, inset 0 -4px 0 ${s.color}22`)}
-              >
-                <img
-                  src={s.mascot}
-                  alt=""
-                  aria-hidden="true"
-                  style={{
-                    width: "58%", height: "58%", objectFit: "contain",
-                    filter: `drop-shadow(0 4px 8px ${s.color}55)`,
-                    animation: "heroBeeFloat 3s ease-in-out infinite",
-                  }}
-                />
-                <div style={{
-                  fontSize: "clamp(11px, 2.3vw, 16px)",
-                  fontWeight: 900, color: "#1F2937",
-                  letterSpacing: -0.3, lineHeight: 1.15,
-                  textAlign: "center", wordBreak: "keep-all",
-                }}>
-                  {t(s.titleKey, lang)}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 교사 전용 — 화이트보드(타일에서 편입 제외, 기능은 유지) */}
-        {user.isTeacher && (
-          <div style={{ textAlign: "center", marginTop: 6 }}>
-            <button
-              onClick={() => onSelect("whiteboard")}
-              style={{
-                padding: "8px 18px", borderRadius: 999,
-                background: "rgba(255,255,255,0.85)", border: "2px solid #BFDBFE",
-                color: "#1D4ED8", fontSize: 13, fontWeight: 800,
-                cursor: "pointer", fontFamily: "inherit",
-                boxShadow: "0 4px 12px rgba(59,130,246,0.15)",
-              }}
-            >🖊 화이트보드 열기 <span style={{ fontSize: 10, opacity: 0.7 }}>(켜면 학생 화면이 자동으로 따라와요)</span></button>
-          </div>
+          </section>
         )}
       </div>
 
-      {/* 입장 QR 모달 — 교사용 */}
       {showQR && (
-        <div
-          onClick={() => setShowQR(false)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 1000,
-            background: "rgba(15,12,40,0.6)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-          }}
-        >
+        <div className="hub-modal-veil" onClick={() => setShowQR(false)}>
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="hub-qr-title"
+            className="hub-modal"
+            data-ux-surface="panel"
             onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#fff", borderRadius: 24, padding: "26px 28px",
-              maxWidth: 360, width: "100%", textAlign: "center",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
-            }}
           >
-            <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", marginBottom: 4 }}>
-              📱 우리 반 입장하기
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 18 }}>
-              학생이 휴대폰 카메라로 찍으면 바로 입장해요
-            </div>
-            <div style={{
-              display: "inline-flex", padding: 14, borderRadius: 16,
-              background: "#fff", border: "3px solid #FDE68A",
-            }}>
+            <h2 id="hub-qr-title" data-ux-role="body-emphasis" className="hub-modal-title">
+              {t("hubQrTitle", lang)}
+            </h2>
+            <p data-ux-role="body" className="hub-modal-sub">{t("hubQrSub", lang)}</p>
+            <span className="hub-qr-frame">
               <QRCodeSVG value={joinUrl} size={200} />
-            </div>
-            <div style={{ marginTop: 14, fontSize: 13, fontWeight: 800, color: "#374151", wordBreak: "break-all" }}>
-              {joinUrl}
-            </div>
-            <div style={{ marginTop: 10, fontSize: 24, fontWeight: 900, color: "#B45309", letterSpacing: 2 }}>
-              🚪 {roomCode}
-            </div>
+            </span>
+            <p data-ux-role="secondary" className="hub-qr-url">{joinUrl}</p>
+            <p data-ux-role="body-emphasis" className="hub-qr-code">
+              <span aria-hidden>🚪</span> {roomCode}
+            </p>
             <button
+              ref={qrCloseRef}
+              type="button"
+              data-ux-role="action"
+              className="hub-modal-close"
               onClick={() => setShowQR(false)}
-              style={{
-                marginTop: 18, width: "100%", padding: "12px",
-                background: "linear-gradient(135deg, #F59E0B, #D97706)",
-                color: "#fff", border: "none", borderRadius: 14,
-                fontSize: 15, fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
-              }}
-            >닫기</button>
+            >{t("closeBtn", lang)}</button>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+/* 허브 전용 규칙 ─────────────────────────────────────────────────
+   크기는 전부 토큰이 정한다. 여기서 px 글자 크기를 새로 만들지 않는다.
+   문서를 100vh 로 잠그지 않는다 — 큰 글씨/긴 번역에서 카드가 세로로 늘어나야 하고,
+   그만큼 문서가 스크롤돼야 한다(README 5.2). */
+const HUB_CSS = `
+.hub-root{
+  position: relative;
+  min-height: 100svh;
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-12);
+  background: var(--ux-bg);
+  display: flex; justify-content: center;
+}
+.hub-backdrop{
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: url('/landing/landing-bees.webp') center / cover no-repeat;
+  opacity: .3;
+}
+.hub-shell{
+  position: relative; z-index: 1; width: 100%; max-width: 1080px;
+  display: grid; gap: var(--ux-space-6); align-content: start;
+}
+
+/* 상단 설정 영역 */
+.hub-head{
+  background: var(--ux-surface);
+  border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-4);
+  box-shadow: 0 8px 24px rgba(137,83,0,.12);
+  display: grid; gap: var(--ux-space-4);
+}
+.hub-who{ display: flex; align-items: center; gap: var(--ux-space-3); min-width: 0; }
+.hub-who-bee{ width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
+.hub-who-text{ min-width: 0; display: grid; gap: var(--ux-space-1); }
+.hub-hello{ margin: 0; font-weight: 800; color: var(--ux-ink); word-break: keep-all; overflow-wrap: anywhere; }
+.hub-who-meta{ margin: 0; display: flex; flex-wrap: wrap; gap: var(--ux-space-2); }
+.hub-chip{
+  display: inline-flex; align-items: center; gap: var(--ux-space-1);
+  background: var(--ux-surface-sunk); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-pill); padding: var(--ux-space-1) var(--ux-space-3);
+  color: var(--ux-ink); font-weight: 800;
+}
+.hub-settings{
+  display: grid; gap: var(--ux-space-2);
+  border-top: 2px dashed var(--ux-surface-sunk); padding-top: var(--ux-space-3);
+}
+.hub-settings-label{ font-weight: 800; }
+.hub-settings-row{ display: flex; flex-wrap: wrap; gap: var(--ux-control-gap); }
+.hub-setting-btn{
+  display: inline-flex; align-items: center; gap: var(--ux-space-2);
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 700;
+}
+.hub-setting-icon{ line-height: 1; flex-shrink: 0; }
+.hub-setting-text{ white-space: normal; word-break: keep-all; }
+
+.hub-lang-panel{ display: grid; grid-template-columns: 1fr; gap: var(--ux-space-2); }
+@media (min-width: 600px){ .hub-lang-panel{ grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1024px){ .hub-lang-panel{ grid-template-columns: 1fr 1fr 1fr; } }
+.hub-lang-choice{
+  display: flex; align-items: center; gap: var(--ux-space-3); width: 100%;
+  background: var(--ux-surface); color: var(--ux-ink); text-align: left;
+  border: 2px solid var(--ux-ink-soft); font-family: inherit; font-weight: 700;
+}
+/* 선택은 색만으로 알리지 않는다 — aria-pressed + 체크 + 테두리를 함께 쓴다. */
+.hub-lang-choice.on{ border: 3px solid var(--ux-selected-border); background: var(--ux-surface-sunk); }
+.hub-lang-name{ flex: 1; min-width: 0; font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
+.hub-check{ font-weight: 900; color: var(--ux-selected-border); flex-shrink: 0; }
+
+/* 지금 함께할 활동 */
+.hub-live{ display: grid; gap: var(--ux-space-2); }
+.hub-live-tag{ margin: 0; font-weight: 800; color: var(--ux-ink); }
+.hub-live-btn{
+  width: 100%; display: flex; align-items: center; gap: var(--ux-space-4);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 3px solid var(--ux-primary-border); text-align: left;
+  font-family: inherit; font-weight: 800;
+}
+/* 전역 [data-ux-role] 규칙이 layout 의 <style> 에서 더 뒤에 오기 때문에, 같은
+   특정도(클래스 하나)로는 min-height 가 되돌려진다 — 속성까지 함께 걸어 이긴다.
+   실측에서 카드가 105px 로 눌려 있던 원인이다. */
+.hub-live-btn[data-ux-role="action"]{ min-height: 112px; }
+.hub-live-bee{
+  width: 56px; height: 56px; object-fit: contain; flex-shrink: 0;
+  /* 노랑 위에 올리면 마스코트의 밝은 선이 사라진다 — 밝은 판을 한 겹 깔아 준다. */
+  background: var(--ux-surface); border-radius: var(--ux-radius-surface); padding: var(--ux-space-1);
+}
+.hub-live-text{ display: grid; gap: var(--ux-space-1); min-width: 0; }
+.hub-live-title{ font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
+.hub-live-sub{ color: var(--ux-primary-ink); word-break: keep-all; }
+
+/* 제목 */
+.hub-lead{ text-align: center; display: grid; gap: var(--ux-space-2); justify-items: center; }
+.hub-comb{ display: flex; gap: 4px; align-items: flex-end; }
+.hub-hex{
+  width: 22px; height: 25.4px; display: block;
+  background: var(--ux-primary-fill);
+  /* clip-path 는 fractional px 를 그대로 받는다 — 반올림하면 변이 어긋난다. */
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+.hub-hex.mid{ background: var(--ux-hint-apricot); }
+.hub-title{ color: var(--ux-ink); font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
+.hub-lead-sub{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }
+
+/* 활동 카드: 360px 1열 / 600~1023px 2열 / 그 이상 3열 */
+.hub-grid{ display: grid; grid-template-columns: 1fr; gap: var(--ux-control-gap); }
+@media (min-width: 600px){ .hub-grid{ grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1024px){ .hub-grid{ grid-template-columns: 1fr 1fr 1fr; } }
+.hub-card{
+  display: flex; align-items: center; gap: var(--ux-space-4); width: 100%;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
+  box-shadow: 0 4px 14px rgba(137,83,0,.10);
+  text-align: left; font-family: inherit;
+  transition: border-color var(--ux-motion-state) var(--ux-motion-ease);
+}
+/* 최소 높이만 정하고 실제 높이는 내용이 정한다 — 큰 글씨·긴 번역에서 자동으로 늘어난다. */
+.hub-card[data-ux-role="control"]{ min-height: 112px; }
+.hub-card:hover{ border-color: var(--ux-selected-border); }
+.hub-card-icon{
+  width: 56px; height: 56px; flex-shrink: 0;
+  border-radius: var(--ux-radius-surface);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+/* 육각형은 칭찬(나의 꿀벌) 한 곳에만 — 벌집을 탐색 수단으로 되돌리지 않는다. */
+.hub-card-icon.hex{
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+.hub-card-bee{ width: 44px; height: 44px; object-fit: contain; }
+.hub-card-text{ display: grid; gap: var(--ux-space-1); min-width: 0; }
+.hub-card-title{ font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
+.hub-card-desc{ color: var(--ux-ink-soft); word-break: keep-all; overflow-wrap: anywhere; }
+
+/* 교사 도구 */
+.hub-teacher{
+  background: var(--ux-surface); border: 2px dashed var(--ux-ink-soft);
+  border-radius: var(--ux-radius-panel); padding: var(--ux-space-4);
+  display: grid; gap: var(--ux-space-3);
+}
+.hub-teacher-tag{ margin: 0; font-weight: 800; }
+.hub-teacher-btn{
+  display: flex; align-items: center; gap: var(--ux-space-3); width: 100%;
+  background: var(--ux-surface); color: var(--ux-ink); text-align: left;
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 700;
+}
+.hub-teacher-btn-text{ display: grid; gap: 2px; min-width: 0; flex: 1; word-break: keep-all; }
+.hub-manage{ border-top: 2px solid var(--ux-surface-sunk); padding-top: var(--ux-space-3); }
+
+/* QR 모달 */
+.hub-modal-veil{
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(41,37,31,.62);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--ux-space-4); overflow-y: auto;
+}
+.hub-modal{
+  background: var(--ux-surface); border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-6); max-width: 420px; width: 100%; text-align: center;
+  display: grid; gap: var(--ux-space-3); justify-items: center;
+}
+.hub-modal-title{ margin: 0; font-weight: 900; color: var(--ux-ink); }
+.hub-modal-sub{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }
+.hub-qr-frame{
+  display: inline-flex; padding: var(--ux-space-3);
+  border-radius: var(--ux-radius-surface); background: var(--ux-surface);
+  border: 3px solid var(--ux-primary-border);
+}
+.hub-qr-url{ margin: 0; word-break: break-all; }
+.hub-qr-code{ margin: 0; font-weight: 900; letter-spacing: .12em; color: var(--ux-ink); }
+.hub-modal-close{
+  width: 100%; font-family: inherit; font-weight: 900;
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border);
+}
+`;
