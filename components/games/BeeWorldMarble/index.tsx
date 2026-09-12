@@ -9,6 +9,7 @@ import {
 } from "@/lib/marbleReducer";
 import { CHANCES, JAIL_INDEX, TILES } from "@/lib/marbleData";
 import { prefetchGameTexts } from "@/lib/gameI18n";
+import ScopedStyle from "../../ui/child/ScopedStyle";
 import { renderActionPanels } from "./ActionPanel";
 import { Board } from "./Board";
 import { CharacterSetup } from "./CharacterSetup";
@@ -119,7 +120,8 @@ export default function BeeWorldMarble({
   // Intro screen
   if (state.phase.kind === "intro") {
     return (
-      <div style={rootIntro}>
+      <div data-ux-root style={rootIntro}>
+        <ScopedStyle css={ROOT_CSS} />
         <CharacterSetup langA={langA} langB={langB} onDone={handleStart} />
       </div>
     );
@@ -155,21 +157,18 @@ export default function BeeWorldMarble({
 
   const footerNode = (
     <div style={footerBar}>
-      <div style={{
-        fontSize: 11, fontWeight: 900, color: "#92400E",
-        background: "#FEF3C7", border: "1.5px solid #FDE68A",
-        borderRadius: 999, padding: "4px 10px", whiteSpace: "nowrap", flexShrink: 0,
-      }}>
+      <span data-ux-role="secondary" className="mb-round">
         ⏰ {Math.min(state.round, MAX_ROUNDS)}/{MAX_ROUNDS}
-      </div>
+      </span>
       <LogTicker log={state.log} variant="footer" />
+      {/* 아이콘만 있는 버튼은 만들지 않는다 — 짧은 글자 라벨을 함께 둔다. */}
       <button
-        type="button"
+        data-ux-role="control"
+        className="mb-restart"
         aria-label="게임 다시 시작"
         onClick={() => dispatch({ type: "restart" })}
-        style={restartBtn}
       >
-        🔁
+        🔁 처음부터
       </button>
     </div>
   );
@@ -177,7 +176,8 @@ export default function BeeWorldMarble({
   if (wide) {
     // Landscape / desktop: board on the left, HUD + log stacked on the right.
     return (
-      <div style={rootWide}>
+      <div data-ux-root style={rootWide}>
+        <ScopedStyle css={ROOT_CSS} />
         <div style={boardCol}>{boardNode}</div>
         <aside style={sideCol} aria-label="플레이어 정보">
           {hudNode}
@@ -189,7 +189,8 @@ export default function BeeWorldMarble({
 
   // Mobile / tablet portrait: HUD top, board mid, log bottom.
   return (
-    <div style={root}>
+    <div data-ux-root style={root}>
+      <ScopedStyle css={ROOT_CSS} />
       <div style={topBar}>{hudNode}</div>
       <div style={boardWrap}>{boardNode}</div>
       <div style={{ width: "100%" }}>{footerNode}</div>
@@ -267,14 +268,19 @@ const footerBar: CSSProperties = {
   width: "100%",
 };
 
-const restartBtn: CSSProperties = {
-  background: "#fff",
-  color: "#92400E",
-  border: "2px solid #FDE68A",
-  borderRadius: 12,
-  padding: "6px 10px",
-  fontSize: 18,
-  fontWeight: 900,
-  cursor: "pointer",
-  flexShrink: 0,
-};
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const ROOT_CSS = `
+.mb-round{
+  font-weight: 900; color: var(--ux-primary-ink);
+  background: var(--ux-primary-fill); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-pill); padding: 0 var(--ux-space-3);
+  white-space: nowrap; flex-shrink: 0;
+  display: flex; align-items: center;
+}
+.mb-restart[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
+  font-family: inherit; font-weight: 900;
+  white-space: nowrap; flex-shrink: 0;
+}
+`;

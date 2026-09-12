@@ -9,6 +9,7 @@ import { GLOBE_COUNTRIES, type GlobeCountry } from "@/lib/globeData";
 import { pickN } from "@/lib/gameData";
 import type { PieceId, Throw } from "@/lib/yutTypes";
 import BeeMascot from "../../BeeMascot";
+import ScopedStyle from "../../ui/child/ScopedStyle";
 import YutBoard, { TEAM_COLOR } from "./YutBoard";
 import YutSticks from "./YutSticks";
 import CultureCard from "./CultureCard";
@@ -71,115 +72,78 @@ export default function HoneyYut({ langA }: { langA: string; langB: string }) {
   const lastLog = state.log[state.log.length - 1] ?? "";
 
   return (
-    <div style={{
-      maxWidth: 620, margin: "0 auto", padding: "12px 10px 36px",
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-    }}>
-      {/* 턴 표시 */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10,
-        background: "#fff", borderRadius: 999,
-        border: `3px solid ${accent}`,
-        padding: "8px 22px",
-        boxShadow: `0 6px 16px ${accent}33`,
-      }}>
-        <span style={{
-          width: 14, height: 14, borderRadius: "50%", background: accent,
-          display: "inline-block",
-        }} />
-        <span style={{ fontSize: 16, fontWeight: 900, color: "#1F2937" }}>
-          {state.turn}팀 차례
-        </span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: "#92400E" }}>
-          {state.phase === "needThrow" ? "윷을 던져요" : state.phase === "move" ? "말을 고르세요" : ""}
-        </span>
-      </div>
+    <div data-ux-root className="hy-root">
+      <ScopedStyle css={HY_CSS} />
 
-      {/* 보드 */}
-      <YutBoard state={state} selectedValue={selectedValue} onPickPiece={handlePick} />
+      <div className="hy-play">
+        {/* 보드 — 넓은 화면에서는 더 크게 */}
+        <div className="hy-boardcol">
+          <YutBoard state={state} selectedValue={selectedValue} onPickPiece={handlePick} />
+        </div>
 
-      {/* 로그 한 줄 */}
-      <div style={{
-        minHeight: 24, fontSize: 13, fontWeight: 800, color: "#78350F",
-        textAlign: "center",
-      }}>
-        {lastLog}
-      </div>
+        <div className="hy-sidecol">
+          {/* 턴 표시 */}
+          <div className="hy-turnbar" style={{ borderColor: accent }}>
+            <span className="hy-dot" style={{ background: accent }} aria-hidden />
+            <span data-ux-role="body-emphasis" className="hy-turnteam">{state.turn}팀 차례</span>
+            <span data-ux-role="secondary">
+              {state.phase === "needThrow" ? "윷을 던져요" : state.phase === "move" ? "말을 고르세요" : ""}
+            </span>
+          </div>
 
-      {/* 하단 패널 */}
-      {state.phase === "needThrow" && (
-        <YutSticks
-          enabled
-          accent={accent}
-          onResult={(v) => dispatch({ type: "throwResult", value: v })}
-        />
-      )}
+          {/* 로그 한 줄 */}
+          <p data-ux-role="body" className="hy-log" role="status">{lastLog}</p>
 
-      {state.phase === "move" && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-          {state.queue.length > 1 && (
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280" }}>
-              사용할 윷을 고르고 말을 누르세요
+          {/* 하단 패널 */}
+          {state.phase === "needThrow" && (
+            <YutSticks
+              enabled
+              accent={accent}
+              onResult={(v) => dispatch({ type: "throwResult", value: v })}
+            />
+          )}
+
+          {state.phase === "move" && (
+            <div className="hy-movepanel">
+              {state.queue.length > 1 && (
+                <p data-ux-role="body">사용할 윷을 고르고 말을 누르세요</p>
+              )}
+              <div className="hy-queue">
+                {state.queue.map((v, i) => {
+                  const active = i === selectedIdx;
+                  return (
+                    <button
+                      key={`${i}-${v}`}
+                      data-ux-role="control"
+                      className="hy-throw"
+                      data-active={active ? "" : undefined}
+                      aria-pressed={active}
+                      onClick={() => setSelectedIdx(i)}
+                      style={active ? { borderColor: accent } : undefined}
+                    >
+                      <span data-ux-role="label">{THROW_LABEL[String(v)]}</span>
+                      <span data-ux-role="secondary">{v === -1 ? "←1" : `→${v}`}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-            {state.queue.map((v, i) => {
-              const active = i === selectedIdx;
-              return (
-                <button
-                  key={`${i}-${v}`}
-                  onClick={() => setSelectedIdx(i)}
-                  style={{
-                    minWidth: 64, padding: "10px 16px", borderRadius: 14,
-                    border: `3px solid ${active ? accent : "#E5E7EB"}`,
-                    background: active ? `${accent}22` : "#fff",
-                    color: active ? "#1F2937" : "#6B7280",
-                    fontSize: 16, fontWeight: 900, cursor: "pointer",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  {THROW_LABEL[String(v)]}
-                  <span style={{ fontSize: 11, marginLeft: 4, color: "#92400E" }}>
-                    {v === -1 ? "←1" : `→${v}`}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
         </div>
-      )}
+      </div>
 
       {/* 승리 오버레이 */}
       {state.phase === "win" && state.winner && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 510,
-          background: "rgba(15,10,40,0.65)", backdropFilter: "blur(5px)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-        }}>
-          <div style={{
-            background: "#fff", borderRadius: 26,
-            border: `4px solid ${TEAM_COLOR[state.winner]}`,
-            padding: "30px 34px", textAlign: "center",
-            boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
-          }}>
+        <div className="hy-winlayer">
+          <div className="hy-wincard" style={{ borderColor: TEAM_COLOR[state.winner] }}>
             <BeeMascot size={120} mood="cheer" />
-            <div style={{ fontSize: 28, fontWeight: 900, color: TEAM_COLOR[state.winner], margin: "12px 0 4px" }}>
-              🏆 {state.winner}팀 승리!
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#6B7280", marginBottom: 18 }}>
-              네 마리 꿀벌이 모두 집에 돌아왔어요
-            </div>
+            <h1 data-ux-role="title">🏆 {state.winner}팀 승리!</h1>
+            <p data-ux-role="body">네 마리 꿀벌이 모두 집에 돌아왔어요</p>
             <button
+              data-ux-role="action"
+              className="hy-primary"
               onClick={() => dispatch({ type: "restart" })}
-              style={{
-                background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
-                color: "#fff", border: "none", borderRadius: 99,
-                padding: "13px 32px", fontSize: 16, fontWeight: 900, cursor: "pointer",
-                boxShadow: "0 8px 20px rgba(245,158,11,0.45)",
-              }}
-            >
-              🔁 다시 하기
-            </button>
+            >🔁 다시 하기</button>
           </div>
         </div>
       )}
@@ -195,3 +159,58 @@ export default function HoneyYut({ langA }: { langA: string; langB: string }) {
     </div>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const HY_CSS = `
+.hy-root{
+  color: var(--ux-ink);
+  width: 100%; max-width: 1200px; margin: 0 auto; box-sizing: border-box;
+  padding: var(--ux-space-3) var(--ux-space-3) var(--ux-space-8);
+}
+/* 넓은 화면에서는 판을 크게 두고 조작을 옆에 붙인다 — 세로로 늘린 휴대폰 금지. */
+.hy-play{ display: grid; gap: var(--ux-space-4); justify-items: center; }
+@media (min-width: 980px){
+  .hy-play{ grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr); align-items: start; justify-items: stretch; }
+}
+.hy-boardcol{ min-width: 0; display: flex; justify-content: center; }
+.hy-sidecol{ display: grid; gap: var(--ux-space-3); justify-items: center; align-content: start; width: 100%; }
+
+.hy-turnbar{
+  display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap;
+  background: var(--ux-surface); border: 3px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-pill); padding: var(--ux-space-2) var(--ux-space-6);
+}
+.hy-dot{ width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.hy-turnteam{ font-weight: 900; }
+.hy-log{ margin: 0; min-height: var(--ux-space-6); text-align: center; color: var(--ux-ink-soft); }
+
+.hy-movepanel{ display: grid; gap: var(--ux-space-2); justify-items: center; width: 100%; }
+.hy-movepanel p{ margin: 0; text-align: center; }
+.hy-queue{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; justify-content: center; }
+.hy-throw[data-ux-role="control"]{
+  display: grid; gap: var(--ux-space-1); justify-items: center;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 3px solid var(--ux-ink-soft); font-family: inherit; font-weight: 900;
+  min-width: 88px;
+}
+.hy-throw[data-active]{ background: var(--ux-primary-fill); color: var(--ux-primary-ink); }
+
+.hy-winlayer{
+  position: fixed; inset: 0; z-index: 510;
+  background: rgba(41,37,31,.6); backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center; padding: var(--ux-space-6);
+}
+.hy-wincard{
+  background: var(--ux-surface); border-radius: var(--ux-radius-panel);
+  border: 4px solid var(--ux-primary-border);
+  padding: var(--ux-space-8); text-align: center;
+  display: grid; justify-items: center; gap: var(--ux-space-3);
+  box-shadow: 0 24px 60px rgba(41,37,31,.5);
+  max-width: 100%;
+}
+.hy-wincard p{ margin: 0; }
+.hy-primary[data-ux-role="action"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+}
+`;

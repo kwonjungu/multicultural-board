@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   SPOTIT_SYMBOLS,
   SPOTIT_CARDS,
@@ -10,6 +10,151 @@ import {
   pickN,
 } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
+import ScopedStyle from "../ui/child/ScopedStyle";
+import { gt, UI, type LangMap } from "./uiText";
+import { gp } from "./plainText";
+
+/** 인라인으로 CSS 커스텀 속성(--si-accent 등)을 넘기기 위한 타입. any 를 쓰지 않는다. */
+type CssVars = CSSProperties & Record<`--${string}`, string>;
+
+// ────────────────────────────────────────────────────────────
+// 게임 고유 문구 (다국어)
+// ────────────────────────────────────────────────────────────
+const SI: Record<string, LangMap> = {
+  title: {
+    ko: "꿀벌 스팟잇", en: "Bee Spot It", vi: "Ong tìm hình", zh: "蜜蜂找相同",
+    ja: "ハチのスポットイット", fil: "Bubuyog Spot It", th: "ผึ้งหาภาพเหมือน",
+    id: "Lebah Spot It", ru: "Пчелиный Spot It", hi: "मधुमक्खी स्पॉट इट", ar: "لعبة النحلة",
+  },
+  howto: {
+    ko: "내 카드와 가운데 카드에서 똑같은 그림 1개를 먼저 찾아 눌러요!",
+    en: "Find the one picture your card shares with the centre card and tap it first!",
+    vi: "Tìm 1 hình giống nhau giữa thẻ của bạn và thẻ ở giữa, chạm vào nó trước!",
+    zh: "在你的卡片和中间卡片上找出相同的那 1 个图案，先点它！",
+    ja: "じぶんのカードと まんなかのカードで おなじ えを ひとつ みつけて おしてね!",
+    fil: "Hanapin ang iisang larawang pareho sa card mo at sa gitnang card, pindutin agad!",
+    th: "หาภาพที่เหมือนกัน 1 ภาพระหว่างการ์ดของคุณกับการ์ดตรงกลาง แล้วกดให้ไว!",
+    id: "Temukan satu gambar yang sama di kartumu dan kartu tengah, lalu tekan lebih dulu!",
+    ru: "Найди одну общую картинку на своей и центральной карте и нажми первым!",
+    hi: "अपने कार्ड और बीच वाले कार्ड में एक जैसी तस्वीर ढूँढो और पहले दबाओ!",
+    ar: "ابحث عن الصورة المشتركة بين بطاقتك والبطاقة الوسطى واضغطها أولًا!",
+  },
+  player: {
+    ko: "플레이어", en: "Player", vi: "Người chơi", zh: "玩家", ja: "プレイヤー",
+    fil: "Manlalaro", th: "ผู้เล่น", id: "Pemain", ru: "Игрок", hi: "खिलाड़ी", ar: "لاعب",
+  },
+  remaining: {
+    ko: "남은 카드", en: "Cards left", vi: "Thẻ còn lại", zh: "剩余卡片", ja: "のこりカード",
+    fil: "Natitirang card", th: "การ์ดที่เหลือ", id: "Sisa kartu", ru: "Осталось карт",
+    hi: "बचे कार्ड", ar: "البطاقات المتبقية",
+  },
+  goal: {
+    ko: "목표", en: "Goal", vi: "Mục tiêu", zh: "目标", ja: "もくひょう",
+    fil: "Layunin", th: "เป้าหมาย", id: "Target", ru: "Цель", hi: "लक्ष्य", ar: "الهدف",
+  },
+  perCard: {
+    ko: "그림/카드", en: "pictures per card", vi: "hình mỗi thẻ", zh: "图案/卡",
+    ja: "え/カード", fil: "larawan bawat card", th: "ภาพต่อการ์ด", id: "gambar per kartu",
+    ru: "картинок на карте", hi: "चित्र प्रति कार्ड", ar: "صور لكل بطاقة",
+  },
+  easy:   { ko: "쉬움", en: "Easy", vi: "Dễ", zh: "简单", ja: "やさしい", fil: "Madali", th: "ง่าย", id: "Mudah", ru: "Легко", hi: "आसान", ar: "سهل" },
+  normal: { ko: "보통", en: "Normal", vi: "Vừa", zh: "普通", ja: "ふつう", fil: "Katamtaman", th: "ปานกลาง", id: "Sedang", ru: "Средне", hi: "सामान्य", ar: "متوسط" },
+  hard:   { ko: "어려움", en: "Hard", vi: "Khó", zh: "困难", ja: "むずかしい", fil: "Mahirap", th: "ยาก", id: "Sulit", ru: "Сложно", hi: "कठिन", ar: "صعب" },
+  ruleScore: {
+    ko: "맞히면 1점을 받고 가운데 카드가 바뀌어요",
+    en: "A correct tap scores 1 point and swaps the centre card",
+    vi: "Chạm đúng được 1 điểm và thẻ giữa được đổi",
+    zh: "点对得 1 分，中间的卡片会换掉",
+    ja: "せいかいで 1てん、まんなかのカードが かわります",
+    fil: "Tamang pindot: 1 puntos at magpapalit ang gitnang card",
+    th: "กดถูกได้ 1 แต้ม และการ์ดกลางจะเปลี่ยน",
+    id: "Tekan benar dapat 1 poin dan kartu tengah berganti",
+    ru: "Верное нажатие — 1 очко, центральная карта меняется",
+    hi: "सही दबाने पर 1 अंक और बीच का कार्ड बदल जाता है",
+    ar: "الضغط الصحيح يمنح نقطة ويبدّل البطاقة الوسطى",
+  },
+  ruleWrong: {
+    ko: "틀리면 잠깐 쉬었다가 다시 눌러요",
+    en: "If it is not the match, wait a moment and look again",
+    vi: "Nếu sai thì nghỉ một chút rồi nhìn lại",
+    zh: "点错了就先歇一下，再看一次",
+    fil: "Kung mali, sandaling magpahinga at tumingin muli",
+    ja: "ちがったら すこし やすんで もういちど みてね",
+    th: "ถ้ากดผิด พักสักครู่แล้วดูใหม่",
+    id: "Kalau salah, tunggu sebentar lalu lihat lagi",
+    ru: "Если не совпало — подожди немного и посмотри снова",
+    hi: "गलत हो तो थोड़ा रुको और फिर देखो",
+    ar: "إذا أخطأت، انتظر قليلًا ثم انظر مرة أخرى",
+  },
+  ruleWin: {
+    ko: "먼저 목표 점수를 내거나 카드가 떨어지면 끝나요",
+    en: "The game ends when someone reaches the goal or the cards run out",
+    vi: "Trò chơi kết thúc khi ai đó đạt mục tiêu hoặc hết thẻ",
+    zh: "有人先达到目标分数或卡片用完就结束",
+    ja: "だれかが もくひょうてんに とどくか カードが なくなると おわり",
+    fil: "Matatapos kapag may nakaabot sa layunin o naubos ang card",
+    th: "จบเกมเมื่อมีคนถึงเป้าหมายหรือการ์ดหมด",
+    id: "Permainan selesai saat ada yang mencapai target atau kartu habis",
+    ru: "Игра кончается, когда кто-то набрал цель или карты закончились",
+    hi: "कोई लक्ष्य तक पहुँचे या कार्ड खत्म हों तो खेल खत्म",
+    ar: "تنتهي اللعبة عند بلوغ الهدف أو نفاد البطاقات",
+  },
+  compromise: {
+    ko: "정식 카드 세트가 아직 준비 중이라, 13개 그림을 다시 써서 간이 모드로 놀아요.",
+    en: "The full card set is still being made, so we reuse the 13 pictures in a simple mode.",
+    vi: "Bộ thẻ đầy đủ đang được chuẩn bị, nên ta dùng lại 13 hình ở chế độ đơn giản.",
+    zh: "正式卡组还在准备中，先用这 13 个图案的简易模式来玩。",
+    ja: "せいしきの カードは じゅんびちゅう。13この えを つかった かんいモードで あそぼう。",
+    fil: "Ginagawa pa ang buong card set, kaya gagamitin muna ang 13 larawan sa simpleng mode.",
+    th: "ชุดการ์ดเต็มยังไม่เสร็จ จึงใช้ 13 ภาพในโหมดอย่างง่ายก่อน",
+    id: "Set kartu lengkap masih disiapkan, jadi kita pakai 13 gambar dalam mode sederhana.",
+    ru: "Полный набор карт ещё готовится — играем упрощённо с 13 картинками.",
+    hi: "पूरा कार्ड सेट अभी बन रहा है, इसलिए 13 चित्रों से आसान मोड में खेलेंगे।",
+    ar: "مجموعة البطاقات الكاملة قيد الإعداد، لذا نلعب بوضع مبسّط بـ13 صورة.",
+  },
+  notReady: {
+    ko: "이 난이도는 준비 중이에요. 다른 난이도를 골라요.",
+    en: "This level is not ready yet. Please pick another one.",
+    vi: "Độ khó này chưa sẵn sàng. Hãy chọn mức khác.",
+    zh: "这个难度还在准备中，请选择其他难度。",
+    ja: "この なんいどは じゅんびちゅう。ほかを えらんでね。",
+    fil: "Hindi pa handa ang antas na ito. Pumili ng iba.",
+    th: "ระดับนี้ยังไม่พร้อม เลือกระดับอื่นนะ",
+    id: "Tingkat ini belum siap. Pilih yang lain ya.",
+    ru: "Этот уровень ещё не готов. Выбери другой.",
+    hi: "यह स्तर अभी तैयार नहीं है। दूसरा चुनो।",
+    ar: "هذا المستوى غير جاهز بعد. اختر مستوى آخر.",
+  },
+  tie: {
+    ko: "동점이에요!", en: "It's a tie!", vi: "Hòa nhau rồi!", zh: "平局！", ja: "どうてん!",
+    fil: "Tabla tayo!", th: "เสมอกัน!", id: "Seri!", ru: "Ничья!", hi: "बराबरी!", ar: "تعادل!",
+  },
+  settings: {
+    ko: "설정", en: "Settings", vi: "Cài đặt", zh: "设置", ja: "せってい",
+    fil: "Setting", th: "ตั้งค่า", id: "Pengaturan", ru: "Настройки", hi: "सेटिंग", ar: "الإعدادات",
+  },
+  noCard: {
+    ko: "카드 없음", en: "No card", vi: "Hết thẻ", zh: "没有卡片", ja: "カードなし",
+    fil: "Walang card", th: "ไม่มีการ์ด", id: "Tidak ada kartu", ru: "Нет карты", hi: "कोई कार्ड नहीं", ar: "لا توجد بطاقة",
+  },
+  // 오답은 흔들거나 경고음을 내지 않는다 — 잠깐 쉬며 다시 보게 한다.
+  lookAgain: {
+    ko: "다시 한 번 볼까요?", en: "Shall we look again?", vi: "Cùng nhìn lại nhé?",
+    zh: "我们再看一次好吗？", ja: "もういちど みてみよう?", fil: "Tingnan nating muli?",
+    th: "ลองดูอีกครั้งนะ", id: "Yuk lihat lagi?", ru: "Посмотрим ещё раз?",
+    hi: "फिर से देखें?", ar: "هل ننظر مرة أخرى؟",
+  },
+  myCard: {
+    ko: "내 카드", en: "My card", vi: "Thẻ của tôi", zh: "我的卡片", ja: "わたしのカード",
+    fil: "Card ko", th: "การ์ดของฉัน", id: "Kartu saya", ru: "Моя карта",
+    hi: "मेरा कार्ड", ar: "بطاقتي",
+  },
+  centerCard: {
+    ko: "가운데 카드", en: "Centre card", vi: "Thẻ ở giữa", zh: "中间卡片", ja: "まんなかのカード",
+    fil: "Gitnang card", th: "การ์ดตรงกลาง", id: "Kartu tengah", ru: "Центральная карта",
+    hi: "बीच का कार्ड", ar: "البطاقة الوسطى",
+  },
+};
 
 // ────────────────────────────────────────────────────────────
 // 타입 / 상수
@@ -28,7 +173,7 @@ interface DifficultyInfo {
   order: number;         // projective plane order
   perCard: number;       // n+1
   ready: boolean;        // order 3만 정식 지원 (order 4/5 는 타협 모드)
-  label: string;
+  label: LangMap;
 }
 
 const WIN_SCORE = 7;
@@ -36,9 +181,9 @@ const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 6;
 
 const DIFF_INFO: Record<Difficulty, DifficultyInfo> = {
-  easy:   { order: 3, perCard: 4, ready: true,  label: "쉬움 (4 심볼/카드)" },
-  normal: { order: 4, perCard: 5, ready: false, label: "보통 (5 심볼/카드)" },
-  hard:   { order: 5, perCard: 6, ready: false, label: "어려움 (6 심볼/카드)" },
+  easy:   { order: 3, perCard: 4, ready: true,  label: SI.easy },
+  normal: { order: 4, perCard: 5, ready: false, label: SI.normal },
+  hard:   { order: 5, perCard: 6, ready: false, label: SI.hard },
 };
 
 // ⚠️ 타협(compromise) 모드
@@ -122,12 +267,30 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
     return () => clearInterval(id);
   }, [phase]);
 
-  const popTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    return () => {
-      if (popTimerRef.current) clearTimeout(popTimerRef.current);
-    };
+  // 예약된 타이머 전부. unmount·재시작 때 한 곳에서 정리한다 (NumberTap 패턴).
+  const timersRef = useRef<number[]>([]);
+  const aliveRef = useRef(true);
+
+  const clearTimers = useCallback(() => {
+    for (const id of timersRef.current) window.clearTimeout(id);
+    timersRef.current = [];
   }, []);
+
+  const later = useCallback((fn: () => void, ms: number) => {
+    const id = window.setTimeout(() => {
+      timersRef.current = timersRef.current.filter((t) => t !== id);
+      if (aliveRef.current) fn();
+    }, ms);
+    timersRef.current.push(id);
+  }, []);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      clearTimers();
+    };
+  }, [clearTimers]);
 
   // dev invariant check (easy/order 3 만)
   useEffect(() => {
@@ -147,7 +310,9 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
 
   function start() {
     const info = DIFF_INFO[difficulty];
+    // aria-disabled 버튼에서도 눌릴 수 있으므로 핸들러가 스스로 막는다.
     if (!info.ready && !COMPROMISE_MODE) return;
+    clearTimers();
 
     const baseDeck = difficulty === "easy"
       ? SPOTIT_CARDS
@@ -184,8 +349,8 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
       label: tr(sym.label, myLang),
       labelOther: tr(sym.label, otherLang),
     });
-    if (popTimerRef.current) clearTimeout(popTimerRef.current);
-    popTimerRef.current = setTimeout(() => setPop(null), 2000);
+    clearTimers();
+    later(() => setPop(null), 2000);
   }
 
   function langForPlayer(p: number): string {
@@ -259,80 +424,89 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
     const blocked = !info.ready && !COMPROMISE_MODE;
 
     return (
-      <div style={{ textAlign: "center", padding: 32, maxWidth: 520, margin: "0 auto" }}>
+      <div data-ux-root className="si-root si-center">
+        <ScopedStyle css={SI_CSS} />
         <BeeMascot size={110} mood="happy" />
-        <div style={{ fontSize: 24, fontWeight: 900, margin: "16px 0 6px", color: "#1F2937" }}>
-          🕵️ 꿀벌 스팟잇
-        </div>
-        <div style={{ color: "#6B7280", marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
-          내 카드와 가운데 카드에서<br />
-          <b>똑같은 그림 1개</b>를 먼저 찾아 탭하세요!
-        </div>
+        <h1 data-ux-role="title" className="si-h">🕵️ {gt(SI.title, langA)}</h1>
+        <p data-ux-role="body" className="si-p">{gt(SI.howto, langA)}</p>
 
-        {/* 인원 선택 */}
-        <div style={sectionBox}>
-          <div style={sectionTitle}>인원</div>
-          <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
-            {[2, 3, 4, 5, 6].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPlayerCount(n)}
-                style={pillBtn(playerCount === n, "#F59E0B")}
-                aria-pressed={playerCount === n}
-              >
-                {n}인
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 난이도 선택 */}
-        <div style={sectionBox}>
-          <div style={sectionTitle}>난이도</div>
-          <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
-            {(Object.keys(DIFF_INFO) as Difficulty[]).map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDifficulty(d)}
-                style={pillBtn(difficulty === d, "#3B82F6")}
-                aria-pressed={difficulty === d}
-              >
-                {DIFF_INFO[d].label}
-              </button>
-            ))}
-          </div>
-          {!info.ready && (
-            <div style={{
-              marginTop: 10, fontSize: 12, color: "#B45309",
-              background: "#FEF3C7", border: "1px solid #FCD34D",
-              padding: "8px 10px", borderRadius: 10, lineHeight: 1.5,
-            }}>
-              {COMPROMISE_MODE ? (
-                <>※ 정식 카드 세트가 아직 준비 중입니다.<br />
-                13개 심볼을 재사용해 간이 모드로 플레이해요.</>
-              ) : (
-                <>※ 이 난이도는 준비 중입니다.</>
-              )}
+        <div className="si-panels">
+          {/* 인원 선택 */}
+          <section className="si-section" aria-labelledby="si-lbl-players">
+            <h2 data-ux-role="label" className="si-sectiontitle" id="si-lbl-players">
+              👥 {gt(UI.players, langA)}
+            </h2>
+            <div className="si-pills">
+              {[2, 3, 4, 5, 6].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  data-ux-role="control"
+                  className="si-pill"
+                  data-active={playerCount === n ? "" : undefined}
+                  onClick={() => setPlayerCount(n)}
+                  aria-pressed={playerCount === n}
+                >
+                  {n} {gp(UI.players, langA)}
+                </button>
+              ))}
             </div>
-          )}
+          </section>
+
+          {/* 난이도 선택 */}
+          <section className="si-section" aria-labelledby="si-lbl-diff">
+            <h2 data-ux-role="label" className="si-sectiontitle" id="si-lbl-diff">
+              🎚️ {gt(UI.difficulty, langA)}
+            </h2>
+            <div className="si-pills">
+              {(Object.keys(DIFF_INFO) as Difficulty[]).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  data-ux-role="control"
+                  className="si-pill"
+                  data-active={difficulty === d ? "" : undefined}
+                  onClick={() => setDifficulty(d)}
+                  aria-pressed={difficulty === d}
+                >
+                  {gp(DIFF_INFO[d].label, langA)}
+                  <span data-ux-role="secondary" className="si-pillsub">
+                    {DIFF_INFO[d].perCard} {gp(SI.perCard, langA)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {!info.ready && (
+              <p data-ux-role="secondary" className="si-note" role="status">
+                ※ {COMPROMISE_MODE ? gt(SI.compromise, langA) : gt(SI.notReady, langA)}
+              </p>
+            )}
+          </section>
+
+          {/* 규칙 */}
+          <section className="si-section si-rules">
+            <p data-ux-role="body">• {gt(SI.ruleScore, langA)}</p>
+            <p data-ux-role="body">• {gt(SI.ruleWrong, langA)}</p>
+            <p data-ux-role="body">
+              • {gt(SI.ruleWin, langA)} — {gp(SI.goal, langA)} {WIN_SCORE}
+            </p>
+          </section>
         </div>
 
-        <div style={{
-          background: "#fff", borderRadius: 16, padding: "12px 14px",
-          fontSize: 12, color: "#374151", lineHeight: 1.7, margin: "14px 0 18px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-          border: "2px solid #FDE68A", textAlign: "left",
-        }}>
-          <div>• 정답 → 점수 +1, 가운데 카드 교체</div>
-          <div>• 오답 → 0.8초 동안 탭 못함</div>
-          <div>• 먼저 <b>{WIN_SCORE}점</b> 내거나 카드 소진 시 종료</div>
-        </div>
-
-        <button onClick={start} style={primaryBtn} disabled={blocked}>
-          ▶ 시작
+        <button
+          type="button"
+          data-ux-role="action"
+          className="si-primary"
+          onClick={start}
+          aria-disabled={blocked || undefined}
+        >
+          ▶ {gt(UI.start, langA)}
         </button>
+        {blocked && (
+          <p data-ux-role="secondary" className="si-note" role="status">
+            {gt(SI.notReady, langA)}
+          </p>
+        )}
       </div>
     );
   }
@@ -348,36 +522,45 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
     const isTie = winners.length > 1;
 
     return (
-      <div style={{ textAlign: "center", padding: 32, maxWidth: 520, margin: "0 auto" }}>
+      <div data-ux-root className="si-root si-center">
+        <ScopedStyle css={SI_CSS} />
         <BeeMascot size={120} mood={isTie ? "think" : "celebrate"} />
-        <div style={{ fontSize: 22, fontWeight: 900, margin: "18px 0 10px", color: "#1F2937" }}>
+        <h1 data-ux-role="title" className="si-h">
           {isTie
-            ? "🤝 동점이에요!"
-            : `🎉 플레이어 ${winners[0] + 1} 승리!`}
-        </div>
-        <div style={{
-          display: "flex", gap: 10, justifyContent: "center", marginBottom: 20,
-          fontSize: 16, fontWeight: 800, flexWrap: "wrap",
-        }}>
+            ? `🤝 ${gt(SI.tie, langA)}`
+            : `🎉 ${gp(SI.player, langA)} ${winners[0] + 1} · ${gt(UI.win, langA)}`}
+        </h1>
+        <div className="si-scores">
           {scores.map((s, i) => {
-            const color = playerAccent(i);
+            const cardVars: CssVars = { "--si-accent": playerAccent(i) };
             const isWin = winners.includes(i) && !isTie;
             return (
-              <div key={i} style={{
-                background: `${color}22`, padding: "10px 14px", borderRadius: 14,
-                border: `2px solid ${color}`,
-                opacity: isWin ? 1 : 0.85,
-                minWidth: 70,
-              }}>
-                <div style={{ fontSize: 11, color: "#374151" }}>P{i + 1}</div>
-                <div style={{ fontSize: 22, color, fontWeight: 900 }}>{s}</div>
+              <div
+                key={i}
+                className="si-scorecard"
+                data-win={isWin ? "" : undefined}
+                style={cardVars}
+              >
+                <span data-ux-role="secondary" className="si-scorename">
+                  {gp(SI.player, langA)} {i + 1}
+                </span>
+                <span data-ux-role="title" className="si-scorenum">{s}</span>
               </div>
             );
           })}
         </div>
-        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-          <button onClick={start} style={primaryBtn}>🔁 다시 하기</button>
-          <button onClick={() => setPhase("intro")} style={secondaryBtn}>⚙️ 설정</button>
+        <div className="si-actions">
+          <button type="button" data-ux-role="action" className="si-primary" onClick={start}>
+            🔁 {gp(UI.playAgain, langA)}
+          </button>
+          <button
+            type="button"
+            data-ux-role="control"
+            className="si-secondary"
+            onClick={() => setPhase("intro")}
+          >
+            ⚙️ {gp(SI.settings, langA)}
+          </button>
         </div>
       </div>
     );
@@ -390,61 +573,41 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
   const layout = computeLayout(playerCount);
 
   return (
-    <div style={{
-      padding: "10px 10px 14px",
-      display: "flex", flexDirection: "column",
-      minHeight: "100%",
-      gap: 8,
-      position: "relative",
-    }}>
+    <div data-ux-root className="si-root si-play">
+      <ScopedStyle css={SI_CSS} />
+
       {/* HUD */}
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "4px 4px 2px", fontSize: 12, fontWeight: 800, color: "#374151",
-      }}>
-        <span style={{
-          background: "#fff", padding: "4px 10px", borderRadius: 999,
-          border: "2px solid #FDE68A", color: "#92400E",
-        }}>
-          🂠 남은 카드 {remaining}장
+      <div className="si-hud">
+        <span data-ux-role="label" className="si-chip si-chip-warm">
+          🂠 {gp(SI.remaining, langA)} {remaining}
         </span>
-        <span style={{
-          background: "#fff", padding: "4px 10px", borderRadius: 999,
-          border: "2px solid #E5E7EB",
-        }}>
-          목표 {WIN_SCORE}점 · {playerCount}인 · {DIFF_INFO[difficulty].label}
+        <span data-ux-role="label" className="si-chip">
+          🎯 {gp(SI.goal, langA)} {WIN_SCORE} · {playerCount} {gp(UI.players, langA)} ·{" "}
+          {gp(DIFF_INFO[difficulty].label, langA)}
         </span>
       </div>
 
       {/* 플레이 영역 */}
-      <div style={{
-        position: "relative",
-        flex: 1,
-        display: "grid",
-        gridTemplateColumns: layout.columns,
-        gridTemplateRows: layout.rows,
-        gap: 8,
-        alignItems: "center",
-        justifyItems: "center",
-      }}>
+      <div
+        className="si-board"
+        style={{ gridTemplateColumns: layout.columns, gridTemplateRows: layout.rows }}
+      >
         {/* 중앙 카드 */}
-        <div style={{
-          gridColumn: layout.center.col,
-          gridRow: layout.center.row,
-          display: "flex", justifyContent: "center", alignItems: "center",
-          zIndex: 1,
-        }}>
+        <div
+          className="si-slot si-slot-center"
+          style={{ gridColumn: layout.center.col, gridRow: layout.center.row }}
+        >
           <SpotItCardView
             card={centerCard}
             accentColor="#F59E0B"
-            bgColor="#FFFFFF"
             imgFail={imgFail}
             onImgFail={(id) => setImgFail((m) => ({ ...m, [id]: true }))}
             interactive={false}
             locked={false}
             ariaRole="img"
-            ariaLabel="중앙 카드"
-            size={layout.cardSize}
+            ariaLabel={gp(SI.centerCard, langA)}
+            tier={layout.tier}
+            noCardText={gp(SI.noCard, langA)}
           />
         </div>
 
@@ -455,14 +618,8 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
           return (
             <div
               key={i}
-              style={{
-                gridColumn: slot.col,
-                gridRow: slot.row,
-                width: "100%",
-                display: "flex",
-                justifyContent: "center",
-                zIndex: 2,
-              }}
+              className="si-slot"
+              style={{ gridColumn: slot.col, gridRow: slot.row }}
             >
               <PlayerZone
                 playerIndex={i}
@@ -474,7 +631,8 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
                 onTap={(s) => onTap(i as PlayerId, s)}
                 pop={pop?.who === i ? pop : null}
                 rotated={slot.rotated}
-                cardSize={layout.cardSize}
+                tier={layout.tier}
+                lang={langA}
               />
             </div>
           );
@@ -497,12 +655,15 @@ interface LayoutInfo {
   rows: string;
   center: { col: string; row: string };
   players: SlotPos[];
-  cardSize: number;
+  tier: CardTier;
 }
 
+/** 카드 치수 단계. 실제 px 은 CSS 가 clamp 로 정한다 (넓은 화면에서 더 크게). */
+type CardTier = "lg" | "md" | "sm";
+
 function computeLayout(n: number): LayoutInfo {
-  // cardSize: 인원 많을수록 작게
-  const cardSize = n <= 2 ? 210 : n <= 4 ? 170 : 140;
+  // 인원이 많을수록 한 단계 작은 카드
+  const tier: CardTier = n <= 2 ? "lg" : n <= 4 ? "md" : "sm";
 
   if (n === 2) {
     // 상(B, 회전) / 중앙 / 하(A)
@@ -514,7 +675,7 @@ function computeLayout(n: number): LayoutInfo {
         { col: "1 / 2", row: "3 / 4", rotated: false }, // P1 하단
         { col: "1 / 2", row: "1 / 2", rotated: true },  // P2 상단(회전)
       ],
-      cardSize,
+      tier,
     };
   }
 
@@ -529,7 +690,7 @@ function computeLayout(n: number): LayoutInfo {
         { col: "2 / 3", row: "3 / 4", rotated: false }, // P2 하-우
         { col: "1 / 3", row: "1 / 2", rotated: true },  // P3 상(회전)
       ],
-      cardSize,
+      tier,
     };
   }
 
@@ -545,7 +706,7 @@ function computeLayout(n: number): LayoutInfo {
         { col: "1 / 2", row: "1 / 2", rotated: true },  // P3 상-좌
         { col: "2 / 3", row: "1 / 2", rotated: true },  // P4 상-우
       ],
-      cardSize,
+      tier,
     };
   }
 
@@ -562,7 +723,7 @@ function computeLayout(n: number): LayoutInfo {
         { col: "1 / 2", row: "1 / 2", rotated: true },  // P4
         { col: "3 / 4", row: "1 / 2", rotated: true },  // P5
       ],
-      cardSize,
+      tier,
     };
   }
 
@@ -579,7 +740,7 @@ function computeLayout(n: number): LayoutInfo {
       { col: "2 / 3", row: "1 / 2", rotated: true },  // P5
       { col: "3 / 4", row: "1 / 2", rotated: true },  // P6
     ],
-    cardSize,
+    tier,
   };
 }
 
@@ -604,100 +765,43 @@ function PlayerZone(props: {
   onTap: (symbolId: number) => void;
   pop: Pop | null;
   rotated: boolean;
-  cardSize: number;
+  tier: CardTier;
+  lang: string;
 }) {
   const {
-    playerIndex, card, score, locked, imgFail, onImgFail, onTap, pop, rotated, cardSize,
+    playerIndex, card, score, locked, imgFail, onImgFail, onTap, pop, rotated, tier, lang,
   } = props;
 
   const accent = playerAccent(playerIndex);
-  const bg = `${accent}1A`;
   const label = `P${playerIndex + 1}`;
 
   return (
-    <div
-      style={{
-        background: bg,
-        borderRadius: 22,
-        padding: "8px 10px 10px",
-        border: `2px solid ${accent}55`,
-        boxShadow: `0 4px 10px ${accent}22`,
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 6,
-      }}
-    >
-      {/* 플레이어 헤더 */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        width: "100%", padding: "0 4px",
-        transform: rotated ? "rotate(180deg)" : undefined,
-      }}>
-        <span style={{
-          fontSize: 11, fontWeight: 900, color: accent,
-          background: "#fff", padding: "3px 10px", borderRadius: 999,
-          border: `2px solid ${accent}`,
-        }}>
-          {label}
-        </span>
-        <span style={{
-          fontSize: 13, fontWeight: 900, color: "#fff",
-          background: accent, padding: "3px 12px", borderRadius: 999,
-        }}>
-          ⭐ {score}
-        </span>
+    <div className="si-zone" style={{ ["--si-accent" as string]: accent }}>
+      <div className={rotated ? "si-zonehead rot" : "si-zonehead"}>
+        <span data-ux-role="secondary" className="si-zonetag">{label}</span>
+        <span data-ux-role="secondary" className="si-zonescore">⭐ {score}</span>
       </div>
 
-      {/* 카드 + 회전 */}
-      <div style={{ transform: rotated ? "rotate(180deg)" : undefined }}>
+      <div className={rotated ? "si-zonecard rot" : "si-zonecard"}>
         <SpotItCardView
           card={card}
           accentColor={accent}
-          bgColor="#FFFFFF"
           imgFail={imgFail}
           onImgFail={onImgFail}
           interactive={!locked && card.length > 0}
           locked={locked}
           onTap={onTap}
           ariaRole="group"
-          ariaLabel={`${label} 카드`}
-          size={cardSize}
+          ariaLabel={`${label} ${gp(SI.myCard, lang)}`}
+          tier={tier}
+          noCardText={gp(SI.noCard, lang)}
         />
       </div>
 
-      {/* 말풍선 */}
       {pop && (
-        <div
-          aria-live="polite"
-          style={{
-            position: "absolute",
-            top: rotated ? undefined : -8,
-            bottom: rotated ? -8 : undefined,
-            left: "50%",
-            transform: `translate(-50%, ${rotated ? "100%" : "-100%"})${rotated ? " rotate(180deg)" : ""}`,
-            background: "#fff",
-            border: `3px solid ${accent}`,
-            borderRadius: 18,
-            padding: "10px 18px",
-            boxShadow: `0 10px 24px ${accent}55`,
-            zIndex: 5,
-            minWidth: 140,
-            textAlign: "center",
-            pointerEvents: "none",
-          }}
-        >
-          <div style={{
-            fontSize: 20, fontWeight: 900, color: "#111827", lineHeight: 1.1,
-          }}>
-            {pop.label}
-          </div>
-          <div style={{
-            fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2,
-          }}>
-            {pop.labelOther}
-          </div>
+        <div aria-live="polite" className={rotated ? "si-pop rot" : "si-pop"}>
+          <span data-ux-role="body-emphasis" className="si-poplabel">{pop.label}</span>
+          <span data-ux-role="secondary" className="si-popsub">{pop.labelOther}</span>
         </div>
       )}
     </div>
@@ -707,10 +811,12 @@ function PlayerZone(props: {
 // ────────────────────────────────────────────────────────────
 // SpotItCardView
 // ────────────────────────────────────────────────────────────
+/** 카드 단계별 심볼 글자 크기. 그림이 없을 때 쓰는 이모지 대체 크기다. */
+const SYMBOL_FONT: Record<CardTier, number> = { lg: 34, md: 28, sm: 22 };
+
 function SpotItCardView(props: {
   card: number[];
   accentColor: string;
-  bgColor: string;
   imgFail: Record<number, boolean>;
   onImgFail: (id: number) => void;
   interactive: boolean;
@@ -718,11 +824,12 @@ function SpotItCardView(props: {
   onTap?: (symbolId: number) => void;
   ariaRole?: string;
   ariaLabel?: string;
-  size: number;
+  tier: CardTier;
+  noCardText: string;
 }) {
   const {
-    card, accentColor, bgColor, imgFail, onImgFail,
-    interactive, locked, onTap, ariaRole, ariaLabel, size,
+    card, accentColor, imgFail, onImgFail,
+    interactive, locked, onTap, ariaRole, ariaLabel, tier, noCardText,
   } = props;
 
   const cid = useMemo(() => (card.length ? cardIndex(card) : 0), [card]);
@@ -730,15 +837,8 @@ function SpotItCardView(props: {
 
   if (!card.length) {
     return (
-      <div style={{
-        width: size, height: size,
-        borderRadius: 24,
-        background: "#F3F4F6",
-        border: "2px dashed #D1D5DB",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: "#9CA3AF", fontSize: 13, fontWeight: 700,
-      }}>
-        카드 없음
+      <div data-ux-role="secondary" className={`si-card si-card-${tier} si-card-empty`}>
+        {noCardText}
       </div>
     );
   }
@@ -747,20 +847,11 @@ function SpotItCardView(props: {
     <div
       role={ariaRole}
       aria-label={ariaLabel}
+      className={locked ? `si-card si-card-${tier} locked` : `si-card si-card-${tier}`}
       style={{
-        position: "relative",
-        width: size, height: size,
-        borderRadius: 24,
-        background: bgColor,
-        border: `3px solid ${accentColor}`,
-        boxShadow: `0 8px 18px ${accentColor}44, inset 0 2px 0 rgba(255,255,255,0.6)`,
-        display: "grid",
+        ["--si-accent" as string]: accentColor,
         gridTemplateColumns: grid.cols,
         gridTemplateRows: grid.rows,
-        gap: 4,
-        padding: 8,
-        opacity: locked ? 0.5 : 1,
-        transition: "opacity 0.15s",
       }}
     >
       {card.map((symbolId, slot) => (
@@ -772,22 +863,12 @@ function SpotItCardView(props: {
           imgFailed={!!imgFail[symbolId]}
           onImgFail={() => onImgFail(symbolId)}
           onTap={onTap}
-          fontSize={Math.max(22, Math.floor(size / 6))}
+          fontSize={SYMBOL_FONT[tier]}
         />
       ))}
 
-      {/* 락 오버레이 */}
       {locked && (
-        <div
-          aria-hidden="true"
-          style={{
-            position: "absolute", inset: 0, borderRadius: 24,
-            background: "rgba(255,255,255,0.55)",
-            backdropFilter: "blur(1.5px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: Math.floor(size / 4), pointerEvents: "none",
-          }}
-        >
+        <div aria-hidden="true" className="si-cardlock">
           <span role="img" aria-label="대기">⏳</span>
         </div>
       )}
@@ -900,45 +981,146 @@ function emojiForKey(key: string): string {
   }
 }
 
-// ────────────────────────────────────────────────────────────
-// 공통 스타일
-// ────────────────────────────────────────────────────────────
-const primaryBtn: CSSProperties = {
-  background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
-  color: "#fff", border: "none", padding: "14px 32px",
-  borderRadius: 99, fontSize: 15, fontWeight: 800, cursor: "pointer",
-  boxShadow: "0 8px 20px rgba(245,158,11,0.4)",
-};
-
-const secondaryBtn: CSSProperties = {
-  background: "#fff", color: "#374151",
-  border: "2px solid #D1D5DB", padding: "12px 22px",
-  borderRadius: 99, fontSize: 14, fontWeight: 800, cursor: "pointer",
-};
-
-const sectionBox: CSSProperties = {
-  background: "#fff", borderRadius: 14, padding: "10px 12px",
-  marginBottom: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
-  border: "1px solid #F3F4F6",
-};
-
-const sectionTitle: CSSProperties = {
-  fontSize: 12, fontWeight: 800, color: "#6B7280",
-  marginBottom: 8, textAlign: "left",
-};
-
-function pillBtn(active: boolean, accent: string): CSSProperties {
-  return {
-    background: active ? accent : "#fff",
-    color: active ? "#fff" : "#374151",
-    border: `2px solid ${active ? accent : "#E5E7EB"}`,
-    padding: "8px 14px",
-    borderRadius: 99,
-    fontSize: 13, fontWeight: 800,
-    cursor: "pointer",
-    minWidth: 60,
-  };
-}
+// 옛 인라인 스타일 상수(primaryBtn/secondaryBtn/sectionBox/sectionTitle/pillBtn)는
+// SI_CSS 클래스로 대체되어 삭제했다. 어디서도 참조하지 않는다.
 
 // MIN_PLAYERS / MAX_PLAYERS / PlayerId 레퍼런스 유지용 (린트)
 export const _SPOT_IT_META = { MIN_PLAYERS, MAX_PLAYERS };
+
+/* ── 스팟잇 전용 규칙 ─────────────────────────────────────────────────
+   크기는 전부 토큰에서 온다. 카드만 단계(lg/md/sm)로 clamp 하며, 넓은 화면
+   에서는 더 크게 잡는다 — 데스크톱을 '세로로 늘린 휴대폰' 으로 두지 않는다. */
+const SI_CSS = `
+.si-root{
+  min-height: 100svh; box-sizing: border-box;
+  padding: var(--ux-space-4);
+  background: var(--ux-bg); color: var(--ux-ink);
+  display: flex; flex-direction: column; gap: var(--ux-space-4);
+}
+.si-center{ align-items: center; text-align: center; }
+.si-play{ gap: var(--ux-space-3); }
+.si-h{ font-weight: 900; word-break: keep-all; }
+.si-p{ color: var(--ux-ink-soft); max-width: 42ch; word-break: keep-all; }
+
+.si-panels{
+  width: 100%; max-width: 1080px; display: grid; gap: var(--ux-space-4);
+  grid-template-columns: 1fr; text-align: left;
+}
+@media (min-width: 768px){ .si-panels{ grid-template-columns: 1fr 1fr; } }
+.si-section{
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-panel); padding: var(--ux-space-4);
+  display: grid; gap: var(--ux-space-3); align-content: start;
+}
+.si-sectiontitle{ font-weight: 900; }
+.si-rules p, .si-note{ color: var(--ux-ink-soft); word-break: keep-all; }
+
+.si-pills{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); }
+.si-pill[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-ink-soft); border-radius: var(--ux-radius-pill);
+  font-family: inherit; font-weight: 800; min-width: 0;
+}
+.si-pill[aria-pressed="true"]{ border: 3px solid var(--ux-selected-border); background: var(--ux-surface-sunk); }
+.si-pillsub{ color: var(--ux-ink-soft); }
+
+.si-actions{ display: flex; flex-wrap: wrap; gap: var(--ux-space-3); justify-content: center; }
+.si-primary[data-ux-role="action"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+}
+.si-primary[aria-disabled="true"]{
+  background: var(--ux-surface-sunk); color: var(--ux-ink-soft); border-style: dashed;
+}
+.si-secondary[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+}
+
+.si-hud{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); justify-content: center; }
+.si-chip{
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-pill); padding: var(--ux-space-1) var(--ux-space-3);
+  font-weight: 800;
+}
+.si-chip-warm{ background: var(--ux-surface-sunk); }
+
+.si-scores{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); justify-content: center; }
+.si-scorecard{
+  display: grid; justify-items: center; gap: 2px;
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface); padding: var(--ux-space-2) var(--ux-space-3);
+}
+.si-scorename{ font-weight: 800; }
+.si-scorenum{ font-weight: 900; }
+
+.si-board{
+  display: grid; gap: var(--ux-space-3); justify-items: center; align-items: center;
+  width: 100%; max-width: 1180px; margin: 0 auto;
+}
+.si-slot{ display: flex; justify-content: center; width: 100%; }
+.si-slot-center{ padding: var(--ux-space-2) 0; }
+
+/* 카드 — 단계별 한 변. 1024px 이상에서 한 뼘 더 크게. */
+.si-card{
+  position: relative; aspect-ratio: 1;
+  display: grid; gap: var(--ux-space-1);
+  padding: var(--ux-space-2);
+  border-radius: var(--ux-radius-panel);
+  background: var(--ux-surface);
+  border: 3px solid var(--si-accent, var(--ux-primary-border));
+  box-shadow: 0 6px 16px rgba(137,83,0,.16);
+  transition: opacity var(--ux-motion-state) var(--ux-motion-ease);
+}
+.si-card.locked{ opacity: .5; }
+.si-card-lg{ width: clamp(160px, 46vw, 240px); }
+.si-card-md{ width: clamp(140px, 38vw, 200px); }
+.si-card-sm{ width: clamp(116px, 30vw, 168px); }
+@media (min-width: 1024px){
+  .si-card-lg{ width: 300px; }
+  .si-card-md{ width: 250px; }
+  .si-card-sm{ width: 200px; }
+}
+.si-card-empty{
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ux-surface-sunk); border: 2px dashed var(--ux-ink-soft);
+  color: var(--ux-ink-soft); font-weight: 700; text-align: center;
+}
+.si-cardlock{
+  position: absolute; inset: 0; border-radius: var(--ux-radius-panel);
+  background: rgba(255,255,255,.55);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--ux-font-title); pointer-events: none;
+}
+
+.si-zone{
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  gap: var(--ux-space-2); padding: var(--ux-space-2);
+  border-radius: var(--ux-radius-panel);
+  border: 2px solid var(--si-accent, var(--ux-primary-border));
+  background: var(--ux-surface);
+}
+.si-zonehead{
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; gap: var(--ux-space-2);
+}
+.si-zonehead.rot, .si-zonecard.rot{ transform: rotate(180deg); }
+.si-zonetag{
+  font-weight: 900; color: var(--ux-ink);
+  background: var(--ux-surface-sunk); border: 2px solid var(--si-accent, var(--ux-primary-border));
+  border-radius: var(--ux-radius-pill); padding: 2px var(--ux-space-2);
+}
+.si-zonescore{ font-weight: 900; color: var(--ux-ink); }
+.si-pop{
+  position: absolute; top: -8px; left: 50%;
+  transform: translate(-50%, -100%);
+  display: grid; justify-items: center; gap: 2px;
+  background: var(--ux-surface); border: 3px solid var(--si-accent, var(--ux-primary-border));
+  border-radius: var(--ux-radius-surface); padding: var(--ux-space-2) var(--ux-space-4);
+  box-shadow: 0 8px 20px rgba(137,83,0,.22);
+  z-index: 5; min-width: 140px; text-align: center; pointer-events: none;
+}
+.si-pop.rot{ top: auto; bottom: -8px; transform: translate(-50%, 100%) rotate(180deg); }
+.si-poplabel{ font-weight: 900; }
+.si-popsub{ color: var(--ux-ink-soft); }
+`;

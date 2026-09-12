@@ -1,21 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState, CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { WYR_CARDS, WYRCard, WYRCategory, tr, pickN } from "@/lib/gameData";
 import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
+import ScopedStyle from "../ui/child/ScopedStyle";
+import { gt, type LangMap } from "./uiText";
+import { gp } from "./plainText";
 
 type Vote = "A" | "B" | null;
 type Phase = "intro" | "voting" | "reveal" | "summary";
 
-const OPT_A_BG = "#FEF3C7"; // yellow
+// 의미색(어느 쪽 보기인가 / 어느 학생인가)만 게임 고유 색으로 남긴다.
+// 표면·글자·성공/실패 색은 전부 공통 토큰을 쓴다.
 const OPT_A_ACCENT = "#F59E0B";
-const OPT_B_BG = "#DBEAFE"; // blue
 const OPT_B_ACCENT = "#2563EB";
-
-const PLAYER_A_BG = "#FDF2F8"; // pink
 const PLAYER_A_ACCENT = "#DB2777";
-const PLAYER_B_BG = "#ECFDF5"; // green
 const PLAYER_B_ACCENT = "#059669";
 
 // #5 저학년(1~2학년) 난이도 하향 — 한 판 길이를 줄여 집중·피로도를 낮춘다.
@@ -36,12 +36,249 @@ function buildEasyDeck(n: number): WYRCard[] {
 }
 
 const CATEGORIES: WYRCategory[] = ["food", "season", "school", "home", "taste"];
-const CATEGORY_META: Record<WYRCategory, { emoji: string; label: string; color: string }> = {
-  food:   { emoji: "🍚", label: "음식",   color: "#EA580C" },
-  season: { emoji: "🌸", label: "계절",   color: "#10B981" },
-  school: { emoji: "🏫", label: "학교",   color: "#2563EB" },
-  home:   { emoji: "🏠", label: "집",     color: "#A855F7" },
-  taste:  { emoji: "👅", label: "취향",   color: "#DB2777" },
+const CATEGORY_META: Record<WYRCategory, { emoji: string; label: LangMap; color: string }> = {
+  food: {
+    emoji: "🍚", color: "#EA580C",
+    label: {
+      ko: "음식", en: "Food", vi: "Món ăn", zh: "食物", fil: "Pagkain",
+      ja: "たべもの", th: "อาหาร", id: "Makanan", ru: "Еда", hi: "खाना", ar: "طعام",
+    },
+  },
+  season: {
+    emoji: "🌸", color: "#10B981",
+    label: {
+      ko: "계절", en: "Season", vi: "Mùa", zh: "季节", fil: "Panahon",
+      ja: "きせつ", th: "ฤดู", id: "Musim", ru: "Сезон", hi: "मौसम", ar: "فصل",
+    },
+  },
+  school: {
+    emoji: "🏫", color: "#2563EB",
+    label: {
+      ko: "학교", en: "School", vi: "Trường", zh: "学校", fil: "Paaralan",
+      ja: "がっこう", th: "โรงเรียน", id: "Sekolah", ru: "Школа", hi: "स्कूल", ar: "مدرسة",
+    },
+  },
+  home: {
+    emoji: "🏠", color: "#A855F7",
+    label: {
+      ko: "집", en: "Home", vi: "Nhà", zh: "家", fil: "Bahay",
+      ja: "いえ", th: "บ้าน", id: "Rumah", ru: "Дом", hi: "घर", ar: "منزل",
+    },
+  },
+  taste: {
+    emoji: "👅", color: "#DB2777",
+    label: {
+      ko: "취향", en: "Taste", vi: "Sở thích", zh: "喜好", fil: "Panlasa",
+      ja: "このみ", th: "ความชอบ", id: "Selera", ru: "Вкус", hi: "पसंद", ar: "ذوق",
+    },
+  },
+};
+
+// 게임 고유 문구 사전. 제목·지문·안내문은 gt()(한국어 병기), 반복되는 작은
+// 동작 버튼·표 라벨은 gp()(병기 없음)로 쓴다.
+const WYR: Record<string, LangMap> = {
+  title: {
+    ko: "이거 저거 고르기", en: "Would You Rather", vi: "Chọn cái nào?", zh: "选这个还是那个",
+    fil: "Alin ang Mas Gusto?", ja: "どっちが すき?", th: "ชอบอันไหนมากกว่า", id: "Pilih yang Mana?",
+    ru: "Что выберешь?", hi: "कौन सा चुनोगे?", ar: "أيهما تفضل؟",
+  },
+  howto: {
+    ko: "둘 중 뭐가 더 좋아? 정답은 없어요.",
+    en: "Which one do you like more? There is no wrong answer.",
+    vi: "Bạn thích cái nào hơn? Không có đáp án sai.",
+    zh: "你更喜欢哪一个? 没有标准答案。",
+    fil: "Alin ang mas gusto mo? Walang maling sagot.",
+    ja: "どっちが すき? せいかいは ないよ。",
+    th: "ชอบอันไหนมากกว่า? ไม่มีคำตอบผิด",
+    id: "Kamu lebih suka yang mana? Tidak ada jawaban yang salah.",
+    ru: "Что тебе нравится больше? Неправильных ответов нет.",
+    hi: "तुम्हें कौन सा ज़्यादा पसंद है? कोई गलत जवाब नहीं है।",
+    ar: "أيهما تحب أكثر؟ لا توجد إجابة خاطئة.",
+  },
+  talkTogether: {
+    ko: "서로 이야기하면서 친해져요!",
+    en: "Talk about it together and become friends!",
+    vi: "Cùng trò chuyện và làm bạn nhé!",
+    zh: "一起聊聊，成为好朋友!",
+    fil: "Mag-usap kayo at magkaibigan!",
+    ja: "はなしながら なかよく なろう!",
+    th: "คุยกันแล้วเป็นเพื่อนกันนะ!",
+    id: "Mengobrollah bersama dan jadi teman!",
+    ru: "Поговорите вместе и подружитесь!",
+    hi: "साथ बात करो और दोस्त बनो!",
+    ar: "تحدثا معًا وكونا صديقين!",
+  },
+  leftSeat: {
+    ko: "왼쪽", en: "Left", vi: "Bên trái", zh: "左边", fil: "Kaliwa",
+    ja: "ひだり", th: "ซ้าย", id: "Kiri", ru: "Слева", hi: "बाएँ", ar: "يسار",
+  },
+  rightSeat: {
+    ko: "오른쪽", en: "Right", vi: "Bên phải", zh: "右边", fil: "Kanan",
+    ja: "みぎ", th: "ขวา", id: "Kanan", ru: "Справа", hi: "दाएँ", ar: "يمين",
+  },
+  student: {
+    ko: "학생", en: "Student", vi: "Học sinh", zh: "学生", fil: "Mag-aaral",
+    ja: "せいと", th: "นักเรียน", id: "Siswa", ru: "Ученик", hi: "छात्र", ar: "طالب",
+  },
+  card: {
+    ko: "카드", en: "Card", vi: "Thẻ", zh: "卡片", fil: "Karta",
+    ja: "カード", th: "การ์ด", id: "Kartu", ru: "Карточка", hi: "कार्ड", ar: "بطاقة",
+  },
+  cardsTogether: {
+    ko: "함께 고른 카드", en: "Cards played together", vi: "Số thẻ đã chơi", zh: "一起玩过的卡片",
+    fil: "Mga kartang nalaro", ja: "いっしょに あそんだ カード", th: "การ์ดที่เล่นด้วยกัน",
+    id: "Kartu yang dimainkan", ru: "Сыграно карточек", hi: "साथ खेले कार्ड", ar: "البطاقات معًا",
+  },
+  matchRate: {
+    ko: "취향 일치", en: "Same taste", vi: "Giống nhau", zh: "喜好一致", fil: "Parehong gusto",
+    ja: "おなじ すき", th: "ชอบเหมือนกัน", id: "Selera sama", ru: "Совпадения", hi: "एक जैसी पसंद", ar: "تطابق الذوق",
+  },
+  lastResult: {
+    ko: "방금 게임 결과", en: "Last game result", vi: "Kết quả vừa rồi", zh: "刚才的结果",
+    fil: "Resulta kanina", ja: "さっきの けっか", th: "ผลเมื่อครู่", id: "Hasil tadi",
+    ru: "Прошлый результат", hi: "पिछला नतीजा", ar: "نتيجة الجولة السابقة",
+  },
+  hintPick: {
+    ko: "마음에 드는 쪽에서 자기 단추를 눌러요.",
+    en: "Tap your own button on the side you like.",
+    vi: "Hãy bấm nút của mình ở bên bạn thích.",
+    zh: "在你喜欢的一边按下自己的按钮。",
+    fil: "Pindutin ang sarili mong butones sa panig na gusto mo.",
+    ja: "すきな ほうで じぶんの ボタンを おしてね。",
+    th: "กดปุ่มของตัวเองในฝั่งที่ชอบ",
+    id: "Tekan tombolmu di sisi yang kamu suka.",
+    ru: "Нажми свою кнопку на той стороне, которая нравится.",
+    hi: "जो पसंद है उस तरफ अपना बटन दबाओ।",
+    ar: "اضغط زرك في الجهة التي تعجبك.",
+  },
+  turnOther: {
+    ko: "이제 친구 차례예요.", en: "Now it is your friend's turn.", vi: "Đến lượt bạn kia.",
+    zh: "轮到另一个朋友了。", fil: "Kapareha mo na ang susunod.", ja: "つぎは ともだちの ばん。",
+    th: "ถึงตาเพื่อนแล้ว", id: "Sekarang giliran temanmu.", ru: "Теперь очередь друга.",
+    hi: "अब दोस्त की बारी है।", ar: "الآن دور صديقك.",
+  },
+  revealing: {
+    ko: "결과를 보여 줄게요.", en: "Showing the result.", vi: "Đang hiện kết quả.",
+    zh: "正在公布结果。", fil: "Ipapakita na ang resulta.", ja: "けっかを みせるね。",
+    th: "กำลังแสดงผล", id: "Menampilkan hasil.", ru: "Показываем результат.",
+    hi: "नतीजा दिखा रहे हैं।", ar: "نعرض النتيجة.",
+  },
+  pickedDone: {
+    ko: "골랐어요", en: "Chosen", vi: "Đã chọn", zh: "选好了", fil: "Napili na",
+    ja: "えらんだよ", th: "เลือกแล้ว", id: "Sudah memilih", ru: "Выбрано", hi: "चुन लिया", ar: "تم الاختيار",
+  },
+  pickHere: {
+    ko: "여기 고르기", en: "Pick this", vi: "Chọn bên này", zh: "选这个", fil: "Piliin ito",
+    ja: "これを えらぶ", th: "เลือกอันนี้", id: "Pilih ini", ru: "Выбрать это", hi: "यह चुनो", ar: "اختر هذا",
+  },
+  alreadyPicked: {
+    ko: "이미 골랐어요", en: "Already chosen", vi: "Đã chọn rồi", zh: "已经选好了",
+    fil: "Nakapili na", ja: "もう えらんだよ", th: "เลือกไปแล้ว", id: "Sudah memilih",
+    ru: "Уже выбрано", hi: "पहले ही चुन लिया", ar: "تم الاختيار مسبقًا",
+  },
+  sameTitle: {
+    ko: "비슷해요!", en: "So alike!", vi: "Giống nhau rồi!", zh: "很像呢!", fil: "Magkapareho!",
+    ja: "にてるね!", th: "เหมือนกันเลย!", id: "Mirip!", ru: "Похоже!", hi: "एक जैसा!", ar: "متشابهان!",
+  },
+  sameSub: {
+    ko: "둘 다 같은 걸 골랐어요.", en: "You both chose the same thing.", vi: "Cả hai chọn giống nhau.",
+    zh: "两人选了同一个。", fil: "Pareho kayo ng napili.", ja: "ふたりとも おなじを えらんだよ。",
+    th: "เลือกเหมือนกันทั้งคู่", id: "Kalian memilih yang sama.", ru: "Вы выбрали одно и то же.",
+    hi: "दोनों ने एक ही चुना।", ar: "اخترتما الشيء نفسه.",
+  },
+  diffTitle: {
+    ko: "달라서 재밌어요!", en: "Different and fun!", vi: "Khác nhau mới vui!", zh: "不一样才有趣!",
+    fil: "Iba, kaya masaya!", ja: "ちがって おもしろい!", th: "ต่างกันก็สนุกดี!", id: "Beda itu seru!",
+    ru: "Разное — это интересно!", hi: "अलग होना मज़ेदार है!", ar: "الاختلاف ممتع!",
+  },
+  diffSub: {
+    ko: "둘 다 멋진 선택이에요.", en: "Both are great choices.", vi: "Cả hai đều là lựa chọn hay.",
+    zh: "两个都是好选择。", fil: "Parehong magandang pili.", ja: "どちらも すてきな えらびかた。",
+    th: "ทั้งสองอย่างดีเลย", id: "Keduanya pilihan bagus.", ru: "Оба выбора отличные.",
+    hi: "दोनों चुनाव अच्छे हैं।", ar: "كلا الخيارين رائع.",
+  },
+  talkAbout: {
+    ko: "이야기해 봐요", en: "Let's talk", vi: "Cùng trò chuyện", zh: "聊一聊", fil: "Mag-usap tayo",
+    ja: "はなして みよう", th: "มาคุยกัน", id: "Ayo mengobrol", ru: "Давайте поговорим",
+    hi: "बात करते हैं", ar: "لنتحدث",
+  },
+  statsTitle: {
+    ko: "우리 취향 통계표", en: "Our taste report", vi: "Bảng sở thích của chúng ta",
+    zh: "我们的喜好统计", fil: "Talaan ng gusto namin", ja: "ふたりの すき まとめ",
+    th: "ตารางความชอบของเรา", id: "Tabel selera kami", ru: "Наша таблица вкусов",
+    hi: "हमारी पसंद की तालिका", ar: "جدول أذواقنا",
+  },
+  secWeb: {
+    ko: "카테고리별 취향 그물", en: "Taste web by topic", vi: "Mạng sở thích theo chủ đề",
+    zh: "分类喜好网", fil: "Lambat ng gusto kada paksa", ja: "テーマべつ すきの あみ",
+    th: "ใยความชอบตามหัวข้อ", id: "Jaring selera per topik", ru: "Сеть вкусов по темам",
+    hi: "विषय अनुसार पसंद का जाल", ar: "شبكة الأذواق حسب الموضوع",
+  },
+  secBars: {
+    ko: "카테고리별 일치율", en: "Match rate by topic", vi: "Tỉ lệ giống theo chủ đề",
+    zh: "各分类一致率", fil: "Porsiyento ng pagkakapareho", ja: "テーマべつ いっちりつ",
+    th: "อัตราตรงกันตามหัวข้อ", id: "Tingkat kecocokan per topik", ru: "Совпадения по темам",
+    hi: "विषय अनुसार मेल दर", ar: "نسبة التطابق حسب الموضوع",
+  },
+  secTable: {
+    ko: "카드별 기록", en: "Card by card", vi: "Ghi chép từng thẻ", zh: "每张卡片记录",
+    fil: "Bawat karta", ja: "カードごとの きろく", th: "บันทึกทีละการ์ด",
+    id: "Catatan tiap kartu", ru: "Карточка за карточкой", hi: "हर कार्ड का रिकॉर्ड",
+    ar: "سجل كل بطاقة",
+  },
+  noData: {
+    ko: "아직 고른 카드가 없어요. 다시 해 볼까요?",
+    en: "No cards yet. Shall we try again?",
+    vi: "Chưa có thẻ nào. Mình thử lại nhé?",
+    zh: "还没有卡片记录。再试一次吧?",
+    fil: "Wala pang karta. Subukan ulit?",
+    ja: "まだ カードが ないよ。もういちど やってみる?",
+    th: "ยังไม่มีการ์ดเลย ลองอีกครั้งไหม",
+    id: "Belum ada kartu. Coba lagi, yuk?",
+    ru: "Пока нет карточек. Попробуем ещё раз?",
+    hi: "अभी कोई कार्ड नहीं है। फिर से करें?",
+    ar: "لا توجد بطاقات بعد. نجرب مرة أخرى؟",
+  },
+  ourTaste: {
+    ko: "우리 취향", en: "Our taste", vi: "Sở thích", zh: "我们的喜好", fil: "Gusto namin",
+    ja: "ふたりの すき", th: "ความชอบเรา", id: "Selera kami", ru: "Наш вкус", hi: "हमारी पसंद", ar: "ذوقنا",
+  },
+  colResult: {
+    ko: "결과", en: "Result", vi: "Kết quả", zh: "结果", fil: "Resulta",
+    ja: "けっか", th: "ผล", id: "Hasil", ru: "Итог", hi: "नतीजा", ar: "النتيجة",
+  },
+  colCategory: {
+    ko: "카테고리", en: "Topic", vi: "Chủ đề", zh: "分类", fil: "Paksa",
+    ja: "テーマ", th: "หัวข้อ", id: "Topik", ru: "Тема", hi: "विषय", ar: "الموضوع",
+  },
+  same: {
+    ko: "일치", en: "Same", vi: "Giống", zh: "一致", fil: "Pareho",
+    ja: "いっち", th: "ตรงกัน", id: "Sama", ru: "Совпало", hi: "मेल", ar: "متطابق",
+  },
+  different: {
+    ko: "다름", en: "Different", vi: "Khác", zh: "不同", fil: "Iba",
+    ja: "ちがう", th: "ต่างกัน", id: "Beda", ru: "Разное", hi: "अलग", ar: "مختلف",
+  },
+  noRecord: {
+    ko: "기록 없음", en: "No record", vi: "Chưa có", zh: "无记录", fil: "Walang tala",
+    ja: "きろく なし", th: "ไม่มีบันทึก", id: "Tidak ada", ru: "Нет записи", hi: "कोई रिकॉर्ड नहीं", ar: "لا سجل",
+  },
+  startBtn: {
+    ko: "시작하기", en: "Start", vi: "Bắt đầu", zh: "开始", fil: "Magsimula",
+    ja: "スタート", th: "เริ่ม", id: "Mulai", ru: "Старт", hi: "शुरू", ar: "ابدأ",
+  },
+  nextCard: {
+    ko: "다음 카드", en: "Next card", vi: "Thẻ tiếp", zh: "下一张", fil: "Susunod",
+    ja: "つぎの カード", th: "การ์ดถัดไป", id: "Kartu berikutnya", ru: "Следующая", hi: "अगला कार्ड", ar: "البطاقة التالية",
+  },
+  endBtn: {
+    ko: "끝내기", en: "Finish", vi: "Kết thúc", zh: "结束", fil: "Tapusin",
+    ja: "おわり", th: "จบ", id: "Selesai", ru: "Закончить", hi: "समाप्त", ar: "إنهاء",
+  },
+  againBtn: {
+    ko: "다시 하기", en: "Play again", vi: "Chơi lại", zh: "再玩一次", fil: "Ulitin",
+    ja: "もう一度", th: "เล่นอีกครั้ง", id: "Main lagi", ru: "Ещё раз", hi: "फिर खेलें", ar: "العب مجددًا",
+  },
 };
 
 interface CategoryStats {
@@ -164,31 +401,36 @@ export default function WouldYouRather({ langA, langB }: { langA: string; langB:
 
   // ----------------- summary -----------------
   if (phase === "summary") {
-    return <SummaryPanel stats={stats} onRestart={restartFromSummary} />;
+    return <SummaryPanel stats={stats} langA={langA} onRestart={restartFromSummary} />;
   }
 
   // ----------------- voting -----------------
   if (phase === "voting") {
     return (
-      <div style={{ padding: "14px 12px 28px", maxWidth: 560, margin: "0 auto" }}>
-        <StatsBar stats={stats} idx={idx} total={deck.length} />
-        <VoteCardNew
-          card={card}
-          langA={langA}
-          langB={langB}
-          voteA={voteA}
-          voteB={voteB}
-          onVote={handleVote}
-        />
-        <HintFooter voteA={voteA} voteB={voteB} />
+      <div data-ux-root className="wyr-root wyr-play">
+        <ScopedStyle css={WYR_CSS} />
+        <StatsBar stats={stats} idx={idx} total={deck.length} langA={langA} />
+        <div className="wyr-arena">
+          <OptionSide
+            option="A" card={card} langA={langA} langB={langB}
+            voteA={voteA} voteB={voteB} onVote={handleVote}
+          />
+          <div className="wyr-vs" aria-hidden="true">VS</div>
+          <OptionSide
+            option="B" card={card} langA={langA} langB={langB}
+            voteA={voteA} voteB={voteB} onVote={handleVote}
+          />
+        </div>
+        <HintFooter voteA={voteA} voteB={voteB} langA={langA} />
       </div>
     );
   }
 
   // ----------------- reveal -----------------
   return (
-    <div style={{ padding: "14px 12px 28px", maxWidth: 560, margin: "0 auto" }}>
-      <StatsBar stats={stats} idx={idx} total={deck.length} />
+    <div data-ux-root className="wyr-root wyr-play">
+      <ScopedStyle css={WYR_CSS} />
+      <StatsBar stats={stats} idx={idx} total={deck.length} langA={langA} />
       <RevealPanel
         card={card}
         langA={langA}
@@ -215,60 +457,47 @@ function IntroPanel({
 }) {
   const rate = stats.played > 0 ? Math.round((stats.matched / stats.played) * 100) : 0;
   return (
-    <div style={{ padding: "32px 20px 40px", textAlign: "center", maxWidth: 520, margin: "0 auto" }}>
-      <div style={{ fontSize: 64, lineHeight: 1 }} aria-hidden="true">🎲</div>
-      <h2 style={{ fontSize: 24, fontWeight: 900, color: "#9A3412", margin: "12px 0 6px" }}>
-        이거 저거 고르기
-      </h2>
-      <div style={{ fontSize: 14, color: "#7C2D12", fontWeight: 700, lineHeight: 1.55, marginBottom: 20 }}>
-        둘 중 뭐가 더 좋아?<br />
-        정답은 없어요 — 서로 이야기하면서 친해져요!
-      </div>
+    <div data-ux-root className="wyr-root wyr-intro">
+      <ScopedStyle css={WYR_CSS} />
+      <div className="wyr-intro-hero" aria-hidden="true">🎲</div>
+      <h2 data-ux-role="title" className="wyr-intro-title">{gt(WYR.title, langA)}</h2>
+      <p data-ux-role="body" className="wyr-intro-sub" data-ux-reading>
+        {gt(WYR.howto, langA)}
+      </p>
+      <p data-ux-role="body" className="wyr-intro-sub" data-ux-reading>
+        {gt(WYR.talkTogether, langA)}
+      </p>
 
-      <div style={{
-        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
-        margin: "0 auto 18px", maxWidth: 360,
-      }}>
-        <div style={{
-          background: PLAYER_A_BG, borderRadius: 18, padding: "14px 10px",
-          border: `2px solid ${PLAYER_A_ACCENT}55`,
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 900, color: PLAYER_A_ACCENT, letterSpacing: 1 }}>왼쪽</div>
-          <div style={{ fontSize: 28, marginTop: 4 }}>🐝</div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: "#9D174D", marginTop: 2 }}>학생 A ({langA})</div>
+      <div className="wyr-seats">
+        <div className="wyr-seat" data-player="A">
+          <span data-ux-role="secondary" className="wyr-seat-side">{gp(WYR.leftSeat, langA)}</span>
+          <span className="wyr-seat-bee" aria-hidden="true">🐝</span>
+          <span data-ux-role="label" className="wyr-seat-name">
+            {gp(WYR.student, langA)} A · {langA.toUpperCase()}
+          </span>
         </div>
-        <div style={{
-          background: PLAYER_B_BG, borderRadius: 18, padding: "14px 10px",
-          border: `2px solid ${PLAYER_B_ACCENT}55`,
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 900, color: PLAYER_B_ACCENT, letterSpacing: 1 }}>오른쪽</div>
-          <div style={{ fontSize: 28, marginTop: 4 }}>🐝</div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: "#065F46", marginTop: 2 }}>학생 B ({langB})</div>
+        <div className="wyr-seat" data-player="B">
+          <span data-ux-role="secondary" className="wyr-seat-side">{gp(WYR.rightSeat, langA)}</span>
+          <span className="wyr-seat-bee" aria-hidden="true">🐝</span>
+          <span data-ux-role="label" className="wyr-seat-name">
+            {gp(WYR.student, langA)} B · {langB.toUpperCase()}
+          </span>
         </div>
       </div>
 
       {stats.played > 0 && (
-        <div style={{
-          margin: "0 auto 18px", maxWidth: 360,
-          background: "#fff", borderRadius: 14, padding: "12px 14px",
-          border: "2px dashed #FCD34D", color: "#78350F",
-          fontSize: 13, fontWeight: 800,
-        }}>
-          방금 게임 결과: 함께 {stats.played}장 · 취향 일치 {rate}%
-        </div>
+        <p data-ux-role="body" className="wyr-intro-last" role="status">
+          {gt(WYR.lastResult, langA)} — {gp(WYR.cardsTogether, langA)} {stats.played} · {gp(WYR.matchRate, langA)} {rate}%
+        </p>
       )}
 
       <button
+        type="button"
+        data-ux-role="action"
+        className="wyr-btn wyr-btn-primary wyr-intro-start"
         onClick={onStart}
-        aria-label="시작하기"
-        style={{
-          background: "linear-gradient(180deg, #FB923C, #EA580C)",
-          color: "#fff", border: "none", borderRadius: 999,
-          padding: "14px 32px", fontSize: 16, fontWeight: 900,
-          cursor: "pointer", boxShadow: "0 8px 22px rgba(234,88,12,0.35)",
-        }}
       >
-        🎲 시작하기
+        🎲 {gp(WYR.startBtn, langA)}
       </button>
     </div>
   );
@@ -278,44 +507,38 @@ function IntroPanel({
 // Stats bar (progress + match rate)
 // ==============================================================
 function StatsBar({
-  stats, idx, total,
+  stats, idx, total, langA,
 }: {
   stats: StatsState;
   idx: number;
   total: number;
+  langA: string;
 }) {
   const rate = stats.played > 0 ? Math.round((stats.matched / stats.played) * 100) : 0;
   const pct = ((idx) / total) * 100;
   return (
-    <div style={{
-      background: "#fff", borderRadius: 14, padding: "10px 12px",
-      border: "2px solid #FED7AA", marginBottom: 12,
-      boxShadow: "0 4px 12px rgba(249,115,22,0.12)",
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, fontWeight: 800, color: "#9A3412" }}>
-        <span>📘 카드 {idx + 1} / {total}</span>
-        <span>함께 {stats.played}장 · 일치 {rate}%</span>
+    <div className="wyr-statsbar">
+      <div className="wyr-statsbar-row">
+        <span data-ux-role="label">📘 {gp(WYR.card, langA)} {idx + 1} / {total}</span>
+        <span data-ux-role="label">
+          {gp(WYR.cardsTogether, langA)} {stats.played} · {gp(WYR.matchRate, langA)} {rate}%
+        </span>
       </div>
-      <div style={{
-        marginTop: 6, height: 6, borderRadius: 999,
-        background: "#FFEDD5", overflow: "hidden",
-      }} aria-hidden="true">
-        <div style={{
-          width: `${pct}%`, height: "100%",
-          background: "linear-gradient(90deg, #FB923C, #EA580C)",
-          transition: "width 0.3s",
-        }} />
+      <div className="wyr-progress" aria-hidden="true">
+        <div className="wyr-progress-fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
 }
 
 // ==============================================================
-// Vote Card (NEW) — HeaderVS + SplitVoteArea
+// Arena — 좌/우 대결 구도. 한 쪽(=보기)마다 두 학생의 단추가 들어간다.
+// 좁은 화면에서는 세로로 쌓이고, 768 이상에서는 A | VS | B 가로 2단이 된다.
 // ==============================================================
-function VoteCardNew({
-  card, langA, langB, voteA, voteB, onVote,
+function OptionSide({
+  option, card, langA, langB, voteA, voteB, onVote,
 }: {
+  option: "A" | "B";
   card: WYRCard;
   langA: string;
   langB: string;
@@ -323,301 +546,86 @@ function VoteCardNew({
   voteB: Vote;
   onVote: (player: "A" | "B", option: "A" | "B") => void;
 }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <HeaderVS card={card} langA={langA} langB={langB} />
-      <SplitVoteArea
-        card={card}
-        langA={langA}
-        langB={langB}
-        voteA={voteA}
-        voteB={voteB}
-        onVote={onVote}
-      />
-    </div>
-  );
-}
-
-// --------------------------------------------------------------
-// HeaderVS — 상단: 대상 A VS 대상 B
-// --------------------------------------------------------------
-function HeaderVS({ card, langA, langB }: { card: WYRCard; langA: string; langB: string }) {
-  return (
-    <div style={{
-      background: "#fff", borderRadius: 22,
-      border: "3px solid #FED7AA",
-      boxShadow: "0 8px 22px rgba(234,88,12,0.12)",
-      padding: "14px 12px",
-      display: "grid",
-      gridTemplateColumns: "1fr auto 1fr",
-      alignItems: "center",
-      gap: 8,
-    }}>
-      <OptionHero option="A" card={card} langA={langA} langB={langB} />
-      <div
-        aria-hidden="true"
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          width: 44, height: 44, borderRadius: "50%",
-          background: "linear-gradient(180deg, #FB923C, #EA580C)",
-          color: "#fff", fontWeight: 900, fontSize: 14, letterSpacing: 0.5,
-          boxShadow: "0 4px 10px rgba(234,88,12,0.35)",
-          flexShrink: 0,
-        }}
-      >
-        VS
-      </div>
-      <OptionHero option="B" card={card} langA={langA} langB={langB} />
-    </div>
-  );
-}
-
-function OptionHero({
-  option, card, langA, langB,
-}: {
-  option: "A" | "B";
-  card: WYRCard;
-  langA: string;
-  langB: string;
-}) {
-  const bg = option === "A" ? OPT_A_BG : OPT_B_BG;
-  const accent = option === "A" ? OPT_A_ACCENT : OPT_B_ACCENT;
-  const textCol = option === "A" ? "#78350F" : "#1E3A8A";
   const opt = option === "A" ? card.optionA : card.optionB;
+  const chosenBy = [voteA === option ? "A" : null, voteB === option ? "B" : null].filter(Boolean);
 
   return (
-    <div style={{
-      background: bg,
-      borderRadius: 16,
-      border: `2px solid ${accent}55`,
-      padding: "10px 8px",
-      textAlign: "center",
-      minWidth: 0,
-    }}>
-      <div style={{
-        display: "inline-block",
-        background: accent, color: "#fff",
-        fontSize: 10, fontWeight: 900, letterSpacing: 1,
-        padding: "2px 8px", borderRadius: 999, marginBottom: 4,
-      }}>
-        {option}
-      </div>
-      <div style={{ fontSize: 40, lineHeight: 1 }} aria-hidden="true">
-        {opt.emoji}
-      </div>
-      <div style={{
-        fontSize: 13, fontWeight: 900, color: textCol,
-        marginTop: 4, lineHeight: 1.25,
-        overflow: "hidden", textOverflow: "ellipsis",
-      }}>
+    <section className="wyr-side" data-opt={option} data-chosen={chosenBy.length > 0 ? "" : undefined}>
+      <div className="wyr-side-badge" aria-hidden="true">{option}</div>
+      <div className="wyr-side-emoji" aria-hidden="true">{opt.emoji}</div>
+      <h3 data-ux-role="body-emphasis" className="wyr-side-label">
         <GameText map={opt.label} lang={langA} />
-      </div>
-      <div style={{
-        fontSize: 11, color: `${textCol}AA`, fontWeight: 700,
-        marginTop: 2, lineHeight: 1.25,
-        overflow: "hidden", textOverflow: "ellipsis",
-      }}>
+      </h3>
+      <p data-ux-role="secondary" className="wyr-side-sub">
         <GameText map={opt.label} lang={langB} />
-      </div>
-    </div>
-  );
-}
-
-// --------------------------------------------------------------
-// SplitVoteArea — 2 players × 2 options grid
-// --------------------------------------------------------------
-function SplitVoteArea({
-  card, langA, langB, voteA, voteB, onVote,
-}: {
-  card: WYRCard;
-  langA: string;
-  langB: string;
-  voteA: Vote;
-  voteB: Vote;
-  onVote: (player: "A" | "B", option: "A" | "B") => void;
-}) {
-  return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 10,
-    }}>
-      <PlayerColumn
-        player="A"
-        card={card}
-        lang={langA}
-        myVote={voteA}
-        disabled={voteA !== null}
-        onVote={(opt) => onVote("A", opt)}
-      />
-      <PlayerColumn
-        player="B"
-        card={card}
-        lang={langB}
-        myVote={voteB}
-        disabled={voteB !== null}
-        onVote={(opt) => onVote("B", opt)}
-      />
-    </div>
-  );
-}
-
-function PlayerColumn({
-  player, card, lang, myVote, disabled, onVote,
-}: {
-  player: "A" | "B";
-  card: WYRCard;
-  lang: string;
-  myVote: Vote;
-  disabled: boolean;
-  onVote: (opt: "A" | "B") => void;
-}) {
-  const bg = player === "A" ? PLAYER_A_BG : PLAYER_B_BG;
-  const accent = player === "A" ? PLAYER_A_ACCENT : PLAYER_B_ACCENT;
-
-  return (
-    <div style={{
-      background: bg,
-      borderRadius: 20,
-      border: `3px solid ${accent}55`,
-      boxShadow: `0 4px 14px ${accent}22`,
-      overflow: "hidden",
-      display: "flex", flexDirection: "column",
-    }}>
-      {/* Player header */}
-      <div style={{
-        background: accent, color: "#fff",
-        padding: "6px 10px",
-        fontSize: 12, fontWeight: 900, letterSpacing: 0.6,
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-      }}>
-        <span aria-hidden="true">🐝</span>
-        <span>학생 {player}</span>
-        {myVote && <span aria-hidden="true" style={{ opacity: 0.85 }}>· ✓</span>}
-      </div>
-
-      {/* Split tap area: option A (top) / option B (bottom) */}
-      <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-        <VoteCell
-          player={player}
-          option="A"
-          card={card}
-          lang={lang}
-          myVote={myVote}
-          disabled={disabled}
-          onClick={() => onVote("A")}
+      </p>
+      <div className="wyr-side-votes">
+        <VoteButton
+          player="A" option={option} optionLabel={tr(opt.label, langA)}
+          myVote={voteA} uiLang={langA} onVote={onVote}
         />
-        <div style={{ height: 2, background: `${accent}44` }} aria-hidden="true" />
-        <VoteCell
-          player={player}
-          option="B"
-          card={card}
-          lang={lang}
-          myVote={myVote}
-          disabled={disabled}
-          onClick={() => onVote("B")}
+        <VoteButton
+          player="B" option={option} optionLabel={tr(opt.label, langB)}
+          myVote={voteB} uiLang={langA} onVote={onVote}
         />
       </div>
-    </div>
+    </section>
   );
 }
 
-function VoteCell({
-  player, option, card, lang, myVote, disabled, onClick,
+function VoteButton({
+  player, option, optionLabel, myVote, uiLang, onVote,
 }: {
   player: "A" | "B";
   option: "A" | "B";
-  card: WYRCard;
-  lang: string;
+  optionLabel: string;
   myVote: Vote;
-  disabled: boolean;
-  onClick: () => void;
+  uiLang: string;
+  onVote: (player: "A" | "B", option: "A" | "B") => void;
 }) {
-  const opt = option === "A" ? card.optionA : card.optionB;
-  const optBg = option === "A" ? OPT_A_BG : OPT_B_BG;
-  const optAccent = option === "A" ? OPT_A_ACCENT : OPT_B_ACCENT;
-  const textCol = option === "A" ? "#78350F" : "#1E3A8A";
-
   const isPicked = myVote === option;
-  const isOther = myVote !== null && myVote !== option;
+  const hasVoted = myVote !== null;
+  // disabled 로 잠그면 포커스를 잃어 키보드로 이유를 읽을 수 없다.
+  // aria-disabled + 핸들러 early-return + 화면에 보이는 이유로 대신한다.
+  const blocked = hasVoted && !isPicked;
 
-  const cellStyle: CSSProperties = {
-    flex: 1, minHeight: 92,
-    background: isPicked ? optBg : "#ffffffDD",
-    border: "none",
-    cursor: disabled ? "default" : "pointer",
-    padding: "10px 6px",
-    display: "flex", flexDirection: "column",
-    alignItems: "center", justifyContent: "center",
-    gap: 3,
-    color: textCol,
-    fontWeight: 800, fontSize: 12, lineHeight: 1.2,
-    textAlign: "center",
-    opacity: isOther ? 0.45 : 1,
-    position: "relative",
-    transition: "background 0.15s, opacity 0.15s",
-  };
+  const state = isPicked ? gp(WYR.pickedDone, uiLang)
+    : blocked ? gp(WYR.alreadyPicked, uiLang)
+    : gp(WYR.pickHere, uiLang);
 
   return (
     <button
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      aria-label={`학생 ${player}가 ${option === "A" ? "A (첫 번째)" : "B (두 번째)"} 선택`}
+      type="button"
+      data-ux-role="control"
+      className="wyr-vote"
+      data-player={player}
+      data-state={isPicked ? "picked" : blocked ? "blocked" : "open"}
+      aria-disabled={blocked || undefined}
       aria-pressed={isPicked}
-      style={cellStyle}
+      aria-label={`${gp(WYR.student, uiLang)} ${player} · ${optionLabel} · ${state}`}
+      onClick={() => { if (blocked) return; onVote(player, option); }}
     >
-      {/* Option badge */}
-      <div style={{
-        position: "absolute", top: 4, left: 4,
-        background: optAccent, color: "#fff",
-        fontSize: 9, fontWeight: 900, letterSpacing: 0.6,
-        padding: "1px 6px", borderRadius: 999,
-      }} aria-hidden="true">
-        {option}
-      </div>
-
-      {isPicked ? (
-        <>
-          <span style={{ fontSize: 26, lineHeight: 1 }} aria-hidden="true">{opt.emoji}</span>
-          <span style={{
-            display: "inline-flex", alignItems: "center", gap: 3,
-            fontSize: 11, fontWeight: 900, color: optAccent,
-          }}>
-            <span aria-hidden="true">✓</span>
-            <span>골랐어!</span>
-          </span>
-        </>
-      ) : (
-        <>
-          <span style={{ fontSize: 24, lineHeight: 1, opacity: isOther ? 0.4 : 0.9 }} aria-hidden="true">
-            {opt.emoji}
-          </span>
-          <span style={{
-            fontSize: 11, fontWeight: 800, color: textCol,
-            maxWidth: "100%",
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            <GameText map={opt.label} lang={lang} />
-          </span>
-        </>
-      )}
+      <span className="wyr-vote-who">
+        <span aria-hidden="true">🐝</span>
+        <span>{gp(WYR.student, uiLang)} {player}</span>
+      </span>
+      <span data-ux-role="secondary" className="wyr-vote-state">
+        {isPicked ? `✓ ${state}` : state}
+      </span>
     </button>
   );
 }
 
-function HintFooter({ voteA, voteB }: { voteA: Vote; voteB: Vote }) {
+function HintFooter({ voteA, voteB, langA }: { voteA: Vote; voteB: Vote; langA: string }) {
   const aDone = voteA !== null;
   const bDone = voteB !== null;
+  const text = aDone && bDone
+    ? gt(WYR.revealing, langA)
+    : aDone || bDone
+      ? gt(WYR.turnOther, langA)
+      : gt(WYR.hintPick, langA);
   return (
-    <div style={{
-      marginTop: 14, textAlign: "center",
-      fontSize: 12, fontWeight: 800, color: "#7C2D12",
-    }}>
-      {aDone && bDone ? "공개하는 중..." :
-        aDone ? "학생 A 골랐어! 학생 B 차례 🎯" :
-        bDone ? "학생 B 골랐어! 학생 A 차례 🎯" :
-        "각자 자기 칸에서 A 또는 B를 탭하세요 🤫"}
-    </div>
+    <p data-ux-role="body" className="wyr-hint" role="status">{text}</p>
   );
 }
 
@@ -637,77 +645,55 @@ function RevealPanel({
   onEnd: () => void;
 }) {
   const match = voteA === voteB;
+  const rate = stats.played > 0 ? Math.round((stats.matched / stats.played) * 100) : 0;
 
   return (
-    <div style={{ position: "relative" }}>
-      {match && <Confetti />}
-
-      <div style={{
-        background: "#fff", borderRadius: 24,
-        border: `3px solid ${match ? "#10B981" : "#F472B6"}55`,
-        padding: "22px 18px 18px",
-        textAlign: "center",
-        boxShadow: `0 10px 28px ${match ? "rgba(16,185,129,0.18)" : "rgba(244,114,182,0.18)"}`,
-      }}>
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
-          <BeeMascot size={90} mood={match ? "celebrate" : "think"} />
-        </div>
-        <div style={{ fontSize: 32, fontWeight: 900, color: match ? "#047857" : "#9D174D", marginBottom: 4 }}>
-          {match ? "🤝 비슷해!" : "🌈 달라서 재밌어!"}
-        </div>
-        <div style={{ fontSize: 13, color: "#6B7280", fontWeight: 700, marginBottom: 16 }}>
-          {match ? "둘 다 같은 걸 골랐어요" : "둘 다 멋진 선택이에요"}
-        </div>
-
-        {/* Node diagram for this card */}
-        <MiniNodeDiagram card={card} voteA={voteA} voteB={voteB} langA={langA} langB={langB} />
-
-        {/* Mini session stats */}
-        <MiniSessionStats stats={stats} />
-
-        {/* Follow-up */}
-        <div style={{
-          background: "#FFF7ED", borderRadius: 16,
-          padding: "14px 16px", textAlign: "left",
-          border: "2px dashed #FDBA74",
-          marginTop: 14,
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 900, color: "#9A3412", letterSpacing: 1.2, marginBottom: 6 }}>
-            💬 이야기해봐
+    <div className="wyr-reveal">
+      <div className="wyr-reveal-grid">
+        <div className="wyr-card wyr-reveal-main" data-match={match ? "" : undefined}>
+          {match && <Confetti />}
+          <div className="wyr-reveal-bee">
+            <BeeMascot size={90} mood={match ? "celebrate" : "think"} />
           </div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: "#1F2937", lineHeight: 1.5 }}>
+          <p data-ux-role="title" className="wyr-reveal-title">
+            {match ? `🤝 ${gt(WYR.sameTitle, langA)}` : `🌈 ${gt(WYR.diffTitle, langA)}`}
+          </p>
+          <p data-ux-role="body" className="wyr-reveal-sub">
+            {match ? gt(WYR.sameSub, langA) : gt(WYR.diffSub, langA)}
+          </p>
+
+          <MiniNodeDiagram card={card} voteA={voteA} voteB={voteB} langA={langA} langB={langB} />
+
+          <div className="wyr-chips">
+            <span data-ux-role="label" className="wyr-chip" data-tone="warm">
+              {gp(WYR.cardsTogether, langA)} {stats.played}
+            </span>
+            <span data-ux-role="label" className="wyr-chip" data-tone="ok">
+              ✓ {gp(WYR.same, langA)} {stats.matched}
+            </span>
+            <span data-ux-role="label" className="wyr-chip" data-tone="cool">
+              {gp(WYR.matchRate, langA)} {rate}%
+            </span>
+          </div>
+        </div>
+
+        <div className="wyr-card wyr-followup">
+          <p data-ux-role="label" className="wyr-followup-head">💬 {gt(WYR.talkAbout, langA)}</p>
+          <p data-ux-role="body-emphasis" className="wyr-followup-main" data-ux-reading>
             <GameText map={card.followUp} lang={langA} />
-          </div>
-          <div style={{ fontSize: 13, color: "#6B7280", marginTop: 4, lineHeight: 1.5 }}>
+          </p>
+          <p data-ux-role="body" className="wyr-followup-sub" data-ux-reading>
             <GameText map={card.followUp} lang={langB} />
-          </div>
+          </p>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-        <button
-          onClick={onEnd}
-          aria-label="끝내기 (통계 보기)"
-          style={{
-            flex: 1, padding: "12px 16px", borderRadius: 14,
-            background: "#fff", border: "2px solid #FCD34D",
-            color: "#92400E", fontWeight: 900, fontSize: 14,
-            cursor: "pointer",
-          }}
-        >
-          끝내기
+      <div className="wyr-actions">
+        <button type="button" data-ux-role="control" className="wyr-btn wyr-btn-quiet" onClick={onEnd}>
+          🏁 {gp(WYR.endBtn, langA)}
         </button>
-        <button
-          onClick={onNext}
-          aria-label="다음 카드"
-          style={{
-            flex: 2, padding: "12px 16px", borderRadius: 14,
-            background: "linear-gradient(180deg, #FB923C, #EA580C)",
-            border: "none", color: "#fff", fontWeight: 900, fontSize: 15,
-            cursor: "pointer", boxShadow: "0 6px 16px rgba(234,88,12,0.35)",
-          }}
-        >
-          다음 카드 →
+        <button type="button" data-ux-role="action" className="wyr-btn wyr-btn-primary wyr-btn-grow" onClick={onNext}>
+          {gp(WYR.nextCard, langA)} →
         </button>
       </div>
     </div>
@@ -734,215 +720,128 @@ function MiniNodeDiagram({
   return (
     <div
       role="img"
-      aria-label={match ? "두 학생 같은 선택 노드 그림" : "두 학생 다른 선택 노드 그림"}
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr auto 1fr",
-        alignItems: "center",
-        gap: 6,
-        background: "#FAFAFA",
-        borderRadius: 16,
-        border: "2px solid #E5E7EB",
-        padding: "12px 10px",
-      }}
+      aria-label={match ? gt(WYR.sameSub, langA) : gt(WYR.diffSub, langA)}
+      className="wyr-nodes"
     >
       <NodeBubble
-        role="A"
+        role="A" uiLang={langA}
         emoji={pickA ? pickA.emoji : "❔"}
-        label={pickA ? tr(pickA.label, langA) : "-"}
+        label={pickA ? tr(pickA.label, langA) : "—"}
       />
       <ConnectorLine match={match} />
       <NodeBubble
-        role="B"
+        role="B" uiLang={langA}
         emoji={pickB ? pickB.emoji : "❔"}
-        label={pickB ? tr(pickB.label, langB) : "-"}
+        label={pickB ? tr(pickB.label, langB) : "—"}
       />
     </div>
   );
 }
 
-function NodeBubble({ role, emoji, label }: { role: "A" | "B"; emoji: string; label: string }) {
-  const accent = role === "A" ? PLAYER_A_ACCENT : PLAYER_B_ACCENT;
-  const bg = role === "A" ? PLAYER_A_BG : PLAYER_B_BG;
+function NodeBubble({
+  role, emoji, label, uiLang,
+}: {
+  role: "A" | "B"; emoji: string; label: string; uiLang: string;
+}) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }}>
-      <div style={{
-        width: 56, height: 56, borderRadius: "50%",
-        background: bg, border: `3px solid ${accent}`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 28,
-        boxShadow: `0 3px 8px ${accent}33`,
-      }} aria-hidden="true">
-        {emoji}
-      </div>
-      <div style={{ fontSize: 10, fontWeight: 900, color: accent, letterSpacing: 0.6 }}>
-        학생 {role}
-      </div>
-      <div style={{
-        fontSize: 11, fontWeight: 700, color: "#374151",
-        maxWidth: "100%",
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-      }}>
-        {label}
-      </div>
+    <div className="wyr-node" data-player={role}>
+      <span className="wyr-node-bubble" aria-hidden="true">{emoji}</span>
+      <span data-ux-role="secondary" className="wyr-node-who">
+        {gp(WYR.student, uiLang)} {role}
+      </span>
+      <span data-ux-role="label" className="wyr-node-label">{label}</span>
     </div>
   );
 }
 
 function ConnectorLine({ match }: { match: boolean }) {
   return (
-    <div style={{
-      display: "flex", alignItems: "center",
-      width: 56, height: 40,
-      flexShrink: 0,
-      position: "relative",
-    }} aria-hidden="true">
-      <div style={{
-        flex: 1, height: 0,
-        borderTop: match ? "3px solid #10B981" : "3px dashed #F472B6",
-      }} />
-      <div style={{
-        position: "absolute", left: "50%", top: "50%",
-        transform: "translate(-50%, -50%)",
-        background: "#fff",
-        border: `2px solid ${match ? "#10B981" : "#F472B6"}`,
-        color: match ? "#047857" : "#9D174D",
-        fontSize: 10, fontWeight: 900,
-        padding: "2px 6px", borderRadius: 999,
-        whiteSpace: "nowrap",
-      }}>
-        {match ? "=" : "≠"}
-      </div>
-    </div>
-  );
-}
-
-// --------------------------------------------------------------
-// MiniSessionStats — quick bar under reveal
-// --------------------------------------------------------------
-function MiniSessionStats({ stats }: { stats: StatsState }) {
-  const rate = stats.played > 0 ? Math.round((stats.matched / stats.played) * 100) : 0;
-  return (
-    <div style={{
-      marginTop: 14,
-      display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap",
-      fontSize: 11, fontWeight: 800, color: "#6B7280",
-    }}>
-      <span style={{
-        background: "#FEF3C7", color: "#92400E",
-        padding: "4px 10px", borderRadius: 999,
-        border: "1px solid #FCD34D",
-      }}>
-        함께 {stats.played}장
-      </span>
-      <span style={{
-        background: "#DCFCE7", color: "#166534",
-        padding: "4px 10px", borderRadius: 999,
-        border: "1px solid #86EFAC",
-      }}>
-        ✓ 일치 {stats.matched}
-      </span>
-      <span style={{
-        background: "#E0E7FF", color: "#3730A3",
-        padding: "4px 10px", borderRadius: 999,
-        border: "1px solid #A5B4FC",
-      }}>
-        비율 {rate}%
-      </span>
+    <div className="wyr-conn" data-match={match ? "" : undefined} aria-hidden="true">
+      <span className="wyr-conn-line" />
+      <span className="wyr-conn-mark">{match ? "=" : "≠"}</span>
     </div>
   );
 }
 
 // ==============================================================
-// Summary panel — final stats table + node diagram
+// Summary panel — final stats + node graph, 넓은 화면에서는 격자
 // ==============================================================
-function SummaryPanel({ stats, onRestart }: { stats: StatsState; onRestart: () => void }) {
+function SummaryPanel({
+  stats, langA, onRestart,
+}: {
+  stats: StatsState;
+  langA: string;
+  onRestart: () => void;
+}) {
   const rate = stats.played > 0 ? Math.round((stats.matched / stats.played) * 100) : 0;
   const hasData = stats.played > 0;
 
   return (
-    <div style={{ padding: "18px 14px 36px", maxWidth: 560, margin: "0 auto" }}>
-      {/* Headline */}
-      <div style={{
-        background: "linear-gradient(180deg, #FFF7ED, #FFEDD5)",
-        borderRadius: 20, border: "3px solid #FDBA74",
-        padding: "20px 16px", textAlign: "center",
-        marginBottom: 14,
-        boxShadow: "0 8px 22px rgba(234,88,12,0.15)",
-      }}>
-        <div style={{ fontSize: 48, lineHeight: 1 }} aria-hidden="true">📊</div>
-        <h2 style={{ fontSize: 22, fontWeight: 900, color: "#9A3412", margin: "8px 0 4px" }}>
-          우리 취향 통계표
-        </h2>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#7C2D12" }}>
-          함께 <strong>{stats.played}</strong>장 · 일치 <strong>{stats.matched}</strong>장 · 비율 <strong>{rate}%</strong>
+    <div data-ux-root className="wyr-root wyr-summary">
+      <ScopedStyle css={WYR_CSS} />
+
+      <div className="wyr-card wyr-sum-head">
+        <div className="wyr-sum-hero" aria-hidden="true">📊</div>
+        <h2 data-ux-role="title" className="wyr-sum-title">{gt(WYR.statsTitle, langA)}</h2>
+        <div className="wyr-chips">
+          <span data-ux-role="label" className="wyr-chip" data-tone="warm">
+            {gp(WYR.cardsTogether, langA)} {stats.played}
+          </span>
+          <span data-ux-role="label" className="wyr-chip" data-tone="ok">
+            ✓ {gp(WYR.same, langA)} {stats.matched}
+          </span>
+          <span data-ux-role="label" className="wyr-chip" data-tone="cool">
+            {gp(WYR.matchRate, langA)} {rate}%
+          </span>
         </div>
       </div>
 
       {!hasData && (
-        <div style={{
-          background: "#fff", borderRadius: 16,
-          border: "2px dashed #E5E7EB",
-          padding: "22px 16px", textAlign: "center",
-          color: "#6B7280", fontSize: 13, fontWeight: 700,
-        }}>
-          아직 고른 카드가 없어요. 다시 해볼까요?
-        </div>
+        <p data-ux-role="body" className="wyr-card wyr-sum-empty" role="status">
+          {gt(WYR.noData, langA)}
+        </p>
       )}
 
       {hasData && (
-        <>
-          {/* Category node diagram */}
-          <SectionHeader emoji="🕸️" title="카테고리별 취향 그물" />
-          <CategoryNodeGraph stats={stats} />
+        <div className="wyr-sum-grid">
+          <section className="wyr-card">
+            <h3 data-ux-role="label" className="wyr-sec-head">🕸️ {gt(WYR.secWeb, langA)}</h3>
+            <CategoryNodeGraph stats={stats} langA={langA} />
+          </section>
 
-          {/* Category bars */}
-          <SectionHeader emoji="📈" title="카테고리별 일치율" />
-          <CategoryBars stats={stats} />
+          <section className="wyr-card">
+            <h3 data-ux-role="label" className="wyr-sec-head">📈 {gt(WYR.secBars, langA)}</h3>
+            <CategoryBars stats={stats} langA={langA} />
+          </section>
 
-          {/* Card-by-card table */}
-          <SectionHeader emoji="📋" title="카드별 기록" />
-          <HistoryTable history={stats.history} />
-        </>
+          <section className="wyr-card">
+            <h3 data-ux-role="label" className="wyr-sec-head">📋 {gt(WYR.secTable, langA)}</h3>
+            <HistoryTable history={stats.history} langA={langA} />
+          </section>
+        </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+      <div className="wyr-actions">
         <button
+          type="button"
+          data-ux-role="action"
+          className="wyr-btn wyr-btn-primary wyr-btn-grow"
           onClick={onRestart}
-          aria-label="처음으로"
-          style={{
-            flex: 1, padding: "14px 16px", borderRadius: 14,
-            background: "linear-gradient(180deg, #FB923C, #EA580C)",
-            border: "none", color: "#fff", fontWeight: 900, fontSize: 15,
-            cursor: "pointer", boxShadow: "0 6px 16px rgba(234,88,12,0.35)",
-          }}
         >
-          🔄 다시 하기
+          🔄 {gp(WYR.againBtn, langA)}
         </button>
       </div>
     </div>
   );
 }
 
-function SectionHeader({ emoji, title }: { emoji: string; title: string }) {
-  return (
-    <div style={{
-      margin: "16px 0 8px",
-      display: "flex", alignItems: "center", gap: 6,
-      fontSize: 13, fontWeight: 900, color: "#9A3412",
-      letterSpacing: 0.4,
-    }}>
-      <span aria-hidden="true">{emoji}</span>
-      <span>{title}</span>
-    </div>
-  );
-}
-
 // --------------------------------------------------------------
 // CategoryNodeGraph — central "우리 취향" node, 5 categories around,
-// line thickness = match rate
+// line thickness = match rate.
+// SVG 안의 숫자는 px 이 아니라 viewBox 사용자 단위다 — 그림 전체가
+// CSS 폭에 맞춰 함께 커지고 작아지므로 글자 크기가 고정되지 않는다.
 // --------------------------------------------------------------
-function CategoryNodeGraph({ stats }: { stats: StatsState }) {
+function CategoryNodeGraph({ stats, langA }: { stats: StatsState; langA: string }) {
   const size = 280;
   const cx = size / 2;
   const cy = size / 2;
@@ -960,17 +859,18 @@ function CategoryNodeGraph({ stats }: { stats: StatsState }) {
     return { cat, x, y, rate, played: s.played, matched: s.matched, active };
   });
 
+  const summary = CATEGORIES.map((cat) => {
+    const s = stats.byCategory[cat];
+    const pct = s.played > 0 ? Math.round((s.matched / s.played) * 100) : 0;
+    return `${gp(CATEGORY_META[cat].label, langA)} ${s.played > 0 ? `${pct}%` : gp(WYR.noRecord, langA)}`;
+  }).join(", ");
+
   return (
-    <div style={{
-      background: "#fff", borderRadius: 18,
-      border: "2px solid #FED7AA", padding: 12,
-      display: "flex", justifyContent: "center",
-    }}>
+    <div className="wyr-web">
       <svg
-        width={size}
-        height={size}
+        className="wyr-web-svg"
         role="img"
-        aria-label="카테고리별 취향 일치 노드 그림. 중앙 '우리 취향' 주변에 음식, 계절, 학교, 집, 취향 노드가 선으로 연결되어 있으며 선 두께는 일치율을 나타냅니다."
+        aria-label={`${gt(WYR.secWeb, langA)} — ${summary}`}
         viewBox={`0 0 ${size} ${size}`}
       >
         {/* Connecting lines */}
@@ -980,14 +880,14 @@ function CategoryNodeGraph({ stats }: { stats: StatsState }) {
               <line
                 key={`line-${n.cat}`}
                 x1={cx} y1={cy} x2={n.x} y2={n.y}
-                stroke="#E5E7EB"
+                stroke="var(--ux-surface-sunk)"
                 strokeWidth={1}
                 strokeDasharray="4 4"
               />
             );
           }
           const color = CATEGORY_META[n.cat].color;
-          const thick = 2 + n.rate * 8; // 2..10px
+          const thick = 2 + n.rate * 8; // 2..10 (viewBox 단위)
           return (
             <line
               key={`line-${n.cat}`}
@@ -1003,26 +903,19 @@ function CategoryNodeGraph({ stats }: { stats: StatsState }) {
         {/* Center node */}
         <circle
           cx={cx} cy={cy} r={centerR}
-          fill="#FFF7ED"
-          stroke="#EA580C"
+          fill="var(--ux-surface)"
+          stroke="var(--ux-primary-border)"
           strokeWidth={3}
         />
-        <text
-          x={cx} y={cy - 4}
-          fontSize={22}
-          textAnchor="middle"
-          dominantBaseline="middle"
-        >
-          🐝
-        </text>
+        <text x={cx} y={cy - 4} fontSize={22} textAnchor="middle" dominantBaseline="middle">🐝</text>
         <text
           x={cx} y={cy + 16}
           fontSize={10}
           fontWeight={900}
-          fill="#9A3412"
+          fill="var(--ux-ink)"
           textAnchor="middle"
         >
-          우리 취향
+          {gp(WYR.ourTaste, langA)}
         </text>
 
         {/* Category nodes */}
@@ -1033,23 +926,18 @@ function CategoryNodeGraph({ stats }: { stats: StatsState }) {
             <g key={`node-${n.cat}`}>
               <circle
                 cx={n.x} cy={n.y} r={nodeR}
-                fill="#fff"
-                stroke={n.active ? meta.color : "#D1D5DB"}
+                fill="var(--ux-surface)"
+                stroke={n.active ? meta.color : "var(--ux-surface-sunk)"}
                 strokeWidth={n.active ? 3 : 2}
               />
-              <text
-                x={n.x} y={n.y - 4}
-                fontSize={18}
-                textAnchor="middle"
-                dominantBaseline="middle"
-              >
+              <text x={n.x} y={n.y - 4} fontSize={18} textAnchor="middle" dominantBaseline="middle">
                 {meta.emoji}
               </text>
               <text
                 x={n.x} y={n.y + 14}
                 fontSize={9}
                 fontWeight={900}
-                fill={n.active ? meta.color : "#9CA3AF"}
+                fill={n.active ? meta.color : "var(--ux-ink-soft)"}
                 textAnchor="middle"
               >
                 {n.active ? `${pct}%` : "—"}
@@ -1065,13 +953,9 @@ function CategoryNodeGraph({ stats }: { stats: StatsState }) {
 // --------------------------------------------------------------
 // CategoryBars — horizontal bar chart per category
 // --------------------------------------------------------------
-function CategoryBars({ stats }: { stats: StatsState }) {
+function CategoryBars({ stats, langA }: { stats: StatsState; langA: string }) {
   return (
-    <div style={{
-      background: "#fff", borderRadius: 16,
-      border: "2px solid #FED7AA", padding: "12px 14px",
-      display: "flex", flexDirection: "column", gap: 8,
-    }}>
+    <div className="wyr-bars">
       {CATEGORIES.map((cat) => {
         const meta = CATEGORY_META[cat];
         const s = stats.byCategory[cat];
@@ -1080,34 +964,27 @@ function CategoryBars({ stats }: { stats: StatsState }) {
         const active = s.played > 0;
 
         return (
-          <div key={cat} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              width: 80, display: "flex", alignItems: "center", gap: 5,
-              fontSize: 12, fontWeight: 900, color: active ? meta.color : "#9CA3AF",
-            }}>
+          <div key={cat} className="wyr-bar" data-active={active ? "" : undefined}>
+            <span data-ux-role="label" className="wyr-bar-name" style={{ color: active ? meta.color : "var(--ux-ink-soft)" }}>
               <span aria-hidden="true">{meta.emoji}</span>
-              <span>{meta.label}</span>
-            </div>
-            <div style={{
-              flex: 1, height: 12, borderRadius: 999,
-              background: "#F3F4F6", overflow: "hidden",
-              position: "relative",
-            }} aria-hidden="true">
-              <div style={{
-                width: active ? `${Math.max(pct, 4)}%` : "0%",
-                height: "100%",
-                background: active ? meta.color : "transparent",
-                transition: "width 0.3s",
-              }} />
-            </div>
-            <div style={{
-              width: 56, textAlign: "right",
-              fontSize: 11, fontWeight: 800, color: "#374151",
-            }}
-            aria-label={`${meta.label} ${active ? `${s.matched}/${s.played}장 일치 ${pct}%` : "기록 없음"}`}
+              <span>{gp(meta.label, langA)}</span>
+            </span>
+            <span className="wyr-bar-track" aria-hidden="true">
+              <span
+                className="wyr-bar-fill"
+                style={{
+                  width: active ? `${Math.max(pct, 4)}%` : "0%",
+                  background: active ? meta.color : "transparent",
+                }}
+              />
+            </span>
+            <span
+              data-ux-role="secondary"
+              className="wyr-bar-num"
+              aria-label={`${gp(meta.label, langA)} ${active ? `${s.matched}/${s.played} ${gp(WYR.same, langA)} ${pct}%` : gp(WYR.noRecord, langA)}`}
             >
               {active ? `${s.matched}/${s.played}` : "—"}
-            </div>
+            </span>
           </div>
         );
       })}
@@ -1118,97 +995,48 @@ function CategoryBars({ stats }: { stats: StatsState }) {
 // --------------------------------------------------------------
 // HistoryTable — card-by-card list
 // --------------------------------------------------------------
-function HistoryTable({ history }: { history: { category: WYRCategory; matched: boolean }[] }) {
+function HistoryTable({
+  history, langA,
+}: {
+  history: { category: WYRCategory; matched: boolean }[];
+  langA: string;
+}) {
   return (
-    <div style={{
-      background: "#fff", borderRadius: 16,
-      border: "2px solid #FED7AA", padding: "10px 10px",
-      overflow: "hidden",
-    }}>
-      <div
-        role="table"
-        aria-label="카드별 기록 표"
-        style={{ display: "flex", flexDirection: "column" }}
-      >
-        <div
-          role="row"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "48px 1fr 56px",
-            gap: 6,
-            padding: "6px 8px",
-            fontSize: 10, fontWeight: 900, color: "#9A3412",
-            letterSpacing: 0.6,
-            borderBottom: "2px dashed #FED7AA",
-          }}
-        >
-          <div role="columnheader">카드</div>
-          <div role="columnheader">카테고리</div>
-          <div role="columnheader" style={{ textAlign: "right" }}>결과</div>
-        </div>
-        {history.map((h, i) => {
-          const meta = CATEGORY_META[h.category];
-          return (
-            <div
-              role="row"
-              key={i}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "48px 1fr 56px",
-                gap: 6,
-                padding: "8px",
-                fontSize: 12, fontWeight: 700,
-                color: "#1F2937",
-                borderBottom: i === history.length - 1 ? "none" : "1px dashed #F3F4F6",
-                alignItems: "center",
-              }}
-            >
-              <div role="cell" style={{ color: "#6B7280", fontWeight: 800 }}>#{i + 1}</div>
-              <div role="cell" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span aria-hidden="true">{meta.emoji}</span>
-                <span style={{ color: meta.color, fontWeight: 900 }}>{meta.label}</span>
-              </div>
-              <div role="cell" style={{ textAlign: "right" }}>
-                {h.matched ? (
-                  <span
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: 3,
-                      background: "#DCFCE7", color: "#166534",
-                      padding: "3px 8px", borderRadius: 999,
-                      fontSize: 11, fontWeight: 900,
-                      border: "1px solid #86EFAC",
-                    }}
-                    aria-label="일치"
-                  >
-                    <span aria-hidden="true">✓</span>
-                    <span>일치</span>
-                  </span>
-                ) : (
-                  <span
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: 3,
-                      background: "#FCE7F3", color: "#9D174D",
-                      padding: "3px 8px", borderRadius: 999,
-                      fontSize: 11, fontWeight: 900,
-                      border: "1px solid #F9A8D4",
-                    }}
-                    aria-label="다름"
-                  >
-                    <span aria-hidden="true">≠</span>
-                    <span>다름</span>
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+    <div role="table" aria-label={gt(WYR.secTable, langA)} className="wyr-hist">
+      <div role="row" className="wyr-hist-row wyr-hist-head">
+        <span role="columnheader" data-ux-role="secondary">{gp(WYR.card, langA)}</span>
+        <span role="columnheader" data-ux-role="secondary">{gp(WYR.colCategory, langA)}</span>
+        <span role="columnheader" data-ux-role="secondary" className="wyr-hist-end">
+          {gp(WYR.colResult, langA)}
+        </span>
       </div>
+      {history.map((h, i) => {
+        const meta = CATEGORY_META[h.category];
+        return (
+          <div role="row" key={i} className="wyr-hist-row">
+            <span role="cell" data-ux-role="secondary">#{i + 1}</span>
+            <span role="cell" data-ux-role="label" className="wyr-hist-cat" style={{ color: meta.color }}>
+              <span aria-hidden="true">{meta.emoji}</span>
+              <span>{gp(meta.label, langA)}</span>
+            </span>
+            <span role="cell" className="wyr-hist-end">
+              <span
+                data-ux-role="secondary"
+                className="wyr-chip"
+                data-tone={h.matched ? "ok" : "cool"}
+              >
+                {h.matched ? `✓ ${gp(WYR.same, langA)}` : `≠ ${gp(WYR.different, langA)}`}
+              </span>
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // ==============================================================
-// Confetti — lightweight transform/opacity sprites
+// Confetti — lightweight transform/opacity sprites (일치했을 때만)
 // ==============================================================
 function Confetti() {
   const pieces = useMemo(() => {
@@ -1227,30 +1055,15 @@ function Confetti() {
   }, []);
 
   return (
-    <div
-      aria-hidden="true"
-      style={{
-        position: "absolute", inset: 0, pointerEvents: "none",
-        overflow: "hidden", zIndex: 3,
-      }}
-    >
-      <style>{`
-        @keyframes wyrConfettiFall {
-          0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
-          15% { opacity: 1; }
-          100% { transform: translateY(320px) rotate(var(--r, 180deg)); opacity: 0; }
-        }
-      `}</style>
+    <div aria-hidden="true" className="wyr-confetti">
       {pieces.map((p, i) => (
         <span
           key={i}
           style={{
-            position: "absolute",
-            top: 0,
             left: `${p.left}%`,
-            fontSize: 22,
-            animation: `wyrConfettiFall ${p.dur}s ease-out ${p.delay}s forwards`,
-            ["--r" as string]: `${p.rot}deg`,
+            animationDuration: `${p.dur}s`,
+            animationDelay: `${p.delay}s`,
+            ["--wyr-rot" as string]: `${p.rot}deg`,
           } as CSSProperties}
         >
           {p.emoji}
@@ -1259,3 +1072,324 @@ function Confetti() {
     </div>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것.
+   장식용 이모지만 토큰의 em 배수로 키운다. */
+const WYR_CSS = `
+.wyr-root{
+  color: var(--ux-ink);
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: var(--ux-space-4) var(--ux-space-3) var(--ux-space-8);
+  box-sizing: border-box;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+/* min-width 는 여기서 0 으로 깔지 않는다 — 전역 [data-ux-role="control"] 의
+   최소 조작 크기를 덮어써 버린다. 폭 제한은 grid 의 minmax(0, 1fr) 로만. */
+.wyr-root *{ box-sizing: border-box; }
+.wyr-card{
+  background: var(--ux-surface);
+  border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-4);
+}
+.wyr-btn{
+  font-family: inherit; font-weight: 800; cursor: pointer;
+  border-radius: var(--ux-radius-pill);
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--ux-space-2);
+}
+.wyr-btn-primary[data-ux-role="action"],
+.wyr-btn-primary[data-ux-role="control"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border);
+}
+.wyr-btn-quiet[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
+}
+.wyr-btn-grow{ flex: 2 1 240px; }
+.wyr-actions{
+  display: flex; flex-wrap: wrap; gap: var(--ux-space-3);
+  margin-top: var(--ux-space-6);
+}
+.wyr-actions > .wyr-btn{ flex: 1 1 160px; }
+
+/* ── intro ───────────────────────────────────────────────── */
+.wyr-intro{ display: grid; justify-items: center; gap: var(--ux-space-3); text-align: center; }
+.wyr-intro p{ margin: 0; }
+.wyr-intro-hero{ font-size: calc(var(--ux-font-title) * 2.2); line-height: 1; }
+.wyr-intro-title{ margin: 0; }
+.wyr-intro-sub{ margin: 0; }
+.wyr-intro-last{
+  margin: 0; background: var(--ux-surface-sunk);
+  border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3) var(--ux-space-4);
+}
+.wyr-intro-start{ margin-top: var(--ux-space-3); }
+.wyr-seats{
+  display: grid; gap: var(--ux-space-3); width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin: var(--ux-space-2) 0;
+}
+.wyr-seat{
+  display: grid; justify-items: center; gap: var(--ux-space-1);
+  background: var(--ux-surface);
+  border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-4) var(--ux-space-3);
+  border: 3px solid var(--ux-surface-sunk);
+}
+.wyr-seat[data-player="A"]{ border-color: ${PLAYER_A_ACCENT}55; }
+.wyr-seat[data-player="B"]{ border-color: ${PLAYER_B_ACCENT}55; }
+.wyr-seat[data-player="A"] .wyr-seat-side{ color: ${PLAYER_A_ACCENT}; }
+.wyr-seat[data-player="B"] .wyr-seat-side{ color: ${PLAYER_B_ACCENT}; }
+.wyr-seat-bee{ font-size: calc(var(--ux-font-title) * 1.2); line-height: 1; }
+.wyr-seat-name{ font-weight: 800; }
+
+/* ── play: 진행 바 ───────────────────────────────────────── */
+.wyr-statsbar{
+  background: var(--ux-surface);
+  border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3) var(--ux-space-4);
+  margin-bottom: var(--ux-space-4);
+}
+.wyr-statsbar-row{
+  display: flex; flex-wrap: wrap; gap: var(--ux-space-2) var(--ux-space-4);
+  justify-content: space-between; align-items: center;
+  font-weight: 800;
+}
+.wyr-progress{
+  margin-top: var(--ux-space-2); height: 8px; border-radius: var(--ux-radius-pill);
+  background: var(--ux-surface-sunk); overflow: hidden;
+}
+.wyr-progress-fill{
+  display: block; height: 100%;
+  background: var(--ux-primary-fill);
+  transition: width var(--ux-motion-state) var(--ux-motion-ease);
+}
+
+/* ── play: 좌/우 대결 무대 ───────────────────────────────── */
+.wyr-arena{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ux-space-3);
+  align-items: stretch;
+}
+.wyr-vs{
+  justify-self: center; align-self: center;
+  display: flex; align-items: center; justify-content: center;
+  min-width: var(--ux-control-min); min-height: var(--ux-control-min);
+  padding: var(--ux-space-2) var(--ux-space-3);
+  border-radius: var(--ux-radius-pill);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  font-weight: 900; font-size: var(--ux-font-label); letter-spacing: .06em;
+}
+.wyr-side{
+  position: relative;
+  display: grid; justify-items: center; align-content: start;
+  gap: var(--ux-space-2);
+  padding: var(--ux-space-6) var(--ux-space-4) var(--ux-space-4);
+  border-radius: var(--ux-radius-panel);
+  background: var(--ux-surface);
+  border: 3px solid var(--ux-surface-sunk);
+  text-align: center;
+  transition: border-color var(--ux-motion-state) var(--ux-motion-ease);
+}
+.wyr-side[data-opt="A"]{ border-color: ${OPT_A_ACCENT}55; }
+.wyr-side[data-opt="B"]{ border-color: ${OPT_B_ACCENT}55; }
+.wyr-side[data-chosen][data-opt="A"]{ border-color: ${OPT_A_ACCENT}; }
+.wyr-side[data-chosen][data-opt="B"]{ border-color: ${OPT_B_ACCENT}; }
+.wyr-side-badge{
+  position: absolute; top: var(--ux-space-2); left: var(--ux-space-2);
+  padding: var(--ux-space-1) var(--ux-space-3);
+  border-radius: var(--ux-radius-pill);
+  color: var(--ux-surface); font-weight: 900;
+  font-size: var(--ux-font-secondary); letter-spacing: .08em;
+}
+.wyr-side[data-opt="A"] .wyr-side-badge{ background: ${OPT_A_ACCENT}; }
+.wyr-side[data-opt="B"] .wyr-side-badge{ background: ${OPT_B_ACCENT}; }
+.wyr-side-emoji{ font-size: calc(var(--ux-font-title) * 2); line-height: 1; }
+.wyr-side-label{ margin: 0; font-weight: 900; }
+.wyr-side-sub{ margin: 0; }
+.wyr-side-votes{
+  width: 100%; margin-top: var(--ux-space-2);
+  display: grid; gap: var(--ux-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.wyr-vote[data-ux-role="control"]{
+  display: grid; gap: var(--ux-space-1); justify-items: center;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-surface-sunk);
+  font-family: inherit; font-weight: 800;
+  transition: background var(--ux-motion-state) var(--ux-motion-ease),
+              border-color var(--ux-motion-state) var(--ux-motion-ease);
+}
+.wyr-vote[data-player="A"]{ border-color: ${PLAYER_A_ACCENT}55; }
+.wyr-vote[data-player="B"]{ border-color: ${PLAYER_B_ACCENT}55; }
+.wyr-vote-who{ display: inline-flex; align-items: center; gap: var(--ux-space-1); }
+.wyr-vote-state{ font-weight: 700; }
+.wyr-vote[data-state="picked"][data-player="A"]{
+  background: color-mix(in srgb, ${PLAYER_A_ACCENT} 14%, var(--ux-surface));
+  border-color: ${PLAYER_A_ACCENT};
+}
+.wyr-vote[data-state="picked"][data-player="B"]{
+  background: color-mix(in srgb, ${PLAYER_B_ACCENT} 14%, var(--ux-surface));
+  border-color: ${PLAYER_B_ACCENT};
+}
+.wyr-vote[data-state="blocked"]{
+  background: var(--ux-surface-sunk); cursor: default;
+}
+.wyr-hint{
+  margin: var(--ux-space-4) 0 0; text-align: center;
+  background: var(--ux-surface-sunk);
+  border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3) var(--ux-space-4);
+}
+
+@media (min-width: 768px){
+  .wyr-arena{ grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .wyr-side{ padding: var(--ux-space-8) var(--ux-space-6) var(--ux-space-6); }
+  .wyr-side-emoji{ font-size: calc(var(--ux-font-title) * 3); }
+}
+@media (min-width: 1024px){
+  .wyr-side-emoji{ font-size: calc(var(--ux-font-title) * 3.6); }
+}
+
+/* ── reveal ──────────────────────────────────────────────── */
+.wyr-reveal-grid{
+  display: grid; gap: var(--ux-space-4);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+.wyr-reveal-main{ position: relative; overflow: hidden; text-align: center; }
+.wyr-reveal-main p{ margin: 0 0 var(--ux-space-2); }
+.wyr-reveal-main[data-match]{ border-color: var(--ux-success); }
+.wyr-reveal-bee{ display: flex; justify-content: center; margin-bottom: var(--ux-space-2); }
+.wyr-reveal-title{ font-weight: 900; }
+.wyr-reveal-main[data-match] .wyr-reveal-title{ color: var(--ux-success); }
+.wyr-followup{
+  background: var(--ux-surface-sunk);
+  border: 2px dashed var(--ux-primary-border);
+  display: grid; gap: var(--ux-space-2); align-content: start;
+}
+.wyr-followup p{ margin: 0; }
+.wyr-followup-head{ font-weight: 900; letter-spacing: .05em; }
+.wyr-followup-main{ font-weight: 800; }
+.wyr-followup-sub{ color: var(--ux-ink-soft); }
+
+.wyr-nodes{
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; gap: var(--ux-space-2);
+  background: var(--ux-surface-sunk);
+  border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3);
+  margin-top: var(--ux-space-3);
+}
+.wyr-node{ display: grid; justify-items: center; gap: var(--ux-space-1); }
+.wyr-node-bubble{
+  width: 3.2em; height: 3.2em; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ux-surface);
+  font-size: calc(var(--ux-font-title) * 0.9); line-height: 1;
+  border: 3px solid var(--ux-surface-sunk);
+}
+.wyr-node[data-player="A"] .wyr-node-bubble{ border-color: ${PLAYER_A_ACCENT}; }
+.wyr-node[data-player="B"] .wyr-node-bubble{ border-color: ${PLAYER_B_ACCENT}; }
+.wyr-node[data-player="A"] .wyr-node-who{ color: ${PLAYER_A_ACCENT}; }
+.wyr-node[data-player="B"] .wyr-node-who{ color: ${PLAYER_B_ACCENT}; }
+.wyr-node-who{ font-weight: 900; }
+.wyr-node-label{ font-weight: 700; max-width: 100%; }
+.wyr-conn{
+  position: relative; display: flex; align-items: center;
+  width: 4em; min-height: 2.4em;
+}
+.wyr-conn-line{ flex: 1; border-top: 3px dashed var(--ux-ink-soft); }
+.wyr-conn[data-match] .wyr-conn-line{ border-top-style: solid; border-top-color: var(--ux-success); }
+.wyr-conn-mark{
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  background: var(--ux-surface);
+  border: 2px solid var(--ux-ink-soft); color: var(--ux-ink-soft);
+  font-size: var(--ux-font-secondary); font-weight: 900;
+  padding: 0 var(--ux-space-2); border-radius: var(--ux-radius-pill);
+  white-space: nowrap;
+}
+.wyr-conn[data-match] .wyr-conn-mark{ border-color: var(--ux-success); color: var(--ux-success); }
+
+.wyr-chips{
+  display: flex; flex-wrap: wrap; gap: var(--ux-space-2);
+  justify-content: center; margin-top: var(--ux-space-3);
+}
+.wyr-chip{
+  display: inline-flex; align-items: center; gap: var(--ux-space-1);
+  padding: var(--ux-space-1) var(--ux-space-3);
+  border-radius: var(--ux-radius-pill);
+  background: var(--ux-surface-sunk); color: var(--ux-ink);
+  border: 2px solid var(--ux-surface-sunk);
+  font-weight: 800;
+}
+.wyr-chip[data-tone="ok"]{ border-color: var(--ux-success); color: var(--ux-success); }
+.wyr-chip[data-tone="cool"]{ border-color: var(--ux-primary-border); }
+.wyr-chip[data-tone="warm"]{ border-color: var(--ux-primary-border); }
+
+.wyr-confetti{
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3;
+}
+.wyr-confetti span{
+  position: absolute; top: 0;
+  font-size: calc(var(--ux-font-title) * 0.8);
+  animation-name: wyrConfettiFall;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+@keyframes wyrConfettiFall{
+  0%   { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translateY(320px) rotate(var(--wyr-rot, 180deg)); opacity: 0; }
+}
+
+@media (min-width: 900px){
+  .wyr-reveal-grid{ grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+}
+
+/* ── summary ─────────────────────────────────────────────── */
+.wyr-summary{ display: grid; gap: var(--ux-space-4); }
+.wyr-sum-head{ text-align: center; }
+.wyr-sum-hero{ font-size: calc(var(--ux-font-title) * 1.8); line-height: 1; }
+.wyr-sum-title{ margin: var(--ux-space-2) 0 0; }
+.wyr-sum-empty{ margin: 0; text-align: center; border-style: dashed; }
+.wyr-sum-grid{
+  display: grid; gap: var(--ux-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: start;
+}
+.wyr-sec-head{
+  margin: 0 0 var(--ux-space-3); font-weight: 900; letter-spacing: .03em;
+}
+.wyr-web{ display: flex; justify-content: center; }
+.wyr-web-svg{ width: 100%; max-width: 340px; height: auto; }
+
+.wyr-bars{ display: grid; gap: var(--ux-space-3); }
+.wyr-bar{ display: grid; grid-template-columns: minmax(0, 7em) minmax(0, 1fr) auto; align-items: center; gap: var(--ux-space-2); }
+.wyr-bar-name{ display: inline-flex; align-items: center; gap: var(--ux-space-1); font-weight: 900; }
+.wyr-bar-track{
+  display: block; height: 14px; border-radius: var(--ux-radius-pill);
+  background: var(--ux-surface-sunk); overflow: hidden;
+}
+.wyr-bar-fill{ display: block; height: 100%; transition: width var(--ux-motion-state) var(--ux-motion-ease); }
+.wyr-bar-num{ font-weight: 800; text-align: right; white-space: nowrap; }
+
+.wyr-hist{ display: grid; gap: var(--ux-space-1); }
+.wyr-hist-row{
+  display: grid; grid-template-columns: 3.5em minmax(0, 1fr) auto;
+  gap: var(--ux-space-2); align-items: center;
+  padding: var(--ux-space-2);
+  border-bottom: 1px dashed var(--ux-surface-sunk);
+}
+.wyr-hist-row:last-child{ border-bottom: none; }
+.wyr-hist-head{ border-bottom: 2px dashed var(--ux-primary-border); font-weight: 900; }
+.wyr-hist-cat{ display: inline-flex; align-items: center; gap: var(--ux-space-2); font-weight: 900; }
+.wyr-hist-end{ text-align: right; justify-self: end; }
+`;

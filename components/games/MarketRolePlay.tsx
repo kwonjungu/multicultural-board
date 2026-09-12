@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import BeeMascot from "../BeeMascot";
+import ScopedStyle from "../ui/child/ScopedStyle";
 
 type Step = {
   speaker: "shop" | "you";
@@ -73,10 +74,26 @@ export default function MarketRolePlay({ langA, langB }: { langA: string; langB:
   const [idx, setIdx] = useState(0);
   const [picks, setPicks] = useState<number[]>([]);
   const [finished, setFinished] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  function playTts(text: string, lang: string) {
-    new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`).play().catch(() => {});
-  }
+  /** 새 음성 전에 이전 음성을 반드시 멈춘다. unmount cleanup 도 이걸 부른다. */
+  const stopAudio = useCallback(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    try { a.pause(); a.currentTime = 0; } catch { /* 이미 정리된 엘리먼트 */ }
+    audioRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => { stopAudio(); };
+  }, [stopAudio]);
+
+  const playTts = useCallback((text: string, lang: string) => {
+    stopAudio();
+    const a = new Audio(`/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`);
+    audioRef.current = a;
+    a.play().catch(() => { /* 소리가 없어도 글자로 계속 읽을 수 있다 */ });
+  }, [stopAudio]);
 
   function handlePick(opIdx: number) {
     setPicks((p) => [...p, opIdx]);
@@ -91,11 +108,12 @@ export default function MarketRolePlay({ langA, langB }: { langA: string; langB:
     }).length;
     const total = SCENE.filter((s) => s.speaker === "you").length;
     return (
-      <div style={{ textAlign: "center", padding: 40 }}>
+      <div data-ux-root className="mk-root mk-center">
+        <ScopedStyle css={MK_CSS} />
         <BeeMascot size={120} mood={good === total ? "cheer" : "happy"} />
-        <div style={{ fontSize: 24, fontWeight: 900, marginTop: 14 }}>
+        <h1 data-ux-role="title">
           🛒 {good === total ? "완벽한 대화!" : `${good} / ${total}`}
-        </div>
+        </h1>
       </div>
     );
   }
@@ -103,90 +121,120 @@ export default function MarketRolePlay({ langA, langB }: { langA: string; langB:
   const cur = SCENE[idx];
 
   return (
-    <div style={{ padding: "16px 16px 40px", maxWidth: 560, margin: "0 auto" }}>
-      <div style={{ textAlign: "center", fontSize: 12, color: "#6B7280", fontWeight: 700, marginBottom: 12 }}>
-        🍎 시장 역할극
-      </div>
+    <div data-ux-root className="mk-root">
+      <ScopedStyle css={MK_CSS} />
+      <p data-ux-role="label" className="mk-kicker">🍎 시장 역할극</p>
 
-      {/* Dialogue history */}
-      {SCENE.slice(0, idx).map((step, i) => {
-        const chosen = step.speaker === "you" && step.options ? step.options[picks[Math.floor(i / 2)] ?? 0] : null;
-        const text = chosen ? chosen.text : step.line;
-        const isShop = step.speaker === "shop";
-        return (
-          <div key={i} style={{
-            display: "flex", justifyContent: isShop ? "flex-start" : "flex-end",
-            marginBottom: 10,
-          }}>
-            <div style={{
-              maxWidth: "80%", padding: "10px 14px", borderRadius: 14,
-              background: isShop ? "#F3F4F6" : "#DBEAFE",
-              fontSize: 14, fontWeight: 600, color: "#111827",
-            }}>
-              <div>{text[langA]}</div>
-              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>{text[langB]}</div>
-            </div>
-          </div>
-        );
-      })}
+      <div className="mk-play">
+        <div className="mk-thread">
+          {/* Dialogue history */}
+          {SCENE.slice(0, idx).map((step, i) => {
+            const chosen = step.speaker === "you" && step.options ? step.options[picks[Math.floor(i / 2)] ?? 0] : null;
+            const text = chosen ? chosen.text : step.line;
+            const isShop = step.speaker === "shop";
+            return (
+              <div key={i} className="mk-row" data-side={isShop ? "shop" : "you"}>
+                <div className="mk-bubble" data-side={isShop ? "shop" : "you"}>
+                  <p data-ux-role="body">{text[langA]}</p>
+                  <p data-ux-role="secondary">{text[langB]}</p>
+                </div>
+              </div>
+            );
+          })}
 
-      {cur.speaker === "shop" ? (
-        <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 12 }}>
-          <div style={{
-            maxWidth: "80%", padding: "14px 16px", borderRadius: 14,
-            background: "#FEF3C7", fontSize: 14, fontWeight: 700,
-          }}>
-            <div style={{ fontSize: 11, color: "#D97706", fontWeight: 800, marginBottom: 4 }}>
-              🧑‍🌾 {LANGUAGES[langA]?.flag} 상인
+          {cur.speaker === "shop" && (
+            <div className="mk-row" data-side="shop">
+              <div className="mk-bubble" data-side="now">
+                <p data-ux-role="label" className="mk-who">
+                  🧑‍🌾 {LANGUAGES[langA]?.flag} 상인
+                </p>
+                <p data-ux-role="body-emphasis" data-ux-reading>{cur.line[langA]}</p>
+                <p data-ux-role="secondary" data-ux-reading>{cur.line[langB]}</p>
+                <div className="mk-listenrow">
+                  <button data-ux-role="control" className="mk-listen" onClick={() => playTts(cur.line[langA], langA)}>
+                    🔊 {langA.toUpperCase()}
+                  </button>
+                  <button data-ux-role="control" className="mk-listen" onClick={() => playTts(cur.line[langB], langB)}>
+                    🔊 {langB.toUpperCase()}
+                  </button>
+                </div>
+              </div>
             </div>
-            <div>{cur.line[langA]}</div>
-            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>{cur.line[langB]}</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button onClick={() => playTts(cur.line[langA], langA)} style={tinyBtn}>🔊 {langA.toUpperCase()}</button>
-              <button onClick={() => playTts(cur.line[langB], langB)} style={tinyBtn}>🔊 {langB.toUpperCase()}</button>
-            </div>
-          </div>
+          )}
         </div>
-      ) : null}
 
-      {cur.speaker === "shop" && (
-        <button
-          onClick={() => setIdx((i) => i + 1)}
-          style={{
-            width: "100%", background: "#F59E0B", color: "#fff", border: "none",
-            padding: 12, borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: "pointer",
-          }}
-        >다음 →</button>
-      )}
-
-      {cur.speaker === "you" && cur.options && (
-        <div style={{ display: "grid", gap: 8 }}>
-          <div style={{ fontSize: 12, color: "#6B7280", fontWeight: 700, textAlign: "center" }}>
-            👉 뭐라고 대답할까요?
-          </div>
-          {cur.options.map((opt, i) => (
-            <button
-              key={i}
-              onClick={() => handlePick(i)}
-              style={{
-                padding: "12px 14px", borderRadius: 14,
-                border: "2px solid #E5E7EB", background: "#fff",
-                cursor: "pointer", fontSize: 14, fontWeight: 700, color: "#111827",
-                textAlign: "left",
-              }}
-            >
-              <div>{opt.text[langA]}</div>
-              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{opt.text[langB]}</div>
+        <div className="mk-actions">
+          {cur.speaker === "shop" && (
+            <button data-ux-role="action" className="mk-primary" onClick={() => setIdx((i) => i + 1)}>
+              다음 →
             </button>
-          ))}
+          )}
+
+          {cur.speaker === "you" && cur.options && (
+            <>
+              <p data-ux-role="body-emphasis" className="mk-ask">👉 뭐라고 대답할까요?</p>
+              <div className="mk-choices">
+                {cur.options.map((opt, i) => (
+                  <button key={i} data-ux-role="control" className="mk-choice" onClick={() => handlePick(i)}>
+                    <span data-ux-role="label">{opt.text[langA]}</span>
+                    <span data-ux-role="secondary">{opt.text[langB]}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-const tinyBtn: React.CSSProperties = {
-  background: "#fff", border: "1px solid #E5E7EB",
-  padding: "4px 10px", borderRadius: 99, cursor: "pointer",
-  fontSize: 11, fontWeight: 700, color: "#374151",
-};
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const MK_CSS = `
+.mk-root{
+  color: var(--ux-ink);
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-8);
+  width: 100%; max-width: 1200px; margin: 0 auto; box-sizing: border-box;
+}
+.mk-center{ display: grid; justify-items: center; gap: var(--ux-space-3); text-align: center; padding-top: var(--ux-space-8); }
+.mk-kicker{ display: block; text-align: center; color: var(--ux-ink-soft); margin: 0 0 var(--ux-space-4); }
+
+/* 넓은 화면: 대화는 왼쪽, 지금 고를 것은 오른쪽에 붙여 둔다. */
+.mk-play{ display: grid; gap: var(--ux-space-4); }
+@media (min-width: 900px){ .mk-play{ grid-template-columns: minmax(0, 1fr) minmax(0, 380px); align-items: start; } }
+
+.mk-thread{ display: grid; gap: var(--ux-space-3); }
+.mk-row{ display: flex; }
+.mk-row[data-side="you"]{ justify-content: flex-end; }
+.mk-bubble{
+  max-width: 90%; padding: var(--ux-space-3) var(--ux-space-4);
+  border-radius: var(--ux-radius-surface);
+  background: var(--ux-surface-sunk); border: 2px solid transparent;
+  display: grid; gap: var(--ux-space-1);
+}
+.mk-bubble p{ margin: 0; }
+.mk-bubble[data-side="you"]{ background: var(--ux-hint-lavender); }
+.mk-bubble[data-side="now"]{ background: var(--ux-surface); border-color: var(--ux-primary-border); }
+.mk-who{ color: var(--ux-primary-ink); font-weight: 900; }
+.mk-listenrow{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; margin-top: var(--ux-space-2); }
+.mk-listen[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+}
+
+.mk-actions{ display: grid; gap: var(--ux-space-3); align-content: start; }
+.mk-ask{ margin: 0; text-align: center; }
+.mk-primary[data-ux-role="action"]{
+  width: 100%;
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+}
+.mk-choices{ display: grid; gap: var(--ux-space-3); }
+.mk-choice[data-ux-role="control"]{
+  display: grid; gap: var(--ux-space-1); text-align: left; justify-items: start;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-ink-soft); font-family: inherit; font-weight: 700;
+  word-break: keep-all;
+}
+.mk-choice:hover{ border-color: var(--ux-primary-border); }
+`;

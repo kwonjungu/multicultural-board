@@ -2770,6 +2770,23 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     id: "Great idea", ar: "Great idea", my: "Great idea",
   },
 
+  // ── X02 명렬표 보관·복원 (교사 도구) ──
+  // 반복되는 작은 동작 버튼이므로 호출부는 tPlain() 을 쓴다 — t() 는 한국어를
+  // 병기해 라벨이 두 배가 되고 버튼이 한 줄에 하나씩 쌓인다.
+  // 없는 언어는 en → ko 순으로 폴백하므로 ko/en 만 둔다.
+  rxRosterTitle: { ko: "이번 명렬표", en: "Current roster" },
+  rxArchiveBox: { ko: "보관함", en: "Archive" },
+  rxRename: { ko: "이름 고치기", en: "Fix name" },
+  rxArchive: { ko: "보관하기", en: "Archive" },
+  rxRestore: { ko: "복원하기", en: "Restore" },
+  rxPurge: { ko: "기록 완전 삭제", en: "Delete records" },
+  rxAdd: { ko: "추가", en: "Add" },
+  rxSave: { ko: "저장", en: "Save" },
+  rxCancel: { ko: "취소", en: "Cancel" },
+  rxPreview: { ko: "미리 보기", en: "Preview" },
+  rxMark: { ko: "표식", en: "Mark" },
+  rxBulk: { ko: "여러 명 한꺼번에 쓰기", en: "Paste many names" },
+
 };
 
 // 외국어 UI 문구에는 한국어 원문을 병기한다 — 다문화 학생의 한국어 적응 지원

@@ -48,7 +48,7 @@ export default function YutBoard({
   return (
     <svg
       viewBox="0 0 1000 1000"
-      style={{ width: "min(94vw, 560px)", height: "auto", display: "block", touchAction: "manipulation" }}
+      style={{ width: "100%", maxWidth: "min(94vw, 720px)", height: "auto", display: "block", touchAction: "manipulation" }}
       role="img"
       aria-label="윷놀이 판"
     >

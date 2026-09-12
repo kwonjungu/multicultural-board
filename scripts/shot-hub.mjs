@@ -80,21 +80,26 @@ for (const screen of SCREENS) {
           const clipped = Array.from(document.querySelectorAll('[data-ux-role]'))
             .filter((el) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)
             .map((el) => `${name(el)}: ${(el.textContent || "").trim().slice(0, 18)}`);
-          const shortCards = Array.from(document.querySelectorAll('.hub-card'))
+          const shortCards = Array.from(document.querySelectorAll('.hub-point'))
             .filter((el) => el.getBoundingClientRect().height < 112)
             .map((el) => `${name(el)} h=${Math.round(el.getBoundingClientRect().height)}`);
           const cardCols = (() => {
-            const cards = Array.from(document.querySelectorAll('.hub-card'));
+            const cards = Array.from(document.querySelectorAll('.hub-point'));
             if (!cards.length) return null;
-            const tops = new Set(cards.map((c) => Math.round(c.getBoundingClientRect().top)));
-            return Math.round(cards.length / tops.size);
+            // 별 배치에서는 '열 수' 가 의미 없다. 대신 다섯 꼭짓점이 실제로
+            // 서로 다른 자리에 흩어져 있는지(겹쳐 쌓이지 않았는지)를 센다.
+            const spots = new Set(cards.map((c) => {
+              const r = c.getBoundingClientRect();
+              return `${Math.round(r.left)}:${Math.round(r.top)}`;
+            }));
+            return spots.size;
           })();
           return {
             body: cs(pick('[data-ux-role="body"]')),
             label: cs(pick('[data-ux-role="label"]')),
             secondary: cs(pick('[data-ux-role="secondary"]')),
             title: cs(pick('[data-ux-role="title"]')),
-            cards: document.querySelectorAll('.hub-card').length,
+            cards: document.querySelectorAll('.hub-point').length,
             cardCols,
             docOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
             dense: __dense,
@@ -106,7 +111,7 @@ for (const screen of SCREENS) {
         rows.push({
           screen: screen.id, view: v.id, size, step,
           body: m.body, label: m.label, secondary: m.secondary, title: m.title,
-          cards: m.cards, cols: m.cardCols,
+          cards: m.cards, spots: m.cardCols,
           overflow: m.docOverflow, tooSmall: m.tooSmall.length, clipped: m.clipped.length,
         });
         if (m.docOverflow > 0) problems.push(`[${tag}] 가로 overflow ${m.docOverflow}px`);
@@ -115,13 +120,14 @@ for (const screen of SCREENS) {
         if (m.shortCards.length) problems.push(`[${tag}] 카드 높이 112px 미만: ${m.shortCards.join(" | ")}`);
         if (m.label !== null && m.label < (m.dense ? 15.5 : 18)) problems.push(`[${tag}] label ${m.label}px < 18`);
         if (m.secondary !== null && m.secondary < (m.dense ? 14.5 : 16)) problems.push(`[${tag}] secondary ${m.secondary}px < 16`);
-        // 열 수 계약: 360px 1열 / 600~1023px 2열 / 1024px 이상 3열
-        const wantCols = v.width < 600 ? 1 : v.width < 1024 ? 2 : 3;
-        if (m.cardCols !== null && m.cardCols !== wantCols) {
-          problems.push(`[${tag}] 활동 카드 ${m.cardCols}열 — ${wantCols}열이어야 한다`);
+        // 계약 변경(2026-09-12): 활동 탐색이 카드 격자에서 ⭐ 소통의 별로 돌아갔다.
+        // 별에서는 '열 수' 가 의미 없다. 대신 다섯 꼭짓점이 서로 다른 자리에
+        // 흩어져 있는지(겹쳐 쌓이거나 한 점으로 뭉치지 않았는지)를 본다.
+        if (m.cardCols !== null && m.cardCols !== 5) {
+          problems.push(`[${tag}] 활동 꼭짓점이 ${m.cardCols}자리 — 5자리로 흩어져야 한다`);
         }
         if (screen.id.startsWith("hub") && m.cards !== 5) {
-          problems.push(`[${tag}] 활동 카드가 ${m.cards}장 — 5장이어야 한다`);
+          problems.push(`[${tag}] 활동 꼭짓점이 ${m.cards}개 — 5개여야 한다`);
         }
         await page.screenshot({ path: `reports/B/${screen.id}-${step}-${v.id}-${size}.png`, fullPage: true });
       };

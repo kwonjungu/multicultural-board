@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, useMemo, useRef, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import {
   COUNTRIES,
   EMOTIONS,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/gameData";
 import { TILES } from "@/lib/marbleData";
 import EmotionGlyph from "../EmotionGlyph";
+import ScopedStyle from "../../ui/child/ScopedStyle";
 
 export interface QuizCardProps {
   tileIdx: number;
@@ -170,6 +171,23 @@ export function QuizCard({ tileIdx, langA, langB, onAnswer }: QuizCardProps) {
   // 마지막 1초에 정답을 골라도 타임아웃의 onAnswer(false) 가 먼저 dispatch 되어
   // 오답 처리(우주 타일이면 한 턴 쉬기 페널티)되는 레이스를 막는다.
   const answeredRef = useRef(false);
+  /** 예약된 타이머 전부 — unmount 시 유령 타이머가 남지 않게 한 곳에서 정리한다. */
+  const timersRef = useRef<number[]>([]);
+
+  const later = useCallback((fn: () => void, ms: number) => {
+    const id = window.setTimeout(() => {
+      timersRef.current = timersRef.current.filter((t) => t !== id);
+      fn();
+    }, ms);
+    timersRef.current.push(id);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      for (const id of timersRef.current) window.clearTimeout(id);
+      timersRef.current = [];
+    };
+  }, []);
 
   const q = useMemo(
     () => buildQuiz(tileIdx, langA, langB),
@@ -179,126 +197,66 @@ export function QuizCard({ tileIdx, langA, langB, onAnswer }: QuizCardProps) {
   );
 
   useEffect(() => {
-    const id = setInterval(() => {
+    const id = window.setInterval(() => {
       setRemaining((r) => {
         if (r <= 1) {
-          clearInterval(id);
+          window.clearInterval(id);
           // Timeout → wrong (이미 답을 골랐다면 무시).
-          if (!answeredRef.current) setTimeout(() => onAnswer(false), 0);
+          if (!answeredRef.current) later(() => onAnswer(false), 0);
           return 0;
         }
         return r - 1;
       });
     }, 1000);
-    return () => clearInterval(id);
-  }, [onAnswer]);
+    return () => window.clearInterval(id);
+  }, [onAnswer, later]);
 
   function handlePick(i: number) {
     if (picked !== null) return;
     answeredRef.current = true;
     setPicked(i);
     const correct = i === q.answerIdx;
-    setTimeout(() => onAnswer(correct), 800);
+    later(() => onAnswer(correct), 800);
   }
 
-  const wrap: CSSProperties = {
-    background: "#fff",
-    border: "3px solid #8B5CF6",
-    borderRadius: 20,
-    padding: 14,
-    maxWidth: 420,
-    width: "92%",
-    boxShadow: "0 20px 40px rgba(139,92,246,0.35)",
-  };
+  const bigChoice = q.kind === "flag" || q.kind === "emotion";
 
   return (
-    <div style={wrap} role="dialog" aria-modal="true" aria-label="문화 퀴즈">
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 8,
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 900, color: "#6D28D9" }}>
+    <div className="mb-quiz" role="dialog" aria-modal="true" aria-label="문화 퀴즈">
+      <ScopedStyle css={QUIZ_CSS} />
+      <div className="mb-quiztop">
+        <span data-ux-role="label" className="mb-quizkind">
           🎯 {q.kind === "flag" ? "국기 맞히기" : q.kind === "greeting" ? "인사말" : "감정"}
-        </div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: "#9CA3AF" }}>
-          ⏳ {remaining}s
-        </div>
+        </span>
+        <span data-ux-role="secondary">⏳ {remaining}s</span>
       </div>
-      <div
-        style={{
-          fontSize: 17,
-          fontWeight: 900,
-          color: "#111827",
-          marginBottom: 4,
-          lineHeight: 1.3,
-        }}
-      >
-        {q.prompt}
-      </div>
+      <p data-ux-role="body-emphasis" data-ux-reading className="mb-quizprompt">{q.prompt}</p>
       {langA !== langB && q.promptSecondary && (
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: "#6B7280",
-            marginBottom: 10,
-          }}
-        >
-          {q.promptSecondary}
-        </div>
+        <p data-ux-role="secondary" data-ux-reading className="mb-quizprompt2">{q.promptSecondary}</p>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 8,
-          marginTop: 10,
-        }}
-      >
+      <div className="mb-quizchoices">
         {q.choices.map((c, i) => {
           const isAns = i === q.answerIdx;
           const isPicked = picked === i;
           const state = picked === null ? "idle" : isAns ? "correct" : isPicked ? "wrong" : "dim";
-          const bg =
-            state === "correct" ? "#D1FAE5" :
-            state === "wrong" ? "#FEE2E2" :
-            state === "dim" ? "#F3F4F6" : "#FEF3C7";
-          const border =
-            state === "correct" ? "3px solid #10B981" :
-            state === "wrong" ? "3px solid #EF4444" :
-            state === "dim" ? "2px solid #E5E7EB" : "2px solid #FBBF24";
           return (
             <button
               key={c.key}
-              type="button"
+              data-ux-role="control"
+              className="mb-quizchoice"
+              data-state={state}
+              data-big={bigChoice ? "" : undefined}
               aria-label={`답변 ${i + 1}`}
+              aria-disabled={picked !== null}
               onClick={() => handlePick(i)}
-              disabled={picked !== null}
-              style={{
-                background: bg,
-                border,
-                borderRadius: 14,
-                padding: "12px 6px",
-                fontSize: q.kind === "flag" || q.kind === "emotion" ? 36 : 15,
-                fontWeight: 900,
-                color: "#111827",
-                cursor: picked === null ? "pointer" : "default",
-                minHeight: 60,
-                lineHeight: 1.2,
-                wordBreak: "break-word",
-              }}
             >
               {q.kind === "flag" ? (
                 <FlagChoice code={c.key} emoji={c.label} />
               ) : q.kind === "emotion" ? (
-                <EmotionGlyph key={c.label} emoji={c.label} size={48} />
+                <EmotionGlyph key={c.label} emoji={c.label} size={44} />
               ) : (
-                c.label
+                <span data-ux-role="label">{c.label}</span>
               )}
             </button>
           );
@@ -308,11 +266,42 @@ export function QuizCard({ tileIdx, langA, langB, onAnswer }: QuizCardProps) {
   );
 }
 
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const QUIZ_CSS = `
+.mb-quiz{
+  background: var(--ux-surface);
+  border: 3px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-3);
+  width: min(460px, 100%);
+  max-height: 100%; overflow-y: auto; box-sizing: border-box;
+  display: grid; gap: var(--ux-space-2);
+  box-shadow: 0 20px 40px rgba(41,37,31,.3);
+}
+.mb-quiz p{ margin: 0; }
+.mb-quiztop{ display: flex; justify-content: space-between; align-items: center; gap: var(--ux-space-2); }
+.mb-quizkind{ font-weight: 900; color: var(--ux-primary-ink); }
+.mb-quizprompt{ font-weight: 900; }
+.mb-quizprompt2{ color: var(--ux-ink-soft); }
+.mb-quizchoices{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ux-space-2); }
+@media (min-width: 900px){ .mb-quizchoices{ grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.mb-quizchoice[data-ux-role="control"]{
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ux-surface-sunk); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+  padding: var(--ux-space-2); word-break: break-word; text-align: center;
+}
+.mb-quizchoice[data-state="correct"]{ background: var(--ux-hint-mint); border: 3px solid var(--ux-success); }
+.mb-quizchoice[data-state="wrong"]{ background: var(--ux-surface); border: 3px solid var(--ux-selected-border); }
+.mb-quizchoice[data-state="dim"]{ background: var(--ux-surface); border-color: var(--ux-ink-soft); opacity: .6; }
+.mb-quizchoice[aria-disabled="true"]{ cursor: default; }
+`;
+
 // 국기 선택지 — flagcdn 실물 국기 이미지 우선, 로드 실패 시 국기 이모지 폴백.
 // (CountryGuess 와 동일한 오픈 라이선스 CDN. 선택지 key 가 ISO 국가코드.)
 function FlagChoice({ code, emoji }: { code: string; emoji: string }) {
   const [failed, setFailed] = useState(false);
-  if (failed) return <span aria-hidden="true">{emoji}</span>;
+  if (failed) return <span aria-hidden="true" style={{ fontSize: "var(--ux-font-title)" }}>{emoji}</span>;
   const cc = code.toLowerCase();
   return (
     <img
@@ -323,11 +312,12 @@ function FlagChoice({ code, emoji }: { code: string; emoji: string }) {
       onError={() => setFailed(true)}
       draggable={false}
       style={{
-        width: 64,
-        height: 42,
+        width: "100%",
+        maxWidth: 72,
+        aspectRatio: "3 / 2",
         objectFit: "cover",
         borderRadius: 6,
-        border: "1px solid rgba(0,0,0,0.12)",
+        border: "1px solid rgba(41,37,31,0.2)",
         verticalAlign: "middle",
       }}
     />

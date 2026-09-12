@@ -1,9 +1,10 @@
 "use client";
 
-import { CSSProperties, Dispatch, ReactNode } from "react";
+import { Dispatch, ReactNode } from "react";
 import { tr } from "@/lib/gameData";
 import { CHANCES, TILES } from "@/lib/marbleData";
 import { MAX_ROUNDS, totalAssets, type Action, type GameState } from "@/lib/marbleReducer";
+import ScopedStyle from "../../ui/child/ScopedStyle";
 import { ChanceCard } from "./ChanceCard";
 import { DicePanel } from "./DicePanel";
 import { LogTicker } from "./LogTicker";
@@ -96,37 +97,35 @@ export function ActionPanel({
       : null;
     return (
       <CenterCard>
-        <div style={iconRow}>🏆</div>
-        <div style={titleStyle}>
+        <div className="mb-acticon" aria-hidden>🏆</div>
+        <p data-ux-role="label" className="mb-acttitle">
           {phase.winner
             ? `${state.players[phase.winner].name || phase.winner} 승리!`
             : "무승부!"}
-        </div>
+        </p>
         {ranking && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, margin: "6px 0 2px" }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#92400E" }}>
+          <div className="mb-actrank">
+            <span data-ux-role="secondary" className="mb-actrankhead">
               ⏰ {MAX_ROUNDS}라운드 종료 · 총자산 순위
-            </div>
+            </span>
             {ranking.map(({ p, total }, i) => (
-              <div
+              <span
                 key={p.id}
-                style={{
-                  display: "flex", justifyContent: "space-between", gap: 10,
-                  fontSize: 12, fontWeight: 800,
-                  color: PLAYER_COLOR[p.id] ?? "#1F2937",
-                }}
+                data-ux-role="secondary"
+                className="mb-actrankrow"
+                style={{ color: PLAYER_COLOR[p.id] ?? "var(--ux-ink)" }}
               >
                 <span>{i + 1}위 {p.name || p.id}</span>
                 <span>💰 {total}</span>
-              </div>
+              </span>
             ))}
           </div>
         )}
         <button
-          type="button"
+          data-ux-role="control"
+          className="mb-actprimary"
           aria-label="다시 시작"
           onClick={() => dispatch({ type: "restart" })}
-          style={primaryBtn}
         >
           🔁 다시 시작
         </button>
@@ -141,46 +140,39 @@ export function ActionPanel({
     const canAfford = p.cash >= price;
     return (
       <CenterCard>
-        <div style={iconRow}>🏘️</div>
-        <div style={titleStyle}>
+        <div className="mb-acticon" aria-hidden>🏘️</div>
+        <p data-ux-role="label" className="mb-acttitle">
           {tile.landmark ? tr(tile.landmark, langA) : "도시"}
-        </div>
+        </p>
         {langA !== langB && tile.landmark && (
-          <div style={subtitleStyle}>{tr(tile.landmark, langB)}</div>
+          <p data-ux-role="secondary">{tr(tile.landmark, langB)}</p>
         )}
-        <div style={priceStyle}>💰 {price}</div>
-        <div style={buttonRow}>
+        <p data-ux-role="label" className="mb-actprice">💰 {price}</p>
+        <div className="mb-actrow">
+          {/* 아이콘만 있는 버튼은 만들지 않는다 — 짧은 글자 라벨을 함께 둔다. */}
           <button
-            type="button"
+            data-ux-role="control"
+            className="mb-actsecondary"
             aria-label="구매하지 않음"
             onClick={() => {
               dispatch({ type: "buyNo" });
               dispatch({ type: "endTurn" });
             }}
-            style={secondaryBtn}
           >
-            ❌
+            안 살래요
           </button>
           <button
-            type="button"
+            data-ux-role="control"
+            className="mb-actprimary"
             aria-label={canAfford ? "구매" : "잔액 부족"}
+            aria-disabled={!canAfford}
             onClick={() => {
               if (canAfford) dispatch({ type: "buyYes" });
               else dispatch({ type: "buyNo" });
               dispatch({ type: "endTurn" });
             }}
-            disabled={!canAfford}
-            style={{
-              ...primaryBtn,
-              background: canAfford
-                ? "linear-gradient(135deg,#FBBF24,#F59E0B)"
-                : "#E5E7EB",
-              color: canAfford ? "#fff" : "#9CA3AF",
-              cursor: canAfford ? "pointer" : "not-allowed",
-              boxShadow: canAfford ? "0 6px 16px rgba(245,158,11,0.4)" : "none",
-            }}
           >
-            ✅ {canAfford ? "구매" : "잔액 부족"}
+            ✅ {canAfford ? "살래요" : "돈이 모자라요"}
           </button>
         </div>
       </CenterCard>
@@ -191,16 +183,16 @@ export function ActionPanel({
     const tile = TILES[phase.tile];
     return (
       <CenterCard>
-        <div style={iconRow}>💸</div>
-        <div style={titleStyle}>통행료 {phase.amount}</div>
-        <div style={subtitleStyle}>
+        <div className="mb-acticon" aria-hidden>💸</div>
+        <p data-ux-role="label" className="mb-acttitle">통행료 {phase.amount}</p>
+        <p data-ux-role="secondary">
           {tile.landmark ? tr(tile.landmark, langA) : ""}
-        </div>
+        </p>
         <button
-          type="button"
+          data-ux-role="control"
+          className="mb-actprimary"
           aria-label="계속"
           onClick={() => dispatch({ type: "endTurn" })}
-          style={primaryBtn}
         >
           ➡️ 계속
         </button>
@@ -211,14 +203,14 @@ export function ActionPanel({
   if (phase.kind === "festival") {
     return (
       <CenterCard>
-        <div style={iconRow}>🎉</div>
-        <div style={titleStyle}>축제 당첨!</div>
-        <div style={{ ...priceStyle, color: "#B45309" }}>💰 +{phase.amount}</div>
+        <div className="mb-acticon" aria-hidden>🎉</div>
+        <p data-ux-role="label" className="mb-acttitle">축제 당첨!</p>
+        <p data-ux-role="label" className="mb-actprice">💰 +{phase.amount}</p>
         <button
-          type="button"
+          data-ux-role="control"
+          className="mb-actprimary"
           aria-label="계속"
           onClick={() => dispatch({ type: "endTurn" })}
-          style={primaryBtn}
         >
           ➡️ 계속
         </button>
@@ -229,12 +221,12 @@ export function ActionPanel({
   if (phase.kind === "landed") {
     return (
       <CenterCard>
-        <div style={{ ...subtitleStyle, fontWeight: 700 }}>칸 #{phase.tile}</div>
+        <p data-ux-role="secondary">칸 #{phase.tile}</p>
         <button
-          type="button"
+          data-ux-role="control"
+          className="mb-actprimary"
           aria-label="턴 종료"
           onClick={() => dispatch({ type: "endTurn" })}
-          style={primaryBtn}
         >
           ➡️ 턴 종료
         </button>
@@ -251,17 +243,9 @@ export function ActionPanel({
 
   return (
     <CenterCard>
-      <div
-        style={{
-          fontSize: "clamp(12px, 2vw, 16px)",
-          fontWeight: 900,
-          color,
-          textAlign: "center",
-          lineHeight: 1.15,
-        }}
-      >
+      <p data-ux-role="label" className="mb-actturn" style={{ color }}>
         {who.name || whoId}의 차례
-      </div>
+      </p>
       <DicePanel
         a={state.diceA}
         b={state.diceB}
@@ -278,84 +262,45 @@ export function ActionPanel({
 // ─── small layout helpers ───
 
 function CenterCard({ children }: { children: React.ReactNode }) {
-  const card: CSSProperties = {
-    background: "rgba(255,255,255,0.96)",
-    border: "2.5px solid #F59E0B",
-    borderRadius: 16,
-    padding: "clamp(6px, 1.4vw, 12px)",
-    textAlign: "center",
-    width: "100%",
-    height: "100%",
-    maxWidth: "100%",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "clamp(4px, 0.8vw, 8px)",
-    boxShadow: "0 12px 24px rgba(245,158,11,0.25)",
-    overflow: "hidden",
-    boxSizing: "border-box",
-  };
-  return <div style={card}>{children}</div>;
+  return (
+    <div className="mb-actcard">
+      <ScopedStyle css={ACTION_CSS} />
+      {children}
+    </div>
+  );
 }
 
-// ─── shared styles ───
-
-const iconRow: CSSProperties = {
-  fontSize: "clamp(28px, 5vw, 44px)",
-  lineHeight: 1,
-};
-
-const titleStyle: CSSProperties = {
-  fontSize: "clamp(13px, 1.9vw, 16px)",
-  fontWeight: 900,
-  color: "#111827",
-  lineHeight: 1.15,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  maxWidth: "100%",
-};
-
-const subtitleStyle: CSSProperties = {
-  fontSize: "clamp(11px, 1.5vw, 13px)",
-  color: "#6B7280",
-  fontWeight: 700,
-  lineHeight: 1.15,
-};
-
-const priceStyle: CSSProperties = {
-  fontSize: "clamp(12px, 1.8vw, 15px)",
-  fontWeight: 900,
-  color: "#374151",
-};
-
-const buttonRow: CSSProperties = {
-  display: "flex",
-  gap: "clamp(6px, 1vw, 10px)",
-  justifyContent: "center",
-  flexWrap: "wrap",
-};
-
-const primaryBtn: CSSProperties = {
-  background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
-  color: "#fff",
-  border: "none",
-  padding: "clamp(6px, 1.2vw, 10px) clamp(12px, 2vw, 20px)",
-  borderRadius: 999,
-  fontWeight: 900,
-  fontSize: "clamp(11px, 1.6vw, 14px)",
-  cursor: "pointer",
-  boxShadow: "0 6px 14px rgba(245,158,11,0.45)",
-};
-
-const secondaryBtn: CSSProperties = {
-  background: "#fff",
-  color: "#92400E",
-  border: "2px solid #FDE68A",
-  padding: "clamp(6px, 1.2vw, 10px) clamp(12px, 2vw, 20px)",
-  borderRadius: 999,
-  fontWeight: 900,
-  fontSize: "clamp(11px, 1.6vw, 14px)",
-  cursor: "pointer",
-};
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const ACTION_CSS = `
+.mb-actcard{
+  background: rgba(255,255,255,.96);
+  border: 3px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-2);
+  text-align: center; width: 100%; height: 100%; max-width: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--ux-space-1);
+  box-shadow: 0 12px 24px rgba(137,83,0,.25);
+  overflow: hidden; box-sizing: border-box;
+}
+.mb-actcard p{ margin: 0; }
+.mb-acticon{ font-size: clamp(1.75rem, 5vw, 2.75rem); line-height: 1; }
+.mb-acttitle{ font-weight: 900; overflow-wrap: anywhere; }
+.mb-actprice{ font-weight: 900; color: var(--ux-primary-ink); }
+.mb-actturn{ font-weight: 900; line-height: var(--ux-lh-tight); }
+.mb-actrank{ display: grid; gap: var(--ux-space-1); width: 100%; }
+.mb-actrankhead{ font-weight: 800; color: var(--ux-primary-ink); }
+.mb-actrankrow{ display: flex; justify-content: space-between; gap: var(--ux-space-3); font-weight: 800; }
+.mb-actrow{ display: flex; gap: var(--ux-space-2); justify-content: center; flex-wrap: wrap; width: 100%; }
+.mb-actprimary[data-ux-role="control"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); border-radius: var(--ux-radius-pill);
+  font-family: inherit; font-weight: 900; padding: var(--ux-space-2) var(--ux-space-4);
+}
+.mb-actprimary[aria-disabled="true"]{ opacity: .6; }
+.mb-actsecondary[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); border-radius: var(--ux-radius-pill);
+  font-family: inherit; font-weight: 900; padding: var(--ux-space-2) var(--ux-space-4);
+}
+`;

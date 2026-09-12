@@ -2,7 +2,10 @@
 
 import { tr } from "@/lib/gameData";
 import { GameText } from "@/lib/gameI18n";
+import ScopedStyle from "../../ui/child/ScopedStyle";
+import { gt, UI } from "../uiText";
 import { MENU_BY_ID } from "./cafeData";
+import { CAFE, roleEmoji, roleName } from "./cafeText";
 import type { MenuId, Role } from "./types";
 
 interface Props {
@@ -38,63 +41,47 @@ export default function MenuDeck({
 }: Props) {
   const cLang = customerLang(roleA, langA, langB);
   const hLang = chefLang(roleA, langA, langB);
-  return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: "20px 14px" }}>
-      <div style={{ textAlign: "center", marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: "#F59E0B", fontWeight: 800 }}>
-          라운드 {completedCount + 1} / 3 · Customer picks
-        </div>
-        <h3 style={{ fontSize: 18, fontWeight: 900, margin: "4px 0 0" }}>
-          🧑‍💼 {cLang.toUpperCase()} → 👨‍🍳 {hLang.toUpperCase()}
-        </h3>
-        <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
-          메뉴 3장 중 하나를 고르세요 / Pick 1 of 3
-        </div>
-      </div>
+  void roleB; // 역할 쌍은 roleA 로 결정된다 (props 는 호출부 호환용).
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: 12,
-        }}
-      >
+  return (
+    <div className="md-wrap">
+      <ScopedStyle css={MD_CSS} />
+
+      <section className="md-side" data-ux-surface="panel">
+        <p data-ux-role="secondary" className="md-round">
+          {gt(UI.round, langA)} {completedCount + 1} / 3
+        </p>
+        <h3 data-ux-role="body-emphasis" className="md-h">
+          {roleEmoji("customer")} {gt(CAFE.customerPicks, langA)}
+        </h3>
+        <p data-ux-role="body" className="md-note">
+          {gt(CAFE.pickOneOfThree, langA)}
+        </p>
+        <p data-ux-role="secondary" className="md-flow">
+          {roleEmoji("customer")} {tr(roleName("customer"), cLang)} ({cLang.toUpperCase()})
+          {" → "}
+          {roleEmoji("chef")} {tr(roleName("chef"), hLang)} ({hLang.toUpperCase()})
+        </p>
+      </section>
+
+      <div className="md-grid">
         {openCards.map((id) => {
           const menu = MENU_BY_ID[id];
           return (
             <button
               key={id}
+              data-ux-role="control"
+              className="md-card"
               onClick={() => onPick(id)}
-              aria-label={`Pick menu ${tr(menu.name, cLang)}`}
-              style={{
-                padding: "18px 12px",
-                borderRadius: 18,
-                border: "1px solid #E5E7EB",
-                background: "#fff",
-                cursor: "pointer",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-                textAlign: "center",
-                transition: "transform 0.15s",
-              }}
-              onMouseDown={(e) =>
-                (e.currentTarget.style.transform = "scale(0.97)")
-              }
-              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              aria-label={tr(menu.name, cLang)}
             >
-              <div style={{ fontSize: 54 }}>{menu.emoji}</div>
-              <div style={{ fontWeight: 900, marginTop: 6 }}>
+              <span className="md-emoji" aria-hidden="true">{menu.emoji}</span>
+              <span data-ux-role="body-emphasis" className="md-name">
                 <GameText map={menu.name} lang={cLang} />
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "#6B7280",
-                  marginTop: 2,
-                }}
-              >
+              </span>
+              <span data-ux-role="secondary" className="md-alt">
                 <GameText map={menu.name} lang={hLang} /> · {menu.origin}
-              </div>
+              </span>
             </button>
           );
         })}
@@ -102,3 +89,34 @@ export default function MenuDeck({
     </div>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const MD_CSS = `
+.md-wrap{ display: grid; gap: var(--ux-space-4); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1024px){
+  .md-wrap{ grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); align-items: start; }
+}
+.md-side{
+  display: grid; gap: var(--ux-space-2); align-content: start;
+  padding: var(--ux-space-4); background: var(--ux-surface);
+}
+.md-round{ margin: 0; font-weight: 800; }
+.md-h, .md-note, .md-flow{ margin: 0; word-break: keep-all; overflow-wrap: anywhere; }
+
+.md-grid{ display: grid; gap: var(--ux-space-3); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.md-card[data-ux-role="control"]{
+  display: grid; justify-items: center; gap: var(--ux-space-1);
+  padding: var(--ux-space-6) var(--ux-space-3);
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-surface-sunk);
+  border-radius: var(--ux-radius-panel);
+  font-family: inherit; text-align: center;
+  transition: border-color var(--ux-motion-state) var(--ux-motion-ease),
+              background var(--ux-motion-state) var(--ux-motion-ease);
+}
+.md-card:hover, .md-card:focus-visible{ border-color: var(--ux-primary-border); }
+.md-card:active{ background: var(--ux-hint-apricot); }
+.md-emoji{ font-size: calc(var(--ux-font-title) * 2); line-height: 1; }
+.md-name{ font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
+.md-alt{ word-break: keep-all; overflow-wrap: anywhere; }
+`;

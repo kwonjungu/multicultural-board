@@ -1,5 +1,10 @@
 "use client";
 
+import { tr } from "@/lib/gameData";
+import ScopedStyle from "../../ui/child/ScopedStyle";
+import { gp } from "../plainText";
+import { gt, UI } from "../uiText";
+import { CAFE, DIFFICULTY_LABEL, roleEmoji, roleName } from "./cafeText";
 import type { Difficulty, Role } from "./types";
 
 interface Props {
@@ -15,30 +20,6 @@ interface Props {
 
 const L = (lang: string) => (lang || "").toUpperCase();
 
-function roleLabel(r: Role, lang: string): string {
-  if (r === "customer") {
-    if (lang === "ko") return "손님";
-    if (lang === "ja") return "お客";
-    if (lang === "zh") return "顾客";
-    if (lang === "vi") return "Khách";
-    return "Customer";
-  }
-  if (lang === "ko") return "셰프";
-  if (lang === "ja") return "シェフ";
-  if (lang === "zh") return "厨师";
-  if (lang === "vi") return "Đầu bếp";
-  return "Chef";
-}
-
-function difficultyLabel(d: Difficulty, lang: string): string {
-  const map: Record<Difficulty, Record<string, string>> = {
-    easy: { ko: "쉬움 (무제한)", en: "Easy (unlimited)", ja: "やさしい", zh: "简单", vi: "Dễ" },
-    normal: { ko: "보통 (75초)", en: "Normal (75s)", ja: "普通 (75秒)", zh: "普通", vi: "Thường" },
-    hard: { ko: "어려움 (45초)", en: "Hard (45s)", ja: "難しい (45秒)", zh: "困难", vi: "Khó" },
-  };
-  return map[d][lang] ?? map[d].en ?? "";
-}
-
 export default function RoleSelect({
   langA,
   langB,
@@ -52,126 +33,109 @@ export default function RoleSelect({
   const diffs: Difficulty[] = ["easy", "normal", "hard"];
 
   return (
-    <div
-      style={{
-        maxWidth: 520,
-        margin: "0 auto",
-        padding: "28px 18px",
-        textAlign: "center",
-      }}
-    >
-      <div style={{ fontSize: 56 }}>☕️🐝</div>
-      <h2 style={{ fontSize: 22, fontWeight: 900, margin: "8px 0 4px" }}>
-        BeeCafe
-      </h2>
-      <p style={{ color: "#6B7280", fontSize: 13, margin: 0 }}>
-        {langA === "ko"
-          ? "손님과 셰프가 함께 요리해요!"
-          : "Customer & Chef cook together!"}
-      </p>
+    <div className="rs-wrap">
+      <ScopedStyle css={RS_CSS} />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 12,
-          marginTop: 22,
-        }}
-      >
-        <RoleCard lang={langA} role={roleA} tag="A" />
-        <RoleCard lang={langB} role={roleB} tag="B" />
+      <div className="rs-intro">
+        <div className="rs-logo" aria-hidden="true">☕️🐝</div>
+        <h2 data-ux-role="title" className="rs-title">BeeCafe</h2>
+        <p data-ux-role="body" className="rs-sub">{gt(CAFE.subtitle, langA)}</p>
+        <p data-ux-role="secondary" className="rs-sub">{gt(CAFE.howto, langA)}</p>
       </div>
 
-      <button
-        onClick={onSwap}
-        aria-label="Swap roles"
-        style={{
-          marginTop: 14,
-          padding: "10px 18px",
-          borderRadius: 14,
-          border: "1px solid #F59E0B",
-          background: "#FEF3C7",
-          fontWeight: 800,
-          cursor: "pointer",
-        }}
-      >
-        🔄 Swap / 역할 바꾸기
-      </button>
+      <div className="rs-cols">
+        <section className="rs-panel" data-ux-surface="panel">
+          <h3 data-ux-role="body-emphasis" className="rs-h">
+            🧑‍💼👨‍🍳 {gt(UI.players, langA)}
+          </h3>
+          <div className="rs-roles">
+            <RoleCard lang={langA} role={roleA} tag="A" />
+            <RoleCard lang={langB} role={roleB} tag="B" />
+          </div>
+          <button data-ux-role="control" className="bc-secondary rs-swap" onClick={onSwap}>
+            🔄 {gp(CAFE.swapRole, langA)}
+          </button>
+        </section>
 
-      <div style={{ marginTop: 28 }}>
-        <div
-          style={{
-            fontSize: 12,
-            color: "#6B7280",
-            fontWeight: 700,
-            marginBottom: 8,
-          }}
-        >
-          난이도 / Difficulty
-        </div>
-        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-          {diffs.map((d) => (
-            <button
-              key={d}
-              onClick={() => onDifficulty(d)}
-              aria-label={`Difficulty ${d}`}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 12,
-                border:
-                  difficulty === d ? "2px solid #F59E0B" : "1px solid #E5E7EB",
-                background: difficulty === d ? "#FEF3C7" : "#fff",
-                fontWeight: 800,
-                cursor: "pointer",
-                fontSize: 13,
-              }}
-            >
-              {difficultyLabel(d, langA)}
-            </button>
-          ))}
-        </div>
+        <section className="rs-panel" data-ux-surface="panel">
+          <h3 data-ux-role="body-emphasis" className="rs-h">
+            🎚️ {gt(UI.difficulty, langA)}
+          </h3>
+          <div className="rs-diffs">
+            {diffs.map((d) => (
+              <button
+                key={d}
+                data-ux-role="control"
+                className="rs-diff"
+                data-on={difficulty === d ? "" : undefined}
+                aria-pressed={difficulty === d}
+                onClick={() => onDifficulty(d)}
+              >
+                {difficulty === d ? "✅ " : "⬜ "}
+                {gp(DIFFICULTY_LABEL[d], langA)}
+              </button>
+            ))}
+          </div>
+          <button data-ux-role="action" className="bc-primary rs-start" onClick={onStart}>
+            ▶ {gt(UI.start, langA)}
+          </button>
+        </section>
       </div>
-
-      <button
-        onClick={onStart}
-        aria-label="Start game"
-        style={{
-          marginTop: 26,
-          padding: "14px 28px",
-          borderRadius: 16,
-          border: "none",
-          background: "linear-gradient(180deg,#FBBF24,#F59E0B)",
-          color: "#111",
-          fontWeight: 900,
-          fontSize: 16,
-          cursor: "pointer",
-          boxShadow: "0 6px 14px rgba(245,158,11,0.35)",
-        }}
-      >
-        ▶ Start / 시작
-      </button>
     </div>
   );
 }
 
 function RoleCard({ lang, role, tag }: { lang: string; role: Role; tag: string }) {
   return (
-    <div
-      style={{
-        padding: "16px 12px",
-        borderRadius: 16,
-        border: "1px solid #E5E7EB",
-        background: "#fff",
-        boxShadow: "0 4px 10px rgba(0,0,0,0.04)",
-      }}
-    >
-      <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 800 }}>
+    <div className="rs-card">
+      <span data-ux-role="secondary" className="rs-tag">
         Player {tag} · {L(lang)}
-      </div>
-      <div style={{ fontSize: 40, margin: "4px 0" }}>
-        {role === "customer" ? "🧑‍💼" : "👨‍🍳"}
-      </div>
-      <div style={{ fontWeight: 800 }}>{roleLabel(role, lang)}</div>
+      </span>
+      <span className="rs-face" aria-hidden="true">{roleEmoji(role)}</span>
+      <span data-ux-role="body-emphasis" className="rs-role">
+        {tr(roleName(role), lang)}
+      </span>
     </div>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const RS_CSS = `
+.rs-wrap{ display: grid; gap: var(--ux-space-4); }
+.rs-intro{ display: grid; justify-items: center; gap: var(--ux-space-2); text-align: center; }
+.rs-logo{ font-size: calc(var(--ux-font-title) * 2.2); line-height: 1; }
+.rs-title{ margin: 0; }
+.rs-sub{ margin: 0; max-width: 60ch; word-break: keep-all; overflow-wrap: anywhere; }
+
+.rs-cols{ display: grid; gap: var(--ux-space-4); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1024px){
+  .rs-cols{ grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+}
+.rs-panel{
+  display: grid; gap: var(--ux-space-3);
+  padding: var(--ux-space-4); background: var(--ux-surface);
+}
+.rs-h{ margin: 0; }
+
+.rs-roles{ display: grid; gap: var(--ux-space-3); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.rs-card{
+  display: grid; justify-items: center; gap: var(--ux-space-1);
+  padding: var(--ux-space-4) var(--ux-space-3);
+  background: var(--ux-surface-sunk); border-radius: var(--ux-radius-surface);
+  text-align: center;
+}
+.rs-face{ font-size: calc(var(--ux-font-title) * 1.8); line-height: 1; }
+.rs-tag{ font-weight: 800; }
+.rs-role{ font-weight: 900; }
+.rs-swap{ justify-self: start; }
+
+.rs-diffs{ display: grid; gap: var(--ux-space-2); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.rs-diff[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-surface-sunk);
+  font-family: inherit; font-weight: 800; text-align: left;
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.rs-diff[data-on]{ border-color: var(--ux-selected-border); background: var(--ux-hint-apricot); }
+.rs-start{ justify-self: stretch; }
+`;

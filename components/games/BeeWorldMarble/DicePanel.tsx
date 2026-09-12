@@ -1,6 +1,7 @@
 "use client";
 
 import { CSSProperties, useEffect, useState } from "react";
+import ScopedStyle from "../../ui/child/ScopedStyle";
 
 export interface DicePanelProps {
   a: number;
@@ -159,52 +160,43 @@ export function DicePanel({
     padding: compact ? "10px 18px" : "14px 24px",
   };
 
-  const size = compact ? 58 : 84;
-
-  const buttonPad = compact ? "10px 18px" : "12px 26px";
-  const buttonFontSize = compact ? 14 : 16;
+  // 보드 한가운데 카드 안에서도 56px 조작 영역이 들어가도록 컴팩트 주사위는 조금 작게.
+  const size = compact ? 48 : 84;
 
   return (
     <div style={wrap}>
+      <ScopedStyle css={DICE_CSS} />
       <div style={diceRow} aria-live="polite">
         <Die value={a} rolling={rolling} size={size} />
         <Die value={b} rolling={rolling} size={size} />
       </div>
       <button
-        type="button"
+        data-ux-role="control"
+        className="mb-diceroll"
         aria-label="주사위 굴리기"
-        onClick={onRoll}
-        disabled={!canRoll || rolling}
-        style={{
-          background:
-            canRoll && !rolling
-              ? "linear-gradient(135deg,#FBBF24,#F59E0B)"
-              : "#E5E7EB",
-          color: canRoll && !rolling ? "#fff" : "#9CA3AF",
-          border: "none",
-          padding: buttonPad,
-          borderRadius: 999,
-          fontWeight: 900,
-          fontSize: buttonFontSize,
-          cursor: canRoll && !rolling ? "pointer" : "not-allowed",
-          boxShadow:
-            canRoll && !rolling
-              ? "0 6px 16px rgba(245,158,11,0.4)"
-              : "none",
-          transition: "transform 0.1s ease-out",
-        }}
+        aria-disabled={!canRoll || rolling}
+        onClick={() => { if (canRoll && !rolling) onRoll(); }}
       >
         {rolling ? "🎲 구르는 중…" : "🎲 굴리기"}
       </button>
-      <style>{`
-        @keyframes marbleDiceShake {
-          0%   { transform: translate(0, 0) rotate(0deg); }
-          25%  { transform: translate(-2px, 1px) rotate(-7deg); }
-          50%  { transform: translate(2px, -1px) rotate(6deg); }
-          75%  { transform: translate(-1px, -2px) rotate(-4deg); }
-          100% { transform: translate(0, 0) rotate(0deg); }
-        }
-      `}</style>
     </div>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const DICE_CSS = `
+@keyframes marbleDiceShake {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  25%  { transform: translate(-2px, 1px) rotate(-7deg); }
+  50%  { transform: translate(2px, -1px) rotate(6deg); }
+  75%  { transform: translate(-1px, -2px) rotate(-4deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+.mb-diceroll[data-ux-role="control"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); border-radius: var(--ux-radius-pill);
+  font-family: inherit; font-weight: 900;
+  padding: var(--ux-space-2) var(--ux-space-4); white-space: nowrap;
+}
+.mb-diceroll[aria-disabled="true"]{ opacity: .55; cursor: default; }
+`;

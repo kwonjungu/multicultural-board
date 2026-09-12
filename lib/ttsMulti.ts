@@ -1,3 +1,4 @@
+import { isSoundOn, registerForeignStop, stopAll } from "./audioBus";
 // Multi-language TTS helper built on top of Web Speech API.
 // Picks the best available OS/browser voice for each language and applies
 // child-friendly rate/pitch so reading aloud doesn't feel robotic.
@@ -169,11 +170,28 @@ async function playServerTts(text: string, langShort: string): Promise<void> {
   }
 }
 
+/**
+ * 이 경로도 audioBus 의 '동시에 한 목소리' 계약에 넣는다. 등록해두면 통역
+ * 서랍이나 녹음 화면이 말하기 시작할 때 카드 읽어주기도 함께 멈춘다.
+ * 등록은 모듈 1회. cancelSpeak 은 stopAll 을 부르지 않는다 — 부르면 재귀다.
+ */
+let registered = false;
+function ensureRegistered() {
+  if (registered || typeof window === "undefined") return;
+  registered = true;
+  registerForeignStop(cancelSpeak);
+}
+
 export async function speak(text: string, langShort: string): Promise<void> {
   if (typeof window === "undefined" || !text.trim()) return;
+  // 소리를 끈 아이에게는 아무 소리도 나면 안 된다. 화면 안내는 그대로 두고
+  // 재생만 건너뛴다(호출부는 await 로 '다 읽었다' 를 기다리므로 즉시 resolve).
+  if (!isSoundOn()) return;
+  ensureRegistered();
 
-  // Stop any previous playback
+  // 이전 재생 정지 — 이 파일 것과 버스 것 양쪽 모두.
   cancelSpeak();
+  stopAll();
 
   // For reliably-unsupported languages, skip browser entirely.
   const goServerFirst = WEBSPEECH_UNRELIABLE.has(langShort);

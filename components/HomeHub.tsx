@@ -44,6 +44,41 @@ const ACTIVITIES: ActivityMeta[] = [
   { id: "games", titleKey: "hubActGames", descKey: "hubSectionGamesDesc", mascot: "/mascot/bee-celebrate.png", tint: "var(--ux-surface-sunk)" },
 ];
 
+/**
+ * ⭐ 소통의 별 — 처음부터 이 교실의 얼굴이었던 구조다. 다섯 활동이 별 꼭짓점에
+ * 하나씩 붙고 가운데에 '소통하는 우리' 가 있다. 카드 격자로 바꿨더니 읽기는
+ * 편해졌지만 교실의 정체성이 사라졌다 — 그래서 구조는 되살리고, 라벨 크기와
+ * 터치 영역만 토큰 계약에 맞춘다.
+ *
+ * 12시(-90°)부터 시계방향 72° 간격. ACTIVITIES 순서와 1:1 로 대응하므로
+ * 활동을 더하거나 빼면 이 배열과 polygon 도 함께 바꿔야 한다.
+ */
+const STAR_ANGLES = [-90, -18, 54, 126, 198];
+const STAR_CX = 50;
+const STAR_CY = 52;
+const STAR_R_OUTER = 38;
+const STAR_R_INNER = STAR_R_OUTER * 0.382; // 정통 오각성 내경비
+
+/** 오각성 실루엣 points (viewBox 100 기준) */
+function starPolygonPoints(): string {
+  const pts: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? STAR_R_OUTER : STAR_R_INNER;
+    const ang = ((-90 + i * 36) * Math.PI) / 180;
+    pts.push(`${(STAR_CX + r * Math.cos(ang)).toFixed(2)},${(STAR_CY + r * Math.sin(ang)).toFixed(2)}`);
+  }
+  return pts.join(" ");
+}
+
+/** 꼭짓점 좌표(%) — 버튼 중심이 놓일 자리 */
+const STAR_POINTS = STAR_ANGLES.map((deg) => {
+  const ang = (deg * Math.PI) / 180;
+  return {
+    x: STAR_CX + STAR_R_OUTER * Math.cos(ang),
+    y: STAR_CY + STAR_R_OUTER * Math.sin(ang),
+  };
+});
+
 interface Props {
   user: UserConfig;
   roomCode: string;
@@ -248,23 +283,40 @@ export default function HomeHub({
           <p data-ux-role="body" className="hub-lead-sub">{t("hubPrompt", lang)}</p>
         </div>
 
-        <nav className="hub-grid" aria-label={t("hubToday", lang)}>
-          {ACTIVITIES.map((a) => (
+        <nav className="hub-star" aria-label={t("hubToday", lang)}>
+          <svg className="hub-star-art" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="hubStarGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--ux-surface)" />
+                <stop offset="100%" stopColor="var(--ux-primary-fill)" />
+              </linearGradient>
+            </defs>
+            <polygon
+              points={starPolygonPoints()}
+              fill="url(#hubStarGrad)"
+              stroke="var(--ux-primary-border)"
+              strokeWidth="1.2"
+              strokeLinejoin="round"
+            />
+          </svg>
+
+          <span className="hub-star-center" aria-hidden="true">소통하는<br />우리</span>
+
+          {ACTIVITIES.map((a, i) => (
             <button
               key={a.id}
               type="button"
               data-tutorial-id={`hub-section-${a.id}`}
               data-ux-role="control"
-              className="hub-card"
+              className="hub-point"
+              style={{ left: `${STAR_POINTS[i].x}%`, top: `${STAR_POINTS[i].y}%` }}
               onClick={() => onSelect(a.id)}
             >
-              <span className={a.hex ? "hub-card-icon hex" : "hub-card-icon"} style={{ background: a.tint }}>
-                <img src={a.mascot} alt="" aria-hidden="true" className="hub-card-bee" />
+              <span className={a.hex ? "hub-point-icon hex" : "hub-point-icon"} style={{ background: a.tint }}>
+                <img src={a.mascot} alt="" aria-hidden="true" className="hub-point-bee" />
               </span>
-              <span className="hub-card-text">
-                <span data-ux-role="body-emphasis" className="hub-card-title">{t(a.titleKey, lang)}</span>
-                <span data-ux-role="body" className="hub-card-desc">{t(a.descKey, lang)}</span>
-              </span>
+              {/* 아이콘만으로 안내하지 않는다 — 글자 라벨은 언제나 붙어 있다. */}
+              <span data-ux-role="label" className="hub-point-label">{t(a.titleKey, lang)}</span>
             </button>
           ))}
         </nav>
@@ -452,6 +504,63 @@ const HUB_CSS = `
 .hub-lead-sub{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }
 
 /* 활동 카드: 360px 1열 / 600~1023px 2열 / 그 이상 3열 */
+/* ── ⭐ 소통의 별 ────────────────────────────────────────────────────
+   정사각 무대 위에 별 실루엣을 깔고, 다섯 활동을 꼭짓점에 하나씩 앉힌다.
+   버튼은 '동그란 아이콘 + 글자 라벨' 한 덩어리이고 그 덩어리의 중심이
+   꼭짓점이다. 아이콘만 두고 라벨을 빼지 말 것 — 아이는 그림만으로
+   어디로 가는지 알 수 없다. */
+.hub-star{
+  position: relative;
+  width: min(94vw, 620px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+.hub-star-art{ position: absolute; inset: 0; width: 100%; height: 100%; }
+.hub-star-center{
+  position: absolute; left: 50%; top: 52%;
+  transform: translate(-50%, -50%);
+  width: 34%; text-align: center; pointer-events: none;
+  font-family: 'Jua', 'Noto Sans KR', sans-serif;
+  font-size: var(--ux-font-title);
+  line-height: var(--ux-lh-tight);
+  color: var(--ux-primary-ink);
+  word-break: keep-all;
+}
+.hub-point{
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 30%;
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--ux-space-1);
+  background: transparent; border: 2px solid transparent;
+  padding: var(--ux-space-1); cursor: pointer; font-family: inherit;
+  z-index: 2;
+}
+/* 전역 [data-ux-role="control"] 이 뒤에 주입되므로 속성까지 걸어야 덮인다. */
+.hub-point[data-ux-role="control"]{ min-height: 0; border-radius: var(--ux-radius-panel); }
+.hub-point:hover .hub-point-icon,
+.hub-point:focus-visible .hub-point-icon{ border-color: var(--ux-selected-border); }
+.hub-point-icon{
+  width: 100%; aspect-ratio: 1; border-radius: 50%;
+  border: 3px solid var(--ux-primary-border);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 16px rgba(137,83,0,.18);
+}
+/* 벌집 육각형은 브랜드 장식과 칭찬 표시로만 남긴다. */
+.hub-point-icon.hex{
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  border: none;
+  outline: 3px solid var(--ux-primary-border);
+  outline-offset: -3px;
+}
+.hub-point-bee{ width: 62%; height: 62%; object-fit: contain; }
+.hub-point-label{
+  font-weight: 900; color: var(--ux-ink); text-align: center;
+  line-height: var(--ux-lh-tight); word-break: keep-all; overflow-wrap: anywhere;
+  text-shadow: 0 1px 0 var(--ux-surface), 0 0 6px var(--ux-surface);
+}
+
 .hub-grid{ display: grid; grid-template-columns: 1fr; gap: var(--ux-control-gap); }
 @media (min-width: 600px){ .hub-grid{ grid-template-columns: 1fr 1fr; } }
 @media (min-width: 1024px){ .hub-grid{ grid-template-columns: 1fr 1fr 1fr; } }

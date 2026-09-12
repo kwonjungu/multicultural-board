@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import BeeMascot from "../BeeMascot";
+import ScopedStyle from "../ui/child/ScopedStyle";
 import { LangMap, tr } from "@/lib/gameData";
-import { playTone } from "@/lib/gameSfx";
+import { playSequence, playTone } from "@/lib/gameSfx";
 
 // 할리갈리 — Halli Galli (Amigo Games, 1990) 정식 룰 기반.
 // ─────────────────────────────────────────────────────────────
@@ -70,15 +71,7 @@ type Phase = "intro" | "play" | "result";
 
 type PlayerCount = 2 | 3 | 4 | 5;
 
-// 플레이어 팔레트 (최대 5명).
-const PLAYER_PALETTE: ReadonlyArray<{ color: string; bg: string }> = [
-  { color: "#F59E0B", bg: "#FEF3C7" }, // A - amber
-  { color: "#3B82F6", bg: "#DBEAFE" }, // B - blue
-  { color: "#10B981", bg: "#D1FAE5" }, // C - emerald
-  { color: "#EC4899", bg: "#FCE7F3" }, // D - pink
-  { color: "#8B5CF6", bg: "#EDE9FE" }, // E - violet
-];
-
+// 플레이어는 색이 아니라 글자 라벨(P A~E)로 구분한다 — 색각 이상에서도 읽힌다.
 const PLAYER_LABEL = ["A", "B", "C", "D", "E"];
 
 // ─────────────────────────────────────────────────────────────
@@ -86,8 +79,13 @@ const PLAYER_LABEL = ["A", "B", "C", "D", "E"];
 // ─────────────────────────────────────────────────────────────
 const sfx = {
   flip: () => playTone(420, 120, "triangle"),
-  bell: () => { playTone(880, 160); setTimeout(() => playTone(1320, 200), 80); },
-  miss: () => playTone(180, 240, "sawtooth"),
+  // 연속음은 컴포넌트에서 setTimeout 을 직접 잡지 않고 playSequence 에 맡긴다.
+  bell: () => playSequence([
+    { freq: 880,  durationMs: 160, delayMs: 0 },
+    { freq: 1320, durationMs: 200, delayMs: 80 },
+  ]),
+  // 오답은 경고음이 아니라 '한 번 더 보자' 는 부드러운 낮은 음 하나 (README §3-5).
+  miss: () => playTone(392, 160, "sine", 0.12),
 };
 
 // 56장 덱을 n명에게 균등 분배. 나머지는 앞 사람부터 1장씩.
@@ -227,7 +225,7 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
         return s + 1;
       }));
       sfx.miss();
-      setFlash({ who, kind: "miss", reason: "5개가 아니에요" });
+      setFlash({ who, kind: "miss", reason: "지금은 5개가 아니에요. 카드를 더 넘겨볼까요?" });
     }
     flashTimer.current = setTimeout(() => setFlash(null), 1400);
   }
@@ -241,52 +239,42 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
 
   if (phase === "intro") {
     return (
-      <div style={wrap}>
-        <div style={{ textAlign: "center", padding: "24px 10px" }}>
-          <div style={{ fontSize: 72, margin: "10px 0 8px" }}>🔔</div>
-          <h2 style={{ fontSize: 26, fontWeight: 900, color: "#1F2937", margin: "0 0 6px" }}>할리갈리</h2>
-          <p style={{ fontSize: 14, color: "#6B7280", fontWeight: 600, margin: 0 }}>
+      <div data-ux-root className="hg-root">
+        <ScopedStyle css={HG_CSS} />
+        <div className="hg-head">
+          <div className="hg-bigicon" aria-hidden>🔔</div>
+          <h1 data-ux-role="title">할리갈리</h1>
+          <p data-ux-role="body">
             같은 과일이 <b>정확히 5개</b>가 되면 종을 누르세요!
           </p>
         </div>
 
-        <div style={{
-          display: "flex", flexDirection: "column", gap: 8,
-          background: "#FFFBEB", border: "2px solid #FDE68A", borderRadius: 14,
-          padding: "12px 14px", marginBottom: 12,
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 900, color: "#B45309" }}>👥 플레이어 수</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        <div className="hg-setup">
+          <span data-ux-role="label" className="hg-setuptitle">👥 플레이어 수</span>
+          <div className="hg-countgrid">
             {([2, 3, 4, 5] as PlayerCount[]).map((n) => {
               const active = playerCount === n;
               return (
                 <button
                   key={n}
-                  onClick={() => setPlayerCount(n)}
-                  aria-label={`${n}명`}
+                  data-ux-role="control"
+                  className="hg-count"
+                  data-active={active ? "" : undefined}
                   aria-pressed={active}
-                  style={{
-                    // 친화규격 예외: 할리갈리는 빠른탭 게임 — 의도적 컴팩트 타깃 유지(56 하한 면제)
-                    minHeight: 44, padding: "8px 4px", borderRadius: 12,
-                    background: active ? "#F59E0B" : "#fff",
-                    color: active ? "#fff" : "#92400E",
-                    border: `2px solid ${active ? "#D97706" : "#FDE68A"}`,
-                    fontSize: 15, fontWeight: 900, cursor: "pointer",
-                  }}
+                  onClick={() => setPlayerCount(n)}
                 >{n}명</button>
               );
             })}
           </div>
-          <div style={{ fontSize: 11, color: "#6B7280", fontWeight: 700 }}>
+          <p data-ux-role="secondary" className="hg-deal">
             56장을 {playerCount}명에게 균등 분배 ({Math.floor(56 / playerCount)}장씩
             {56 % playerCount > 0 ? `, 앞 ${56 % playerCount}명은 +1장` : ""})
-          </div>
+          </p>
         </div>
 
-        <button
-          onClick={() => setPhase("play")}
-          style={primaryBtn}
-        >🎮 시작하기</button>
+        <button data-ux-role="action" className="hg-primary" onClick={() => setPhase("play")}>
+          🎮 시작하기
+        </button>
         <Rules langA={langA} langB={langB} />
       </div>
     );
@@ -298,19 +286,20 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
     scores.forEach((s, i) => { if (s === max) winners.push(i); });
     const isDraw = winners.length > 1;
     return (
-      <div style={{ ...wrap, textAlign: "center" }}>
+      <div data-ux-root className="hg-root hg-center">
+        <ScopedStyle css={HG_CSS} />
         <BeeMascot size={120} mood={isDraw ? "think" : "cheer"} />
-        <h2 style={{ fontSize: 26, fontWeight: 900, margin: "14px 0 4px", color: "#111827" }}>
+        <h1 data-ux-role="title">
           {isDraw ? "🤝 무승부!" : `🏆 플레이어 ${PLAYER_LABEL[winners[0]]} 승!`}
-        </h2>
-        <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginTop: 18, fontSize: 16, fontWeight: 900 }}>
+        </h1>
+        <div className="hg-scores">
           {scores.map((s, i) => (
-            <div key={i} style={{ color: PLAYER_PALETTE[i].color }}>
+            <span key={i} data-ux-role="body-emphasis">
               {PLAYER_LABEL[i]}: {s}
-            </div>
+            </span>
           ))}
         </div>
-        <button onClick={reset} style={{ ...primaryBtn, marginTop: 20 }}>🔄 다시하기</button>
+        <button data-ux-role="action" className="hg-primary" onClick={reset}>🔄 다시하기</button>
       </div>
     );
   }
@@ -321,25 +310,18 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
     const topA = piles[0]?.[0];
     const topB = piles[1]?.[0];
     return (
-      <div style={{
-        maxWidth: 680, margin: "0 auto",
-        display: "flex", flexDirection: "column", gap: 10,
-        padding: "12px 12px 28px",
-      }}>
+      <div data-ux-root className="hg-root hg-play2">
+        <ScopedStyle css={HG_CSS} />
         {/* Player B controls (top, rotated 180° toward opposite player) */}
         <PlayerControls
           label="B"
-          color={PLAYER_PALETTE[1].color} bg={PLAYER_PALETTE[1].bg}
           deckCount={decks[1]?.length ?? 0} score={scores[1] ?? 0} isTurn={turn === 1}
           onFlip={flipNext} onBell={() => ringBell(1)}
           flipped
         />
 
         {/* Center table — two face-up cards */}
-        <div style={{
-          display: "flex", flexDirection: "column", gap: 8,
-          alignItems: "center", padding: "4px 0",
-        }}>
+        <div className="hg-table">
           <CenterCard
             card={topB}
             flipped
@@ -354,7 +336,6 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
         {/* Player A controls (bottom) */}
         <PlayerControls
           label="A"
-          color={PLAYER_PALETTE[0].color} bg={PLAYER_PALETTE[0].bg}
           deckCount={decks[0]?.length ?? 0} score={scores[0] ?? 0} isTurn={turn === 0}
           onFlip={flipNext} onBell={() => ringBell(0)}
         />
@@ -364,25 +345,17 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
     );
   }
 
-  // 3~5인: flex-wrap 격자 — 각 플레이어 영역을 카드+컨트롤로 묶어 나열.
+  // 3~5인: 격자 — 각 플레이어 영역을 카드+컨트롤로 묶어 나열.
   return (
-    <div style={{
-      maxWidth: 880, margin: "0 auto",
-      display: "flex", flexDirection: "column", gap: 10,
-      padding: "12px 12px 28px",
-    }}>
-      <div style={{
-        display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10,
-      }}>
+    <div data-ux-root className="hg-root hg-playn">
+      <ScopedStyle css={HG_CSS} />
+      <div className="hg-panels">
         {Array.from({ length: playerCount }).map((_, i) => {
           const top = piles[i]?.[0];
-          const palette = PLAYER_PALETTE[i];
           return (
             <PlayerPanel
               key={i}
               label={PLAYER_LABEL[i]}
-              color={palette.color}
-              bg={palette.bg}
               card={top}
               highlight={!!(top && winningFruit && top.fruit === winningFruit)}
               deckCount={decks[i]?.length ?? 0}
@@ -405,11 +378,9 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
 // ────────────────────────────────────────────────
 
 function PlayerControls({
-  label, color, bg, deckCount, score, isTurn, onFlip, onBell, flipped,
+  label, deckCount, score, isTurn, onFlip, onBell, flipped,
 }: {
   label: string;
-  color: string;
-  bg: string;
   deckCount: number;
   score: number;
   isTurn: boolean;
@@ -417,62 +388,35 @@ function PlayerControls({
   onBell: () => void;
   flipped?: boolean;
 }) {
+  const canFlip = isTurn && deckCount > 0;
   return (
-    <div
-      style={{
-        background: bg, border: `2px solid ${color}`, borderRadius: 16,
-        padding: "10px 12px", display: "flex", alignItems: "center", gap: 10,
-        transform: flipped ? "rotate(180deg)" : undefined,
-      }}
-    >
-      <div style={{
-        fontSize: 12, fontWeight: 900, color, padding: "4px 10px",
-        background: "#fff", borderRadius: 999, border: `2px solid ${color}`,
-      }}>P {label}</div>
-      <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280" }}>
-        🃏 {deckCount} · 🏆 {score}
-      </div>
-      {isTurn && (
-        <span style={{
-          fontSize: 11, fontWeight: 900, background: color, color: "#fff",
-          padding: "3px 10px", borderRadius: 999,
-        }}>내 차례</span>
-      )}
-      <span style={{ flex: 1 }} />
+    <div className="hg-controls" data-flipped={flipped ? "" : undefined}>
+      <span data-ux-role="label" className="hg-tag">P {label}</span>
+      <span data-ux-role="secondary">🃏 {deckCount} · 🏆 {score}</span>
+      {isTurn && <span data-ux-role="label" className="hg-turn">내 차례</span>}
+      <span className="hg-spacer" />
       <button
-        onClick={onFlip}
-        disabled={!isTurn || deckCount === 0}
+        data-ux-role="control"
+        className="hg-flip"
+        aria-disabled={!canFlip}
         aria-label={`플레이어 ${label} 카드 넘기기`}
-        style={{
-          minHeight: 44, padding: "0 16px", borderRadius: 12,
-          background: isTurn && deckCount > 0 ? "#fff" : "#F3F4F6",
-          color: isTurn && deckCount > 0 ? color : "#9CA3AF",
-          border: `2px solid ${isTurn && deckCount > 0 ? color : "#E5E7EB"}`,
-          fontWeight: 900, fontSize: 14,
-          cursor: isTurn && deckCount > 0 ? "pointer" : "not-allowed",
-        }}
+        onClick={() => { if (canFlip) onFlip(); }}
       >▶ 넘기기</button>
       <button
-        onClick={onBell}
+        data-ux-role="control"
+        className="hg-bell"
         aria-label={`플레이어 ${label} 종 누르기`}
-        style={{
-          minHeight: 44, minWidth: 56, padding: 0, borderRadius: 14,
-          background: `linear-gradient(135deg, ${color}, ${color}cc)`,
-          color: "#fff", border: "none", fontWeight: 900, fontSize: 24,
-          cursor: "pointer", boxShadow: `0 4px 10px ${color}55`,
-        }}
-      >🔔</button>
+        onClick={onBell}
+      >🔔 종</button>
     </div>
   );
 }
 
 // 3~5인 격자용 단일 플레이어 패널 (카드 + 컨트롤 한 덩어리).
 function PlayerPanel({
-  label, color, bg, card, highlight, deckCount, score, isTurn, onFlip, onBell,
+  label, card, highlight, deckCount, score, isTurn, onFlip, onBell,
 }: {
   label: string;
-  color: string;
-  bg: string;
   card: Card | undefined;
   highlight: boolean;
   deckCount: number;
@@ -481,127 +425,62 @@ function PlayerPanel({
   onFlip: () => void;
   onBell: () => void;
 }) {
+  const canFlip = isTurn && deckCount > 0;
   return (
-    <div
-      style={{
-        background: bg, border: `2px solid ${color}`, borderRadius: 16,
-        padding: 10, display: "flex", flexDirection: "column", gap: 8,
-        // 3~5인 공통: 셀 크기 고정 (flex-grow 금지) → 마지막 플레이어만 커지지 않음
-        flex: "0 0 260px", maxWidth: 260,
-        boxShadow: isTurn ? `0 0 0 3px ${color}55, 0 6px 14px rgba(0,0,0,0.12)` : "0 2px 6px rgba(0,0,0,0.08)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{
-          fontSize: 12, fontWeight: 900, color, padding: "3px 10px",
-          background: "#fff", borderRadius: 999, border: `2px solid ${color}`,
-        }}>P {label}</div>
-        <div style={{ fontSize: 11, fontWeight: 800, color: "#6B7280" }}>
-          🃏 {deckCount} · 🏆 {score}
-        </div>
-        {isTurn && (
-          <span style={{
-            fontSize: 10, fontWeight: 900, background: color, color: "#fff",
-            padding: "2px 8px", borderRadius: 999, marginLeft: "auto",
-          }}>내 차례</span>
-        )}
+    <div className="hg-panel" data-turn={isTurn ? "" : undefined}>
+      <div className="hg-panelhead">
+        <span data-ux-role="label" className="hg-tag">P {label}</span>
+        <span data-ux-role="secondary">🃏 {deckCount} · 🏆 {score}</span>
+        {isTurn && <span data-ux-role="label" className="hg-turn">내 차례</span>}
       </div>
       <CenterCard card={card} highlight={highlight} compact />
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="hg-panelbtns">
         <button
-          onClick={onFlip}
-          disabled={!isTurn || deckCount === 0}
+          data-ux-role="control"
+          className="hg-flip"
+          aria-disabled={!canFlip}
           aria-label={`플레이어 ${label} 카드 넘기기`}
-          style={{
-            flex: 1,
-            minHeight: 44, padding: "0 10px", borderRadius: 12,
-            background: isTurn && deckCount > 0 ? "#fff" : "#F3F4F6",
-            color: isTurn && deckCount > 0 ? color : "#9CA3AF",
-            border: `2px solid ${isTurn && deckCount > 0 ? color : "#E5E7EB"}`,
-            fontWeight: 900, fontSize: 13,
-            cursor: isTurn && deckCount > 0 ? "pointer" : "not-allowed",
-          }}
+          onClick={() => { if (canFlip) onFlip(); }}
         >▶ 넘기기</button>
         <button
-          onClick={onBell}
+          data-ux-role="control"
+          className="hg-bell"
           aria-label={`플레이어 ${label} 종 누르기`}
-          style={{
-            minHeight: 44, minWidth: 52, padding: 0, borderRadius: 14,
-            background: `linear-gradient(135deg, ${color}, ${color}cc)`,
-            color: "#fff", border: "none", fontWeight: 900, fontSize: 22,
-            cursor: "pointer", boxShadow: `0 4px 10px ${color}55`,
-          }}
-        >🔔</button>
+          onClick={onBell}
+        >🔔 종</button>
       </div>
     </div>
   );
 }
 
 function CenterCard({ card, flipped, highlight, compact }: { card: Card | undefined; flipped?: boolean; highlight?: boolean; compact?: boolean }) {
-  const transform = flipped ? "rotate(180deg)" : undefined;
-  const widthStyle = compact ? "100%" : "min(92%, 420px)";
   if (!card) {
     return (
-      <div
-        style={{
-          width: widthStyle, aspectRatio: "5 / 3",
-          background: "#fff", border: "3px dashed #E5E7EB", borderRadius: 20,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#9CA3AF", fontWeight: 800, fontSize: 13,
-          transform,
-        }}
-      >카드 대기 중</div>
+      <div className="hg-card hg-cardempty" data-flipped={flipped ? "" : undefined} data-compact={compact ? "" : undefined}>
+        <span data-ux-role="secondary">카드 대기 중</span>
+      </div>
     );
   }
   const meta = FRUIT_META[card.fruit];
   const columns = card.count <= 3 ? card.count : 3;
   return (
     <div
-      style={{
-        width: widthStyle, aspectRatio: "5 / 3",
-        background: "#fff",
-        // 합이 5인 승리 기회 상태 = 긍정적 녹색(#10B981). 빨강은 오답/경고용이라 부적절.
-        border: `4px solid ${highlight ? "#10B981" : meta.color}`,
-        borderRadius: 20,
-        boxShadow: highlight
-          ? "0 0 0 6px rgba(16,185,129,0.35), 0 12px 28px rgba(0,0,0,0.18)"
-          : "0 10px 22px rgba(0,0,0,0.12)",
-        padding: 12, position: "relative",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        transform,
-        animation: highlight ? "halliGlow 0.6s ease-in-out infinite alternate" : undefined,
-      }}
+      className="hg-card"
+      data-flipped={flipped ? "" : undefined}
+      data-compact={compact ? "" : undefined}
+      data-highlight={highlight ? "" : undefined}
+      style={{ borderColor: highlight ? "var(--ux-success)" : meta.color }}
     >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-          gap: 8,
-          width: "100%",
-          height: "100%",
-          alignContent: "center",
-          justifyItems: "center",
-          placeItems: "center",
-        }}
-      >
+      <div className="hg-fruits" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
         {/* key 에 fruit 포함 — 카드가 바뀔 때 리마운트되어 failed(onError) 상태가 새 과일로 새어가지 않게 */}
         {Array.from({ length: card.count }).map((_, i) => (
           <FruitGlyph key={`${card.fruit}-${i}`} fruit={card.fruit} />
         ))}
       </div>
-      {/* Corner count for tactile confirmation, very subtle */}
-      <div style={{
-        position: "absolute", top: 8, left: 12,
-        fontSize: 13, fontWeight: 900, color: meta.color,
-        background: "#fff", padding: "2px 8px", borderRadius: 999,
-        border: `2px solid ${meta.color}`,
-      }}>{meta.emoji} ×{card.count}</div>
-      <style jsx>{`
-        @keyframes halliGlow {
-          from { box-shadow: 0 0 0 4px rgba(16,185,129,0.25), 0 12px 28px rgba(0,0,0,0.18); }
-          to   { box-shadow: 0 0 0 10px rgba(16,185,129,0.55), 0 12px 32px rgba(0,0,0,0.25); }
-        }
-      `}</style>
+      {/* Corner count for tactile confirmation */}
+      <span data-ux-role="secondary" className="hg-corner" style={{ color: meta.color, borderColor: meta.color }}>
+        {meta.emoji} ×{card.count}
+      </span>
     </div>
   );
 }
@@ -610,38 +489,25 @@ function FruitGlyph({ fruit }: { fruit: Fruit }) {
   const meta = FRUIT_META[fruit];
   const [failed, setFailed] = useState(false);
   if (failed) {
-    return <span style={{ fontSize: "clamp(32px, 9vw, 56px)", lineHeight: 1 }}>{meta.emoji}</span>;
+    return <span className="hg-fruitfallback" aria-hidden="true">{meta.emoji}</span>;
   }
   return (
     <img
+      className="hg-fruit"
       src={fruitImg(fruit)}
       alt=""
       aria-hidden="true"
       onError={() => setFailed(true)}
-      style={{ width: "clamp(28px, 9vw, 56px)", height: "clamp(28px, 9vw, 56px)", objectFit: "contain", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.12))" }}
     />
   );
 }
 
 function FlashOverlay({ flash }: { flash: { who: string; kind: "hit" | "miss"; reason: string } }) {
   return (
-    <div
-      aria-live="polite"
-      style={{
-        position: "fixed", inset: 0, zIndex: 500, pointerEvents: "none",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}
-    >
-      <div style={{
-        background: flash.kind === "hit" ? "rgba(16,185,129,0.95)" : "rgba(239,68,68,0.95)",
-        color: "#fff", padding: "18px 28px", borderRadius: 22,
-        fontWeight: 900, fontSize: 22, boxShadow: "0 20px 50px rgba(0,0,0,0.35)",
-        textAlign: "center",
-      }}>
-        <div>{flash.kind === "hit" ? "🎯 정답" : "❌ 오답"}</div>
-        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4, opacity: 0.95 }}>
-          플레이어 {flash.who} · {flash.reason}
-        </div>
+    <div className="hg-flashlayer" aria-live="polite">
+      <div className="hg-flash" data-kind={flash.kind}>
+        <p data-ux-role="body-emphasis">{flash.kind === "hit" ? "🎯 정답" : "🌱 한 번 더 볼까요?"}</p>
+        <p data-ux-role="body">플레이어 {flash.who} · {flash.reason}</p>
       </div>
     </div>
   );
@@ -649,35 +515,155 @@ function FlashOverlay({ flash }: { flash: { who: string; kind: "hit" | "miss"; r
 
 function Rules({ langA, langB }: { langA: string; langB: string }) {
   return (
-    <div style={{
-      marginTop: 18, padding: "12px 14px", background: "#fff",
-      borderRadius: 14, border: "2px solid #FDE68A",
-      fontSize: 13, color: "#374151", lineHeight: 1.7,
-    }}>
-      <div style={{ fontWeight: 900, color: "#B45309", marginBottom: 4 }}>🎯 규칙</div>
-      <ol style={{ margin: 0, paddingLeft: 18 }}>
+    <div className="hg-rules">
+      <span data-ux-role="label" className="hg-rulestitle">🎯 규칙</span>
+      <ol data-ux-role="body" className="hg-rulelist">
         <li>서로 번갈아 카드를 넘겨요.</li>
         <li>지금 공개된 카드 중 <b>한 과일이 정확히 5개</b>면 종을 눌러요.</li>
         <li>정답이면 지금까지 쌓인 카드를 모두 가져가요.</li>
         <li>오답이면 상대에게 1장씩 줘야 해요.</li>
         <li>덱이 다 떨어지면 점수 많은 쪽이 이겨요.</li>
       </ol>
-      <div style={{ marginTop: 8, fontSize: 11, color: "#9CA3AF" }}>
-        {langA} / {langB}
-      </div>
+      <span data-ux-role="secondary">{langA} / {langB}</span>
     </div>
   );
 }
 
-const wrap: React.CSSProperties = {
-  padding: "20px 16px 32px", maxWidth: 560, margin: "0 auto",
-  fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
-};
-const primaryBtn: React.CSSProperties = {
-  width: "100%", padding: "16px 18px", borderRadius: 16,
-  background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#fff",
-  fontSize: 18, fontWeight: 900, border: "none", cursor: "pointer",
-  boxShadow: "0 6px 16px rgba(245,158,11,0.3)",
-};
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const HG_CSS = `
+.hg-root{
+  color: var(--ux-ink);
+  width: 100%; max-width: 1100px; margin: 0 auto; box-sizing: border-box;
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-8);
+  display: flex; flex-direction: column; gap: var(--ux-space-4);
+}
+.hg-center{ align-items: center; text-align: center; }
+.hg-head{ display: grid; justify-items: center; gap: var(--ux-space-2); text-align: center; }
+.hg-head p{ margin: 0; }
+.hg-bigicon{ font-size: clamp(3.5rem, 14vw, 5.5rem); line-height: 1; }
+
+.hg-setup{
+  display: grid; gap: var(--ux-space-3);
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface); padding: var(--ux-space-4);
+}
+.hg-setuptitle{ font-weight: 900; color: var(--ux-primary-ink); }
+.hg-countgrid{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ux-space-2); }
+.hg-count[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+  padding: var(--ux-space-2);
+}
+.hg-count[data-active]{ background: var(--ux-primary-fill); color: var(--ux-primary-ink); border-width: 3px; border-color: var(--ux-selected-border); }
+.hg-deal{ margin: 0; }
+
+.hg-primary[data-ux-role="action"]{
+  width: 100%;
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+}
+.hg-scores{ display: flex; justify-content: center; flex-wrap: wrap; gap: var(--ux-space-4); }
+
+.hg-rules{
+  display: grid; gap: var(--ux-space-2);
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface); padding: var(--ux-space-4);
+}
+.hg-rulestitle{ font-weight: 900; color: var(--ux-primary-ink); }
+.hg-rulelist{ margin: 0; padding-left: var(--ux-space-6); display: grid; gap: var(--ux-space-1); }
+
+/* ── 대전 화면 ── */
+.hg-play2{ gap: var(--ux-space-3); }
+.hg-table{ display: flex; flex-direction: column; gap: var(--ux-space-2); align-items: center; }
+/* 넓은 화면에서는 두 카드를 나란히 놓아 판을 크게 본다. */
+@media (min-width: 900px){
+  .hg-table{ flex-direction: row; justify-content: center; align-items: stretch; }
+  .hg-table > *{ flex: 1 1 0; max-width: 480px; }
+}
+
+.hg-controls{
+  background: var(--ux-surface-sunk); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-2) var(--ux-space-3);
+  display: flex; align-items: center; gap: var(--ux-space-2); flex-wrap: wrap;
+}
+.hg-controls[data-flipped]{ transform: rotate(180deg); }
+.hg-spacer{ flex: 1; }
+.hg-tag{
+  font-weight: 900; color: var(--ux-primary-ink);
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-pill); padding: 0 var(--ux-space-3);
+}
+.hg-turn{
+  font-weight: 900; color: var(--ux-primary-ink); background: var(--ux-primary-fill);
+  border-radius: var(--ux-radius-pill); padding: 0 var(--ux-space-3);
+}
+.hg-flip[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+  white-space: nowrap;
+}
+.hg-flip[aria-disabled="true"]{ opacity: .55; cursor: default; }
+.hg-bell[data-ux-role="control"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+  white-space: nowrap;
+}
+
+.hg-panels{ display: grid; gap: var(--ux-space-3); grid-template-columns: 1fr; }
+@media (min-width: 640px){ .hg-panels{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px){ .hg-panels{ grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.hg-panel{
+  background: var(--ux-surface-sunk); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface); padding: var(--ux-space-3);
+  display: flex; flex-direction: column; gap: var(--ux-space-2); min-width: 0;
+}
+.hg-panel[data-turn]{ border-width: 4px; border-color: var(--ux-selected-border); }
+.hg-panelhead{ display: flex; align-items: center; gap: var(--ux-space-2); flex-wrap: wrap; }
+.hg-panelbtns{ display: flex; gap: var(--ux-space-2); }
+.hg-panelbtns .hg-flip{ flex: 1; }
+
+.hg-card{
+  width: 100%; aspect-ratio: 5 / 3;
+  background: var(--ux-surface);
+  border: 4px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface);
+  box-shadow: 0 10px 22px rgba(41,37,31,.12);
+  padding: var(--ux-space-3); position: relative; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+}
+.hg-card[data-compact]{ width: 100%; }
+.hg-card:not([data-compact]){ width: min(92%, 420px); }
+.hg-card[data-flipped]{ transform: rotate(180deg); }
+.hg-cardempty{ border-style: dashed; border-color: var(--ux-ink-soft); }
+/* 합이 5인 '기회' 상태는 긍정적 초록. 빨강은 오답/경고용이라 여기선 쓰지 않는다. */
+.hg-card[data-highlight]{ animation: hgGlow .6s ease-in-out infinite alternate; }
+@keyframes hgGlow{
+  from{ box-shadow: 0 0 0 4px rgba(20,107,73,.25), 0 12px 28px rgba(41,37,31,.18); }
+  to  { box-shadow: 0 0 0 10px rgba(20,107,73,.5), 0 12px 32px rgba(41,37,31,.25); }
+}
+.hg-fruits{ display: grid; gap: var(--ux-space-2); width: 100%; height: 100%; place-items: center; align-content: center; }
+.hg-fruit{ width: clamp(1.75rem, 9vw, 3.5rem); height: clamp(1.75rem, 9vw, 3.5rem); object-fit: contain; }
+.hg-fruitfallback{ font-size: clamp(2rem, 9vw, 3.5rem); line-height: 1; }
+.hg-corner{
+  position: absolute; top: var(--ux-space-2); left: var(--ux-space-3);
+  background: var(--ux-surface); padding: 0 var(--ux-space-2);
+  border-radius: var(--ux-radius-pill); border: 2px solid currentColor; font-weight: 900;
+}
+
+.hg-flashlayer{
+  position: fixed; inset: 0; z-index: 500; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; padding: var(--ux-space-4);
+}
+.hg-flash{
+  border-radius: var(--ux-radius-panel); padding: var(--ux-space-4) var(--ux-space-8);
+  text-align: center; box-shadow: 0 20px 50px rgba(41,37,31,.35);
+  background: var(--ux-surface); border: 4px solid var(--ux-primary-border);
+  display: grid; gap: var(--ux-space-1);
+}
+.hg-flash p{ margin: 0; }
+.hg-flash[data-kind="hit"]{ background: var(--ux-hint-mint); border-color: var(--ux-success); }
+.hg-flash[data-kind="miss"]{ background: var(--ux-surface); border-color: var(--ux-primary-border); }
+`;
 // Minimal unused import avoidance
 void tr;

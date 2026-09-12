@@ -14,21 +14,42 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLOBE_COUNTRIES, globeCountryName, flagUrlFor, type GlobeCountry } from "@/lib/globeData";
 import { LANGUAGES } from "@/lib/constants";
 import { pickN } from "@/lib/gameData";
-import { playTone } from "@/lib/gameSfx";
-import { speak } from "@/lib/ttsMulti";
+import { playSequence, playTone } from "@/lib/gameSfx";
+import { cancelSpeak, speak } from "@/lib/ttsMulti";
+import ScopedStyle from "../ui/child/ScopedStyle";
 
 const GLOBE_R = 100;
 const QUIZ_ROUNDS = 8;
 
+// 효과음은 공유 싱글턴 컨텍스트(lib/gameSfx)만 쓴다 — new AudioContext 금지.
+// 연속음도 컴포넌트에서 window.setTimeout 을 직접 잡지 않고 playSequence 에 맡긴다.
 const sfx = {
-  ok: () => { playTone(659, 130, "sine", 0.18); window.setTimeout(() => playTone(880, 200, "sine", 0.2), 110); },
-  bad: () => playTone(180, 240, "sawtooth", 0.16),
-  win: () => {
-    playTone(523, 140, "triangle", 0.2);
-    window.setTimeout(() => playTone(659, 140, "triangle", 0.2), 130);
-    window.setTimeout(() => playTone(784, 300, "triangle", 0.22), 260);
-  },
+  ok: () => playSequence([
+    { freq: 659, durationMs: 130, delayMs: 0,   type: "sine", volume: 0.18 },
+    { freq: 880, durationMs: 200, delayMs: 110, type: "sine", volume: 0.2 },
+  ]),
+  // 오답은 경고음이 아니라 '다시 해보자' 는 부드러운 낮은 음 하나 (README §3-5).
+  again: () => playTone(392, 160, "sine", 0.12),
+  win: () => playSequence([
+    { freq: 523, durationMs: 140, delayMs: 0,   type: "triangle", volume: 0.2 },
+    { freq: 659, durationMs: 140, delayMs: 130, type: "triangle", volume: 0.2 },
+    { freq: 784, durationMs: 300, delayMs: 260, type: "triangle", volume: 0.22 },
+  ]),
 };
+
+/**
+ * 음성 정리 — lib/ttsMulti 의 cancelSpeak 을 감싼다(그 파일은 수정하지 않는다).
+ * 새 인사말을 읽기 전과 화면을 떠날 때 이 함수를 반드시 부른다.
+ */
+function stopSpeak(): void {
+  cancelSpeak();
+}
+
+/** 이전 음성을 멈춘 뒤 새 인사말을 읽는다. */
+function say(text: string, lang: string): void {
+  stopSpeak();
+  void speak(text, lang);
+}
 
 /** 위도/경도 → three.js 좌표 (SphereGeometry 등장방형 UV 기준 표준 변환) */
 function latLonToVec3(lat: number, lon: number, r: number): THREE.Vector3 {
@@ -210,13 +231,7 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
   return (
     <div ref={mountRef} style={{ width: "100%", height: "100%", position: "relative" }}>
       {!ready && (
-        <div style={{
-          position: "absolute", inset: 0, display: "flex",
-          alignItems: "center", justifyContent: "center",
-          color: "#A5B4FC", fontSize: 14, fontWeight: 800,
-        }}>
-          🌍 지구 불러오는 중…
-        </div>
+        <p data-ux-role="body" className="gq-loading">🌍 지구 불러오는 중…</p>
       )}
     </div>
   );
@@ -231,25 +246,31 @@ type Mode = "menu" | "explore" | "quiz";
 export default function GlobeQuest({ langA, langB }: { langA: string; langB: string }) {
   const [mode, setMode] = useState<Mode>("menu");
 
+  // 모드를 벗어나거나 화면을 닫으면 읽던 인사말을 반드시 멈춘다.
+  useEffect(() => {
+    return () => { stopSpeak(); };
+  }, []);
+
   if (mode === "menu") {
     return (
-      <div style={{ padding: "28px 16px 40px", maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
-        <div style={{ fontSize: 72, marginBottom: 8 }}>🌍</div>
-        <div style={{ fontSize: 24, fontWeight: 900, color: "#1F2937", marginBottom: 6 }}>
-          다문화 지구본
+      <div data-ux-root className="gq-root gq-menu">
+        <ScopedStyle css={GQ_CSS} />
+        <div className="gq-menuhead">
+          <div className="gq-bigicon" aria-hidden>🌍</div>
+          <h1 data-ux-role="title">다문화 지구본</h1>
+          <p data-ux-role="body">
+            {GLOBE_COUNTRIES.length}개 나라가 진짜 지구 위에 떠 있어요
+          </p>
         </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#6B7280", marginBottom: 24 }}>
-          {GLOBE_COUNTRIES.length}개 나라가 진짜 지구 위에 떠 있어요
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="gq-modegrid">
           <ModeCard
-            emoji="📖" color="#3B82F6" bg="#DBEAFE"
+            emoji="📖"
             title="공부하기"
             sub="지구를 돌려보고, 나라를 눌러 인사말을 들어요"
             onClick={() => setMode("explore")}
           />
           <ModeCard
-            emoji="⚡" color="#F59E0B" bg="#FEF3C7"
+            emoji="⚡"
             title="게임하기 — 빠르게 그 나라 찾기"
             sub={`제시된 나라를 지구본에서 찾아 탭! ${QUIZ_ROUNDS}라운드`}
             onClick={() => setMode("quiz")}
@@ -265,34 +286,16 @@ export default function GlobeQuest({ langA, langB }: { langA: string; langB: str
   return <QuizMode viewerLang={langA} friendLang={langB} onBack={() => setMode("menu")} />;
 }
 
-function ModeCard({ emoji, color, bg, title, sub, onClick }: {
-  emoji: string; color: string; bg: string; title: string; sub: string; onClick: () => void;
+function ModeCard({ emoji, title, sub, onClick }: {
+  emoji: string; title: string; sub: string; onClick: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 16,
-        padding: "20px 18px", borderRadius: 22,
-        border: `3px solid ${color}`, background: "#fff",
-        cursor: "pointer", textAlign: "left",
-        boxShadow: `0 8px 22px ${color}33`,
-        transition: "transform 0.12s",
-      }}
-      onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
-      onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-    >
-      <div style={{
-        width: 60, height: 60, borderRadius: 18, background: bg,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 32, flexShrink: 0,
-      }}>{emoji}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 18, fontWeight: 900, color }}>{title}</div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginTop: 3, lineHeight: 1.4 }}>{sub}</div>
-      </div>
-      <div style={{ fontSize: 22, color, fontWeight: 900 }}>›</div>
+    <button data-ux-role="control" className="gq-modecard" onClick={onClick}>
+      <span className="gq-modeemoji" aria-hidden>{emoji}</span>
+      <span className="gq-modetext">
+        <span data-ux-role="label">{title}</span>
+        <span data-ux-role="secondary">{sub}</span>
+      </span>
     </button>
   );
 }
@@ -304,25 +307,23 @@ function GlobeShell({ topBar, children, overlay }: {
   overlay?: React.ReactNode;
 }) {
   return (
-    <div style={{
-      height: "100%", minHeight: 480,
-      display: "flex", flexDirection: "column",
-      background: "radial-gradient(circle at 50% 40%, #1e1b4b 0%, #0d0b26 70%)",
-      position: "relative",
-    }}>
-      <div style={{ padding: "10px 12px", flexShrink: 0 }}>{topBar}</div>
-      <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
+    <div data-ux-root className="gq-shell">
+      <ScopedStyle css={GQ_CSS} />
+      <div className="gq-topbar">{topBar}</div>
+      <div className="gq-stage">{children}</div>
       {overlay}
     </div>
   );
 }
 
-const backBtnStyle: React.CSSProperties = {
-  width: 40, height: 40, borderRadius: 12,
-  border: "2px solid rgba(255,255,255,0.25)",
-  background: "rgba(255,255,255,0.1)", color: "#fff",
-  fontSize: 16, fontWeight: 900, cursor: "pointer", flexShrink: 0,
-};
+/** 아이콘만 있는 버튼은 만들지 않는다 — 짧은 글자 라벨을 함께 둔다. */
+function BackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <button data-ux-role="control" className="gq-back" onClick={onBack}>
+      ← 모드 선택
+    </button>
+  );
+}
 
 // ============================================================
 // 📖 공부하기 — 자유 탐험
@@ -331,87 +332,43 @@ const backBtnStyle: React.CSSProperties = {
 function ExploreMode({ viewerLang, onBack }: { viewerLang: string; onBack: () => void }) {
   const [selected, setSelected] = useState<GlobeCountry | null>(null);
 
+  useEffect(() => {
+    return () => { stopSpeak(); };
+  }, []);
+
   return (
     <GlobeShell
       topBar={
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={onBack} aria-label="모드 선택으로" style={backBtnStyle}>←</button>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 900, color: "#fff" }}>📖 지구본 공부하기</div>
-            <div style={{ fontSize: 11, color: "#A5B4FC", fontWeight: 700 }}>
-              돌려보고, 나라를 눌러보세요!
-            </div>
+        <div className="gq-topinner">
+          <BackButton onBack={onBack} />
+          <div className="gq-toptext">
+            <span data-ux-role="label">📖 지구본 공부하기</span>
+            <span data-ux-role="secondary">돌려보고, 나라를 눌러보세요!</span>
           </div>
         </div>
       }
       overlay={selected && (
-        <div
-          onClick={() => setSelected(null)}
-          style={{
-            position: "absolute", left: 0, right: 0, bottom: 0,
-            display: "flex", justifyContent: "center",
-            padding: "0 14px 16px", pointerEvents: "none",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              pointerEvents: "auto",
-              width: "min(440px, 100%)",
-              background: "#fff", borderRadius: 22,
-              border: "3px solid #FDE68A",
-              boxShadow: "0 18px 44px rgba(0,0,0,0.5)",
-              padding: "16px 18px",
-              display: "flex", gap: 14, alignItems: "center",
-            }}
-          >
-            <img
-              src={selected.landmark}
-              alt=""
-              aria-hidden="true"
-              style={{ width: 84, height: 84, objectFit: "contain", flexShrink: 0, filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.2))" }}
-            />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <img
-                  src={flagUrlFor(selected.code, "w80")}
-                  alt=""
-                  aria-hidden="true"
-                  style={{ width: 30, height: "auto", borderRadius: 4, boxShadow: "0 1px 4px rgba(0,0,0,0.25)" }}
-                />
-                <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937" }}>
-                  {globeCountryName(selected, viewerLang)}
-                </div>
+        <div className="gq-cardlayer">
+          <div className="gq-card">
+            <img className="gq-landmark" src={selected.landmark} alt="" aria-hidden="true" />
+            <div className="gq-cardbody">
+              <div className="gq-nameline">
+                <img className="gq-flag" src={flagUrlFor(selected.code, "w80")} alt="" aria-hidden="true" />
+                <span data-ux-role="body-emphasis">{globeCountryName(selected, viewerLang)}</span>
               </div>
               {viewerLang !== "ko" && (
-                <div style={{ fontSize: 12, color: "#6B7280", fontWeight: 700, marginTop: 2 }}>
-                  {globeCountryName(selected, "ko")}
-                </div>
+                <span data-ux-role="secondary">{globeCountryName(selected, "ko")}</span>
               )}
-              <button
-                onClick={() => speak(selected.hello, selected.lang)}
-                style={{
-                  marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6,
-                  background: "linear-gradient(135deg, #F59E0B, #D97706)",
-                  border: "none", color: "#fff", borderRadius: 99,
-                  padding: "8px 16px", fontSize: 15, fontWeight: 900, cursor: "pointer",
-                }}
-              >
-                🔊 {selected.hello}
-              </button>
-              <span style={{ marginLeft: 8, fontSize: 12, color: "#92400E", fontWeight: 800 }}>
-                {LANGUAGES[selected.lang]?.label}
-              </span>
+              <div className="gq-hellorow">
+                <button data-ux-role="control" className="gq-hello" onClick={() => say(selected.hello, selected.lang)}>
+                  🔊 {selected.hello}
+                </button>
+                <span data-ux-role="secondary">{LANGUAGES[selected.lang]?.label}</span>
+              </div>
             </div>
-            <button
-              onClick={() => setSelected(null)}
-              aria-label="카드 닫기"
-              style={{
-                alignSelf: "flex-start",
-                background: "transparent", border: "none",
-                fontSize: 18, fontWeight: 900, color: "#9CA3AF", cursor: "pointer", padding: 2,
-              }}
-            >✕</button>
+            <button data-ux-role="control" className="gq-close" onClick={() => setSelected(null)}>
+              닫기
+            </button>
           </div>
         </div>
       )}
@@ -419,7 +376,7 @@ function ExploreMode({ viewerLang, onBack }: { viewerLang: string; onBack: () =>
       <GlobeCanvas
         onPick={(c) => {
           setSelected(c);
-          speak(c.hello, c.lang);
+          say(c.hello, c.lang);
         }}
       />
     </GlobeShell>
@@ -437,13 +394,13 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [missedFirst, setMissedFirst] = useState(false); // 이번 라운드 오답 여부
-  const [flash, setFlash] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
+  const [flash, setFlash] = useState<{ kind: "ok" | "again"; text: string } | null>(null);
   const [startedAt] = useState(() => Date.now());
   const [, setTick] = useState(0);
   const [done, setDone] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const lockRef = useRef(false);
-  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimer = useRef<number | null>(null);
 
   // 경과시간 표시용 틱
   useEffect(() => {
@@ -452,7 +409,14 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
     return () => window.clearInterval(id);
   }, [done]);
 
-  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
+  // unmount: 예약된 플래시 타이머와 읽던 인사말을 모두 정리한다.
+  useEffect(() => {
+    return () => {
+      if (flashTimer.current) window.clearTimeout(flashTimer.current);
+      flashTimer.current = null;
+      stopSpeak();
+    };
+  }, []);
 
   const target = rounds[idx];
 
@@ -461,11 +425,11 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
     if (c.code === target.code) {
       lockRef.current = true;
       sfx.ok();
-      speak(c.hello, c.lang);
+      say(c.hello, c.lang);
       if (!missedFirst) setScore((s) => s + 1);
       setFlash({ kind: "ok", text: `🎉 ${globeCountryName(c, viewerLang)} — ${c.hello}` });
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      flashTimer.current = setTimeout(() => {
+      if (flashTimer.current) window.clearTimeout(flashTimer.current);
+      flashTimer.current = window.setTimeout(() => {
         setFlash(null);
         lockRef.current = false;
         setMissedFirst(false);
@@ -478,15 +442,19 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
         }
       }, 1100);
     } else {
-      sfx.bad();
+      // 오답은 흔들거나 경고음을 내지 않는다 — 어디를 눌렀는지 알려주고 다시 찾게 한다.
+      sfx.again();
       setMissedFirst(true);
-      setFlash({ kind: "bad", text: `❌ 거긴 ${globeCountryName(c, viewerLang)}! 다시 찾아봐요` });
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      flashTimer.current = setTimeout(() => setFlash(null), 1000);
+      setFlash({ kind: "again", text: `🌱 거기는 ${globeCountryName(c, viewerLang)}예요. 한 번 더 찾아볼까요?` });
+      if (flashTimer.current) window.clearTimeout(flashTimer.current);
+      flashTimer.current = window.setTimeout(() => setFlash(null), 1400);
     }
   }
 
   function restart() {
+    if (flashTimer.current) window.clearTimeout(flashTimer.current);
+    flashTimer.current = null;
+    stopSpeak();
     setRounds(pickN(GLOBE_COUNTRIES, QUIZ_ROUNDS));
     setIdx(0);
     setScore(0);
@@ -500,30 +468,18 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
   if (done) {
     const sec = Math.round(elapsedMs / 1000);
     return (
-      <div style={{ padding: "36px 16px", maxWidth: 480, margin: "0 auto", textAlign: "center" }}>
-        <div style={{ fontSize: 64, marginBottom: 8 }}>{score === rounds.length ? "🏆" : score >= rounds.length * 0.6 ? "🎉" : "💪"}</div>
-        <div style={{ fontSize: 26, fontWeight: 900, color: "#1F2937", marginBottom: 6 }}>
-          {score} / {rounds.length}
+      <div data-ux-root className="gq-root gq-result">
+        <ScopedStyle css={GQ_CSS} />
+        <div className="gq-bigicon" aria-hidden>
+          {score === rounds.length ? "🏆" : score >= rounds.length * 0.6 ? "🎉" : "💪"}
         </div>
-        <div style={{
-          display: "inline-block", padding: "10px 22px", marginBottom: 22,
-          background: "#FEF3C7", borderRadius: 14,
-          fontSize: 15, fontWeight: 800, color: "#92400E",
-        }}>
+        <h1 data-ux-role="title">{score} / {rounds.length}</h1>
+        <p data-ux-role="body-emphasis" className="gq-time">
           ⏱ {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, "0")}
-        </div>
-        <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-          <button onClick={restart} style={{
-            background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
-            color: "#fff", border: "none", borderRadius: 99,
-            padding: "13px 26px", fontSize: 15, fontWeight: 900, cursor: "pointer",
-            boxShadow: "0 6px 18px rgba(245,158,11,0.4)",
-          }}>🔁 다시 하기</button>
-          <button onClick={onBack} style={{
-            background: "#fff", color: "#92400E",
-            border: "2px solid #FDE68A", borderRadius: 99,
-            padding: "13px 22px", fontSize: 15, fontWeight: 900, cursor: "pointer",
-          }}>모드 선택</button>
+        </p>
+        <div className="gq-endrow">
+          <button data-ux-role="action" className="gq-primary" onClick={restart}>🔁 다시 하기</button>
+          <button data-ux-role="control" className="gq-secondary" onClick={onBack}>모드 선택</button>
         </div>
       </div>
     );
@@ -532,52 +488,32 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
   return (
     <GlobeShell
       topBar={
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={onBack} aria-label="모드 선택으로" style={backBtnStyle}>←</button>
-          <div style={{
-            flex: 1, minWidth: 0,
-            background: "rgba(255,255,255,0.95)", borderRadius: 14,
-            padding: "8px 14px",
-            display: "flex", alignItems: "center", gap: 10,
-          }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#92400E" }}>
-                🔍 이 나라를 찾아 탭! ({idx + 1}/{rounds.length})
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: "#1F2937", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div className="gq-topinner">
+          <BackButton onBack={onBack} />
+          <div className="gq-quizbar">
+            <div className="gq-quizask">
+              <span data-ux-role="secondary">🔍 이 나라를 찾아 탭! ({idx + 1}/{rounds.length})</span>
+              <span data-ux-role="body-emphasis">
                 {target ? globeCountryName(target, viewerLang) : ""}
                 {target && viewerLang !== friendLang && (
-                  <span style={{ fontSize: 12, color: "#6B7280", fontWeight: 700, marginLeft: 8 }}>
+                  <span data-ux-role="secondary" className="gq-friendname">
                     {globeCountryName(target, friendLang)}
                   </span>
                 )}
-              </div>
+              </span>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 900, color: "#F59E0B", whiteSpace: "nowrap" }}>
-              ⭐ {score}
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280", whiteSpace: "nowrap" }}>
-              ⏱ {Math.floor((Date.now() - startedAt) / 1000)}s
+            <div className="gq-quizstat">
+              <span data-ux-role="label">⭐ {score}</span>
+              <span data-ux-role="secondary">⏱ {Math.floor((Date.now() - startedAt) / 1000)}s</span>
             </div>
           </div>
         </div>
       }
       overlay={flash && (
-        <div style={{
-          position: "absolute", left: 0, right: 0, bottom: 24,
-          display: "flex", justifyContent: "center", pointerEvents: "none",
-        }}>
-          <div style={{
-            background: flash.kind === "ok" ? "#ECFDF5" : "#FEF2F2",
-            border: `3px solid ${flash.kind === "ok" ? "#10B981" : "#EF4444"}`,
-            color: flash.kind === "ok" ? "#065F46" : "#B91C1C",
-            borderRadius: 16, padding: "12px 22px",
-            fontSize: 15, fontWeight: 900,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
-            maxWidth: "90%",
-          }}>
+        <div className="gq-flashlayer">
+          <p data-ux-role="body-emphasis" className="gq-flash" data-kind={flash.kind} role="status">
             {flash.text}
-          </div>
+          </p>
         </div>
       )}
     >
@@ -585,3 +521,119 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
     </GlobeShell>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const GQ_CSS = `
+.gq-root{
+  color: var(--ux-ink);
+  width: 100%; max-width: 1100px; margin: 0 auto; box-sizing: border-box;
+  padding: var(--ux-space-6) var(--ux-space-4) var(--ux-space-8);
+}
+.gq-menu, .gq-result{ display: grid; gap: var(--ux-space-4); justify-items: center; text-align: center; }
+.gq-menuhead{ display: grid; gap: var(--ux-space-2); justify-items: center; }
+.gq-menuhead p, .gq-result p{ margin: 0; }
+.gq-bigicon{ font-size: clamp(3.5rem, 14vw, 6rem); line-height: 1; }
+
+/* 넓은 화면에서는 모드 두 장을 나란히 — 세로로 늘린 휴대폰이 되지 않게. */
+.gq-modegrid{ display: grid; gap: var(--ux-space-3); width: 100%; grid-template-columns: 1fr; }
+@media (min-width: 768px){ .gq-modegrid{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.gq-modecard[data-ux-role="control"]{
+  display: flex; align-items: center; gap: var(--ux-space-4); text-align: left;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 3px solid var(--ux-primary-border); font-family: inherit;
+  padding: var(--ux-space-4);
+}
+.gq-modeemoji{ font-size: var(--ux-font-title); line-height: 1; flex-shrink: 0; }
+.gq-modetext{ display: grid; gap: var(--ux-space-1); min-width: 0; }
+.gq-modetext [data-ux-role="label"]{ font-weight: 900; }
+
+.gq-time{ background: var(--ux-surface-sunk); border-radius: var(--ux-radius-surface); padding: var(--ux-space-2) var(--ux-space-6); }
+.gq-endrow{ display: flex; gap: var(--ux-space-3); flex-wrap: wrap; justify-content: center; }
+.gq-primary[data-ux-role="action"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+}
+.gq-secondary[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+}
+
+/* ── 지구본 셸 ── */
+.gq-shell{
+  position: relative; display: flex; flex-direction: column;
+  width: 100%; box-sizing: border-box;
+  background: radial-gradient(circle at 50% 40%, #1e1b4b 0%, #0d0b26 70%);
+  color: #fff;
+}
+.gq-topbar{ padding: var(--ux-space-3); flex-shrink: 0; }
+.gq-topinner{ display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap; }
+.gq-toptext{ display: grid; gap: var(--ux-space-1); min-width: 0; }
+.gq-toptext [data-ux-role="label"]{ color: #fff; font-weight: 900; }
+.gq-toptext [data-ux-role="secondary"]{ color: #C7D2FE; }
+.gq-back[data-ux-role="control"]{
+  background: rgba(255,255,255,.12); color: #fff;
+  border: 2px solid rgba(255,255,255,.4); font-family: inherit; font-weight: 800;
+  white-space: nowrap; flex-shrink: 0;
+}
+/* 지구본은 넓은 화면에서 더 크게 본다 — 판을 키우는 쪽이 아이에게 유리하다. */
+.gq-stage{ flex: 1; min-height: clamp(320px, 58svh, 680px); }
+.gq-loading{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #C7D2FE; font-weight: 800; }
+
+.gq-quizbar{
+  flex: 1; min-width: 0;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-2) var(--ux-space-4);
+  display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap;
+}
+.gq-quizask{ display: grid; gap: var(--ux-space-1); min-width: 0; flex: 1; }
+.gq-quizask [data-ux-role="body-emphasis"]{ font-weight: 900; }
+.gq-friendname{ margin-left: var(--ux-space-2); }
+.gq-quizstat{ display: flex; gap: var(--ux-space-3); align-items: baseline; flex-wrap: wrap; }
+.gq-quizstat [data-ux-role="label"]{ color: var(--ux-primary-ink); font-weight: 900; }
+
+.gq-cardlayer{
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: center;
+  padding: 0 var(--ux-space-3) var(--ux-space-4);
+}
+.gq-card{
+  width: min(560px, 100%);
+  background: var(--ux-surface); color: var(--ux-ink);
+  border-radius: var(--ux-radius-panel); border: 3px solid var(--ux-primary-border);
+  box-shadow: 0 18px 44px rgba(0,0,0,.5);
+  padding: var(--ux-space-4);
+  display: flex; gap: var(--ux-space-4); align-items: flex-start; flex-wrap: wrap;
+}
+.gq-landmark{ width: 84px; height: 84px; object-fit: contain; flex-shrink: 0; }
+.gq-cardbody{ flex: 1; min-width: 0; display: grid; gap: var(--ux-space-2); }
+.gq-nameline{ display: flex; align-items: center; gap: var(--ux-space-2); flex-wrap: wrap; }
+.gq-nameline [data-ux-role="body-emphasis"]{ font-weight: 900; }
+.gq-flag{ width: 34px; height: auto; border-radius: 4px; flex-shrink: 0; }
+.gq-hellorow{ display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap; }
+.gq-hello[data-ux-role="control"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+}
+.gq-close[data-ux-role="control"]{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-ink-soft); font-family: inherit; font-weight: 800;
+  flex-shrink: 0;
+}
+
+.gq-flashlayer{
+  position: absolute; left: 0; right: 0; bottom: var(--ux-space-6);
+  display: flex; justify-content: center; pointer-events: none;
+  padding: 0 var(--ux-space-4);
+}
+.gq-flash{
+  margin: 0; max-width: 100%;
+  border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-3) var(--ux-space-6);
+  font-weight: 900; text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,.4);
+}
+.gq-flash[data-kind="ok"]{ background: var(--ux-hint-mint); color: var(--ux-ink); border: 3px solid var(--ux-success); }
+.gq-flash[data-kind="again"]{ background: var(--ux-surface); color: var(--ux-ink); border: 3px solid var(--ux-primary-border); }
+`;

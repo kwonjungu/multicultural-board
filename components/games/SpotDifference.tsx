@@ -1,9 +1,10 @@
 "use client";
 
-import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LangMap, SPOT_DIFF_SCENES, SpotDiffScene, pickN, tr } from "@/lib/gameData";
 import { playTone } from "@/lib/gameSfx";
 import BeeMascot from "../BeeMascot";
+import ScopedStyle from "../ui/child/ScopedStyle";
 
 // ============================================================
 // Spot the Difference (틀린 그림 찾기)
@@ -12,6 +13,11 @@ import BeeMascot from "../BeeMascot";
 // 3-item checklist — students tap whichever difference they
 // spot between the A and B images. All 3 found → next scene.
 // 6 randomly selected scenes out of 10 per game.
+//
+// 좌표 탭이 아니라 "체크리스트 탭" 게임이다. 그림 위의 픽셀을 찍지 않으므로
+// 캔버스·DPR·정규화 좌표가 필요 없다 (판정은 differences 배열의 index 로만 한다).
+// 그 대신 두 그림이 **같은 크기로 나란히** 보이는 것이 정확도의 핵심이라
+// aspect-ratio 를 고정하고 768px 이상에서 좌우 2단으로 크게 배치한다.
 // ============================================================
 
 const L = {
@@ -29,6 +35,10 @@ const L = {
   finish:      { ko: "모든 장면 완료!", en: "All scenes complete!", vi: "Hoàn thành tất cả!", zh: "全部完成！", ja: "ぜんぶクリア!" },
   totalTime:   { ko: "총 시간", en: "Total time", vi: "Tổng thời gian", zh: "总时间", ja: "合計時間" },
   replay:      { ko: "다시하기", en: "Play again", vi: "Chơi lại", zh: "再玩一次", ja: "もう一度" },
+  // 이미 체크한 줄을 다시 눌렀을 때 — 실패가 아니라 "이미 찾았어요" 안내.
+  already:     { ko: "이미 찾았어요", en: "Already found", vi: "Đã tìm rồi", zh: "已经找到了", ja: "もう見つけたよ" },
+  // 그림이 안 열릴 때 아이에게 지금 할 일만 말한다.
+  imgFail:     { ko: "그림을 못 불러왔어요. 친구와 이야기하며 찾아봐요.", en: "The picture did not load. Talk with your friend and keep looking.", vi: "Không tải được hình. Hãy cùng bạn tìm tiếp nhé.", zh: "图片没有加载。和朋友一起继续找吧。", ja: "えが ひらきませんでした。ともだちと さがしてみよう。" },
 } satisfies Record<string, LangMap>;
 
 function lab(map: LangMap, a: string, b: string): string {
@@ -36,25 +46,6 @@ function lab(map: LangMap, a: string, b: string): string {
   const y = tr(map, b);
   return x === y ? x : `${x} / ${y}`;
 }
-
-// ============================================================
-// Tiny Web Audio sfx — 공유 싱글턴 컨텍스트 (lib/gameSfx).
-// ============================================================
-
-const sfx = {
-  tick: (): void => playTone(880, 90, "triangle", 0.16),
-  sceneDone: (): void => {
-    playTone(523, 140, "sine", 0.18);
-    window.setTimeout(() => playTone(659, 140, "sine", 0.18), 130);
-    window.setTimeout(() => playTone(784, 260, "sine", 0.2), 260);
-  },
-  win: (): void => {
-    playTone(392, 150, "triangle", 0.2);
-    window.setTimeout(() => playTone(523, 150, "triangle", 0.2), 140);
-    window.setTimeout(() => playTone(659, 150, "triangle", 0.2), 280);
-    window.setTimeout(() => playTone(784, 380, "triangle", 0.22), 420);
-  },
-};
 
 // ============================================================
 // Phases
@@ -78,6 +69,48 @@ export default function SpotDifference({ langA, langB }: Props) {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [tick, setTick] = useState(0);
 
+  // 예약된 효과음 타이머 전부. unmount·재시작 때 한 곳에서 정리한다 (NumberTap 패턴).
+  const timersRef = useRef<number[]>([]);
+  const aliveRef = useRef(true);
+
+  const clearTimers = useCallback(() => {
+    for (const id of timersRef.current) window.clearTimeout(id);
+    timersRef.current = [];
+  }, []);
+
+  const later = useCallback((fn: () => void, ms: number) => {
+    const id = window.setTimeout(() => {
+      timersRef.current = timersRef.current.filter((t) => t !== id);
+      if (aliveRef.current) fn();
+    }, ms);
+    timersRef.current.push(id);
+  }, []);
+
+  // 화면을 나가도 예약된 축하음이 남지 않는다.
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      clearTimers();
+    };
+  }, [clearTimers]);
+
+  // 효과음 — 음정·길이는 그대로, 예약만 관리형 타이머로 옮겼다.
+  const sfxTick = useCallback(() => {
+    playTone(880, 90, "triangle", 0.16);
+  }, []);
+  const sfxSceneDone = useCallback(() => {
+    playTone(523, 140, "sine", 0.18);
+    later(() => playTone(659, 140, "sine", 0.18), 130);
+    later(() => playTone(784, 260, "sine", 0.2), 260);
+  }, [later]);
+  const sfxWin = useCallback(() => {
+    playTone(392, 150, "triangle", 0.2);
+    later(() => playTone(523, 150, "triangle", 0.2), 140);
+    later(() => playTone(659, 150, "triangle", 0.2), 280);
+    later(() => playTone(784, 380, "triangle", 0.22), 420);
+  }, [later]);
+
   // Running timer while in play phase.
   useEffect(() => {
     if (phase !== "play" || startedAt == null) return;
@@ -96,6 +129,7 @@ export default function SpotDifference({ langA, langB }: Props) {
   const sceneDone = scene ? found.size >= scene.differences.length : false;
 
   function handleStart(): void {
+    clearTimers();
     setOrder(pickN(SPOT_DIFF_SCENES, SCENES_PER_GAME));
     setSceneIdx(0);
     setFound(new Set());
@@ -111,9 +145,9 @@ export default function SpotDifference({ langA, langB }: Props) {
     next.add(diffIdx);
     setFound(next);
     if (next.size >= scene.differences.length) {
-      sfx.sceneDone();
+      sfxSceneDone();
     } else {
-      sfx.tick();
+      sfxTick();
     }
   }
 
@@ -122,7 +156,7 @@ export default function SpotDifference({ langA, langB }: Props) {
       // finished
       const end = startedAt == null ? 0 : Date.now() - startedAt;
       setElapsedMs(end);
-      sfx.win();
+      sfxWin();
       setPhase("result");
       return;
     }
@@ -131,6 +165,7 @@ export default function SpotDifference({ langA, langB }: Props) {
   }
 
   function handleReplay(): void {
+    clearTimers();
     setPhase("intro");
     setFound(new Set());
     setStartedAt(null);
@@ -144,22 +179,15 @@ export default function SpotDifference({ langA, langB }: Props) {
 
   if (phase === "intro") {
     return (
-      <div style={wrap}>
-        <div style={{ textAlign: "center", paddingTop: 20 }}>
-          <BeeMascot size={120} mood="welcome" />
-          <h2 style={{ fontSize: 26, fontWeight: 900, margin: "10px 0 6px", color: "#111827" }}>
-            {lab(L.title, langA, langB)}
-          </h2>
-          <p style={{ fontSize: 14, color: "#4B5563", margin: "0 0 2px" }}>
-            {lab(L.intro, langA, langB)}
-          </p>
-          <p style={{ fontSize: 13, color: "#6B7280", margin: "0 0 22px" }}>
-            {lab(L.rounds, langA, langB)}
-          </p>
-          <button onClick={handleStart} style={startBtn}>
-            {lab(L.start, langA, langB)}
-          </button>
-        </div>
+      <div data-ux-root className="sd-root sd-center">
+        <ScopedStyle css={SD_CSS} />
+        <BeeMascot size={120} mood="welcome" />
+        <h2 data-ux-role="title" className="sd-h">{lab(L.title, langA, langB)}</h2>
+        <p data-ux-role="body" className="sd-p">{lab(L.intro, langA, langB)}</p>
+        <p data-ux-role="secondary" className="sd-p">{lab(L.rounds, langA, langB)}</p>
+        <button type="button" data-ux-role="action" className="sd-primary" onClick={handleStart}>
+          ▶ {lab(L.start, langA, langB)}
+        </button>
       </div>
     );
   }
@@ -169,25 +197,16 @@ export default function SpotDifference({ langA, langB }: Props) {
     const ss = elapsedSec % 60;
     const timeStr = `${mm}:${ss.toString().padStart(2, "0")}`;
     return (
-      <div style={wrap}>
-        <div style={{ textAlign: "center", paddingTop: 30 }}>
-          <BeeMascot size={140} mood="celebrate" />
-          <h2 style={{ fontSize: 26, fontWeight: 900, margin: "12px 0 6px", color: "#111827" }}>
-            {lab(L.finish, langA, langB)}
-          </h2>
-          <div style={{
-            display: "inline-block", marginTop: 10, padding: "12px 24px",
-            background: "#FEF3C7", borderRadius: 16, fontSize: 16, fontWeight: 800,
-            color: "#92400E",
-          }}>
-            {lab(L.totalTime, langA, langB)}: {timeStr}
-          </div>
-          <div style={{ marginTop: 22 }}>
-            <button onClick={handleReplay} style={startBtn}>
-              {lab(L.replay, langA, langB)}
-            </button>
-          </div>
-        </div>
+      <div data-ux-root className="sd-root sd-center">
+        <ScopedStyle css={SD_CSS} />
+        <BeeMascot size={140} mood="celebrate" />
+        <h2 data-ux-role="title" className="sd-h">🎉 {lab(L.finish, langA, langB)}</h2>
+        <p data-ux-role="body-emphasis" className="sd-time">
+          ⏱ {lab(L.totalTime, langA, langB)}: {timeStr}
+        </p>
+        <button type="button" data-ux-role="action" className="sd-primary" onClick={handleReplay}>
+          🔁 {lab(L.replay, langA, langB)}
+        </button>
       </div>
     );
   }
@@ -195,73 +214,71 @@ export default function SpotDifference({ langA, langB }: Props) {
   // phase === "play"
   if (!scene) return null;
   return (
-    <div style={wrap}>
+    <div data-ux-root className="sd-root sd-play">
+      <ScopedStyle css={SD_CSS} />
+
       {/* Header */}
-      <div style={headerRow}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: "#6366F1" }}>
+      <div className="sd-header">
+        <span data-ux-role="secondary" className="sd-scenenum">
           {lab(L.sceneLabel, langA, langB)} {sceneIdx + 1} / {order.length}
-        </div>
-        <div style={{ fontSize: 16, fontWeight: 900, color: "#111827" }}>
+        </span>
+        <span data-ux-role="body-emphasis" className="sd-scenename">
           {lab(scene.name, langA, langB)}
-        </div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280" }}>
+        </span>
+        <span data-ux-role="secondary" className="sd-clock">
           ⏱ {Math.floor(elapsedSec / 60)}:{(elapsedSec % 60).toString().padStart(2, "0")}
-        </div>
+        </span>
       </div>
 
-      {/* A/B images */}
-      <div style={imagesGrid}>
+      {/* A/B images — 좁은 화면 위아래, 768 이상 좌우 2단 */}
+      <div className="sd-images">
         {/* key 로 장면마다 리마운트 — errored(onError) 상태가 다음 장면으로 새어가지 않게 */}
-        <SceneImage key={scene.imageA} src={scene.imageA} badge="A" label={lab(L.left, langA, langB)} />
-        <SceneImage key={scene.imageB} src={scene.imageB} badge="B" label={lab(L.right, langA, langB)} />
+        <SceneImage
+          key={scene.imageA}
+          src={scene.imageA}
+          badge="A"
+          label={lab(L.left, langA, langB)}
+          failText={lab(L.imgFail, langA, langB)}
+        />
+        <SceneImage
+          key={scene.imageB}
+          src={scene.imageB}
+          badge="B"
+          label={lab(L.right, langA, langB)}
+          failText={lab(L.imgFail, langA, langB)}
+        />
       </div>
 
       {/* Checklist */}
-      <div style={{ marginTop: 18 }}>
-        <div style={checklistHeader}>
-          <span>{lab(L.checklist, langA, langB)}</span>
-          <span style={{ fontWeight: 900, color: "#16A34A" }}>
-            {found.size} / {scene.differences.length}
+      <div className="sd-checkwrap">
+        <div className="sd-checkhead">
+          <span data-ux-role="label">{lab(L.checklist, langA, langB)}</span>
+          <span data-ux-role="label" className="sd-count">
+            {lab(L.progress, langA, langB)} {found.size} / {scene.differences.length}
           </span>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="sd-checklist">
           {scene.differences.map((d, i) => {
             const ok = found.has(i);
             return (
               <button
                 key={i}
+                type="button"
+                data-ux-role="control"
+                className="sd-check"
+                data-found={ok ? "" : undefined}
+                aria-disabled={ok || undefined}
+                aria-pressed={ok}
                 onClick={() => handleTick(i)}
-                disabled={ok}
-                style={{
-                  ...checkRow,
-                  background: ok ? "#DCFCE7" : "#fff",
-                  borderColor: ok ? "#16A34A" : "#E5E7EB",
-                  cursor: ok ? "default" : "pointer",
-                }}
               >
-                <span style={{
-                  width: 28, height: 28, borderRadius: 8,
-                  background: ok ? "#16A34A" : "#F3F4F6",
-                  color: "#fff", fontSize: 16, fontWeight: 900,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0,
-                }}>
-                  {ok ? "✓" : "□"}
-                </span>
-                <div style={{ textAlign: "left", flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 14, fontWeight: 800, color: ok ? "#15803D" : "#111827",
-                    textDecoration: ok ? "line-through" : "none",
-                  }}>
-                    {lab(d.label, langA, langB)}
-                  </div>
-                  <div style={{
-                    fontSize: 11, fontWeight: 700, color: ok ? "#16A34A" : "#9CA3AF",
-                    marginTop: 2,
-                  }}>
+                <span aria-hidden="true" className="sd-box">{ok ? "✓" : "□"}</span>
+                <span className="sd-checktext">
+                  <span className="sd-checklabel">{lab(d.label, langA, langB)}</span>
+                  <span data-ux-role="secondary" className="sd-where">
                     📍 {lab(d.where, langA, langB)}
-                  </div>
-                </div>
+                    {ok ? ` · ${lab(L.already, langA, langB)}` : ""}
+                  </span>
+                </span>
               </button>
             );
           })}
@@ -270,11 +287,11 @@ export default function SpotDifference({ langA, langB }: Props) {
 
       {/* Next scene CTA */}
       {sceneDone && (
-        <div style={{ textAlign: "center", marginTop: 20 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, color: "#16A34A", marginBottom: 10 }}>
+        <div className="sd-cta" role="status">
+          <p data-ux-role="body-emphasis" className="sd-done">
             ✨ {lab(L.complete, langA, langB)}
-          </div>
-          <button onClick={handleNext} style={startBtn}>
+          </p>
+          <button type="button" data-ux-role="action" className="sd-primary" onClick={handleNext}>
             {sceneIdx + 1 >= order.length
               ? lab(L.finish, langA, langB)
               : lab(L.next, langA, langB)}
@@ -289,31 +306,29 @@ export default function SpotDifference({ langA, langB }: Props) {
 // Sub-components
 // ============================================================
 
-function SceneImage({ src, badge, label }: { src: string; badge: "A" | "B"; label: string }) {
+function SceneImage({
+  src, badge, label, failText,
+}: { src: string; badge: "A" | "B"; label: string; failText: string }) {
   const [errored, setErrored] = useState(false);
-  const imgRef = useRef<HTMLImageElement | null>(null);
 
   return (
-    <figure style={figStyle}>
-      <figcaption style={figCap}>
-        <span style={badgeStyle}>{badge}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#4B5563" }}>{label}</span>
+    <figure className="sd-fig">
+      <figcaption className="sd-figcap">
+        <span aria-hidden="true" className="sd-badge">{badge}</span>
+        <span data-ux-role="label">{label}</span>
       </figcaption>
-      <div style={imgBox}>
+      <div className="sd-imgbox">
         {errored ? (
-          <div style={fallbackBox}>
-            <div style={{ fontSize: 64 }}>🖼️</div>
-            <div style={{ fontSize: 11, color: "#6B7280", marginTop: 6 }}>
-              {badge}
-            </div>
+          <div className="sd-fallback">
+            <span aria-hidden="true" className="sd-fallicon">🖼️</span>
+            <span data-ux-role="secondary" className="sd-falltext">{failText}</span>
           </div>
         ) : (
           <img
-            ref={imgRef}
             src={src}
-            alt={`Scene ${badge}`}
+            alt={`${label}`}
             onError={() => setErrored(true)}
-            style={imgStyle}
+            className="sd-img"
             draggable={false}
           />
         )}
@@ -323,114 +338,138 @@ function SceneImage({ src, badge, label }: { src: string; badge: "A" | "B"; labe
 }
 
 // ============================================================
-// Styles
+// Styles — 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것.
 // ============================================================
 
-const wrap: CSSProperties = {
-  padding: "16px 12px 40px",
-  maxWidth: 960,
-  margin: "0 auto",
-};
+const SD_CSS = `
+.sd-root{
+  color: var(--ux-ink);
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: var(--ux-space-4) var(--ux-space-3) var(--ux-space-12);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.sd-center{
+  display: grid; justify-items: center; gap: var(--ux-space-3);
+  text-align: center;
+  padding-top: var(--ux-space-8);
+}
+.sd-center .sd-h, .sd-center .sd-p{ margin: 0; max-width: 42ch; }
+.sd-time{
+  margin: 0;
+  background: var(--ux-hint-apricot);
+  border-radius: var(--ux-radius-pill);
+  padding: var(--ux-space-3) var(--ux-space-6);
+  font-weight: 800;
+}
+.sd-primary{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border);
+  font-family: inherit; font-weight: 800;
+  margin-top: var(--ux-space-2);
+}
 
-const startBtn: CSSProperties = {
-  background: "linear-gradient(135deg, #6366F1, #8B5CF6)",
-  color: "#fff",
-  border: "none",
-  padding: "14px 32px",
-  fontSize: 16,
-  fontWeight: 900,
-  borderRadius: 99,
-  cursor: "pointer",
-  boxShadow: "0 6px 16px rgba(99,102,241,0.3)",
-};
+.sd-play{ display: flex; flex-direction: column; gap: var(--ux-space-4); }
 
-const headerRow: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 8,
-  marginBottom: 12,
-  padding: "0 4px",
-};
+.sd-header{
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: var(--ux-space-2);
+  padding: 0 var(--ux-space-1);
+}
+.sd-scenename{ font-weight: 900; flex: 1 1 auto; min-width: 0; text-align: center; }
+.sd-scenenum{ color: var(--ux-primary-border); font-weight: 800; }
+.sd-clock{ white-space: nowrap; }
 
-const imagesGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-  gap: 10,
-};
+.sd-images{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ux-space-3);
+}
+@media (min-width: 768px){
+  .sd-images{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.sd-fig{ margin: 0; display: flex; flex-direction: column; gap: var(--ux-space-2); min-width: 0; }
+.sd-figcap{ display: flex; align-items: center; gap: var(--ux-space-2); }
+.sd-badge{
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2em; height: 2em; border-radius: var(--ux-radius-pill);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  font-weight: 900; flex-shrink: 0;
+}
+.sd-imgbox{
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--ux-surface-sunk);
+  border-radius: var(--ux-radius-panel);
+  overflow: hidden;
+  border: 2px solid var(--ux-primary-border);
+}
+.sd-img{
+  width: 100%; height: 100%;
+  object-fit: contain;      /* cover 는 가장자리를 잘라 A/B 가 서로 다르게 보인다 */
+  display: block;
+  background: var(--ux-surface);
+  user-select: none; -webkit-user-drag: none;
+}
+.sd-fallback{
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column; gap: var(--ux-space-2);
+  align-items: center; justify-content: center;
+  padding: var(--ux-space-4);
+  text-align: center;
+  background: var(--ux-hint-lavender);
+}
+.sd-fallicon{ font-size: calc(var(--ux-font-title) * 2); line-height: 1; }
+.sd-falltext{ max-width: 30ch; }
 
-const figStyle: CSSProperties = {
-  margin: 0,
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-};
+.sd-checkwrap{ display: grid; gap: var(--ux-space-2); }
+.sd-checkhead{
+  display: flex; justify-content: space-between; align-items: center;
+  gap: var(--ux-space-2); flex-wrap: wrap;
+  padding: 0 var(--ux-space-1);
+  font-weight: 800;
+}
+.sd-count{ color: var(--ux-success); font-weight: 900; }
+.sd-checklist{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--ux-space-3);
+}
+.sd-check[data-ux-role="control"]{
+  display: flex; align-items: center; gap: var(--ux-space-3);
+  text-align: left;
+  width: 100%;
+  background: var(--ux-surface);
+  border: 2px solid var(--ux-primary-border);
+  color: var(--ux-ink);
+  font-family: inherit;
+  transition: background var(--ux-motion-state) var(--ux-motion-ease),
+              border-color var(--ux-motion-state) var(--ux-motion-ease);
+}
+.sd-check[data-found]{
+  background: color-mix(in srgb, var(--ux-success) 14%, var(--ux-surface));
+  border-color: var(--ux-success);
+  cursor: default;
+}
+.sd-box{
+  display: flex; align-items: center; justify-content: center;
+  width: 2em; height: 2em; flex-shrink: 0;
+  border-radius: var(--ux-radius-surface);
+  background: var(--ux-surface-sunk); color: var(--ux-ink-soft);
+  font-weight: 900;
+}
+.sd-check[data-found] .sd-box{ background: var(--ux-success); color: var(--ux-primary-ink); }
+.sd-checktext{ display: grid; gap: var(--ux-space-1); min-width: 0; flex: 1; }
+.sd-checklabel{ font-size: var(--ux-font-body); line-height: var(--ux-lh-reading); font-weight: 800; }
+.sd-check[data-found] .sd-checklabel{ color: var(--ux-success); text-decoration: line-through; }
 
-const figCap: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-};
-
-const badgeStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 26,
-  height: 26,
-  borderRadius: 99,
-  background: "#6366F1",
-  color: "#fff",
-  fontSize: 13,
-  fontWeight: 900,
-};
-
-const imgBox: CSSProperties = {
-  position: "relative",
-  aspectRatio: "4 / 3",
-  background: "#F3F4F6",
-  borderRadius: 14,
-  overflow: "hidden",
-  boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
-};
-
-const imgStyle: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  objectFit: "cover",
-  display: "block",
-};
-
-const fallbackBox: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "linear-gradient(135deg, #E0E7FF, #F3E8FF)",
-};
-
-const checklistHeader: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  fontSize: 13,
-  fontWeight: 800,
-  color: "#111827",
-  marginBottom: 8,
-  padding: "0 4px",
-};
-
-const checkRow: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  padding: "12px 14px",
-  border: "2px solid #E5E7EB",
-  borderRadius: 12,
-  background: "#fff",
-  width: "100%",
-  textAlign: "left",
-  transition: "background 0.15s, border-color 0.15s",
-};
+.sd-cta{
+  display: grid; justify-items: center; gap: var(--ux-space-3);
+  text-align: center;
+  padding: var(--ux-space-4);
+  background: var(--ux-surface-sunk);
+  border-radius: var(--ux-radius-panel);
+}
+.sd-done{ margin: 0; color: var(--ux-success); font-weight: 900; }
+`;

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
+import { speakVia, stopAll as stopAllAudio } from "@/lib/audioBus";
 import BeeMascot from "./BeeMascot";
 
 type SideState = "idle" | "listening" | "translating" | "done" | "error";
@@ -13,29 +14,25 @@ const TTS_LANG_MAP: Record<string, string> = {
   uz: "uz-UZ", hi: "hi-IN", id: "id-ID", ar: "ar-SA", my: "my-MM",
 };
 const WEB_SPEECH_SUPPORTED = new Set(["ko", "en", "vi", "zh", "ja", "th", "ru", "hi", "id", "ar"]);
-let ttsAudio: HTMLAudioElement | null = null;
 
+/**
+ * 통역 음성은 전부 audioBus 를 통과한다 (X19 / ADD-TTS-01).
+ *
+ * 옛 코드는 WebSpeech 분기로 들어가기 전에 이전 HTMLAudio 를 멈추지 않아서,
+ * 서버 폴백으로 크메르어를 읽는 도중 한국어로 바꾸면 **두 목소리가 겹쳤다**.
+ * 이제 버스가 양쪽을 함께 소유하므로 새 재생 전에 둘 다 멈춘다. '소리 끄기'
+ * 설정이 켜져 있으면 이 함수는 아무 소리도 내지 않는다.
+ */
 async function speakText(text: string, lang: string) {
   if (typeof window === "undefined" || !text) return;
-  const bcp47 = TTS_LANG_MAP[lang] || "en-US";
-  const voices = window.speechSynthesis?.getVoices() ?? [];
-  const prefix = bcp47.split("-")[0];
-  const hasVoice = voices.some((v) => v.lang.startsWith(prefix));
-  if (WEB_SPEECH_SUPPORTED.has(lang) && hasVoice) {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = bcp47;
-    window.speechSynthesis.speak(u);
-  } else {
-    try {
-      window.speechSynthesis?.cancel();
-      if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
-      const url = `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text.slice(0, 200))}`;
-      const a = new Audio(url);
-      ttsAudio = a;
-      await a.play();
-    } catch {}
-  }
+  await speakVia({
+    text,
+    lang,
+    bcp47: TTS_LANG_MAP[lang] || "en-US",
+    allowWebSpeech: WEB_SPEECH_SUPPORTED.has(lang),
+    audioUrl: (t2, l) =>
+      `/api/tts?lang=${encodeURIComponent(l)}&text=${encodeURIComponent(t2.slice(0, 200))}`,
+  });
 }
 
 interface SideProps {
@@ -72,7 +69,7 @@ function InterpreterSide({ side, lang, value, state, onStart, onStop, onReplay, 
       padding: "18px 16px", minHeight: 0,
       transform: flipped ? "rotate(180deg)" : "none",
     }}>
-      <svg style={{ position: "absolute", top: -10, right: -10, opacity: 0.18, pointerEvents: "none" }} width="140" height="140" viewBox="0 0 140 140" aria-hidden="true">
+      <svg data-ux-decor="background" style={{ position: "absolute", top: -10, right: -10, opacity: 0.18, pointerEvents: "none" }} width="140" height="140" viewBox="0 0 140 140" aria-hidden="true">
         {[0,1,2].flatMap(i => [0,1,2].map(j => {
           const x = i*44 + (j%2)*22 + 10; const y = j*38 + 10;
           return <polygon key={`${i}-${j}`} points={`${x+16},${y} ${x+32},${y+9} ${x+32},${y+28} ${x+16},${y+37} ${x},${y+28} ${x},${y+9}`} fill="none" stroke={tint.pri} strokeWidth="1.5"/>;
@@ -114,7 +111,7 @@ function InterpreterSide({ side, lang, value, state, onStart, onStop, onReplay, 
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 4px", zIndex: 2 }}>
         {listening ? (
           <div style={{ textAlign: "center" }}>
-            <div style={{ display: "flex", gap: 4, justifyContent: "center", marginBottom: 10, height: 44, alignItems: "center" }}>
+            <div data-ux-decor aria-hidden="true" style={{ display: "flex", gap: 4, justifyContent: "center", marginBottom: 10, height: 44, alignItems: "center" }}>
               {Array.from({ length: 16 }).map((_, i) => (
                 <div key={i} style={{
                   width: 4, borderRadius: 2, background: tint.pri, height: 12 + (i % 4) * 8,
@@ -246,13 +243,14 @@ export default function InterpreterDrawer({ open, onClose, viewerLang, available
 
   function reset() {
     cancelRecording();
+    stopAllAudio(); // 닫기·초기화 후 활성 음성 0개 (ADD-TTS-01)
     setMeState("idle"); setOtherState("idle");
     setMeValue(null); setOtherValue(null);
     setErrMsg("");
   }
 
   useEffect(() => { if (!open) reset(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open]);
-  useEffect(() => () => cancelRecording(), []);
+  useEffect(() => () => { cancelRecording(); stopAllAudio(); }, []);
 
   function cancelRecording() {
     const r = recorderRef.current;

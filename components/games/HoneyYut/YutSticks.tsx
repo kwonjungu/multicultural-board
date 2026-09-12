@@ -1,11 +1,12 @@
 "use client";
 
 // 윷가락 4개 + 던지기 버튼. 결과는 먼저 계산하고 애니메이션이 끝난 뒤
-// 부모에 전달한다 (더블탭은 로컬 가드 + disabled 로 차단).
+// 부모에 전달한다 (더블탭은 로컬 가드 + aria-disabled 로 차단).
 
 import React, { useEffect, useRef, useState } from "react";
 import { throwSticks, type StickThrow } from "@/lib/yutLogic";
 import type { Throw } from "@/lib/yutTypes";
+import ScopedStyle from "../../ui/child/ScopedStyle";
 import { sfx } from "./yutSfx";
 
 const THROW_LABEL: Record<string, string> = {
@@ -25,7 +26,10 @@ export default function YutSticks({
   const busyRef = useRef(false);
   const timersRef = useRef<number[]>([]);
 
-  useEffect(() => () => { timersRef.current.forEach((t) => window.clearTimeout(t)); }, []);
+  // unmount 시 예약된 깜빡임/결과 타이머를 남기지 않는다.
+  useEffect(() => {
+    return () => { timersRef.current.forEach((t) => window.clearTimeout(t)); timersRef.current = []; };
+  }, []);
 
   function handleThrow() {
     if (!enabled || busyRef.current) return;
@@ -49,25 +53,19 @@ export default function YutSticks({
   }
 
   const sticks = spinning ? flicker : (shown?.sticks ?? [true, true, false, false]);
+  const canThrow = enabled && !spinning;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-      <div style={{ display: "flex", gap: 10 }}>
+    <div className="ys-root">
+      <ScopedStyle css={YS_CSS} />
+      <div className="ys-sticks" aria-hidden>
         {sticks.map((up, i) => (
           <div
             key={i}
-            style={{
-              width: 26, height: 84, borderRadius: 13,
-              background: up
-                ? "linear-gradient(180deg, #FDE68A, #D4A95C)"   // 배(평평한 면)
-                : "linear-gradient(180deg, #92400E, #6B3410)",  // 등(둥근 면)
-              border: "2.5px solid #78350F",
-              boxShadow: spinning ? "0 8px 18px rgba(0,0,0,0.3)" : "0 3px 8px rgba(0,0,0,0.2)",
-              transform: spinning ? `translateY(-${6 + (i % 2) * 6}px) rotate(${(i - 1.5) * 8}deg)` : "none",
-              transition: "transform 0.13s, background 0.13s",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 900, color: up ? "#92400E" : "#FDE68A",
-            }}
+            className="ys-stick"
+            data-up={up ? "" : undefined}
+            data-spinning={spinning ? "" : undefined}
+            style={{ transform: spinning ? `translateY(-${6 + (i % 2) * 6}px) rotate(${(i - 1.5) * 8}deg)` : undefined }}
           >
             {/* 백도 표시 가락 (첫 번째) */}
             {i === 0 && up && !spinning ? "✕" : ""}
@@ -75,45 +73,57 @@ export default function YutSticks({
         ))}
       </div>
 
-      <div style={{ minHeight: 30, display: "flex", alignItems: "center" }}>
+      <div className="ys-resultslot">
         {shown && !spinning && (
-          <div style={{
-            fontSize: 20, fontWeight: 900, color: accent,
-            animation: "yutPop 0.35s ease",
-          }}>
+          <p data-ux-role="body-emphasis" className="ys-result" style={{ color: accent }} role="status">
             {THROW_LABEL[String(shown.value)]}!
             {(shown.value === 4 || shown.value === 5) && (
-              <span style={{ fontSize: 13, marginLeft: 6, color: "#92400E" }}>한 번 더 🎉</span>
+              <span data-ux-role="secondary" className="ys-again"> 한 번 더 🎉</span>
             )}
-          </div>
+          </p>
         )}
       </div>
 
       <button
-        onClick={handleThrow}
-        disabled={!enabled || spinning}
-        style={{
-          background: enabled && !spinning
-            ? `linear-gradient(135deg, ${accent}, ${accent}CC)`
-            : "#E5E7EB",
-          color: enabled && !spinning ? "#fff" : "#9CA3AF",
-          border: "none", borderRadius: 99,
-          padding: "14px 40px", fontSize: 17, fontWeight: 900,
-          cursor: enabled && !spinning ? "pointer" : "default",
-          boxShadow: enabled && !spinning ? `0 8px 20px ${accent}66` : "none",
-          fontFamily: "inherit",
-        }}
+        data-ux-role="action"
+        className="ys-throw"
+        aria-disabled={!canThrow}
+        onClick={() => { if (canThrow) handleThrow(); }}
+        style={canThrow ? { background: accent, color: "#fff", borderColor: accent } : undefined}
       >
         🪵 윷 던지기
       </button>
-
-      <style>{`
-        @keyframes yutPop {
-          0% { transform: scale(0.4); opacity: 0; }
-          70% { transform: scale(1.2); }
-          100% { transform: scale(1); opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const YS_CSS = `
+.ys-root{ display: grid; justify-items: center; gap: var(--ux-space-3); width: 100%; }
+.ys-sticks{ display: flex; gap: var(--ux-space-3); }
+.ys-stick{
+  width: 26px; height: 84px; border-radius: 13px;
+  background: linear-gradient(180deg, #6B3410, #4A2409);
+  border: 2px solid #4A2409;
+  box-shadow: 0 3px 8px rgba(41,37,31,.2);
+  transition: transform var(--ux-motion-press) var(--ux-motion-ease), background var(--ux-motion-press) var(--ux-motion-ease);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--ux-font-secondary); font-weight: 900; color: #FFF3D0;
+}
+.ys-stick[data-up]{ background: linear-gradient(180deg, #FFE6A3, #C79B4E); color: #4A2409; }
+.ys-stick[data-spinning]{ box-shadow: 0 8px 18px rgba(41,37,31,.3); }
+.ys-resultslot{ min-height: var(--ux-space-8); display: flex; align-items: center; }
+.ys-result{ margin: 0; font-weight: 900; animation: ysPop .35s ease; }
+.ys-again{ margin-left: var(--ux-space-2); color: var(--ux-primary-ink); }
+@keyframes ysPop{
+  0%{ transform: scale(.4); opacity: 0; }
+  70%{ transform: scale(1.2); }
+  100%{ transform: scale(1); opacity: 1; }
+}
+.ys-throw[data-ux-role="action"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); border-radius: var(--ux-radius-pill);
+  font-family: inherit; font-weight: 900; padding-left: var(--ux-space-8); padding-right: var(--ux-space-8);
+}
+.ys-throw[aria-disabled="true"]{ opacity: .55; cursor: default; }
+`;

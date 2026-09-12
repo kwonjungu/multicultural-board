@@ -1,3 +1,5 @@
+import type { LearnerProfile } from "./learnerId";
+
 export type CardType = "text" | "image" | "youtube" | "drawing";
 
 export type CardStatus = "pending" | "approved";
@@ -6,10 +8,24 @@ export interface RoomConfig {
   languages: string[];
   qrEntry?: boolean;
   rosterMode?: boolean;
+  /**
+   * 입장 화면에 보이는 활성 학생 이름 목록.
+   * X02 이후 이 값은 `learners` 에서 나오는 **파생 projection** 이다
+   * (활성 학습자의 displayName). 여기만 따로 고치지 말 것 —
+   * lib/rosterArchive.ts 의 applyRosterOps 가 둘을 한 번에 쓴다.
+   */
   roster?: string[];
+  /**
+   * X01/X02 — 학습자 프로필의 권위 저장소. key = learnerId.
+   * 이름은 표시값이고 기록 경로는 learnerId 가 정한다 (lib/learnerId.ts).
+   */
+  learners?: Record<string, LearnerProfile>;
   approvalMode?: boolean;
   /** 교사 입장 암호. 미설정(기본)이면 방 번호와 동일. 관리 패널에서 변경/초기화. */
   teacherPin?: string;
+  /** 교실 기준 시간대 (IANA). 미설정이면 Asia/Seoul. 일일 퀘스트 dayKey 의 기준 —
+   *  기기 시간대가 아니라 이 값으로 '오늘' 을 정한다 (lib/classroomDay.ts). */
+  timeZone?: string;
 }
 
 export interface CardData {

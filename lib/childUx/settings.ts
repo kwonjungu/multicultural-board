@@ -8,14 +8,25 @@
 import type { TextSize, ToneMode } from "./tokens";
 
 export type MotionPref = "system" | "full" | "reduced";
+/** 말소리·효과음 전체 스위치. 끄면 lib/audioBus 가 재생을 실제로 막는다. */
+export type SoundPref = "on" | "off";
 
 export interface ChildUxSettings {
   textSize: TextSize;
   motion: MotionPref;
   tone: ToneMode;
+  sound: SoundPref;
+  /** 집중 모드 — 배경 비행·오라·튜터 팝업·보상 반복 애니메이션을 줄인다. 기능은 그대로. */
+  focus: boolean;
 }
 
-export const DEFAULT_CHILD_UX: ChildUxSettings = { textSize: "basic", motion: "system", tone: "playful" };
+export const DEFAULT_CHILD_UX: ChildUxSettings = {
+  textSize: "basic",
+  motion: "system",
+  tone: "playful",
+  sound: "on",
+  focus: false,
+};
 
 export const CHILD_UX_STORAGE_KEY = "childUx.settings";
 /** FontSizeButton 이 쓰던 옛 키. 1회 이관 후에도 남겨두고 읽기만 한다. */
@@ -30,6 +41,9 @@ function isMotion(v: unknown): v is MotionPref {
 function isTone(v: unknown): v is ToneMode {
   return v === "playful" || v === "calm";
 }
+function isSound(v: unknown): v is SoundPref {
+  return v === "on" || v === "off";
+}
 
 /** 저장된 설정을 읽는다. 값이 깨져 있거나 없으면 기본값으로 떨어진다(예외 없음). */
 export function readChildUx(): ChildUxSettings {
@@ -42,6 +56,8 @@ export function readChildUx(): ChildUxSettings {
         textSize: isTextSize(parsed.textSize) ? parsed.textSize : DEFAULT_CHILD_UX.textSize,
         motion: isMotion(parsed.motion) ? parsed.motion : DEFAULT_CHILD_UX.motion,
         tone: isTone(parsed.tone) ? parsed.tone : DEFAULT_CHILD_UX.tone,
+        sound: isSound(parsed.sound) ? parsed.sound : DEFAULT_CHILD_UX.sound,
+        focus: parsed.focus === true,
       };
     }
     // 옛 zoom 배율(0.9 / 1 / 1.15 / 1.3) → 두 단계 글자 크기로 1회 이관.
@@ -73,6 +89,10 @@ export function applyChildUx(s: ChildUxSettings): void {
   const root = document.documentElement;
   root.dataset.uxText = s.textSize;
   root.dataset.uxTone = s.tone;
+  root.dataset.uxSound = s.sound;
+  // 집중 모드는 "on" 일 때만 속성을 단다 — 선택자가 존재 여부로 걸린다.
+  if (s.focus) root.dataset.uxFocus = "on";
+  else delete root.dataset.uxFocus;
   if (s.motion === "system") delete root.dataset.uxMotion;
   else root.dataset.uxMotion = s.motion;
   // 옛 applyFontScale 이 남긴 인라인 zoom 제거 — 남아 있으면 이중 배율이 된다.

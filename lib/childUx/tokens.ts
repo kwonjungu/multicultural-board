@@ -149,5 +149,27 @@ export function childUxCss(): string {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
-}`;
+}
+
+/* ── 집중 모드 (X19) ──────────────────────────────────────────────────
+   '움직임 줄이기' 는 모든 모션을 1ms 로 눌러 전환까지 끊는다. 집중 모드는
+   목적이 다르다 — **기능은 그대로 두고 장식만 잠재운다**. 배경 벌의 비행,
+   오라, 보상 반짝임처럼 계속 도는 장식이 대상이고, 누르면 반응하는 전환이나
+   '인식 중' 같은 진행 표시는 건드리지 않는다.
+
+   선택 기준은 '보조기술에 감춰진 것' = 순수 장식이다. 화면 전체에 걸어
+   회전 스피너까지 멈추면 아이가 기다려야 하는지 알 수 없게 된다 — 그래서
+   진행 표시에는 [data-ux-keep-motion] 으로 빠져나갈 길을 둔다.
+   장식 레이어를 직접 표시하려면 [data-ux-decor] 를 단다. */
+:root[data-ux-focus="on"] [aria-hidden="true"]:not([data-ux-keep-motion]),
+:root[data-ux-focus="on"] [aria-hidden="true"]:not([data-ux-keep-motion]) *,
+:root[data-ux-focus="on"] [data-ux-decor]:not([data-ux-keep-motion]),
+:root[data-ux-focus="on"] [data-ux-decor]:not([data-ux-keep-motion]) *{
+  animation: none !important;
+}
+/* 배경 장식은 남기되 뒤로 물린다 — 지우면 화면 구조가 바뀐다. */
+:root[data-ux-focus="on"] [data-ux-decor="background"]{ opacity: .18 !important; }
+/* 먼저 말을 거는 팝업(튜터 인사·보상 축하 자동 표시)만 막는다.
+   아이가 직접 누르면 열리는 경로는 그대로다 — 기능을 없애지 않는다. */
+:root[data-ux-focus="on"] [data-ux-autopopup]{ display: none !important; }`;
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
+import ScopedStyle from "../ui/child/ScopedStyle";
 
 type Topic = {
   key: string;
@@ -117,27 +118,12 @@ export default function CulturePuzzle({ langA, langB }: { langA: string; langB: 
 
   if (allDone) {
     return (
-      <div style={{
-        padding: "40px 16px", maxWidth: 520, margin: "0 auto", textAlign: "center",
-        minHeight: "100%",
-        background: "linear-gradient(rgba(255,251,235,0.86), rgba(255,247,224,0.86)), url('/backgrounds/world-landmarks.jpg') center top / cover no-repeat",
-      }}>
-        <div style={{ fontSize: 64, marginBottom: 12 }}>🏆</div>
-        <div style={{ fontSize: 28, fontWeight: 900, color: "#16A34A", marginBottom: 6 }}>
-          전체 완료!
-        </div>
-        <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 22 }}>
-          {ordered.length}개 퍼즐을 모두 맞혔어요. 👏
-        </div>
-        <button
-          onClick={handleRestart}
-          style={{
-            background: "#F59E0B", color: "white", border: "none",
-            borderRadius: 999, padding: "12px 28px",
-            fontSize: 15, fontWeight: 800, cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(245,158,11,0.35)",
-          }}
-        >
+      <div data-ux-root className="cp-root cp-center">
+        <ScopedStyle css={CP_CSS} />
+        <div className="cp-bigicon" aria-hidden>🏆</div>
+        <h1 data-ux-role="title">전체 완료!</h1>
+        <p data-ux-role="body">{ordered.length}개 퍼즐을 모두 맞혔어요. 👏</p>
+        <button data-ux-role="action" className="cp-primary" onClick={handleRestart}>
           ↻ 다시 시작
         </button>
       </div>
@@ -145,111 +131,140 @@ export default function CulturePuzzle({ langA, langB }: { langA: string; langB: 
   }
 
   return (
-    <div style={{
-      padding: "16px 16px 40px", maxWidth: 520, margin: "0 auto", minHeight: "100%",
-      background: "linear-gradient(rgba(255,251,235,0.88), rgba(255,247,224,0.88)), url('/backgrounds/world-landmarks.jpg') center top / cover no-repeat",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <div style={{ fontSize: 13, color: "#6B7280", fontWeight: 700 }}>
-          🧩 조각을 맞춰보세요
-        </div>
-        <div style={{ fontSize: 13, color: "#F59E0B", fontWeight: 800 }}>
-          {stageIdx + 1} / {ordered.length}
-        </div>
-      </div>
+    <div data-ux-root className="cp-root">
+      <ScopedStyle css={CP_CSS} />
 
-      {/* 진행 도트 */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-        {ordered.map((_, i) => (
-          <span
-            key={i}
-            style={{
-              width: i === stageIdx ? 18 : 8, height: 8,
-              borderRadius: 999,
-              background: i < stageIdx ? "#16A34A" : i === stageIdx ? "#F59E0B" : "#E5E7EB",
-              transition: "width 0.25s, background 0.25s",
-            }}
-          />
-        ))}
-      </div>
+      <div className="cp-play">
+        <div className="cp-boardcol">
+          <div className="cp-top">
+            <span data-ux-role="label">🧩 조각을 맞춰보세요</span>
+            <span data-ux-role="label" className="cp-count">{stageIdx + 1} / {ordered.length}</span>
+          </div>
 
-      <div
-        style={{
-          position: "relative", aspectRatio: topic!.aspect || "1 / 1",
-          borderRadius: 16, overflow: "hidden",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          background: "#f3f4f6",
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
-            gridTemplateRows: `repeat(${GRID_SIZE}, 1fr)`,
-            gap: solved ? 0 : 2,
-            width: "100%", height: "100%",
-            transition: "gap 0.4s",
-          }}
-        >
-          {cells.map((c, i) => {
-            const row = Math.floor(c.currentIdx / GRID_SIZE);
-            const col = c.currentIdx % GRID_SIZE;
-            return (
-              <button
+          {/* 진행 도트 */}
+          <div className="cp-dots" aria-hidden>
+            {ordered.map((_, i) => (
+              <span
                 key={i}
-                onClick={() => handleClick(i)}
-                aria-label={`조각 ${i + 1}`}
-                style={{
-                  backgroundColor: "#f3f4f6",
-                  backgroundImage: `url(${topic!.src})`,
-                  backgroundSize: `${GRID_SIZE * 100}% ${GRID_SIZE * 100}%`,
-                  backgroundPosition: `${(col / (GRID_SIZE - 1)) * 100}% ${(row / (GRID_SIZE - 1)) * 100}%`,
-                  backgroundRepeat: "no-repeat",
-                  border: selected === i ? "3px solid #F59E0B" : "none",
-                  outline: "none",
-                  cursor: solved ? "default" : "pointer",
-                  padding: 0,
-                  transition: "border-color 0.15s",
-                }}
+                className="cp-dot"
+                data-state={i < stageIdx ? "done" : i === stageIdx ? "now" : "todo"}
               />
-            );
-          })}
+            ))}
+          </div>
+
+          <div className="cp-frame" style={{ aspectRatio: topic!.aspect || "1 / 1" }}>
+            <div className="cp-grid" data-solved={solved ? "" : undefined}>
+              {cells.map((c, i) => {
+                const row = Math.floor(c.currentIdx / GRID_SIZE);
+                const col = c.currentIdx % GRID_SIZE;
+                return (
+                  <button
+                    key={i}
+                    data-ux-role="control"
+                    className="cp-cell"
+                    data-picked={selected === i ? "" : undefined}
+                    onClick={() => handleClick(i)}
+                    aria-label={`조각 ${i + 1}`}
+                    aria-pressed={selected === i}
+                    style={{
+                      backgroundImage: `url(${topic!.src})`,
+                      backgroundSize: `${GRID_SIZE * 100}% ${GRID_SIZE * 100}%`,
+                      backgroundPosition: `${(col / (GRID_SIZE - 1)) * 100}% ${(row / (GRID_SIZE - 1)) * 100}%`,
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="cp-side">
+          {solved ? (
+            <div className="cp-done" role="status">
+              <p data-ux-role="body-emphasis" className="cp-doneline">🎉 완성!</p>
+              <div className="cp-caption">
+                <p data-ux-role="body" data-ux-reading>
+                  {LANGUAGES[langA]?.flag} {getCaption(topic!, langA)}
+                </p>
+                <p data-ux-role="secondary" data-ux-reading>
+                  {LANGUAGES[langB]?.flag} {getCaption(topic!, langB)}
+                </p>
+              </div>
+              <button data-ux-role="action" className="cp-primary" onClick={handleNext}>
+                {stageIdx + 1 < ordered.length ? "다음 퍼즐 →" : "🏆 마지막 결과 보기"}
+              </button>
+            </div>
+          ) : (
+            <p data-ux-role="body" data-ux-reading className="cp-guide">
+              조각 하나를 누르고, 바꾸고 싶은 다른 조각을 누르면 자리가 바뀌어요.
+            </p>
+          )}
         </div>
       </div>
-
-      {solved && (
-        <div style={{ marginTop: 20, textAlign: "center" }}>
-          <div style={{ fontSize: 26, fontWeight: 900, color: "#16A34A", marginBottom: 10 }}>
-            🎉 완성!
-          </div>
-          <div
-            style={{
-              background: "linear-gradient(180deg,#FEF3C7,#fff)",
-              padding: 16, borderRadius: 14,
-              boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
-              marginBottom: 16,
-            }}
-          >
-            <div style={{ fontSize: 15, fontWeight: 800, color: "#111827", marginBottom: 4 }}>
-              {LANGUAGES[langA]?.flag} {getCaption(topic!, langA)}
-            </div>
-            <div style={{ fontSize: 13, color: "#6B7280" }}>
-              {LANGUAGES[langB]?.flag} {getCaption(topic!, langB)}
-            </div>
-          </div>
-          <button
-            onClick={handleNext}
-            style={{
-              background: "#F59E0B", color: "white", border: "none",
-              borderRadius: 999, padding: "12px 28px",
-              fontSize: 15, fontWeight: 800, cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(245,158,11,0.35)",
-            }}
-          >
-            {stageIdx + 1 < ordered.length ? "다음 퍼즐 →" : "🏆 마지막 결과 보기"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const CP_CSS = `
+.cp-root{
+  color: var(--ux-ink);
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-8);
+  width: 100%; max-width: 1200px; margin: 0 auto; box-sizing: border-box;
+  min-height: 100%;
+  background: linear-gradient(rgba(255,249,237,.88), rgba(253,243,224,.88)), url('/backgrounds/world-landmarks.jpg') center top / cover no-repeat;
+}
+.cp-center{ display: grid; justify-items: center; gap: var(--ux-space-3); text-align: center; padding-top: var(--ux-space-8); }
+.cp-center p{ margin: 0; }
+.cp-bigicon{ font-size: clamp(3rem, 12vw, 5rem); line-height: 1; }
+
+/* 넓은 화면에서는 판을 키우고 안내/완성 카드를 옆에 둔다. */
+.cp-play{ display: grid; gap: var(--ux-space-4); }
+@media (min-width: 900px){ .cp-play{ grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; } }
+
+.cp-boardcol{ display: grid; gap: var(--ux-space-2); min-width: 0; }
+.cp-top{ display: flex; justify-content: space-between; gap: var(--ux-space-2); }
+.cp-count{ color: var(--ux-primary-ink); font-weight: 900; }
+.cp-dots{ display: flex; justify-content: center; gap: var(--ux-space-1); flex-wrap: wrap; }
+.cp-dot{ width: 10px; height: 10px; border-radius: var(--ux-radius-pill); background: var(--ux-surface-sunk); border: 1px solid var(--ux-ink-soft); }
+.cp-dot[data-state="done"]{ background: var(--ux-success); border-color: var(--ux-success); }
+.cp-dot[data-state="now"]{ width: 24px; background: var(--ux-primary-fill); border-color: var(--ux-primary-border); }
+
+.cp-frame{
+  position: relative; width: 100%;
+  border-radius: var(--ux-radius-surface); overflow: hidden;
+  background: var(--ux-surface-sunk);
+  box-shadow: 0 8px 24px rgba(41,37,31,.12);
+}
+.cp-grid{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 2px; width: 100%; height: 100%;
+  transition: gap var(--ux-motion-celebrate) var(--ux-motion-ease);
+}
+.cp-grid[data-solved]{ gap: 0; }
+/* 전역 [data-ux-role="control"] 규칙이 뒤에 주입되므로 속성까지 걸어 덮는다. */
+.cp-cell[data-ux-role="control"]{
+  padding: 0; border: none; border-radius: 0; min-width: 0; min-height: 0;
+  background-color: var(--ux-surface-sunk);
+  background-repeat: no-repeat;
+  outline: none; font-family: inherit;
+}
+.cp-cell[data-picked]{ box-shadow: inset 0 0 0 4px var(--ux-selected-border); }
+
+.cp-side{ display: grid; gap: var(--ux-space-3); align-content: start; }
+.cp-guide{ margin: 0; padding: var(--ux-space-4); background: var(--ux-surface); border-radius: var(--ux-radius-surface); border: 2px solid var(--ux-primary-border); }
+.cp-done{ display: grid; gap: var(--ux-space-3); justify-items: center; text-align: center; }
+.cp-doneline{ margin: 0; color: var(--ux-success); font-weight: 900; }
+.cp-caption{
+  width: 100%; display: grid; gap: var(--ux-space-1);
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface); padding: var(--ux-space-4); text-align: left;
+}
+.cp-caption p{ margin: 0; }
+.cp-primary[data-ux-role="action"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
+}
+`;

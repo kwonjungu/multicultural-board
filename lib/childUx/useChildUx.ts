@@ -38,7 +38,10 @@ const getServerSnapshot = () => DEFAULT_CHILD_UX;
 /** 설정을 바꾼다. 저장·문서 반영·구독자 통지를 한 번에 처리한다. */
 export function setChildUx(patch: Partial<ChildUxSettings>): void {
   const next = { ...current, ...patch };
-  if (next.textSize === current.textSize && next.motion === current.motion && next.tone === current.tone) return;
+  // 필드를 나열해 비교하면 새 설정(소리·집중)을 추가할 때 조용히 빠져
+  // "아무 일도 하지 않는 토글" 이 된다. 키 전체를 돈다.
+  const keys = Object.keys(next) as (keyof ChildUxSettings)[];
+  if (keys.every((k) => next[k] === current[k])) return;
   current = next;
   applyChildUx(next);
   writeChildUx(next);

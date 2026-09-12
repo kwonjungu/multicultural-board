@@ -3,8 +3,10 @@
 import { useMemo, useState, useRef, useEffect, KeyboardEvent } from "react";
 import { VOCAB, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
+import ScopedStyle from "../ui/child/ScopedStyle";
 import VocabImage from "./VocabImage";
 import { gt, UI, type LangMap } from "./uiText";
+import { gp } from "./plainText";
 
 const DG: Record<string, LangMap> = {
   whatDrawing: {
@@ -24,10 +26,12 @@ const DG: Record<string, LangMap> = {
     th: "เขียนคำตอบที่นี่", id: "Tulis jawaban di sini", ru: "Напишите ответ здесь",
     hi: "यहाँ उत्तर लिखो", ar: "اكتب إجابتك هنا",
   },
+  // 오답 안내는 차분하게 — 흔들림·경고음 없이 "다시 한 번 해볼까요?" 톤으로.
   tryAgainHint: {
-    ko: "다시 한 번! 힌트:", en: "Try again! Hint:", vi: "Thử lại! Gợi ý:", zh: "再试一次!提示:",
-    fil: "Subukan ulit! Pahiwatig:", ja: "もういちど!ヒント:", th: "ลองอีกครั้ง! ใบ้:",
-    id: "Coba lagi! Petunjuk:", ru: "Ещё раз! Подсказка:", hi: "फिर कोशिश! संकेत:", ar: "حاول ثانية! تلميح:",
+    ko: "다시 한 번 해볼까요? 힌트:", en: "Shall we try once more? Hint:", vi: "Thử lại nhé! Gợi ý:",
+    zh: "我们再试一次吧!提示:", fil: "Subukan natin ulit! Pahiwatig:", ja: "もういちど やってみよう!ヒント:",
+    th: "ลองอีกครั้งกันไหม ใบ้:", id: "Ayo coba sekali lagi! Petunjuk:", ru: "Попробуем ещё раз! Подсказка:",
+    hi: "एक बार और कोशिश करें? संकेत:", ar: "هل نحاول مرة أخرى؟ تلميح:",
   },
   otherLangHint: {
     ko: "다른 언어 힌트:", en: "Other language hint:", vi: "Gợi ý ngôn ngữ khác:",
@@ -47,6 +51,13 @@ const DG: Record<string, LangMap> = {
     ko: "맞혀야 할 그림", en: "Picture to guess", vi: "Hình cần đoán", zh: "要猜的图",
     fil: "Larawang huhulaan", ja: "あてるえ", th: "ภาพที่ต้องทาย", id: "Gambar tebakan",
     ru: "Картинка для угадывания", hi: "अनुमान चित्र", ar: "صورة للتخمين",
+  },
+  // 제출 버튼이 아직 동작하지 않는 이유를 화면에 보여준다 (disabled 대신 aria-disabled).
+  typeFirst: {
+    ko: "답을 먼저 써주세요", en: "Write your answer first", vi: "Hãy viết câu trả lời trước",
+    zh: "请先写下答案", fil: "Isulat muna ang sagot", ja: "さきに こたえを かいてね",
+    th: "เขียนคำตอบก่อนนะ", id: "Tulis dulu jawabannya", ru: "Сначала напиши ответ",
+    hi: "पहले उत्तर लिखो", ar: "اكتب الإجابة أولًا",
   },
 };
 
@@ -84,12 +95,11 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
 
   if (done) {
     return (
-      <div style={{ textAlign: "center", padding: 40 }}>
+      <div data-ux-root className="dg-root dg-center">
+        <ScopedStyle css={DG_CSS} />
         <BeeMascot size={120} mood="cheer" />
-        <div style={{ fontSize: 24, fontWeight: 900, marginTop: 14 }}>🎉 {gt(UI.allDone, langA)}</div>
-        <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8, color: "#6B7280" }}>
-          {gt(UI.score, langA)}: {score} / {rounds.length}
-        </div>
+        <h1 data-ux-role="title">🎉 {gt(UI.allDone, langA)}</h1>
+        <p data-ux-role="body">{gt(UI.score, langA)}: {score} / {rounds.length}</p>
       </div>
     );
   }
@@ -103,6 +113,8 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
     if (chars.length === 0) return "";
     return chars[0] + chars.slice(1).map((c) => (c === " " ? " " : "_")).join("");
   };
+
+  const canSubmit = normalize(input).length > 0;
 
   const handleSubmit = () => {
     const guess = normalize(input);
@@ -120,6 +132,8 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
   };
 
   const handleKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    // 한글·일본어 조합 중의 Enter 는 글자 확정이지 제출이 아니다.
+    if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter") {
       e.preventDefault();
       handleSubmit();
@@ -140,118 +154,210 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
   };
 
   return (
-    <div style={{ padding: "16px 16px 40px", maxWidth: 520, margin: "0 auto" }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        fontSize: 12, color: "#6B7280", fontWeight: 700, marginBottom: 10,
-      }}>
-        <span>{gt(DG.whatDrawing, langA)}</span>
-        <span>{gt(UI.score, langA)} {score} · {round + 1} / {rounds.length}</span>
+    <div data-ux-root className="dg-root">
+      <ScopedStyle css={DG_CSS} />
+
+      <div className="dg-top">
+        <span data-ux-role="body-emphasis" className="dg-ask">{gt(DG.whatDrawing, langA)}</span>
+        <span data-ux-role="label" className="dg-progress">
+          {gt(UI.score, langA)} {score} · {round + 1} / {rounds.length}
+        </span>
       </div>
 
-      <div style={{
-        position: "relative", aspectRatio: "1 / 1",
-        background: "#fff", borderRadius: 16, overflow: "hidden",
-        boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-      }}>
-        <img
-          src={imgSrc} alt={gt(DG.toGuess, langA)}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      </div>
+      <div className="dg-cols">
+        <div className="dg-pic">
+          <img src={imgSrc} alt={gt(DG.toGuess, langA)} className="dg-img" />
+        </div>
 
-      {!revealed ? (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
-            <BeeMascot size={72} mood={feedback === "wrong" ? "think" : "happy"} />
-          </div>
+        <div className="dg-side">
+          {!revealed ? (
+            <>
+              <div className="dg-mascot">
+                <BeeMascot size={72} mood={feedback === "wrong" ? "think" : "happy"} />
+              </div>
 
-          <label htmlFor="draw-guess-input" style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
-            ✏️ {gt(DG.enterAnswer, langA)}
-          </label>
-          <input
-            id="draw-guess-input"
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => { setInput(e.target.value); if (feedback === "wrong") setFeedback("idle"); }}
-            onKeyDown={handleKey}
-            aria-label={gt(DG.enterAnswer, langA)}
-            placeholder={gt(DG.answerPlaceholder, langA)}
-            autoComplete="off"
-            style={{
-              width: "100%", padding: "12px 14px", borderRadius: 12,
-              border: feedback === "wrong" ? "2px solid #EF4444" : "2px solid #FBBF24",
-              fontSize: 16, fontWeight: 700, background: "#FFFBEB",
-              outline: "none", boxSizing: "border-box",
-            }}
-          />
+              <label htmlFor="draw-guess-input" data-ux-role="label" className="dg-label">
+                ✏️ {gt(DG.enterAnswer, langA)}
+              </label>
+              <input
+                id="draw-guess-input"
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => { setInput(e.target.value); if (feedback === "wrong") setFeedback("idle"); }}
+                onKeyDown={handleKey}
+                aria-label={gt(DG.enterAnswer, langA)}
+                placeholder={gt(DG.answerPlaceholder, langA)}
+                autoComplete="off"
+                className="dg-input"
+                data-state={feedback === "wrong" ? "wrong" : undefined}
+              />
 
-          {feedback === "wrong" && wrongCount > 0 && (
-            <div style={{
-              marginTop: 10, padding: "10px 12px", background: "#FEE2E2",
-              borderRadius: 10, color: "#B91C1C", fontSize: 13, fontWeight: 700,
-              textAlign: "center",
-            }} role="status" aria-live="polite">
-              {gt(DG.tryAgainHint, langA)} <span style={{ fontFamily: "monospace", letterSpacing: 2 }}>{firstHint(answerA)}</span>
-              {wrongCount >= 2 && (
-                <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600 }}>
-                  {gt(DG.otherLangHint, langA)} <span style={{ fontFamily: "monospace", letterSpacing: 2 }}>{firstHint(answerB)}</span>
+              {feedback === "wrong" && wrongCount > 0 && (
+                <div className="dg-hint" role="status" aria-live="polite">
+                  <span data-ux-role="body">{gt(DG.tryAgainHint, langA)}</span>{" "}
+                  <span className="dg-mask">{firstHint(answerA)}</span>
+                  {wrongCount >= 2 && (
+                    <div className="dg-hint2">
+                      <span data-ux-role="secondary">{gt(DG.otherLangHint, langA)}</span>{" "}
+                      <span className="dg-mask">{firstHint(answerB)}</span>
+                    </div>
+                  )}
                 </div>
               )}
+
+              <div className="dg-actions">
+                <button
+                  type="button"
+                  data-ux-role="action"
+                  className="dg-submit"
+                  onClick={handleSubmit}
+                  aria-disabled={!canSubmit}
+                  aria-describedby={!canSubmit ? "draw-guess-why" : undefined}
+                  aria-label={gt(UI.submit, langA)}
+                >✅ {gt(UI.submit, langA)}</button>
+                <button
+                  type="button"
+                  data-ux-role="control"
+                  className="dg-ghost"
+                  onClick={giveUp}
+                  aria-label={gp(DG.showAnswer, langA)}
+                >💡 {gp(DG.showAnswer, langA)}</button>
+              </div>
+              {!canSubmit && (
+                <p id="draw-guess-why" data-ux-role="secondary" className="dg-why">
+                  ✏️ {gt(DG.typeFirst, langA)}
+                </p>
+              )}
+            </>
+          ) : (
+            <div className="dg-reveal" data-state={feedback === "correct" ? "correct" : "shown"}>
+              <div className="dg-mascot">
+                <BeeMascot size={80} mood={feedback === "correct" ? "cheer" : "think"} />
+              </div>
+              <p data-ux-role="body-emphasis" className="dg-revealhead">
+                {feedback === "correct" ? `🎉 ${gt(UI.correct, langA)}` : gt(DG.theAnswerIs, langA)}
+              </p>
+              <div className="dg-mascot">
+                {/* key 로 라운드마다 리마운트 — onError 폴백 상태가 다음 단어로 새어가지 않게 */}
+                <VocabImage key={cur.key} vocabKey={cur.key} emoji={cur.emoji} size={64} />
+              </div>
+              <p data-ux-role="title" className="dg-answer">{answerA}</p>
+              <p data-ux-role="body" className="dg-answerb">{answerB}</p>
+              <button
+                type="button"
+                data-ux-role="action"
+                className="dg-next"
+                onClick={goNext}
+                aria-label={gp(UI.next, langA)}
+              >➡ {gp(UI.next, langA)}</button>
             </div>
           )}
-
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              aria-label={gt(UI.submit, langA)}
-              style={{
-                flex: 1,
-                background: "linear-gradient(135deg,#FBBF24,#F59E0B)",
-                color: "#fff", border: "none", padding: 14, borderRadius: 14,
-                fontSize: 15, fontWeight: 800, cursor: "pointer",
-              }}
-            >✅ {gt(UI.submit, langA)}</button>
-            <button
-              type="button"
-              onClick={giveUp}
-              aria-label={gt(DG.showAnswer, langA)}
-              style={{
-                background: "#F3F4F6", color: "#6B7280", border: "none",
-                padding: "14px 16px", borderRadius: 14,
-                fontSize: 13, fontWeight: 800, cursor: "pointer",
-              }}
-            >💡 {gt(DG.showAnswer, langA)}</button>
-          </div>
         </div>
-      ) : (
-        <div style={{ marginTop: 18, padding: 18, background: feedback === "correct" ? "#D1FAE5" : "#FEF3C7", borderRadius: 14, textAlign: "center" }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
-            <BeeMascot size={80} mood={feedback === "correct" ? "cheer" : "think"} />
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: feedback === "correct" ? "#065F46" : "#92400E", marginBottom: 6 }}>
-            {feedback === "correct" ? `🎉 ${gt(UI.correct, langA)}` : gt(DG.theAnswerIs, langA)}
-          </div>
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            {/* key 로 라운드마다 리마운트 — onError 폴백 상태가 다음 단어로 새어가지 않게 */}
-            <VocabImage key={cur.key} vocabKey={cur.key} emoji={cur.emoji} size={64} />
-          </div>
-          <div style={{ fontSize: 17, fontWeight: 900, marginTop: 6 }}>{answerA}</div>
-          <div style={{ fontSize: 14, color: "#6B7280", marginTop: 2 }}>{answerB}</div>
-          <button
-            type="button"
-            onClick={goNext}
-            aria-label={gt(UI.next, langA)}
-            style={{
-              marginTop: 14, background: "#F59E0B", color: "#fff", border: "none",
-              padding: "10px 24px", borderRadius: 99, cursor: "pointer",
-              fontSize: 14, fontWeight: 800,
-            }}
-          >➡ {gt(UI.next, langA)}</button>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
+
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
+const DG_CSS = `
+.dg-root{
+  color: var(--ux-ink);
+  max-width: 1180px; margin: 0 auto;
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-12);
+}
+.dg-center{
+  display: grid; justify-items: center; gap: var(--ux-space-3);
+  padding: var(--ux-space-12) var(--ux-space-4); text-align: center;
+}
+.dg-center h1, .dg-center p{ margin: 0; }
+.dg-top{
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: var(--ux-space-3); flex-wrap: wrap; margin-bottom: var(--ux-space-4);
+}
+.dg-ask{ font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; min-width: 0; }
+.dg-progress{ color: var(--ux-ink-soft); white-space: nowrap; }
+.dg-cols{ display: grid; gap: var(--ux-space-4); align-items: start; }
+.dg-pic{
+  position: relative; aspect-ratio: 1 / 1; width: 100%;
+  background: var(--ux-surface); border-radius: var(--ux-radius-panel);
+  overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+.dg-img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.dg-side{ display: grid; gap: var(--ux-space-3); min-width: 0; align-content: start; }
+.dg-mascot{ display: flex; justify-content: center; }
+.dg-label{ display: block; font-weight: 700; }
+.dg-input{
+  width: 100%; box-sizing: border-box;
+  padding: var(--ux-space-3) var(--ux-space-4);
+  border-radius: var(--ux-radius-surface);
+  border: 2px solid var(--ux-primary-border);
+  background: var(--ux-surface);
+  color: var(--ux-ink);
+  font-family: inherit; font-weight: 700;
+  font-size: var(--ux-font-body-emphasis);
+  line-height: var(--ux-lh-tight);
+  min-height: var(--ux-control-min);
+  outline: none;
+}
+.dg-input[data-state="wrong"]{ border-color: var(--ux-selected-border); background: var(--ux-surface-sunk); }
+.dg-hint{
+  padding: var(--ux-space-3) var(--ux-space-4);
+  background: var(--ux-surface-sunk);
+  border-radius: var(--ux-radius-surface);
+  text-align: center;
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.dg-hint2{ margin-top: var(--ux-space-1); }
+.dg-mask{
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .18em; font-weight: 800;
+  font-size: var(--ux-font-body-emphasis);
+}
+.dg-actions{
+  display: grid; gap: var(--ux-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.dg-submit{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border);
+  font-family: inherit; font-weight: 800;
+}
+.dg-submit[aria-disabled="true"]{ opacity: .62; }
+.dg-ghost{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
+  font-family: inherit; font-weight: 800; white-space: nowrap;
+}
+.dg-why{ margin: 0; text-align: center; }
+.dg-reveal{
+  padding: var(--ux-space-4);
+  border-radius: var(--ux-radius-panel);
+  background: var(--ux-surface-sunk);
+  text-align: center;
+  display: grid; gap: var(--ux-space-2); justify-items: center;
+}
+.dg-reveal[data-state="correct"]{ background: color-mix(in srgb, var(--ux-success) 14%, var(--ux-surface)); }
+.dg-reveal p{ margin: 0; }
+.dg-revealhead{ font-weight: 800; }
+.dg-answer{ font-weight: 900; }
+.dg-answerb{ color: var(--ux-ink-soft); }
+.dg-next{
+  margin-top: var(--ux-space-2);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-pill);
+  font-family: inherit; font-weight: 800;
+}
+@media (min-width: 768px){
+  .dg-root{ padding-left: var(--ux-space-6); padding-right: var(--ux-space-6); }
+}
+@media (min-width: 1024px){
+  .dg-cols{
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: var(--ux-space-8);
+    align-items: stretch;
+  }
+  .dg-reveal{ align-content: center; }
+}
+`;

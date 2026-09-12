@@ -1,3 +1,4 @@
+import { isSoundOn } from "./audioBus";
 // 게임 공용 Web Audio 신스 효과음.
 //
 // ⚠️ 과거 패턴("톤마다 new AudioContext()")은 컨텍스트를 닫지 않아 누적되고,
@@ -36,6 +37,9 @@ export function playTone(
   type: OscillatorType = "sine",
   volume = 0.18,
 ): void {
+  // 소리를 끈 아이에게는 효과음도 나면 안 된다. 게임 로직은 그대로 돌고
+  // 소리만 빠진다 — 여기서 막아야 호출부 7곳을 다 고치지 않는다.
+  if (!isSoundOn()) return;
   const ctx = getCtx();
   if (!ctx) return;
   try {

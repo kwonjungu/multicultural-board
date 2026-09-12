@@ -13,22 +13,187 @@ import {
 } from "@/lib/gameData";
 import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
-import { ProgressBar } from "./CountryGuess";
+import ScopedStyle from "../ui/child/ScopedStyle";
+import { gt, UI, type LangMap } from "./uiText";
+import { gp } from "./plainText";
 
 type Phase = "category" | "setup" | "play" | "asking" | "guess" | "result";
 
-const CATEGORY_META: Record<TwentyQCategory, { emoji: string; labelKo: string; labelEn: string; color: string; bg: string }> = {
-  country: { emoji: "🌏", labelKo: "나라",   labelEn: "country", color: "#F59E0B", bg: "#FEF3C7" },
-  food:    { emoji: "🍜", labelKo: "음식",   labelEn: "food",    color: "#EF4444", bg: "#FEE2E2" },
-  person:  { emoji: "👤", labelKo: "직업",   labelEn: "job",     color: "#8B5CF6", bg: "#EDE9FE" },
+const TOTAL_QUESTIONS = 20;
+
+// 게임 고유 UI 문구. 반복되는 짧은 동작 버튼은 gp(), 지문·제목·안내문은 gt().
+const TQ: Record<string, LangMap> = {
+  title: {
+    ko: "스무고개", en: "Twenty Questions", vi: "Hai mươi câu hỏi", zh: "二十个问题",
+    fil: "Dalawampung Tanong", ja: "にじゅうの しつもん", th: "ยี่สิบคำถาม", id: "Dua Puluh Pertanyaan",
+    ru: "Двадцать вопросов", hi: "बीस सवाल", ar: "عشرون سؤالًا",
+  },
+  pickCategory: {
+    ko: "무엇을 맞힐지 먼저 골라요",
+    en: "First choose what you will guess",
+    vi: "Trước tiên hãy chọn chủ đề để đoán",
+    zh: "先选择要猜的主题",
+    fil: "Piliin muna kung ano ang huhulaan",
+    ja: "まず なにを あてるか えらぼう",
+  },
+  setupTitle: {
+    ko: "출제자: 비밀 답을 고르세요",
+    en: "Question master: pick the secret answer",
+    vi: "Người ra đề: hãy chọn đáp án bí mật",
+    zh: "出题者: 请选一个秘密答案",
+    fil: "Taga-tanong: pumili ng lihim na sagot",
+    ja: "しゅつだいしゃ: ひみつの こたえを えらんでね",
+  },
+  setupHowto: {
+    ko: "친구가 보기 전에 하나만 고르세요. 고르면 바로 시작해요.",
+    en: "Pick one before your friend looks. The game starts right away.",
+    vi: "Chọn một cái trước khi bạn nhìn thấy. Chọn xong là bắt đầu ngay.",
+    zh: "在同伴看到之前选一个，选好就马上开始。",
+    fil: "Pumili ng isa bago tumingin ang kaibigan mo. Magsisimula agad.",
+  },
+  askPrompt: {
+    ko: "물어볼 질문을 골라요",
+    en: "Choose a question to ask",
+    vi: "Chọn một câu hỏi để hỏi",
+    zh: "选一个要问的问题",
+    fil: "Pumili ng tanong na itatanong",
+    ja: "きく しつもんを えらぼう",
+  },
+  recent: {
+    ko: "지금까지 물어본 질문",
+    en: "Questions asked so far",
+    vi: "Các câu đã hỏi",
+    zh: "已经问过的问题",
+    fil: "Mga naitanong na",
+    ja: "いままでの しつもん",
+  },
+  noneYet: {
+    ko: "아직 물어본 질문이 없어요",
+    en: "No questions asked yet",
+    vi: "Chưa hỏi câu nào",
+    zh: "还没有问过问题",
+    fil: "Wala pang naitanong",
+  },
+  remain: {
+    ko: "남은 질문", en: "Left", vi: "Còn lại", zh: "剩余", fil: "Natitira",
+    ja: "のこり", th: "เหลือ", id: "Sisa", ru: "Осталось", hi: "बाकी", ar: "المتبقي",
+  },
+  used: {
+    ko: "이미 물어봤어요", en: "Already asked", vi: "Đã hỏi rồi", zh: "已经问过了",
+    fil: "Naitanong na", ja: "きいたよ",
+  },
+  outOfQuestions: {
+    ko: "질문을 다 썼어요. 이제 정답을 말해 볼까요?",
+    en: "No questions left. Shall we say the answer now?",
+    vi: "Hết câu hỏi rồi. Mình nói đáp án nhé?",
+    zh: "问题用完了，现在说出答案吧?",
+    fil: "Ubos na ang tanong. Sabihin na natin ang sagot?",
+  },
+  sayAnswer: {
+    ko: "정답 말하기", en: "Say the answer", vi: "Nói đáp án", zh: "说出答案",
+    fil: "Sabihin ang sagot", ja: "こたえを いう",
+  },
+  toStart: {
+    ko: "처음으로", en: "Start over", vi: "Về đầu", zh: "回到开始",
+    fil: "Sa umpisa", ja: "はじめに",
+  },
+  changeCategory: {
+    ko: "카테고리 바꾸기", en: "Change topic", vi: "Đổi chủ đề", zh: "换主题",
+    fil: "Palitan ang paksa", ja: "テーマを かえる",
+  },
+  guessTitle: {
+    ko: "정답은?", en: "What is the answer?", vi: "Đáp án là gì?", zh: "答案是什么?",
+    fil: "Ano ang sagot?", ja: "こたえは?",
+  },
+  guessHowto: {
+    ko: "아래에서 하나를 골라보세요",
+    en: "Choose one from below",
+    vi: "Hãy chọn một trong số dưới đây",
+    zh: "从下面选一个",
+    fil: "Pumili ng isa sa ibaba",
+  },
+  answerHere: {
+    ko: "출제자: 이 질문에 답해주세요",
+    en: "Question master: please answer this",
+    vi: "Người ra đề: hãy trả lời câu này",
+    zh: "出题者: 请回答这个问题",
+    fil: "Taga-tanong: pakisagot ito",
+  },
+  suggest: {
+    ko: "추천 답", en: "Suggested", vi: "Gợi ý", zh: "建议答案",
+    fil: "Mungkahi", ja: "おすすめ",
+  },
+  yes: {
+    ko: "예", en: "Yes", vi: "Có", zh: "是", fil: "Oo",
+    ja: "はい", th: "ใช่", id: "Ya", ru: "Да", hi: "हाँ", ar: "نعم",
+  },
+  no: {
+    ko: "아니오", en: "No", vi: "Không", zh: "不是", fil: "Hindi",
+    ja: "いいえ", th: "ไม่", id: "Tidak", ru: "Нет", hi: "नहीं", ar: "لا",
+  },
+  notYet: {
+    ko: "조금 달랐어요. 한 번 더 해볼까요?",
+    en: "That was a little different. Shall we try once more?",
+    vi: "Hơi khác một chút. Mình thử lại nhé?",
+    zh: "有一点不一样，再试一次好吗?",
+    fil: "Medyo iba pala. Subukan nating muli?",
+    ja: "ちょっと ちがったね。もういちど やってみる?",
+  },
+  answerWas: {
+    ko: "정답은", en: "The answer was", vi: "Đáp án là", zh: "答案是",
+    fil: "Ang sagot ay", ja: "こたえは",
+  },
+  asked: {
+    ko: "물어본 질문", en: "Asked", vi: "Đã hỏi", zh: "已问",
+    fil: "Naitanong", ja: "きいた かず",
+  },
 };
 
-const GROUP_LABEL: Record<HintGroup, { ko: string; en: string; emoji: string }> = {
-  region: { ko: "지역",  en: "Region",  emoji: "🗺️" },
-  taste:  { ko: "맛/감각", en: "Taste",   emoji: "👅" },
-  use:    { ko: "쓰임",  en: "Use",     emoji: "🛠️" },
-  form:   { ko: "생김새", en: "Form",    emoji: "🔍" },
-  misc:   { ko: "기타",  en: "Other",   emoji: "✨" },
+const CATEGORY_META: Record<TwentyQCategory, { emoji: string; label: LangMap }> = {
+  country: {
+    emoji: "🌏",
+    label: {
+      ko: "나라", en: "Country", vi: "Quốc gia", zh: "国家", fil: "Bansa",
+      ja: "くに", th: "ประเทศ", id: "Negara", ru: "Страна", hi: "देश", ar: "دولة",
+    },
+  },
+  food: {
+    emoji: "🍜",
+    label: {
+      ko: "음식", en: "Food", vi: "Món ăn", zh: "食物", fil: "Pagkain",
+      ja: "たべもの", th: "อาหาร", id: "Makanan", ru: "Еда", hi: "खाना", ar: "طعام",
+    },
+  },
+  person: {
+    emoji: "👤",
+    label: {
+      ko: "직업", en: "Job", vi: "Nghề nghiệp", zh: "职业", fil: "Trabaho",
+      ja: "しごと", th: "อาชีพ", id: "Pekerjaan", ru: "Профессия", hi: "काम", ar: "مهنة",
+    },
+  },
+};
+
+const GROUP_LABEL: Record<HintGroup, { emoji: string; label: LangMap }> = {
+  region: {
+    emoji: "🗺️",
+    label: { ko: "지역", en: "Region", vi: "Vùng", zh: "地区", fil: "Rehiyon", ja: "ちいき" },
+  },
+  taste: {
+    emoji: "👅",
+    label: { ko: "맛과 느낌", en: "Taste", vi: "Mùi vị", zh: "味道", fil: "Lasa", ja: "あじ" },
+  },
+  use: {
+    emoji: "🛠️",
+    label: { ko: "쓰임", en: "Use", vi: "Công dụng", zh: "用途", fil: "Gamit", ja: "つかいかた" },
+  },
+  form: {
+    emoji: "🔍",
+    label: { ko: "생김새", en: "Form", vi: "Hình dáng", zh: "外形", fil: "Hugis", ja: "かたち" },
+  },
+  misc: {
+    emoji: "✨",
+    label: { ko: "그 밖에", en: "Other", vi: "Khác", zh: "其他", fil: "Iba pa", ja: "そのほか" },
+  },
 };
 
 // 아이템별 PNG (있는 것만). 없거나 로드 실패 시 이모지 폴백 (ItemArt).
@@ -63,30 +228,39 @@ const ITEM_IMAGES: Record<string, string> = {
   "p-singer": "/game-assets/twentyq/p-singer.png",
 };
 
+type ArtSize = "md" | "lg";
+
 // PNG 우선 + 이모지 폴백 아이템 그림 (404 시 게임이 깨지지 않게).
-function ItemArt({ item, size = 52 }: { item: TwentyQItem; size?: number }) {
+// 크기는 px 이 아니라 CSS 클래스 + 토큰 배수로만 정한다.
+function ItemArt({ item, size = "md" }: { item: TwentyQItem; size?: ArtSize }) {
   const [failed, setFailed] = useState(false);
   const src = ITEM_IMAGES[item.id];
   if (!src || failed) {
-    return <span style={{ fontSize: Math.round(size * 0.62), lineHeight: 1 }} aria-hidden="true">{item.emoji}</span>;
+    return <span className="tq-art-emoji" data-size={size} aria-hidden="true">{item.emoji}</span>;
   }
   return (
     <img
+      className="tq-art-img"
+      data-size={size}
       src={src}
       alt=""
       aria-hidden="true"
       onError={() => setFailed(true)}
       draggable={false}
-      style={{ width: size, height: size, objectFit: "contain" }}
     />
   );
+}
+
+/** 진행 막대 폭만 인라인으로 준다 (상태에 따라 변하므로 CSS 클래스로 표현 불가). */
+function barWidth(ratio: number): React.CSSProperties {
+  return { width: `${Math.max(0, Math.min(1, ratio)) * 100}%` };
 }
 
 export default function TwentyQuestions({ langA, langB }: { langA: string; langB: string }) {
   const [phase, setPhase] = useState<Phase>("category");
   const [category, setCategory] = useState<TwentyQCategory | null>(null);
   const [secret, setSecret] = useState<TwentyQItem | null>(null);
-  const [remaining, setRemaining] = useState(20);
+  const [remaining, setRemaining] = useState(TOTAL_QUESTIONS);
   const [usedFlags, setUsedFlags] = useState<Set<string>>(new Set());
   const [log, setLog] = useState<{ cardEmoji: string; labelA: string; yes: boolean }[]>([]);
   const [pendingCard, setPendingCard] = useState<HintCard | null>(null);
@@ -107,7 +281,7 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
 
   function pickSecret(item: TwentyQItem) {
     setSecret(item);
-    setRemaining(20);
+    setRemaining(TOTAL_QUESTIONS);
     setUsedFlags(new Set());
     setLog([]);
     setPhase("play");
@@ -148,7 +322,7 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
     setPhase("category");
     setCategory(null);
     setSecret(null);
-    setRemaining(20);
+    setRemaining(TOTAL_QUESTIONS);
     setUsedFlags(new Set());
     setLog([]);
     setPendingCard(null);
@@ -160,29 +334,25 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
   // ---- render ----
   if (phase === "category") {
     return (
-      <div style={wrapStyle}>
-        <h2 style={titleStyle}>🔎 스무고개</h2>
-        <p style={subtitleStyle}>카테고리를 먼저 고르세요</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 16 }}>
+      <div data-ux-root className="tq-root tq-page">
+        <ScopedStyle css={TQ_CSS} />
+        <h2 data-ux-role="title" className="tq-title">🔎 {gt(TQ.title, langA)}</h2>
+        <p data-ux-role="body" className="tq-lede">{gt(TQ.pickCategory, langA)}</p>
+        <div className="tq-cards">
           {(Object.keys(CATEGORY_META) as TwentyQCategory[]).map((cat) => {
             const m = CATEGORY_META[cat];
             return (
               <button
                 key={cat}
+                type="button"
+                data-ux-role="action"
+                className="tq-catbtn"
+                data-cat={cat}
                 onClick={() => chooseCategory(cat)}
-                aria-label={m.labelKo}
-                style={{
-                  padding: "20px 18px", borderRadius: 20, fontSize: 22, fontWeight: 900,
-                  color: "#1F2937", background: m.bg, border: `3px solid ${m.color}`,
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
-                  boxShadow: "0 6px 18px rgba(0,0,0,0.06)", transition: "transform 0.12s",
-                }}
-                onMouseDown={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(0.97)")}
-                onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
+                aria-label={gp(m.label, langA)}
               >
-                <span style={{ fontSize: 36 }}>{m.emoji}</span>
-                <span>{m.labelKo}</span>
+                <span className="tq-art-emoji" data-size="lg" aria-hidden="true">{m.emoji}</span>
+                <span>{gt(m.label, langA)}</span>
               </button>
             );
           })}
@@ -193,7 +363,8 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
 
   if (phase === "setup") {
     return (
-      <div style={wrapStyle}>
+      <div data-ux-root className="tq-root tq-page">
+        <ScopedStyle css={TQ_CSS} />
         <SetupPanel
           candidates={setupCandidates}
           category={category!}
@@ -206,81 +377,75 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
   }
 
   if (phase === "play" || phase === "asking") {
+    const noneLeft = remaining <= 0;
     return (
-      <>
-        <div style={wrapStyle}>
-          <PlayHeader category={category!} remaining={remaining} />
-          <HintGrid
-            usedFlags={usedFlags}
-            onTap={tapCard}
-            langA={langA}
-          />
+      // AskModal 도 이 루트 안에 둔다 — 화면 분기마다 data-ux-root 는 하나뿐이어야 한다.
+      <div data-ux-root className="tq-root tq-play">
+        <ScopedStyle css={TQ_CSS} />
+        <PlayHeader category={category!} remaining={remaining} langA={langA} />
 
-          <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button
-              onClick={startGuess}
-              style={primaryBtn}
-            >🎯 정답 말하기</button>
-            <button
-              onClick={resetAll}
-              style={secondaryBtn}
-            >↩ 처음으로</button>
-          </div>
+        <div className="tq-cols">
+          <section className="tq-logcol" data-ux-surface="panel" aria-live="polite">
+            <h3 data-ux-role="label" className="tq-colhead">🗒 {gt(TQ.recent, langA)}</h3>
+            {log.length === 0 ? (
+              <p data-ux-role="secondary" className="tq-empty">{gt(TQ.noneYet, langA)}</p>
+            ) : (
+              <ul className="tq-loglist">
+                {log.map((e, i) => (
+                  <li key={i} className="tq-logrow">
+                    <span className="tq-logemoji" aria-hidden="true">{e.cardEmoji}</span>
+                    <span data-ux-role="body" className="tq-logtext">{e.labelA}</span>
+                    <span data-ux-role="label" className="tq-yn" data-yes={e.yes ? "" : undefined}>
+                      {e.yes ? gp(TQ.yes, langA) : gp(TQ.no, langA)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-          {log.length > 0 && (
-            <div style={{ marginTop: 16, background: "#fff", padding: 12, borderRadius: 14,
-              border: "1px solid #E5E7EB", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280", marginBottom: 8 }}>
-                최근 질문
-              </div>
-              {log.map((e, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, fontSize: 14, padding: "6px 0",
-                  borderBottom: i < log.length - 1 ? "1px solid #F3F4F6" : "none" }}>
-                  <span style={{ fontSize: 18 }}>{e.cardEmoji}</span>
-                  <span style={{ flex: 1, color: "#111827" }}>{e.labelA}</span>
-                  <span style={{
-                    fontWeight: 900, fontSize: 13, padding: "2px 10px", borderRadius: 999,
-                    background: e.yes ? "#DCFCE7" : "#FEE2E2",
-                    color: e.yes ? "#15803D" : "#B91C1C",
-                  }}>{e.yes ? "예" : "아니오"}</span>
-                </div>
-              ))}
+          <section className="tq-askcol">
+            <h3 data-ux-role="label" className="tq-colhead">❓ {gt(TQ.askPrompt, langA)}</h3>
+            {noneLeft && (
+              <p data-ux-role="body" className="tq-notice" role="status">
+                🐝 {gt(TQ.outOfQuestions, langA)}
+              </p>
+            )}
+            <HintGrid usedFlags={usedFlags} onTap={tapCard} langA={langA} noneLeft={noneLeft} />
+
+            <div className="tq-actions">
+              <button type="button" data-ux-role="action" className="tq-primary" onClick={startGuess}>
+                🎯 {gp(TQ.sayAnswer, langA)}
+              </button>
+              <button type="button" data-ux-role="control" className="tq-secondary" onClick={resetAll}>
+                ↩ {gp(TQ.toStart, langA)}
+              </button>
             </div>
-          )}
+          </section>
         </div>
 
         {phase === "asking" && pendingCard && secret && (
-          <AskModal
-            card={pendingCard}
-            secret={secret}
-            langB={langB}
-            onAnswer={answerCard}
-          />
+          <AskModal card={pendingCard} secret={secret} langB={langB} onAnswer={answerCard} />
         )}
-      </>
+      </div>
     );
   }
 
   if (phase === "guess") {
     return (
-      <div style={wrapStyle}>
-        <h2 style={titleStyle}>🎯 정답은?</h2>
-        <p style={subtitleStyle}>아래 8개 중에서 골라보세요</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
+      <div data-ux-root className="tq-root tq-page">
+        <ScopedStyle css={TQ_CSS} />
+        <h2 data-ux-role="title" className="tq-title">🎯 {gt(TQ.guessTitle, langA)}</h2>
+        <p data-ux-role="body" className="tq-lede">{gt(TQ.guessHowto, langA)}</p>
+        <div className="tq-cards">
           {guessChoices.map((it) => (
             <button
               key={it.id}
+              type="button"
+              data-ux-role="control"
+              className="tq-pick"
               onClick={() => submitGuess(it)}
               aria-label={tr(it.names, langA)}
-              style={{
-                padding: "16px 12px", borderRadius: 16, fontSize: 14, fontWeight: 800,
-                background: "#fff", border: "2px solid #E5E7EB", cursor: "pointer",
-                color: "#1F2937", display: "flex", flexDirection: "column", gap: 6,
-                alignItems: "center", transition: "all 0.12s",
-              }}
-              onMouseDown={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(0.97)")}
-              onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
             >
               <ItemArt item={it} />
               <span><GameText map={it.names} lang={langA} /></span>
@@ -293,28 +458,32 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
 
   // result
   const correct = finalPick && secret && finalPick.id === secret.id;
+  const asked = TOTAL_QUESTIONS - remaining;
   return (
-    <div style={{ ...wrapStyle, textAlign: "center" }}>
-      <div style={{ padding: "20px 0" }}>
-        <BeeMascot size={120} mood={correct ? "cheer" : "think"} />
-      </div>
-      <div style={{ fontSize: 28, fontWeight: 900, color: "#111827", marginBottom: 10 }}>
-        {correct ? "🎉 정답!" : "😅 아쉬워요"}
-      </div>
+    <div data-ux-root className="tq-root tq-page tq-result">
+      <ScopedStyle css={TQ_CSS} />
+      <BeeMascot size={120} mood={correct ? "cheer" : "think"} />
+      <h2 data-ux-role="title" className="tq-title">
+        {correct ? gt(UI.correct, langA) : gt(TQ.notYet, langA)}
+      </h2>
       {secret && (
-        <div style={{ fontSize: 18, color: "#374151", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
-          <span>정답은</span>
-          <ItemArt item={secret} />
-
+        <p data-ux-role="body-emphasis" className="tq-answer">
+          <span>{gt(TQ.answerWas, langA)}</span>
+          <ItemArt item={secret} size="lg" />
           <b><GameText map={secret.names} lang={langA} /></b>
-          <span>/ <GameText map={secret.names} lang={langB} /></span>
-        </div>
+          <span className="tq-answerb">/ <GameText map={secret.names} lang={langB} /></span>
+        </p>
       )}
-      <ProgressBar value={20 - remaining} max={20} score={correct ? 1 : 0} />
-      <button
-        onClick={resetAll}
-        style={{ ...primaryBtn, marginTop: 18 }}
-      >🔄 다시 하기</button>
+      <div className="tq-progress">
+        <div className="tq-progresstop">
+          <span data-ux-role="secondary">{gt(TQ.asked, langA)} {asked} / {TOTAL_QUESTIONS}</span>
+          <span data-ux-role="secondary">⭐ {correct ? 1 : 0}</span>
+        </div>
+        <div className="tq-track"><div className="tq-fill" style={barWidth(asked / TOTAL_QUESTIONS)} /></div>
+      </div>
+      <button type="button" data-ux-role="action" className="tq-primary" onClick={resetAll}>
+        🔄 {gp(UI.playAgain, langA)}
+      </button>
     </div>
   );
 }
@@ -323,68 +492,61 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
 // Sub-components
 // ============================================================
 
-function PlayHeader({ category, remaining }: { category: TwentyQCategory; remaining: number }) {
+function PlayHeader({
+  category, remaining, langA,
+}: { category: TwentyQCategory; remaining: number; langA: string }) {
   const m = CATEGORY_META[category];
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
-      padding: "10px 14px", background: m.bg, borderRadius: 14, border: `2px solid ${m.color}`,
-    }}>
-      <span style={{ fontSize: 22 }}>{m.emoji}</span>
-      <span style={{ fontWeight: 900, color: "#1F2937" }}>{m.labelKo}</span>
-      <span style={{ flex: 1 }} />
-      <span style={{
-        padding: "4px 12px", borderRadius: 999, background: "#fff",
-        border: `2px solid ${m.color}`, fontSize: 13, fontWeight: 900, color: m.color,
-      }}>남은 질문 {remaining} / 20</span>
+    <div className="tq-head" data-cat={category}>
+      <span className="tq-art-emoji" aria-hidden="true">{m.emoji}</span>
+      <span data-ux-role="body-emphasis" className="tq-headname">{gt(m.label, langA)}</span>
+      <span data-ux-role="label" className="tq-remain">
+        {gp(TQ.remain, langA)} {remaining} / {TOTAL_QUESTIONS}
+      </span>
     </div>
   );
 }
 
 function HintGrid({
-  usedFlags, onTap, langA,
+  usedFlags, onTap, langA, noneLeft,
 }: {
   usedFlags: Set<string>;
   onTap: (c: HintCard) => void;
   langA: string;
+  noneLeft: boolean;
 }) {
   const groups: HintGroup[] = ["region", "taste", "use", "form", "misc"];
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div className="tq-groups">
       {groups.map((g) => {
         const cards = HINT_CARDS.filter((c) => c.group === g);
         if (cards.length === 0) return null;
         const meta = GROUP_LABEL[g];
         return (
           <div key={g}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280", marginBottom: 6 }}>
-              {meta.emoji} {meta.ko}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <h4 data-ux-role="secondary" className="tq-grouphead">
+              {meta.emoji} {gt(meta.label, langA)}
+            </h4>
+            <div className="tq-cards">
               {cards.map((c) => {
                 const used = usedFlags.has(c.flag as string);
+                const blocked = used || noneLeft;
                 return (
                   <button
                     key={c.flag as string}
-                    disabled={used}
-                    onClick={() => onTap(c)}
+                    type="button"
+                    data-ux-role="control"
+                    className="tq-hint"
+                    data-used={used ? "" : undefined}
+                    aria-disabled={blocked || undefined}
+                    onClick={() => { if (blocked) return; onTap(c); }}
                     aria-label={tr(c.label, langA)}
-                    style={{
-                      padding: "12px 12px", borderRadius: 14, fontSize: 13, fontWeight: 800,
-                      background: used ? "#F3F4F6" : "#fff",
-                      color: used ? "#9CA3AF" : "#1F2937",
-                      border: used ? "2px solid #E5E7EB" : "2px solid #FDE68A",
-                      cursor: used ? "not-allowed" : "pointer",
-                      textAlign: "left", display: "flex", alignItems: "center", gap: 8,
-                      transition: "transform 0.12s",
-                      opacity: used ? 0.6 : 1,
-                    }}
-                    onMouseDown={(e) => !used && ((e.currentTarget as HTMLButtonElement).style.transform = "scale(0.96)")}
-                    onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
-                    onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
                   >
-                    <span style={{ fontSize: 18 }}>{c.emoji}</span>
-                    <span><GameText map={c.label} lang={langA} /></span>
+                    <span className="tq-hintemoji" aria-hidden="true">{c.emoji}</span>
+                    <span className="tq-hinttext"><GameText map={c.label} lang={langA} /></span>
+                    {used && (
+                      <span data-ux-role="secondary" className="tq-usedtag">✔ {gp(TQ.used, langA)}</span>
+                    )}
                   </button>
                 );
               })}
@@ -408,32 +570,29 @@ function SetupPanel({
   const m = CATEGORY_META[category];
   return (
     <>
-      <h2 style={titleStyle}>{m.emoji} 출제자: 비밀 답을 고르세요</h2>
-      <p style={subtitleStyle}>
-        친구가 보기 전에 빠르게 한 개 선택. 선택 즉시 게임 시작!
-      </p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
+      <h2 data-ux-role="title" className="tq-title">{m.emoji} {gt(TQ.setupTitle, langB)}</h2>
+      <p data-ux-role="body" className="tq-lede">{gt(TQ.setupHowto, langB)}</p>
+      <div className="tq-cards">
         {candidates.map((it) => (
           <button
             key={it.id}
+            type="button"
+            data-ux-role="control"
+            className="tq-pick tq-pick-cat"
+            data-cat={category}
             onClick={() => onPick(it)}
             aria-label={tr(it.names, langB)}
-            style={{
-              padding: "16px 10px", borderRadius: 16, fontSize: 14, fontWeight: 800,
-              background: m.bg, border: `2px solid ${m.color}`, color: "#1F2937",
-              cursor: "pointer", display: "flex", flexDirection: "column", gap: 6,
-              alignItems: "center", transition: "transform 0.12s",
-            }}
-            onMouseDown={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(0.97)")}
-            onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
           >
             <ItemArt item={it} />
             <span><GameText map={it.names} lang={langB} /></span>
           </button>
         ))}
       </div>
-      <button onClick={onBack} style={{ ...secondaryBtn, marginTop: 16 }}>↩ 카테고리 바꾸기</button>
+      <div className="tq-actions">
+        <button type="button" data-ux-role="control" className="tq-secondary" onClick={onBack}>
+          ↩ {gp(TQ.changeCategory, langB)}
+        </button>
+      </div>
     </>
   );
 }
@@ -450,71 +609,198 @@ function AskModal({
   const flagVal = secret.hints[card.flag];
   const recommended: boolean = flagVal === true;
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      style={{
-        position: "fixed", inset: 0, background: "rgba(17,24,39,0.6)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        zIndex: 600, padding: 16,
-      }}
-    >
-      <div style={{
-        maxWidth: 420, width: "100%", background: "#fff", borderRadius: 20,
-        padding: "22px 20px", boxShadow: "0 30px 60px rgba(0,0,0,0.25)",
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: "#6B7280", marginBottom: 8 }}>
-          출제자: 이 질문에 답해주세요
-        </div>
-        <div style={{ fontSize: 20, fontWeight: 900, color: "#111827", display: "flex", gap: 10, alignItems: "center" }}>
-          <span style={{ fontSize: 28 }}>{card.emoji}</span>
+    <div role="dialog" aria-modal="true" className="tq-scrim">
+      <div className="tq-modal" data-ux-surface="panel">
+        <p data-ux-role="secondary" className="tq-modallede">{gt(TQ.answerHere, langB)}</p>
+        <p data-ux-role="body-emphasis" className="tq-modalq">
+          <span className="tq-art-emoji" aria-hidden="true">{card.emoji}</span>
           <span><GameText map={card.label} lang={langB} /></span>
-        </div>
-        <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 6 }}>
-          추천 답: {recommended ? "예" : "아니오"}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 18 }}>
+        </p>
+        <p data-ux-role="secondary" className="tq-suggest">
+          {gt(TQ.suggest, langB)}: {recommended ? gp(TQ.yes, langB) : gp(TQ.no, langB)}
+        </p>
+        <div className="tq-yesno">
           <button
+            type="button"
+            data-ux-role="action"
+            className="tq-yes"
             onClick={() => onAnswer(true)}
-            aria-label="예"
-            style={{
-              padding: "16px 0", borderRadius: 14, fontSize: 20, fontWeight: 900,
-              background: "#10B981", color: "#fff", border: "none", cursor: "pointer",
-              boxShadow: "0 6px 14px rgba(16,185,129,0.3)",
-            }}
-          >✅ 예</button>
+            aria-label={gp(TQ.yes, langB)}
+          >⭕ {gp(TQ.yes, langB)}</button>
           <button
+            type="button"
+            data-ux-role="action"
+            className="tq-no"
             onClick={() => onAnswer(false)}
-            aria-label="아니오"
-            style={{
-              padding: "16px 0", borderRadius: 14, fontSize: 20, fontWeight: 900,
-              background: "#EF4444", color: "#fff", border: "none", cursor: "pointer",
-              boxShadow: "0 6px 14px rgba(239,68,68,0.3)",
-            }}
-          >❌ 아니오</button>
+            aria-label={gp(TQ.no, langB)}
+          >✖ {gp(TQ.no, langB)}</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ---- shared styles ----
-const wrapStyle: React.CSSProperties = {
-  padding: "20px 16px 40px", maxWidth: 640, margin: "0 auto",
-  fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
-};
-const titleStyle: React.CSSProperties = {
-  fontSize: 24, fontWeight: 900, color: "#111827", margin: "4px 0 6px",
-};
-const subtitleStyle: React.CSSProperties = {
-  fontSize: 13, color: "#6B7280", fontWeight: 600, margin: 0,
-};
-const primaryBtn: React.CSSProperties = {
-  padding: "12px 18px", borderRadius: 14, fontSize: 15, fontWeight: 900,
-  background: "linear-gradient(135deg, #F59E0B, #D97706)", color: "#fff", border: "none",
-  cursor: "pointer", boxShadow: "0 6px 14px rgba(245,158,11,0.3)",
-};
-const secondaryBtn: React.CSSProperties = {
-  padding: "12px 18px", borderRadius: 14, fontSize: 14, fontWeight: 800,
-  background: "#fff", color: "#6B7280", border: "2px solid #E5E7EB", cursor: "pointer",
-};
+/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것.
+   넓은 화면에서는 좌우 2단 + 보기 격자로 펼친다 (좁은 고정폭 금지). */
+const TQ_CSS = `
+.tq-root{
+  color: var(--ux-ink);
+  max-width: 1180px; margin: 0 auto;
+  padding: var(--ux-space-6) var(--ux-space-4) var(--ux-space-12);
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.tq-root button{ font-family: inherit; }
+.tq-title{ margin: 0 0 var(--ux-space-2); }
+.tq-lede{ margin: 0 0 var(--ux-space-4); color: var(--ux-ink-soft); }
+
+.tq-cards{
+  display: grid; gap: var(--ux-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: stretch;
+}
+
+.tq-catbtn{
+  display: flex; align-items: center; gap: var(--ux-space-3);
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 3px solid var(--ux-primary-border);
+  font-weight: 800; text-align: left;
+}
+.tq-catbtn[data-cat="country"]{ background: var(--ux-hint-apricot); }
+.tq-catbtn[data-cat="food"]{ background: var(--ux-hint-mint); }
+.tq-catbtn[data-cat="person"]{ background: var(--ux-hint-lavender); }
+
+.tq-pick{
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--ux-space-2);
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
+  font-weight: 800; text-align: center;
+}
+.tq-pick-cat[data-cat="country"]{ background: var(--ux-hint-apricot); }
+.tq-pick-cat[data-cat="food"]{ background: var(--ux-hint-mint); }
+.tq-pick-cat[data-cat="person"]{ background: var(--ux-hint-lavender); }
+
+.tq-art-img{ width: 3.25rem; height: 3.25rem; object-fit: contain; }
+.tq-art-img[data-size="lg"]{ width: 4.5rem; height: 4.5rem; }
+.tq-art-emoji{ font-size: calc(var(--ux-font-title) * 1.2); line-height: 1; }
+.tq-art-emoji[data-size="lg"]{ font-size: calc(var(--ux-font-title) * 1.8); }
+
+.tq-play{ min-height: 100svh; background: var(--ux-bg); }
+.tq-head{
+  display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap;
+  padding: var(--ux-space-3) var(--ux-space-4);
+  border-radius: var(--ux-radius-panel);
+  border: 2px solid var(--ux-primary-border);
+  background: var(--ux-surface);
+  margin-bottom: var(--ux-space-4);
+}
+.tq-head[data-cat="country"]{ background: var(--ux-hint-apricot); }
+.tq-head[data-cat="food"]{ background: var(--ux-hint-mint); }
+.tq-head[data-cat="person"]{ background: var(--ux-hint-lavender); }
+.tq-headname{ font-weight: 900; flex: 1; min-width: 0; }
+.tq-remain{
+  font-weight: 900; white-space: nowrap;
+  padding: var(--ux-space-1) var(--ux-space-3);
+  border-radius: var(--ux-radius-pill);
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+}
+
+.tq-cols{ display: grid; gap: var(--ux-space-4); }
+.tq-logcol{ order: 2; padding: var(--ux-space-4); border: 2px solid var(--ux-primary-border); }
+.tq-askcol{ order: 1; display: grid; gap: var(--ux-space-3); align-content: start; }
+@media (min-width: 1024px){
+  .tq-cols{ grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); align-items: start; }
+  .tq-logcol, .tq-askcol{ order: 0; }
+  .tq-logcol{ position: sticky; top: var(--ux-space-4); }
+}
+
+.tq-colhead{ margin: 0 0 var(--ux-space-2); font-weight: 900; }
+.tq-empty{ margin: 0; }
+.tq-loglist{ list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ux-space-2); }
+.tq-logrow{
+  display: flex; align-items: center; gap: var(--ux-space-2);
+  padding: var(--ux-space-2) 0;
+  border-bottom: 1px solid var(--ux-surface-sunk);
+}
+.tq-logrow:last-child{ border-bottom: none; }
+.tq-logemoji{ font-size: calc(var(--ux-font-body) * 1.2); line-height: 1; }
+.tq-logtext{ flex: 1; min-width: 0; }
+.tq-yn{
+  font-weight: 900; white-space: nowrap;
+  padding: var(--ux-space-1) var(--ux-space-3);
+  border-radius: var(--ux-radius-pill);
+  background: var(--ux-surface-sunk); color: var(--ux-ink-soft);
+}
+.tq-yn[data-yes]{
+  background: color-mix(in srgb, var(--ux-success) 16%, var(--ux-surface));
+  color: var(--ux-success);
+}
+
+.tq-groups{ display: grid; gap: var(--ux-space-4); }
+.tq-grouphead{ margin: 0 0 var(--ux-space-2); font-weight: 900; }
+.tq-hint{
+  display: flex; align-items: center; gap: var(--ux-space-2); flex-wrap: wrap;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
+  font-weight: 800; text-align: left;
+  transition: background var(--ux-motion-state) var(--ux-motion-ease);
+}
+.tq-hint[data-used]{
+  background: var(--ux-surface-sunk); color: var(--ux-ink-soft);
+  border-color: var(--ux-surface-sunk);
+}
+.tq-hint[aria-disabled="true"]{ cursor: default; }
+.tq-hintemoji{ font-size: calc(var(--ux-font-label) * 1.3); line-height: 1; }
+.tq-hinttext{ flex: 1; min-width: 0; }
+.tq-usedtag{ white-space: nowrap; }
+
+.tq-notice{
+  margin: 0; padding: var(--ux-space-3) var(--ux-space-4);
+  background: var(--ux-surface-sunk); border-radius: var(--ux-radius-surface);
+}
+.tq-actions{ display: flex; gap: var(--ux-space-3); flex-wrap: wrap; margin-top: var(--ux-space-4); }
+.tq-primary{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-weight: 900;
+}
+.tq-secondary{
+  background: var(--ux-surface); color: var(--ux-ink-soft);
+  border: 2px solid var(--ux-primary-border); font-weight: 800;
+}
+
+.tq-scrim{
+  position: fixed; inset: 0; z-index: 600;
+  background: color-mix(in srgb, var(--ux-ink) 60%, transparent);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--ux-space-4);
+}
+.tq-modal{
+  width: 100%; max-width: 34rem;
+  background: var(--ux-surface);
+  padding: var(--ux-space-6);
+  display: grid; gap: var(--ux-space-3);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+}
+.tq-modallede, .tq-suggest{ margin: 0; }
+.tq-modalq{
+  margin: 0; display: flex; align-items: center; gap: var(--ux-space-3);
+  font-weight: 900;
+}
+.tq-yesno{
+  display: grid; gap: var(--ux-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+.tq-yes{ background: var(--ux-success); color: var(--ux-surface); border: 2px solid var(--ux-success); font-weight: 900; }
+.tq-no{ background: var(--ux-surface); color: var(--ux-ink); border: 3px solid var(--ux-primary-border); font-weight: 900; }
+
+.tq-result{ display: grid; justify-items: center; gap: var(--ux-space-3); text-align: center; }
+.tq-answer{
+  margin: 0; display: flex; align-items: center; justify-content: center;
+  gap: var(--ux-space-2); flex-wrap: wrap; font-weight: 800;
+}
+.tq-answerb{ color: var(--ux-ink-soft); }
+.tq-progress{ width: 100%; max-width: 32rem; }
+.tq-progresstop{ display: flex; justify-content: space-between; margin-bottom: var(--ux-space-1); }
+.tq-track{ height: 10px; background: var(--ux-surface-sunk); border-radius: var(--ux-radius-pill); overflow: hidden; }
+.tq-fill{ height: 100%; background: var(--ux-primary-fill); transition: width var(--ux-motion-state) var(--ux-motion-ease); }
+`;
