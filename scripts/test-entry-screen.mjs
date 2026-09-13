@@ -73,7 +73,8 @@ check('명단/자유 입력 분기가 방 설정을 따른다 (ENTRY-03)', () =>
 check('교사 입장 계약을 유지한다', () => {
   assert.match(setup, /roomConfig\.teacherPin \|\| roomCode/, '교사 PIN 판정이 바뀌었다');
   assert.match(setup, /isTeacher: true, teacherLangs: availableLangs/);
-  assert.match(setup, /isTeacher: false, teacherLangs: \[\]/);
+  // U05 로 학생 payload 가 여러 줄이 됐다. 같은 계약을 줄바꿈에 강하지 않게 본다.
+  assert.match(setup, /isTeacher: false,[\s\S]{0,40}teacherLangs: \[\]/);
 });
 
 check('조합 중 Enter 를 전송으로 쓰지 않는다 (IME-01)', () => {
@@ -90,6 +91,52 @@ check('배경 꿀벌은 한 마리, 계속 날지 않는다', () => {
   assert.ok(!/beeFlyR|beeFlyL/.test(c), '가로지르는 비행 애니메이션이 남아 있다');
   assert.equal((c.match(/<img/g) || []).length, 1, '배경 꿀벌은 한 마리');
   assert.ok(!/animation:/.test(c), '기본 화면 배경은 정적');
+});
+
+/* ── U05 내 동물 ─────────────────────────────────────────────────────
+   데이터 계약(폴백 결정성·동명이인·공용 기기·allowlist)은
+   scripts/test-animals.mjs 가 실제로 실행해 검사한다(11건).
+   여기서는 화면과 저장 경로에 **실제로 연결됐는지** 만 본다. */
+const cardSrc = read('components/PadletCard.tsx');
+const boardSrc = read('components/PadletBoard.tsx');
+const routeSrc = read('app/api/translate/route.ts');
+const sc = code(setup);
+
+check('U05: 입장에 동물 단계가 있고 언어 카드 컴포넌트를 재사용한다', () => {
+  assert.match(sc, /"animal"/, '동물 단계가 없다');
+  assert.match(sc, /animalStepTitle/, '동물 단계 제목이 없다');
+  // 새 디자인 체계를 만들지 않는다 — 언어 선택과 같은 .setup-choice 를 쓴다.
+  assert.match(sc, /"setup-choice on" : "setup-choice"/,
+    '동물 카드가 언어 카드 컴포넌트를 재사용하지 않는다');
+  assert.match(sc, /setup-choices animals/, '동물 격자 클래스가 없다');
+  assert.match(sc, /totalSteps = 3/, '단계 수가 3으로 바뀌지 않았다');
+});
+
+check('U05: 저장 권위는 learnerId 이고 이름으로 프로필을 합치지 않는다', () => {
+  assert.match(sc, /hit\.length === 1/,
+    '동명이인일 때 learnerId 를 비우지 않는다 — 자동 병합 위험');
+  assert.match(sc, /animalSessionOnly/, '저장할 프로필이 없을 때 알리지 않는다');
+  // clientId 에 동물을 붙이면 공용 기기에서 A→B→A 선택이 섞인다.
+  assert.ok(!/avatarAnimalId[\s\S]{0,60}myClientId/.test(sc),
+    'clientId 에 동물을 붙이고 있다 — 공용 기기에서 섞인다');
+});
+
+check('U05: 이미 고른 학생에게 선택 단계를 반복시키지 않는다', () => {
+  assert.match(sc, /if \(savedAnimal\) \{ finishStudent\(savedAnimal\); return; \}/,
+    '저장된 선택이 있어도 동물 단계를 다시 거친다');
+  assert.match(sc, /animalChange/, '프로필에서 바꿀 경로가 없다');
+  assert.match(sc, /setAnimalId\(null\); setStep\("name"\)/, '취소가 원복되지 않는다');
+});
+
+check('U05: 타입뿐 아니라 payload·저장·표시까지 연결됐다', () => {
+  // 설계서: "타입에 필드만 추가하고 화면에서만 바꾸면 미완료다"
+  assert.match(sc, /animalId: chosen/, 'onDone payload 에 동물이 실리지 않는다');
+  assert.match(sc, /learnerId: myLearnerId/, 'onDone payload 에 learnerId 가 없다');
+  assert.match(boardSrc, /authorLearnerId: user\.learnerId/, '글 저장 요청에 작성자 learnerId 가 없다');
+  assert.match(boardSrc, /authorAnimalId: user\.animalId/, '글 저장 요청에 동물 스냅샷이 없다');
+  assert.match(routeSrc, /isAnimalId\(authorAnimalId\)/, '서버가 allowlist 검증 없이 저장한다');
+  assert.match(cardSrc, /resolveAnimal\(\{/, '카드가 작성자 동물을 해석하지 않는다');
+  assert.match(cardSrc, /<AnimalArt id=\{authorAnimal\}/, '카드 아바타에 동물이 그려지지 않는다');
 });
 
 console.log(`\n${count} checks passed — DOM/시각 검사는 Q 하네스에서 별도 수행`);

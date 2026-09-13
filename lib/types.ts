@@ -47,6 +47,17 @@ export interface CardData {
   youtubeId?: string;
   status?: CardStatus;
   authorClientId?: string;
+  /**
+   * U05 — 작성자의 학습자 프로필 id. 옛 글에는 없다.
+   * 동물 표시는 이 값 → 프로필 조회 순서로 정한다. clientId 는 브라우저 단위라
+   * 공용 기기에서 사람을 가르지 못하므로 신원 근거로 쓰지 않는다.
+   */
+  authorLearnerId?: string;
+  /**
+   * U05 — 글을 쓸 당시의 동물 스냅샷. 프로필을 못 찾을 때의 폴백이다.
+   * 프로필 값이 있으면 프로필이 이긴다(현재 선택이 과거 글에도 반영된다).
+   */
+  authorAnimalId?: string;
   editedAt?: number;
   transcript?: TranscriptData;
 }
@@ -74,6 +85,18 @@ export interface UserConfig {
   myName: string;
   isTeacher: boolean;
   teacherLangs: string[];
+  /**
+   * U05 — 이 세션의 학습자 프로필 id. 명렬표에서 고른 이름이 활성 프로필
+   * **정확히 하나**와 맞을 때만 채워진다. 동명이인이면 이름만으로 누구인지
+   * 가를 수 없으므로 비운다(lib/learnerId.ts 의 ambiguous 와 같은 원칙).
+   */
+  learnerId?: string;
+  /**
+   * U05 — 고른 내 동물(lib/animals.ts 의 AnimalId).
+   * 권위 저장소는 `LearnerProfile.avatarAnimalId` 이고 이 값은 화면 표시용
+   * 사본이다. learnerId 가 없으면 저장되지 않는 세션 한정 선택이다.
+   */
+  animalId?: string;
 }
 
 export interface PostData {
@@ -84,6 +107,9 @@ export interface PostData {
   youtubeId?: string;
   status?: CardStatus;
   authorClientId?: string;
+  /** U05 — 작성자 프로필 id 와 당시 동물 스냅샷. 없으면 옛 방식으로 그린다. */
+  authorLearnerId?: string;
+  authorAnimalId?: string;
 }
 
 export interface CommentData {
@@ -113,6 +139,9 @@ export interface TranslateRequest {
   youtubeId?: string;
   status?: CardStatus;
   authorClientId?: string;
+  /** U05 — 서버가 카드에 함께 저장한다. allowlist 검증 후에만 기록한다. */
+  authorLearnerId?: string;
+  authorAnimalId?: string;
 }
 
 export interface TranslateResponse {

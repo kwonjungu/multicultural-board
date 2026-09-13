@@ -40,6 +40,17 @@ import {
 } from "@/lib/quests";
 import { dayKeyAt, msUntilNextDay } from "@/lib/classroomDay";
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 컨테이너는 Firebase 를
+ * 구독하지도, 보상을 지급하지도 않는다 — quests/state 를 그대로 화면에 낸다.
+ * (표시만 원하면 QuestBoardView 를 직접 써도 되지만, BeeVillage 처럼 이
+ * 컨테이너를 그대로 렌더해야 하는 자리를 위해 컨테이너에도 주입구를 둔다.)
+ */
+export interface QuestBoardFixture {
+  quests: QuestDef[];
+  state: DailyQuestState;
+}
+
 interface Props {
   roomCode: string;
   myClientId: string;
@@ -48,6 +59,7 @@ interface Props {
   onGoTo?: (event: QuestEventType) => void;
   /** 교실 시간대 강제 지정 (fixture·테스트용). 없으면 방 설정을 구독한다. */
   timeZone?: string;
+  fixture?: QuestBoardFixture;
 }
 
 /** 자정을 넘겨 남은 '어제' 몫. 어제 상태 스냅샷을 그대로 들고 있는다. */
@@ -374,12 +386,14 @@ export function QuestBoardView({
 }
 
 // ── 컨테이너 ─────────────────────────────────────────────────────────────
-export default function QuestBoard({ roomCode, myClientId, onToast, onGoTo, timeZone }: Props) {
+export default function QuestBoard({ roomCode, myClientId, onToast, onGoTo, timeZone, fixture }: Props) {
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
   const [tz, setTz] = useState<string>(() => timeZone || classroomTimeZone(roomCode));
   const [dayKey, setDayKey] = useState<string>(() =>
     dayKeyAt(Date.now(), timeZone || classroomTimeZone(roomCode)),
   );
-  const [state, setState] = useState<DailyQuestState>({});
+  const [state, setState] = useState<DailyQuestState>(fixture?.state ?? {});
   const [busy, setBusy] = useState<Record<string, true>>({});
   const [dayChanged, setDayChanged] = useState(false);
   const [carryOver, setCarryOver] = useState<CarryOver | null>(null);
@@ -394,16 +408,20 @@ export default function QuestBoard({ roomCode, myClientId, onToast, onGoTo, time
 
   // 방 설정의 교실 시간대 구독 (prop 이 있으면 그쪽이 우선).
   useEffect(() => {
+    if (offline) return;
     if (timeZone || !roomCode) return;
     const unsub = subscribeClassroomTimeZone(roomCode, setTz);
     return () => unsub();
-  }, [roomCode, timeZone]);
+  }, [roomCode, timeZone, offline]);
 
   useEffect(() => {
     if (timeZone) setTz(timeZone);
   }, [timeZone]);
 
-  const quests = useMemo(() => dailyQuestsFor(dayKey, myClientId), [dayKey, myClientId]);
+  const quests = useMemo(
+    () => fixture?.quests ?? dailyQuestsFor(dayKey, myClientId),
+    [dayKey, myClientId, fixture],
+  );
 
   // ── 날짜 경계 감시 ──
   // 자정 타이머 + 탭 복귀(visibility/focus) 둘 다 본다. 절전으로 타이머가
@@ -429,6 +447,7 @@ export default function QuestBoard({ roomCode, myClientId, onToast, onGoTo, time
   }, [tz, myClientId]);
 
   useEffect(() => {
+    if (offline) return; // fixture: 화면은 정지 상태 그대로 — 자정 경계로 목록을 바꾸지 않는다.
     let timer: ReturnType<typeof setTimeout> | null = null;
     const arm = () => {
       if (timer) clearTimeout(timer);
@@ -451,18 +470,20 @@ export default function QuestBoard({ roomCode, myClientId, onToast, onGoTo, time
       if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onWake);
       if (typeof window !== "undefined") window.removeEventListener("focus", onWake);
     };
-  }, [tz, evaluateDay]);
+  }, [tz, evaluateDay, offline]);
 
   // ── 구독 — 목록과 **같은 dayKey** 로 ──
   useEffect(() => {
+    if (offline) return;
     if (!roomCode || !myClientId) return;
     const unsub = subscribeTodayQuests(roomCode, myClientId, setState, dayKey);
     return () => unsub();
-  }, [roomCode, myClientId, dayKey]);
+  }, [roomCode, myClientId, dayKey, offline]);
 
   // ── 끊긴 지급 자동 재처리 ──
   // 서버 worker 가 없으므로 화면이 열릴 때/상태가 바뀔 때 학생 client 가 민다.
   useEffect(() => {
+    if (offline) return; // fixture: recoverDayRewards 는 실제 지급 쓰기라 절대 호출 금지
     if (!roomCode || !myClientId) return;
     const stuck = pendingRewards(quests, state);
     if (stuck.length === 0) return;
@@ -484,7 +505,7 @@ export default function QuestBoard({ roomCode, myClientId, onToast, onGoTo, time
     return () => {
       alive = false;
     };
-  }, [roomCode, myClientId, dayKey, quests, state, onToast]);
+  }, [roomCode, myClientId, dayKey, quests, state, onToast, offline]);
 
   const mark = (key: string, on: boolean) =>
     setBusy((p) => {
@@ -506,6 +527,7 @@ export default function QuestBoard({ roomCode, myClientId, onToast, onGoTo, time
   const handleClaim = (q: QuestDef, key = q.id, forDay = dayKey, src = state) => {
     if (busy[key]) return;
     mark(key, true);
+    if (offline) { mark(key, false); return; } // fixture: 보상 지급 호출 금지
     claimQuestReward(roomCode, myClientId, q, src, forDay)
       .then((res) => report(key, q.label, res))
       .catch((err) => {
@@ -518,6 +540,7 @@ export default function QuestBoard({ roomCode, myClientId, onToast, onGoTo, time
   const handleBonus = (key = "bonus", forDay = dayKey, src = state, qs = quests) => {
     if (busy[key]) return;
     mark(key, true);
+    if (offline) { mark(key, false); return; } // fixture: 보상 지급 호출 금지
     claimBonusReward(roomCode, myClientId, qs, src, forDay)
       .then((res) => {
         mark(key, false);

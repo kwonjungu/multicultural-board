@@ -66,6 +66,30 @@ function latLonToVec3(lat: number, lon: number, r: number): THREE.Vector3 {
 // 3D 캔버스 — 모드와 무관한 공용 지구본 씬
 // ============================================================
 
+// U11 — 구체가 stage 짧은 변 대비 차지할 목표 비율. 78~86% 범위의 중간값.
+// (07_지구본_크기와반응형_수정.md §렌더와 카메라 계약)
+const GLOBE_TARGET_FRACTION = 0.82;
+// 마커(핀 스프라이트) 외곽이 화면 밖으로 잘리지 않도록 두는 상한 — 이 값을
+// 넘기면서까지 GLOBE_TARGET_FRACTION 을 강제하지 않는다(마커를 잘라 비율만
+// 맞추는 것은 불합격 — 07 인수조건).
+const MARKER_SAFE_FRACTION = 0.985;
+// 핀 스프라이트가 실제로 도달하는 구 중심 기준 최대 반지름 근사치
+// (핀 위치 GLOBE_R*1.13 + 스프라이트 절반 대각선 폭 여유).
+const MARKER_OUTER_R = GLOBE_R * 1.13 + 9;
+
+/**
+ * 목표 비율 f 로 구를 담기 위한 카메라 거리. w/h 중 더 짧은 변 쪽의 half-FOV
+ * (가로 FOV 는 aspect 로부터 유도)를 기준으로 삼는다 — "가로/세로 FOV 중
+ * 제한되는 쪽으로 fit distance 를 계산" (07 계약). 구 실루엣의 각반지름은
+ * asin(R/d) — 평면 근사(atan)가 아니라 실제 구 투영 공식으로 역산한다:
+ *   목표 화면비 f = tan(asin(R/d)) / tanHalf  →  d = R·√(1+C²)/C, C = f·tanHalf
+ */
+function fitDistanceForFraction(R: number, f: number, w: number, h: number, tanHalfVFov: number): number {
+  const tanHalf = w >= h ? tanHalfVFov : tanHalfVFov * (w / h);
+  const C = f * tanHalf;
+  return R * Math.sqrt(1 + C * C) / C;
+}
+
 function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -75,24 +99,56 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
 
   useEffect(() => {
     const mount = mountRef.current;
-    if (!mount) return;
+    // U11: 실측 결과 mount 자신의 `height:100%` 는 부모(.gq-stage)의 높이가
+    // flex 로만 결정되는 상황에서 신뢰할 수 없었다(집계: 445px 인 stage 안에서
+    // mount.clientHeight 가 canvas 의 브라우저 기본 크기인 150px 로 굳어버림 —
+    // canvas 를 붙인 뒤 첫 resize() 가 그 150px 을 그대로 읽어 고착시켰다).
+    // 그래서 mount 는 CSS 로 position:absolute+inset:0 를 쓰고(styleGQ_CSS 의
+    // .gq-stage{position:relative}), 크기는 항상 부모 .gq-stage 를 직접
+    // ResizeObserver 로 재서 구한다 — mount 자신의 computed height 를 믿지 않는다.
+    const stageEl = mount?.parentElement ?? null;
+    if (!mount || !stageEl) return;
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 1, 2000);
-    camera.position.set(0, 60, 320);
+    const vFovHalf = (camera.fov * Math.PI) / 180 / 2;
+    const tanHalfVFov = Math.tan(vFovHalf);
+    // 카메라 시선각(원점에서 살짝 위) — 기존 (0,60,320) 과 동일한 방향을
+    // 거리만 새로 계산해 유지한다.
+    const viewDir = new THREE.Vector3(0, 60, 320).normalize();
+    let fitDistance = 320; // 최초 유효 측정 전 임시값 — 아래에서 즉시 갱신됨
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     mount.appendChild(renderer.domElement);
 
-    function resize() {
-      const w = mount!.clientWidth, h = mount!.clientHeight;
+    let hasValidSize = false;
+    let userAdjusted = false; // 사용자가 직접 회전/줌 했으면 resize 로 원위치시키지 않는다
+
+    function computeFitDistance(w: number, h: number): number {
+      const dGlobe = fitDistanceForFraction(GLOBE_R, GLOBE_TARGET_FRACTION, w, h, tanHalfVFov);
+      const dMarker = fitDistanceForFraction(MARKER_OUTER_R, MARKER_SAFE_FRACTION, w, h, tanHalfVFov);
+      // 더 멀리(=더 작게) 떨어뜨리는 쪽이 "제한되는 쪽" — 마커가 잘리는 쪽은
+      // 절대 택하지 않는다. 목표 78~86% 를 못 채우게 되면 그 사실은 실측으로 보고한다.
+      return Math.max(dGlobe, dMarker);
+    }
+
+    function applySize(w: number, h: number) {
+      if (!(w > 0) || !(h > 0)) { hasValidSize = false; return; } // 0 크기 가드
+      hasValidSize = true;
       camera.aspect = w / h;
+      fitDistance = computeFitDistance(w, h);
+      controls.minDistance = fitDistance * 0.55;
+      controls.maxDistance = fitDistance * 2.4;
+      if (!userAdjusted) {
+        camera.position.copy(viewDir).multiplyScalar(fitDistance);
+      }
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     }
-    resize();
-    window.addEventListener("resize", resize);
+
+    // 최초 위치 — controls 생성 전에 합리적인 기본값을 잡아둔다.
+    camera.position.copy(viewDir).multiplyScalar(fitDistance);
 
     // 별 배경
     const starGeo = new THREE.BufferGeometry();
@@ -153,17 +209,17 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
       disposables.push(tex, mat);
     });
 
-    // 컨트롤
+    // 컨트롤 — minDistance/maxDistance 는 기기별 고정값이 아니라 applySize 가
+    // 매번 계산한 fitDistance 를 기준으로 갱신한다(초기값은 아래 첫 applySize 호출로 설정됨).
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
     controls.enablePan = false;
-    controls.minDistance = 150;
-    controls.maxDistance = 480;
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.6;
     let resumeTimer: ReturnType<typeof setTimeout> | null = null;
     const onStart = () => {
+      userAdjusted = true; // 사용자가 직접 조작한 뒤로는 resize 때 원위치로 덮어쓰지 않는다
       controls.autoRotate = false;
       if (resumeTimer) clearTimeout(resumeTimer);
     };
@@ -173,6 +229,18 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
     };
     controls.addEventListener("start", onStart);
     controls.addEventListener("end", onEnd);
+
+    // 최초 실제 치수로 한 번 맞추고, 이후 stage 실제 크기 변화에 ResizeObserver 로 대응한다.
+    // window resize 뿐 아니라 정보 패널 열기·부모 grid 재배치·큰 글씨·화면 분할도
+    // .gq-stage 자체의 content-box 변화로 잡힌다.
+    const initialRect = stageEl.getBoundingClientRect();
+    applySize(initialRect.width, initialRect.height);
+    const ro = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      if (!box) return;
+      applySize(box.width, box.height);
+    });
+    ro.observe(stageEl);
 
     // 탭 → 레이캐스트 (드래그와 구분: 8px 이내 이동만 클릭)
     const ray = new THREE.Raycaster();
@@ -202,14 +270,14 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
       raf = requestAnimationFrame(animate);
       controls.update();
       stars.rotation.y += 0.0003;
-      renderer.render(scene, camera);
+      if (hasValidSize) renderer.render(scene, camera); // 0 크기일 때 렌더 생략
     };
     animate();
 
     return () => {
       cancelAnimationFrame(raf);
       if (resumeTimer) clearTimeout(resumeTimer);
-      window.removeEventListener("resize", resize);
+      ro.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
       controls.removeEventListener("start", onStart);
@@ -228,8 +296,10 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
     };
   }, []);
 
+  // U11: 부모(.gq-stage)의 height:100% 상속을 믿지 않고 absolute+inset:0 로
+  // 채운다 — .gq-stage 는 GQ_CSS 에서 position:relative 로 앵커를 제공한다.
   return (
-    <div ref={mountRef} style={{ width: "100%", height: "100%", position: "relative" }}>
+    <div ref={mountRef} style={{ position: "absolute", inset: 0 }}>
       {!ready && (
         <p data-ux-role="body" className="gq-loading">🌍 지구 불러오는 중…</p>
       )}
@@ -243,8 +313,12 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
 
 type Mode = "menu" | "explore" | "quiz";
 
-export default function GlobeQuest({ langA, langB }: { langA: string; langB: string }) {
-  const [mode, setMode] = useState<Mode>("menu");
+export default function GlobeQuest({ langA, langB, initialMode }: {
+  langA: string; langB: string;
+  /** fixture 전용 — 메뉴를 거치지 않고 특정 모드로 바로 연다. 실제 게임룸은 넘기지 않는다. */
+  initialMode?: Mode;
+}) {
+  const [mode, setMode] = useState<Mode>(initialMode ?? "menu");
 
   // 모드를 벗어나거나 화면을 닫으면 읽던 인사말을 반드시 멈춘다.
   useEffect(() => {
@@ -560,9 +634,14 @@ const GQ_CSS = `
 }
 
 /* ── 지구본 셸 ── */
+/* U11: height:100% 이 있어야 .gq-shell 이 부모(GameRoom 의 flex:1/minHeight:0/
+   overflow:auto 스테이지)의 실제 남는 높이를 그대로 물려받는다. 이게 없으면
+   .gq-shell 은 auto(내용 기준) 높이가 되어 .gq-stage 의 flex:1 이 분배할 여유
+   공간이 전혀 생기지 않고, .gq-stage 는 min-height 값 그대로만 받는다 —
+   지구본이 화면의 주인공이 아니라 남는 틈에 들어가는 문제의 실측 원인 중 하나. */
 .gq-shell{
   position: relative; display: flex; flex-direction: column;
-  width: 100%; box-sizing: border-box;
+  width: 100%; height: 100%; min-height: 0; box-sizing: border-box;
   background: radial-gradient(circle at 50% 40%, #1e1b4b 0%, #0d0b26 70%);
   color: #fff;
 }
@@ -576,8 +655,12 @@ const GQ_CSS = `
   border: 2px solid rgba(255,255,255,.4); font-family: inherit; font-weight: 800;
   white-space: nowrap; flex-shrink: 0;
 }
-/* 지구본은 넓은 화면에서 더 크게 본다 — 판을 키우는 쪽이 아이에게 유리하다. */
-.gq-stage{ flex: 1; min-height: clamp(320px, 58svh, 680px); }
+/* 지구본은 넓은 화면에서 더 크게 본다 — 판을 키우는 쪽이 아이에게 유리하다.
+   min-height 는 이제 "목표 크기"가 아니라 저높이/큰 글씨에서도 stage 가 0 으로
+   짜부라지지 않게 하는 바닥값이다 — 정상 상황의 실제 크기는 위 .gq-shell 의
+   height:100% 를 통해 flex:1 이 분배하는 남는 공간이 결정한다.
+   position:relative 는 GlobeCanvas 의 absolute+inset:0 mount 앵커. */
+.gq-stage{ position: relative; flex: 1; min-height: clamp(320px, 58svh, 680px); }
 .gq-loading{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #C7D2FE; font-weight: 800; }
 
 .gq-quizbar{

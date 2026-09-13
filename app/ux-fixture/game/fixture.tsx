@@ -66,8 +66,11 @@ export default function GameFixture() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--ux-bg)" }}>
+      {/* data-fixture-chrome: 검수 도구가 제품 UI 로 세면 안 되는 fixture 껍데기.
+          이 칩들은 게임을 고르기 위한 개발용 스위치이지 아이가 보는 화면이 아니다. */}
       <nav
         data-testid="fixture-nav"
+        data-fixture-chrome
         style={{ display: "flex", gap: 8, padding: 8, flexWrap: "wrap", background: "var(--ux-surface-sunk)" }}
       >
         {(Object.keys(GAMES) as Key[]).map((k) => (

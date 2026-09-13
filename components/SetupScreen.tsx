@@ -5,10 +5,14 @@ import { LANGUAGES } from "@/lib/constants";
 import { UserConfig, RoomConfig } from "@/lib/types";
 import { t, tFmt } from "@/lib/i18n";
 import { landmarkFor } from "@/lib/assets";
+import {
+  ANIMALS, animalAssetPath, animalLabel, fallbackAnimal, isAnimalId, type AnimalId,
+} from "@/lib/animals";
 import FlyingBees from "./ui/FlyingBees";
 import BeeBanner from "./BeeBanner";
 import SpeakButton from "./ui/SpeakButton";
 import ScopedStyle from "./ui/child/ScopedStyle";
+import AnimalArt from "./ui/child/AnimalArt";
 
 interface Props {
   onDone: (config: UserConfig) => void;
@@ -24,7 +28,7 @@ interface Props {
  *
  * onDone payload · roomCode · rosterMode · teacherPin 처리는 종전 계약 그대로다.
  */
-type Step = "lang" | "name" | "teacher";
+type Step = "lang" | "name" | "animal" | "teacher";
 
 export default function SetupScreen({ onDone, roomCode, availableLangs, roomConfig }: Props) {
   const [step, setStep] = useState<Step>("lang");
@@ -34,6 +38,8 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
   const [teacherCode, setTeacherCode] = useState("");
   const [codeError, setCodeError] = useState(false);
   const [myName, setMyName] = useState("");
+  /** U05 — 이번 입장에서 고른 동물. null 이면 아직 안 골랐다(저장된 값/폴백을 쓴다). */
+  const [animalId, setAnimalId] = useState<AnimalId | null>(null);
   /** 아무것도 안 고르고 입장을 누른 아이에게 다음 할 일을 알려준다. 비난하지 않는다. */
   const [needName, setNeedName] = useState(false);
   /** CTA 연타로 onDone 이 두 번 나가지 않게 한다 (ENTRY-02). */
@@ -49,11 +55,48 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
   /** 명렬표 방인데 명단이 비어 있으면 아이가 스스로 할 수 있는 일이 없다. */
   const rosterEmpty = !showRoster && Boolean(roomConfig.rosterMode);
 
-  function finishStudent() {
+  /**
+   * U05 — 고른 이름이 활성 프로필 **정확히 하나**와 맞을 때만 learnerId 를 정한다.
+   * 동명이인이면 이름만으로 누구인지 가를 수 없으므로 비운다. 자동으로 한 명에게
+   * 줘 버리는 것이 가장 되돌리기 어려운 사고다(lib/learnerId.ts 의 ambiguous 와 같은 원칙).
+   */
+  const learners = roomConfig.learners ?? {};
+  function learnerIdForName(name: string): string | undefined {
+    const hit = Object.values(learners).filter(
+      (p) => p && p.rosterStatus === "active" && p.displayName === name,
+    );
+    return hit.length === 1 ? hit[0].learnerId : undefined;
+  }
+
+  const myLearnerId = myName.trim() ? learnerIdForName(myName.trim()) : undefined;
+  /** 이미 저장된 선택. 있으면 재입장 때 동물 단계를 강제로 반복하지 않는다. */
+  const savedAnimal = myLearnerId
+    ? (isAnimalId(learners[myLearnerId]?.avatarAnimalId) ? (learners[myLearnerId]!.avatarAnimalId as AnimalId) : null)
+    : null;
+  /** 아직 안 골랐을 때 화면에 보일 결정적 폴백 — 렌더마다 바뀌지 않는다. */
+  const previewAnimal: AnimalId =
+    animalId ?? savedAnimal ?? fallbackAnimal(roomCode, myLearnerId || myName.trim() || roomCode);
+
+  function finishStudent(pickedAnimal?: AnimalId | null) {
     if (submitted.current) return;
     if (!myName.trim()) { setNeedName(true); return; }
     submitted.current = true;
-    onDone({ myLang, myName: myName.trim(), isTeacher: false, teacherLangs: [] });
+    const chosen = pickedAnimal ?? animalId ?? savedAnimal ?? undefined;
+    onDone({
+      myLang,
+      myName: myName.trim(),
+      isTeacher: false,
+      teacherLangs: [],
+      ...(myLearnerId ? { learnerId: myLearnerId } : {}),
+      ...(chosen ? { animalId: chosen } : {}),
+    });
+  }
+
+  /** 이름 단계의 다음 행동. 이미 고른 동물이 있으면 바로 들어간다. */
+  function afterName() {
+    if (!myName.trim()) { setNeedName(true); return; }
+    if (savedAnimal) { finishStudent(savedAnimal); return; }
+    setStep("animal");
   }
 
   function finishTeacher() {
@@ -72,8 +115,9 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
     run();
   };
 
-  const totalSteps = 2;
-  const stepNum = step === "lang" ? 1 : 2;
+  /** 학생 흐름은 편한 말 → 이름 → 내 동물 3단계. 교사 경로는 이 표시를 쓰지 않는다. */
+  const totalSteps = 3;
+  const stepNum = step === "lang" ? 1 : step === "name" ? 2 : 3;
   const greeting = LANGUAGES[myLang]?.greet || "안녕!";
 
   return (
@@ -96,7 +140,11 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 type="button"
                 data-ux-role="control"
                 className="setup-back"
-                onClick={() => { setStep("lang"); setNeedName(false); setCodeError(false); }}
+                onClick={() => {
+                  // 한 단계씩 돌아간다. 동물에서 뒤로 가면 고르던 값은 버린다.
+                  if (step === "animal") { setAnimalId(null); setStep("name"); return; }
+                  setStep("lang"); setNeedName(false); setCodeError(false);
+                }}
               >
                 <span aria-hidden>←</span>
                 <span className="setup-back-label">{t("backBtn", myLang).replace("← ", "")}</span>
@@ -105,7 +153,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
             <div className="setup-progress">
               <span data-ux-role="secondary">{tFmt("stepOfN", myLang, { n: stepNum, total: totalSteps })}</span>
               <div className="setup-bars" aria-hidden>
-                {[1, 2].map((i) => (
+                {[1, 2, 3].map((i) => (
                   <span key={i} className={i <= stepNum ? "setup-bar on" : "setup-bar"} />
                 ))}
               </div>
@@ -239,8 +287,85 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 data-ux-role="action"
                 className="setup-cta"
                 aria-disabled={!myName.trim() || rosterEmpty}
-                onClick={finishStudent}
+                onClick={afterName}
+              >{savedAnimal ? t("enterAsStudent", myLang) : t("nextBtn", myLang)}</button>
+
+              {/* 이미 고른 동물이 있으면 단계를 반복하지 않고, 바꾸고 싶을 때만 들어간다. */}
+              {savedAnimal && (
+                <p className="setup-mine">
+                  <span aria-hidden className="setup-mine-ico">{ANIMALS.find((a) => a.id === savedAnimal)?.emoji}</span>
+                  <span data-ux-role="secondary">
+                    {t("animalMine", myLang)}: {animalLabel(savedAnimal)}
+                  </span>
+                  <button
+                    type="button"
+                    data-ux-role="control"
+                    className="setup-teacher-link"
+                    onClick={() => setStep("animal")}
+                  >{t("animalChange", myLang)}</button>
+                </p>
+              )}
+            </>
+          )}
+
+          {/* ── 3단계: 내 동물 고르기 (U05) ─────────────────────
+              언어 카드와 **같은 컴포넌트**(.setup-choice)를 쓴다. 이 앱에서 가장
+              잘 된 선택 UI 라 새 체계를 만들 이유가 없다 — 그림 + 이름 +
+              굵은 테두리와 체크(색 아닌 단서)가 이미 갖춰져 있다. */}
+          {step === "animal" && (
+            <>
+              <h1 data-ux-role="title" className="setup-title">{t("animalStepTitle", myLang)}</h1>
+              <p data-ux-role="body" className="setup-sub">{t("animalStepSub", myLang)}</p>
+
+              {/* 미리보기 — 지금 무엇이 골라져 있는지 한 곳에서 크게 보인다. */}
+              <p className="setup-preview">
+                <AnimalArt id={previewAnimal} size={72} />
+                <span data-ux-role="body-emphasis">{animalLabel(previewAnimal)}</span>
+              </p>
+
+              <div className="setup-choices animals" role="group" aria-label={t("animalStepTitle", myLang)}>
+                {ANIMALS.map((a) => {
+                  const active = previewAnimal === a.id;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      data-ux-role="control"
+                      className={active ? "setup-choice on" : "setup-choice"}
+                      aria-pressed={active}
+                      onClick={() => setAnimalId(a.id)}
+                    >
+                      <AnimalArt id={a.id} size={44} />
+                      <span className="setup-choice-text">
+                        <span data-ux-role="label" className="setup-choice-name">{a.ko}</span>
+                      </span>
+                      <span aria-hidden className="setup-check">{active ? "✓" : ""}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 저장할 프로필이 없으면 성공한 것처럼 보이게 두지 않는다. */}
+              {!myLearnerId && (
+                <p data-ux-role="secondary" className="setup-hint" role="status">
+                  {t("animalSessionOnly", myLang)}
+                </p>
+              )}
+
+              <button
+                type="button"
+                data-ux-role="action"
+                className="setup-cta"
+                onClick={() => finishStudent(previewAnimal)}
               >{t("enterAsStudent", myLang)}</button>
+
+              {/* 취소하면 원래 선택으로 돌아간다 — 고르다 만 값이 남지 않는다. */}
+              <button
+                type="button"
+                data-ux-role="control"
+                className="setup-teacher-link"
+                onClick={() => { setAnimalId(null); setStep("name"); }}
+              >{t("backBtn", myLang).replace("← ", "")}</button>
             </>
           )}
 
@@ -343,6 +468,32 @@ const SETUP_CSS = `
 /* 한 화면에 한 열. 넓어지면 두 열까지만 — 세 열은 이름이 잘린다. */
 .setup-choices{ display: grid; grid-template-columns: 1fr; gap: var(--ux-space-3); }
 @media (min-width: 600px){ .setup-choices{ grid-template-columns: 1fr 1fr; } }
+
+/* ── 내 동물 (U05) ──────────────────────────────────────────────────
+   동물은 언어보다 라벨이 짧아 같은 2열이면 카드가 과하게 넓어진다.
+   04 §5 "동물 선택은 세로 2~3열, 가로 4열". 8종을 보려고 페이지가 길어지지
+   않게 한다. */
+@media (min-width: 600px){ .setup-choices.animals{ grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px){ .setup-choices.animals{ grid-template-columns: repeat(4, 1fr); } }
+/* 동물 카드는 그림 위·이름 아래로 쌓는다. 언어 카드처럼 가로로 늘어놓으면
+   라벨이 좁은 칸에서 짜부라진다(4열이면 카드가 ~119px 뿐이다). */
+.setup-choices.animals .setup-choice{
+  flex-direction: column; gap: var(--ux-space-2); text-align: center;
+  justify-content: center; position: relative;
+}
+.setup-choices.animals .setup-choice-text{ min-width: 0; }
+.setup-choices.animals .setup-choice-name{ white-space: nowrap; }
+/* 체크는 카드 모서리로 — 세로 배치에서 이름 아래 한 줄을 더 먹지 않게 한다. */
+.setup-choices.animals .setup-check{ position: absolute; top: 6px; right: 10px; }
+.setup-preview{
+  display: flex; flex-direction: column; align-items: center; gap: var(--ux-space-2);
+  margin: 0 0 var(--ux-space-4);
+}
+.setup-mine{
+  display: flex; align-items: center; gap: var(--ux-space-2); flex-wrap: wrap;
+  justify-content: center; margin: var(--ux-space-3) 0 0;
+}
+.setup-mine-ico{ font-size: 1.4em; line-height: 1; }
 
 .setup-choice{
   display: flex; align-items: center; gap: var(--ux-space-3); width: 100%;

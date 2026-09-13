@@ -44,7 +44,7 @@ import {
 } from "@/lib/village";
 import { CharacterImage, CosmeticFrame, AccessoryLayer } from "./CharacterComposite";
 import type { VillagePlot3D } from "./VillageMap3D";
-import QuestBoard from "./QuestBoard";
+import QuestBoard, { type QuestBoardFixture } from "./QuestBoard";
 import { type QuestEventType } from "@/lib/quests";
 import Toast from "./Toast";
 import { HONEY } from "@/lib/constants";
@@ -93,6 +93,19 @@ function shortId(id: string): string {
   return (clean || id).slice(0, 6);
 }
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않는다 — 꿀 이슬·환전·구매·물주기 등 재화가 걸린 경로는
+ * 전부 offline 가드로 막힌다. `quest` 를 생략해도 village 가 offline 이면
+ * QuestBoard 에는 항상 빈 fixture 를 내려 보내 새는 구독을 만들지 않는다.
+ */
+export interface VillageFixture {
+  counts?: Record<string, number>;
+  allCosmetics?: Record<string, StudentCosmetics>;
+  village?: VillageData;
+  quest?: QuestBoardFixture;
+}
+
 interface Props {
   lang: string;
   roomCode: string;
@@ -101,6 +114,7 @@ interface Props {
   roomConfig: RoomConfig;
   /** 심부름 클릭 이동 — village_water 는 여기서 지도 스크롤로 처리, 나머지는 위로 전달 */
   onQuestNavigate?: (event: QuestEventType) => void;
+  fixture?: VillageFixture;
 }
 
 interface HouseEntry {
@@ -156,11 +170,13 @@ function ItemTile({ emoji, label, price, equipped, has, affordable, removable = 
 }
 // ───────────────────────────────────────────────────────────────
 
-export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfig, onQuestNavigate }: Props) {
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [countsReady, setCountsReady] = useState(false);
-  const [allCosmetics, setAllCosmetics] = useState<Record<string, StudentCosmetics>>({});
-  const [village, setVillage] = useState<VillageData>({});
+export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfig, onQuestNavigate, fixture }: Props) {
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
+  const [counts, setCounts] = useState<Record<string, number>>(fixture?.counts ?? {});
+  const [countsReady, setCountsReady] = useState(offline);
+  const [allCosmetics, setAllCosmetics] = useState<Record<string, StudentCosmetics>>(fixture?.allCosmetics ?? {});
+  const [village, setVillage] = useState<VillageData>(fixture?.village ?? {});
   const [toast, setToast] = useState<{ msg: string; tone: "success" | "error" } | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
@@ -183,29 +199,33 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   }, []);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeAllStudentCounts(roomCode, (c) => {
       setCounts(c);
       setCountsReady(true);
     });
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeAllCosmetics(roomCode, setAllCosmetics);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeVillage(roomCode, setVillage);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   // ── 입장 보상: 꿀 이슬(일 1회) + 스티커 환전(증가분) ──────────────
   // 마운트당 1회 (useRef 가드 — StrictMode double-invoke 대비. 트랜잭션
   // 자체도 날짜/기준점 가드로 멱등이라 중복 지급은 없다.)
+  // fixture 에서는 절대 실행하지 않는다 — 재화 지급 경로.
   const rewardsRanRef = useRef(false);
   useEffect(() => {
-    if (user.isTeacher || !countsReady || rewardsRanRef.current) return;
+    if (offline || user.isTeacher || !countsReady || rewardsRanRef.current) return;
     rewardsRanRef.current = true;
     const myCount = counts[myClientId] ?? 0;
     (async () => {
@@ -221,7 +241,7 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countsReady, user.isTeacher, roomCode, myClientId]);
+  }, [countsReady, user.isTeacher, roomCode, myClientId, offline]);
 
   // ── 마을 주민 (전시장 RaceTab 과 동일한 roster 필터 규칙) ─────────
   const entries: HouseEntry[] = useMemo(() => {
@@ -293,6 +313,7 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   // ── 상점 구매/장착 ──────────────────────────────────────────
   const [shopBusy, setShopBusy] = useState(false);
   async function handleDecoTap(deco: VillageDeco) {
+    if (offline) return; // fixture: 구매·장착 쓰기 금지
     if (shopBusy) return;
     const equipped = myVillage.house?.[deco.slot] === deco.id;
     const owned = myVillage.owned?.[deco.id] === true;
@@ -330,6 +351,7 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
 
   // ── 꾸미기 바텀시트 (카탈로그 v2) 구매/장착/해제 ─────────────────
   async function handleDecoV2Tap(deco: VillageDecoV2, yardIndex = 0) {
+    if (offline) return; // fixture: 구매·장착 쓰기 금지
     if (shopBusy) return;
     const houseV2 = effectiveHouseV2(myVillage);
     const equipped =
@@ -378,6 +400,7 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   // ── 물주기 ──────────────────────────────────────────────────
   const [waterBusy, setWaterBusy] = useState(false);
   async function handleWater(friend: HouseEntry) {
+    if (offline) return; // fixture: 물주기 쓰기 금지
     if (waterBusy || user.isTeacher || friend.id === myClientId) return;
     setWaterBusy(true);
     try {
@@ -717,12 +740,18 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
     }
     onQuestNavigate?.(event);
   };
+  // offline 인데 quest fixture 를 안 받았어도 QuestBoard 는 항상 offline 으로
+  // 만든다 — 부모가 깜빡해도 새는 Firebase 구독이 생기지 않게 하는 안전망.
+  const questFixture: QuestBoardFixture | undefined = offline
+    ? (fixture?.quest ?? { quests: [], state: {} })
+    : undefined;
   const questBoard = !user.isTeacher ? (
     <QuestBoard
       roomCode={roomCode}
       myClientId={myClientId}
       onToast={(msg, tone) => setToast({ msg, tone })}
       onGoTo={handleQuestGo}
+      fixture={questFixture}
     />
   ) : null;
 

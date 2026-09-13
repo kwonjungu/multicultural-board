@@ -12,6 +12,8 @@ import RoomManagePanel from "./RoomManagePanel";
 import FontSizeButton from "./FontSizeButton";
 import FlyingBees from "./ui/FlyingBees";
 import ScopedStyle from "./ui/child/ScopedStyle";
+import AppIcon from "./ui/child/AppIcon";
+import type { UiIconId } from "@/lib/uiIcons";
 
 /** 라우팅 계약 — 이 문자열은 app/[roomCode]/page.tsx 의 hubView 와 1:1 이다. 바꾸지 말 것. */
 export type HubView = "board" | "whiteboard" | "games" | "dashboard" | "vocab" | "storybook";
@@ -30,6 +32,13 @@ interface ActivityMeta {
   tint: string;
   /** 칭찬 표시는 육각형으로 — 벌집은 브랜드 장식과 칭찬에만 남긴다. */
   hex?: boolean;
+  /**
+   * U03 — 03 에셋가이드로 생성된 뜻이 있는 그림 아이콘. 있으면 마스코트 벌
+   * 그림 대신 이 아이콘을 쓴다(activity 의 실제 의미를 가리키므로).
+   * 아직 만들어지지 않은 활동(vocab — 단어 카드)은 비워 두고 마스코트로
+   * 남긴다. 없는 파일을 있는 척 채우지 않는다.
+   */
+  icon?: UiIconId;
 }
 
 /**
@@ -37,11 +46,11 @@ interface ActivityMeta {
  * 라우팅(id)은 종전 그대로다.
  */
 const ACTIVITIES: ActivityMeta[] = [
-  { id: "board", titleKey: "hubActBoard", descKey: "hubSectionBoardDesc", mascot: "/mascot/bee-cheer.png", tint: "var(--ux-hint-apricot)" },
-  { id: "storybook", titleKey: "hubActStorybook", descKey: "hubSectionStorybookDesc", mascot: "/mascot/bee-welcome.png", tint: "var(--ux-hint-lavender)" },
+  { id: "board", titleKey: "hubActBoard", descKey: "hubSectionBoardDesc", mascot: "/mascot/bee-cheer.png", tint: "var(--ux-hint-apricot)", icon: "globe" },
+  { id: "storybook", titleKey: "hubActStorybook", descKey: "hubSectionStorybookDesc", mascot: "/mascot/bee-welcome.png", tint: "var(--ux-hint-lavender)", icon: "storybook" },
   { id: "vocab", titleKey: "hubActVocab", descKey: "hubSectionVocabDesc", mascot: "/mascot/bee-book.png", tint: "var(--ux-hint-mint)" },
-  { id: "dashboard", titleKey: "hubActBee", descKey: "hubSectionStickersDesc", mascot: "/mascot/bee-student.png", tint: "var(--ux-primary-fill)", hex: true },
-  { id: "games", titleKey: "hubActGames", descKey: "hubSectionGamesDesc", mascot: "/mascot/bee-celebrate.png", tint: "var(--ux-surface-sunk)" },
+  { id: "dashboard", titleKey: "hubActBee", descKey: "hubSectionStickersDesc", mascot: "/mascot/bee-student.png", tint: "var(--ux-primary-fill)", hex: true, icon: "praise" },
+  { id: "games", titleKey: "hubActGames", descKey: "hubSectionGamesDesc", mascot: "/mascot/bee-celebrate.png", tint: "var(--ux-surface-sunk)", icon: "friends" },
 ];
 
 /**
@@ -313,7 +322,11 @@ export default function HomeHub({
               onClick={() => onSelect(a.id)}
             >
               <span className={a.hex ? "hub-point-icon hex" : "hub-point-icon"} style={{ background: a.tint }}>
-                <img src={a.mascot} alt="" aria-hidden="true" className="hub-point-bee" />
+                {a.icon ? (
+                  <AppIcon name={a.icon} size={64} decorative className="hub-point-bee" />
+                ) : (
+                  <img src={a.mascot} alt="" aria-hidden="true" className="hub-point-bee" />
+                )}
               </span>
               {/* 아이콘만으로 안내하지 않는다 — 글자 라벨은 언제나 붙어 있다. */}
               <span data-ux-role="label" className="hub-point-label">{t(a.titleKey, lang)}</span>
@@ -554,7 +567,9 @@ const HUB_CSS = `
   outline: 3px solid var(--ux-primary-border);
   outline-offset: -3px;
 }
-.hub-point-bee{ width: 62%; height: 62%; object-fit: contain; }
+/* AppIcon(U03) 은 인라인 style 로 width/height 를 px 로 고정한다(AnimalArt 와 같은
+   계약) — 여기서는 배지 크기에 맞춰 반응형(62%)으로 다시 눌러야 하므로 !important 로 이긴다. */
+.hub-point-bee{ width: 62% !important; height: 62% !important; object-fit: contain; }
 .hub-point-label{
   font-weight: 900; color: var(--ux-ink); text-align: center;
   line-height: var(--ux-lh-tight); word-break: keep-all; overflow-wrap: anywhere;

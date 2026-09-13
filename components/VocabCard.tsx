@@ -120,7 +120,7 @@ export default function VocabCard({
           display: "flex", alignItems: "center", justifyContent: "space-between",
           paddingBottom: 8, borderBottom: "2px solid " + PURPLE_LIGHT,
         }}>
-          <button onClick={onClose} aria-label="닫기" style={headerBtnStyle}>
+          <button onClick={onClose} aria-label="닫기" data-ux-role="control" style={headerBtnStyle}>
             {t("vocabBack", lang)}
           </button>
           {phase === "study" ? (
@@ -502,16 +502,17 @@ function IntroPanel({
           <div style={{ fontSize: 12, fontWeight: 900, color: PURPLE_DARK, marginBottom: 8, letterSpacing: 0.3 }}>
             활용형 (탭해서 듣기)
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--ux-space-2)" }}>
             {word.conjugations.map((c) => (
               <button
                 key={c}
                 onClick={() => onListen(c)}
+                data-ux-role="control"
                 style={{
                   background: "#fff",
                   border: "1.5px solid " + PURPLE + "55",
-                  borderRadius: 999, padding: "6px 14px",
-                  fontSize: 15, fontWeight: 800, color: "#1F2937",
+                  borderRadius: 999,
+                  fontWeight: 800, color: "#1F2937",
                   cursor: "pointer", fontFamily: "inherit",
                 }}
               >🔊 {c}</button>
@@ -546,9 +547,11 @@ function IntroPanel({
 
 // ────────────── Shared styles ──────────────
 
+/* U07/U09: 태블릿 터치 기준을 만족해야 한다. 크기는 data-ux-role="control" 이
+   토큰에서 걸어 주므로 여기서 padding/fontSize 로 다시 정하지 않는다. */
 const headerBtnStyle: React.CSSProperties = {
-  background: PURPLE_LIGHT, border: "none", borderRadius: 10,
-  padding: "6px 12px", fontSize: 14, fontWeight: 800, color: PURPLE_DARK,
+  background: PURPLE_LIGHT, border: "none",
+  fontWeight: 800, color: PURPLE_DARK,
   cursor: "pointer", fontFamily: "inherit",
 };
 

@@ -36,6 +36,17 @@ export interface DrawBoardHandle {
   reset: () => void;
 }
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). DrawBoard 는 그 자체로 Firebase/네트워크를
+ * 쓰지 않는 순수 캔버스 엔진이다 — 여기의 fixture 는 네트워크 차단이 아니라
+ * "빈 캔버스로 시작하지 않게" 초기 그림을 심어주는 용도다. 검수 화면에서 캔버스가
+ * 비어 보이면 실제로 그려진 상태인지 확인할 수 없기 때문.
+ */
+export interface DrawBoardFixture {
+  /** 마운트 시 캔버스에 그려 넣을 초기 이미지(데이터 URL). 없으면 기존처럼 흰 배경. */
+  initialImageDataUrl?: string;
+}
+
 export interface DrawBoardProps {
   width?: number;
   height?: number;
@@ -45,10 +56,11 @@ export interface DrawBoardProps {
   onChange?: (dataUrl: string) => void;
   /** onChange 디바운스(ms). 기본 600. */
   debounceMs?: number;
+  fixture?: DrawBoardFixture;
 }
 
 const DrawBoard = forwardRef<DrawBoardHandle, DrawBoardProps>(function DrawBoard(
-  { width = 720, height = 480, accent = "#14B8A6", onChange, debounceMs = 600 },
+  { width = 720, height = 480, accent = "#14B8A6", onChange, debounceMs = 600, fixture },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,13 +94,23 @@ const DrawBoard = forwardRef<DrawBoardHandle, DrawBoardProps>(function DrawBoard
     },
   }));
 
-  // 흰 배경 초기화 + 최초 1회 emit
+  // 흰 배경 초기화 + 최초 1회 emit. fixture 가 초기 이미지를 주면 그 위에 그려 넣는다
+  // (검수용 — 빈 캔버스가 아니라 실제 그려진 상태를 보여줘야 하므로).
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
-    emitChange();
+    if (fixture?.initialImageDataUrl) {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, width, height);
+        emitChange();
+      };
+      img.src = fixture.initialImageDataUrl;
+    } else {
+      emitChange();
+    }
     return () => { if (changeTimer.current) clearTimeout(changeTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

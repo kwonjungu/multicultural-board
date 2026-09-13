@@ -15,6 +15,7 @@ import { cleanupExpiredRecordings } from "@/lib/vocabRecordings";
 import { buildMixedQuiz, buildLessonQuiz, buildDailyChallenge, type QuizItem } from "@/lib/quizFormats";
 import { getUnits, wordsForLesson, type Unit, type Lesson } from "@/lib/lessons";
 import BeeMascot from "./BeeMascot";
+import ScopedStyle from "./ui/child/ScopedStyle";
 import {
   subscribeLearner, setDailyGoal, effectiveHearts, msUntilNextHeart, xpToNextLevel, levelFromXp,
   MAX_HEARTS, type LearnerState,
@@ -51,57 +52,98 @@ const SUB_ICON: Record<string, string> = {
   "인사": "👋",
 };
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않고 /api/* 도 부르지 않는다. 운영 방(1111)의 학생 진도·
+ * 표현 기록을 fixture 로 복제하지 않는다 — 여기 값은 전부 지어낸 것이다.
+ */
+export interface VocabFixture {
+  progress?: ProgressMap;
+  learner?: LearnerState | null;
+  expressions?: ExpressionEntry[];
+  /** 소통창에서 긁어온 문장. 자동 스캔은 서버 대신 로컬 추출로만 돈다. */
+  cardTexts?: string[];
+  stickersEarned?: number;
+  /**
+   * 하위 학습 화면을 바로 열어 검수할 수 있게 하는 초기 상태.
+   * 이 화면들은 홈에서 여러 번 눌러야 도달해 캡처가 불안정하다.
+   *   detail   = 단어 상세(VocabCard)
+   *   notebook = 내 단어장
+   *   write    = 쓰기 학습지
+   *   quiz     = 문제 풀기(VocabTest)
+   *   review   = 표현 복습
+   */
+  openView?: "detail" | "notebook" | "write" | "quiz" | "review";
+  /** openView="detail" 일 때 열 단어. 없으면 첫 단어. */
+  openWordId?: string;
+}
+
 interface Props {
   user: UserConfig;
   roomCode: string;
   onBack: () => void;
+  fixture?: VocabFixture;
 }
 
-export default function VocabHub({ user, roomCode, onBack }: Props) {
+export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
   const lang = user.myLang;
-  const [progress, setProgress] = useState<ProgressMap>({});
+  const [progress, setProgress] = useState<ProgressMap>(fixture?.progress ?? {});
   const [activeSub, setActiveSub] = useState<string | "all">("all");
-  const [openWord, setOpenWord] = useState<VocabWord | null>(null);
+  const [openWord, setOpenWord] = useState<VocabWord | null>(
+    fixture?.openView === "detail"
+      ? (VOCAB_WORDS.find((w) => w.id === fixture.openWordId) ?? VOCAB_WORDS[0])
+      : null,
+  );
 
   // 소통창 카드 텍스트 수집
-  const [cardTexts, setCardTexts] = useState<string[]>([]);
+  const [cardTexts, setCardTexts] = useState<string[]>(fixture?.cardTexts ?? []);
   const [matched, setMatched] = useState<MatchedWord[]>([]);
   const [scanState, setScanState] = useState<"idle" | "scanning" | "error">("idle");
   const scanOnce = useRef(false);
 
   // 자동 보상 축하 큐
   const [awardQueue, setAwardQueue] = useState<RewardRule[]>([]);
-  const [stickersEarned, setStickersEarned] = useState(0);
+  const [stickersEarned, setStickersEarned] = useState(fixture?.stickersEarned ?? 0);
 
   // 뷰 모드 (트리 / 그리드 / 단어장) — 듀오링고 스타일 트리가 기본
-  const [viewMode, setViewMode] = useState<"tree" | "grid" | "notebook">("tree");
+  const [viewMode, setViewMode] = useState<"tree" | "grid" | "notebook">(
+    fixture?.openView === "notebook" ? "notebook" : "tree",
+  );
 
   // 시험
-  const [quiz, setQuiz] = useState<QuizItem[] | null>(null);
+  const [quiz, setQuiz] = useState<QuizItem[] | null>(
+    fixture?.openView === "quiz"
+      ? buildDailyChallenge(fixture.progress ?? {}, [], 10)
+      : null,
+  );
   const [lessonContext, setLessonContext] = useState<{ id: string; title: string } | null>(null);
   // 레슨 시작 시트 — 단어 카드 공부(상황 카드) ↔ 시험 선택
   const [lessonSheet, setLessonSheet] = useState<{ lesson: Lesson; unit: Unit } | null>(null);
   const [studyQueue, setStudyQueue] = useState<VocabWord[] | null>(null);
   const [studyIdx, setStudyIdx] = useState(0);
   const [teacherView, setTeacherView] = useState(false);
-  const [learner, setLearner] = useState<LearnerState | null>(null);
+  const [learner, setLearner] = useState<LearnerState | null>(fixture?.learner ?? null);
   const [now, setNow] = useState(Date.now());
   const [goalToast, setGoalToast] = useState<string | null>(null);
   const goalAdjustedRef = useRef(false);
-  const [expressions, setExpressions] = useState<ExpressionEntry[]>([]);
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [showWriteSheet, setShowWriteSheet] = useState(false);
+  const [expressions, setExpressions] = useState<ExpressionEntry[]>(fixture?.expressions ?? []);
+  const [reviewOpen, setReviewOpen] = useState(fixture?.openView === "review");
+  const [showWriteSheet, setShowWriteSheet] = useState(fixture?.openView === "write");
   const [showDictation, setShowDictation] = useState(false);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeLearner(roomCode, user.myName, setLearner);
     return unsub;
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeExpressions(roomCode, user.myName, setExpressions);
     return unsub;
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   // 하트 회복 카운트다운 1초마다
   useEffect(() => {
@@ -111,6 +153,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
 
   // 단어카드 진입 시 1회 — 최근 학습 데이터로 데일리 골 자동 조정
   useEffect(() => {
+    if (offline) return;
     if (!learner) return;
     if (goalAdjustedRef.current) return;
     goalAdjustedRef.current = true;
@@ -130,14 +173,16 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [learner, roomCode, user.myName]);
+  }, [offline, learner, roomCode, user.myName]);
 
   useEffect(() => {
+    if (offline) return;
     setProgress(loadProgress(roomCode, user.myName));
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   // Firebase 진행도 구독 — 원격 변경을 로컬과 머지 (doneSentences 합집합, 최대 lastStudied)
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeProgress(roomCode, user.myName, (remote) => {
       setProgress((local) => {
         const merged = mergeProgress(local, remote);
@@ -149,24 +194,27 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       });
     });
     return () => unsub();
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   // 받은 vocab 스티커 수 (지급 기록 개수)
   useEffect(() => {
+    if (offline) return;
     let cancelled = false;
     getAwardedIds(roomCode, user.myName).then((s) => {
       if (!cancelled) setStickersEarned(s.size);
     });
     return () => { cancelled = true; };
-  }, [roomCode, user.myName, awardQueue.length]); // 큐 변경 시 새로고침
+  }, [offline, roomCode, user.myName, awardQueue.length]); // 큐 변경 시 새로고침
 
   // Hub 마운트 시 30일 넘은 녹음 정리 (백그라운드, 1회)
   useEffect(() => {
+    if (offline) return;
     cleanupExpiredRecordings(roomCode, user.myName).catch(() => { /* silent */ });
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   // 카드 구독 — originalText + translations.ko 수집
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const cardsRef = ref(db, `rooms/${roomCode}/cards`);
     const unsub = onValue(cardsRef, (snap) => {
@@ -184,7 +232,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       setCardTexts(texts);
     });
     return () => unsub();
-  }, [roomCode]);
+  }, [offline, roomCode]);
 
   // 카드가 처음 들어왔을 때 1회 자동 스캔
   useEffect(() => {
@@ -197,6 +245,8 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
 
   async function runScan() {
     if (cardTexts.length === 0) { setMatched([]); return; }
+    // fixture 에서는 서버를 부르지 않는다 — 같은 로컬 추출기로만 채운다.
+    if (offline) { setMatched(extractVocabLocal(cardTexts, 12)); setScanState("idle"); return; }
     setScanState("scanning");
     try {
       const res = await fetch("/api/vocab-extract", {
@@ -217,6 +267,8 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
 
   function persist(next: ProgressMap, opts?: { checkRewards?: boolean; touchedWordId?: string }) {
     setProgress(next);
+    // fixture 에서는 화면 상태만 움직이고 localStorage/Firebase/보상은 건드리지 않는다.
+    if (offline) return;
     saveProgress(roomCode, user.myName, next);
 
     // 변경된 단어만 Firebase 에 싱크 — 낙관적 fire-and-forget
@@ -274,6 +326,13 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
 
   const masteredTotal = masteredCount(progress);
   const isTeacher = user.isTeacher ?? false;
+  /** 진도가 하나라도 있는가. 첫 학생에게 0 으로 채운 상태 배지를 보이지 않기 위한 판단(U07). */
+  const hasAnyProgress = useMemo(
+    () => Object.values(progress).some(
+      (p) => (p.doneSentences?.length ?? 0) > 0 || (p.listenCount ?? 0) > 0 || (p.testPassed ?? 0) > 0,
+    ),
+    [progress],
+  );
 
   // 뒤로 가기: 열려 있는 학습/시험 화면을 한 단계씩 닫는다 (단어공부에서 바로
   // 나가지 않음). 중첩(레슨시트 위 학습/시험)은 중앙 백스택이 안쪽부터 닫는다.
@@ -317,12 +376,16 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
         boxShadow: "0 8px 24px rgba(109, 40, 217, 0.12)",
         marginBottom: 18,
       }}>
+        {/* U07/U09: 태블릿 터치 기준을 만족해야 한다. 예전에는 64x32px 라
+            손가락으로 누르기 어려웠다. data-ux-role="control" 이 토큰의
+            최소 크기(터치 48px / 마우스 44px)를 걸어 준다. */}
         <button
           onClick={onBack}
           aria-label="뒤로"
+          data-ux-role="control"
           style={{
-            background: PURPLE_LIGHT, border: "none", borderRadius: 10,
-            padding: "8px 12px", fontSize: 14, fontWeight: 800, color: PURPLE_DARK,
+            background: PURPLE_LIGHT, border: "none",
+            fontWeight: 800, color: PURPLE_DARK,
             cursor: "pointer", fontFamily: "inherit",
           }}
         >{t("vocabBack", lang)}</button>
@@ -331,19 +394,23 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
             📚 {t("hubSectionVocab", lang)}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: PURPLE_DARK, marginTop: 2 }}>
-            {tFmt("vocabProgress", lang, { done: masteredTotal, total: VOCAB_WORDS.length })}
-          </div>
+          {/* U07: 아직 아무것도 안 한 학생에게 '0/100 완료' 를 먼저 보여주지
+              않는다. 진도가 생기면 그때 나타난다. */}
+          {hasAnyProgress && (
+            <div data-ux-role="secondary" style={{ marginTop: 2 }}>
+              {tFmt("vocabProgress", lang, { done: masteredTotal, total: VOCAB_WORDS.length })}
+            </div>
+          )}
         </div>
 
         {isTeacher && (
           <button
             onClick={() => setTeacherView(true)}
+            data-ux-role="control"
             style={{
               background: "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")",
-              color: "#fff", border: "none", borderRadius: 14,
-              padding: "8px 14px", fontSize: 13, fontWeight: 900,
-              cursor: "pointer", fontFamily: "inherit",
+              color: "#fff", border: "none",
+              fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
               boxShadow: "0 4px 10px " + PURPLE + "55",
             }}
           >👨‍🏫 반 전체 보기</button>
@@ -357,15 +424,15 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
             <button
               onClick={() => setReviewOpen(true)}
               aria-label="표현 복습"
+              data-ux-role="control"
               style={{
                 position: "relative",
                 background: dueCount > 0
                   ? "linear-gradient(135deg, #FB923C, #EA580C)"
                   : PURPLE_LIGHT,
                 color: dueCount > 0 ? "#fff" : PURPLE_DARK,
-                border: "none", borderRadius: 14,
-                padding: "8px 12px", fontSize: 13, fontWeight: 900,
-                cursor: "pointer", fontFamily: "inherit",
+                border: "none",
+                fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
                 boxShadow: dueCount > 0 ? "0 4px 12px rgba(234,88,12,0.45)" : "none",
               }}
             >
@@ -396,81 +463,65 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
         </div>
       </div>
 
-      {/* HUD: 하트 / 스트릭 / XP */}
-      <LearnerHUD learner={learner} now={now} />
+      {/* HUD: 하트 / 스트릭 / XP.
+          U07: 진도가 하나도 없는 첫 학생에게는 그리지 않는다. 0/100·Lv.0 0/50·
+          오늘 0/20 XP·연속 0 처럼 0 으로 채운 배지가 학습보다 먼저 나오면
+          '내가 아무것도 안 한 화면' 이 첫인상이 된다. */}
+      {hasAnyProgress && <LearnerHUD learner={learner} now={now} />}
 
-      {/* 🔥 나의 단어 일일 챌린지 — 소통판 단어 + 약점 단어 듀오링고식 릴레이 */}
+      {/* 나의 단어 챌린지 — 소통판 단어 + 약점 단어 릴레이.
+          U07: 예전에는 낼 문제가 0개여도 화면에서 가장 강한 색(주황→핑크
+          그라디언트 + 무한 pulse + 반짝이는 '도전!' 리본)으로 항상 광고했다.
+          진도 0 인 학생에게 '소통판 단어 0개 + 약점 단어 0개' 를 권하고,
+          눌러도 아무 일이 없었다(q.length > 0 가드 때문에 조용히 무시).
+          이제 실제로 낼 문제가 있을 때만 그리고, 강조는 단원 카드보다 낮춘다. */}
       {(() => {
-        const boardCount = matched.length;
-        const studiedCount = Object.values(progress).filter(
-          (p) => (p.doneSentences?.length ?? 0) > 0,
-        ).length;
+        const boardIds = matched.map((m) => m.wordId);
+        // 이 챌린지는 정의상 '내' 단어다 — 소통판에서 걸린 단어 + 내가 틀린
+        // 단어. 둘 다 없으면 buildDailyChallenge 가 기본 단어로 채워 문제 수는
+        // 0 이 아니지만, 그건 '나의 챌린지' 가 아니라 아무 단어 묶음이다.
+        // 첫 학생에게 그걸 권하지 않는다. 출처가 생기면 그때 나타난다.
+        const hasOwnSource = boardIds.length > 0 || hasAnyProgress;
+        const items = hasOwnSource ? buildDailyChallenge(progress, boardIds, 10) : [];
+        if (items.length === 0) return null;
         const startDailyChallenge = () => {
-          const boardIds = matched.map((m) => m.wordId);
-          const q = buildDailyChallenge(progress, boardIds, 10);
-          if (q.length > 0) {
-            setLessonContext({ id: "daily-challenge", title: "🔥 나의 단어 일일 챌린지" });
-            setQuiz(q);
-          }
+          setLessonContext({ id: "daily-challenge", title: "나의 단어 챌린지" });
+          setQuiz(items);
         };
         return (
           <>
-          <style>{`
-            @keyframes dailyChallengePulse {
-              0%, 100% { box-shadow: 0 10px 26px rgba(219,39,119,0.35); }
-              50% { box-shadow: 0 12px 34px rgba(219,39,119,0.65), 0 0 0 4px rgba(249,115,22,0.30); }
-            }
-            @keyframes dailyChallengeSparkle {
-              0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
-              50% { transform: scale(1.18) rotate(8deg); opacity: 0.85; }
-            }
-          `}</style>
           <button
             onClick={startDailyChallenge}
             style={{
               position: "relative",
               maxWidth: 760, width: "100%", margin: "0 auto 14px",
-              display: "flex", alignItems: "center", gap: 14, textAlign: "left",
-              background: "linear-gradient(135deg, #F97316, #DB2777)",
-              border: "none", borderRadius: 20, padding: "14px 18px",
+              display: "flex", alignItems: "center", gap: 12, textAlign: "left",
+              background: "#fff",
+              border: "2px solid var(--ux-primary-border)",
+              borderRadius: 16, padding: "12px 16px",
               cursor: "pointer", fontFamily: "inherit",
-              animation: "dailyChallengePulse 2.2s ease-in-out infinite",
+              boxShadow: "0 4px 12px rgba(137,83,0,0.12)",
               transition: "transform 0.15s",
             }}
             onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
             onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            {/* NEW 반짝 뱃지 — 시선 유도 */}
-            <span style={{
-              position: "absolute", top: -8, right: 14,
-              background: "#FACC15", color: "#7C2D12",
-              fontSize: 11, fontWeight: 900, letterSpacing: 0.5,
-              padding: "3px 9px", borderRadius: 999,
-              boxShadow: "0 3px 8px rgba(0,0,0,0.25)",
-              animation: "dailyChallengeSparkle 1.4s ease-in-out infinite",
-            }}>✨ 도전!</span>
-            <div style={{ fontSize: 46, flexShrink: 0 }}>🔥</div>
-            <div style={{ flex: 1, minWidth: 0, color: "#fff" }}>
-              <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: -0.3 }}>
-                오늘의 일일 챌린지 도전하기!
+            <div aria-hidden style={{ fontSize: 30, flexShrink: 0 }}>🎧</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div data-ux-role="label" style={{ fontWeight: 800, color: "var(--ux-ink)" }}>
+                나의 단어 챌린지
               </div>
-              <div style={{
-                display: "inline-block", marginTop: 5,
-                background: "rgba(255,255,255,0.28)", borderRadius: 999,
-                padding: "3px 10px", fontSize: 12, fontWeight: 900,
-              }}>
-                ⚡ 추가 경험치 획득 가능
-              </div>
-              <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4, opacity: 0.95 }}>
-                🎧 듣고 찾기 · 소통판 단어 {boardCount}개 + 약점 단어(틀린 단어) {studiedCount}개
+              <div data-ux-role="secondary" style={{ marginTop: 2 }}>
+                듣고 찾기 {items.length}문제
               </div>
             </div>
             <div style={{
-              background: "rgba(255,255,255,0.28)", color: "#fff",
-              fontSize: 15, fontWeight: 900, padding: "10px 16px", borderRadius: 12,
-              flexShrink: 0,
-            }}>도전 →</div>
+              background: "var(--ux-primary-fill)", color: "var(--ux-primary-ink)",
+              border: "2px solid var(--ux-primary-border)",
+              fontSize: "var(--ux-font-label)", fontWeight: 800,
+              padding: "8px 14px", borderRadius: 12, flexShrink: 0,
+            }}>시작 →</div>
           </button>
 
           {/* 🖨 오프라인 학습지 — 2분화: 단어 쓰기(모두) / 받아쓰기 테마별(교사 전용) */}
@@ -623,15 +674,16 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
           <button
             key={v.k}
             onClick={() => setViewMode(v.k)}
+            data-ux-role="control"
+            aria-pressed={viewMode === v.k}
             style={{
               flex: 1,
               background: viewMode === v.k
                 ? "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")"
                 : "transparent",
               color: viewMode === v.k ? "#fff" : "#374151",
-              border: "none", borderRadius: 10,
-              padding: "10px", fontSize: 14, fontWeight: 900,
-              cursor: "pointer", fontFamily: "inherit",
+              border: "none",
+              fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
               boxShadow: viewMode === v.k ? "0 6px 14px rgba(139, 92, 246, 0.3)" : "none",
             }}
           >{v.label}</button>
@@ -1195,6 +1247,43 @@ function LearnerHUD({ learner, now }: { learner: LearnerState | null; now: numbe
   );
 }
 
+/**
+ * 레슨 트리 배치 (04 §5 "단어 홈").
+ *
+ * 예전에는 폭과 무관하게 컨테이너가 520px 로 고정이고 레슨이 세로 1열
+ * 지그재그였다. 크롬북 1366px 에서도 한 번에 레슨 1~2개만 보이고 문서 높이가
+ * 3500px 를 넘었다 — 폭이 545px 늘어도 콘텐츠는 늘지 않는 "세로로 늘린
+ * 휴대폰" 이었다.
+ *
+ * 지그재그는 순서를 따라가는 단서라 **좁은 화면에서만** 남기고, 폭이 생기면
+ * 격자로 편다. 태블릿 세로 3열 / 태블릿 가로·분할 4열 / 크롬북·노트북 4열.
+ */
+const SKILL_TREE_CSS = `
+.vh-tree{ max-width:520px; margin:0 auto; padding:0 4px 30px; }
+.vh-lessons{ display:grid; grid-template-columns:1fr; gap:18px; justify-items:center; }
+@media (max-width:639px){
+  .vh-lessons > *:nth-child(odd){ transform:translateX(-40px); }
+  .vh-lessons > *:nth-child(even){ transform:translateX(40px); }
+}
+/* auto-fit + 고정 트랙 + max-width 로 열 수를 정한다. repeat(N, 1fr) 로 하면
+   레슨이 1~2개뿐인 단원에서 노드가 첫 칸에 붙어 왼쪽으로 치우친다. */
+@media (min-width:640px){
+  .vh-tree{ max-width:720px; }
+  .vh-lessons{
+    grid-template-columns:repeat(auto-fit, 116px);
+    justify-content:center; gap:16px 24px;
+    max-width:calc(3 * 116px + 2 * 24px); margin:0 auto;
+  }
+}
+@media (min-width:960px){
+  .vh-tree{ max-width:920px; }
+  .vh-lessons{ max-width:calc(4 * 116px + 3 * 24px); }
+}
+@media (min-width:1200px){
+  .vh-tree{ max-width:1120px; }
+}
+`;
+
 function SkillTreeView({
   learner, onStartLesson,
 }: {
@@ -1203,7 +1292,8 @@ function SkillTreeView({
 }) {
   const units = getUnits();
   return (
-    <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 4px 30px" }}>
+    <div className="vh-tree">
+      <ScopedStyle css={SKILL_TREE_CSS} />
       {units.map((unit, ui) => {
         const completedStars = unit.lessons.reduce((acc, l) => acc + (learner?.lessons?.[l.id]?.stars ?? 0), 0);
         const maxStars = unit.lessons.length * 3;
@@ -1232,8 +1322,8 @@ function SkillTreeView({
               </div>
             </div>
 
-            {/* 레슨 노드 — 지그재그 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {/* 레슨 노드 — 좁은 화면은 지그재그, 넓어지면 격자 (SKILL_TREE_CSS) */}
+            <div className="vh-lessons">
               {unit.lessons.map((lesson, li) => {
                 const res = learner?.lessons?.[lesson.id];
                 const done = !!res;
@@ -1241,12 +1331,8 @@ function SkillTreeView({
                 // 이전 레슨이 done 이거나 첫 레슨이거나 단원 첫 노드 → unlocked
                 const prevLessonDone = li === 0 ? prevUnitDone : !!learner?.lessons?.[unit.lessons[li - 1].id];
                 const unlocked = prevLessonDone;
-                const offset = li % 2 === 0 ? -40 : 40;
                 return (
-                  <div key={lesson.id} style={{
-                    display: "flex", justifyContent: "center",
-                    transform: `translateX(${offset}px)`,
-                  }}>
+                  <div key={lesson.id} style={{ display: "flex", justifyContent: "center" }}>
                     <button
                       onClick={() => unlocked && onStartLesson(lesson, unit)}
                       disabled={!unlocked}

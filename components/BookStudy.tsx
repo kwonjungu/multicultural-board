@@ -16,6 +16,16 @@ import { BOOK_STUDY_SAMPLES, BookStudySample } from "@/lib/bookStudySamples";
 /* ─────────── Types ─────────── */
 type InputMode = "text" | "voice" | "draw";
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않고 /api/* 도 부르지 않는다. 운영 방(1111)의 세션·답변을
+ * fixture 로 복제하지 않는다 — 여기 값은 전부 지어낸 것이다.
+ */
+export interface BookStudyFixture {
+  session: SessionMeta | null;
+  responses: SessionResponse[];
+}
+
 interface Props {
   roomCode: string;
   isTeacher: boolean;
@@ -24,6 +34,7 @@ interface Props {
   myLang: string;
   roomLangs: string[];
   onBack: () => void;
+  fixture?: BookStudyFixture;
 }
 
 /* ─────────── Constants ─────────── */
@@ -42,10 +53,13 @@ export default function BookStudy({
   myLang,
   roomLangs,
   onBack,
+  fixture,
 }: Props) {
   const basePath = `rooms/${roomCode}/bookStudy`;
-  const [session, setSession] = useState<SessionMeta | null>(null);
-  const [responses, setResponses] = useState<SessionResponse[]>([]);
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
+  const [session, setSession] = useState<SessionMeta | null>(fixture?.session ?? null);
+  const [responses, setResponses] = useState<SessionResponse[]>(fixture?.responses ?? []);
   const [inputMode, setInputMode] = useState<InputMode>("text");
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -60,16 +74,18 @@ export default function BookStudy({
 
   // ── Subscribe to session ──
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const metaRef = ref(db, `${basePath}/meta`);
     const unsub = onValue(metaRef, (snap) => {
       setSession(snap.val() as SessionMeta | null);
     });
     return () => unsub();
-  }, [basePath]);
+  }, [basePath, offline]);
 
   // ── Subscribe to responses ──
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const respRef = ref(db, `${basePath}/responses`);
     const unsub = onValue(respRef, (snap) => {
@@ -80,7 +96,7 @@ export default function BookStudy({
       setResponses(list);
     });
     return () => unsub();
-  }, [basePath]);
+  }, [basePath, offline]);
 
   const myResponse = useMemo(
     () => responses.find((r) => r.authorClientId === myClientId),
@@ -89,7 +105,7 @@ export default function BookStudy({
 
   // ── Teacher: create session ──
   async function handleCreate() {
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || offline) return;
     setCreating(true);
     try {
       // Translate title
@@ -163,7 +179,7 @@ export default function BookStudy({
   // ── Image upload (character image) ──
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || offline) return;
     setUploading(true);
     try {
       const compressed = await compressToUnder1MB(file);
@@ -181,7 +197,7 @@ export default function BookStudy({
 
   // ── Student submit ──
   async function handleSubmit(text: string) {
-    if (!text.trim() || submitting || isTeacher) return;
+    if (!text.trim() || submitting || isTeacher || offline) return;
     setSubmitting(true);
     setError("");
     try {
@@ -224,6 +240,7 @@ export default function BookStudy({
 
   // ── Teacher: end session ──
   async function handleEndSession() {
+    if (offline) return;
     if (!confirm("세션을 종료할까요?")) return;
     try {
       const db = getClientDb();
@@ -234,6 +251,7 @@ export default function BookStudy({
   }
 
   async function handleDeleteSession() {
+    if (offline) return;
     if (!confirm("세션을 삭제할까요?")) return;
     try {
       const db = getClientDb();
@@ -346,6 +364,7 @@ export default function BookStudy({
                 myName={myName}
                 onSubmit={handleSubmit}
                 error={error}
+                offline={offline}
               />
             )}
 
@@ -566,7 +585,7 @@ function PostItBoard({ responses, myLang }: { responses: SessionResponse[]; myLa
 /* ─────────── Student Input with 3 modes ─────────── */
 function StudentInput({
   inputMode, setInputMode, draft, setDraft,
-  submitting, myLang, myName, onSubmit, error,
+  submitting, myLang, myName, onSubmit, error, offline,
 }: {
   inputMode: InputMode;
   setInputMode: (m: InputMode) => void;
@@ -577,6 +596,7 @@ function StudentInput({
   myName: string;
   onSubmit: (text: string) => void;
   error: string;
+  offline?: boolean;
 }) {
   return (
     <div style={{
@@ -638,12 +658,13 @@ function StudentInput({
           myLang={myLang}
           onTranscript={(text) => setDraft(text)}
           draft={draft}
+          offline={offline}
         />
       )}
 
       {/* Drawing mode */}
       {inputMode === "draw" && (
-        <DrawingInput onText={(text) => setDraft(text)} draft={draft} />
+        <DrawingInput onText={(text) => setDraft(text)} draft={draft} offline={offline} />
       )}
 
       {/* Submit */}
@@ -678,13 +699,14 @@ function StudentInput({
 }
 
 /* ─────────── Voice Input ─────────── */
-function VoiceInput({ myLang, onTranscript, draft }: { myLang: string; onTranscript: (t: string) => void; draft: string }) {
+function VoiceInput({ myLang, onTranscript, draft, offline }: { myLang: string; onTranscript: (t: string) => void; draft: string; offline?: boolean }) {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   async function startRecording() {
+    if (offline) { alert("fixture 화면에서는 음성 인식을 사용할 수 없어요."); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // Safari doesn't support audio/webm — use mp4 or let browser choose
@@ -774,7 +796,7 @@ function VoiceInput({ myLang, onTranscript, draft }: { myLang: string; onTranscr
 }
 
 /* ─────────── Drawing Input (Canvas) ─────────── */
-function DrawingInput({ onText, draft }: { onText: (t: string) => void; draft: string }) {
+function DrawingInput({ onText, draft, offline }: { onText: (t: string) => void; draft: string; offline?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -842,6 +864,7 @@ function DrawingInput({ onText, draft }: { onText: (t: string) => void; draft: s
   }
 
   async function recognizeHandwriting() {
+    if (offline) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     setProcessing(true);

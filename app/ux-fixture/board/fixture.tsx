@@ -60,7 +60,12 @@ function buildCards(): CardData[] {
   const cards: CardData[] = [];
 
   // 주제 1: 카드 1개 (짧은 글 하나)
-  cards.push(textCard({ id: "fx-a1", colId: "fx-col-1", authorName: "학생 07", timestamp: FIXED_NOW - 1800_000 }));
+  cards.push(textCard({
+    id: "fx-a1", colId: "fx-col-1", authorName: "학생 07",
+    timestamp: FIXED_NOW - 1800_000,
+    // U05 — 프로필로 이어지는 글(현재 선택된 동물이 보인다)
+    authorLearnerId: "L-07",
+  }));
 
   // 주제 2: 카드 50개 — 가장자리 입력을 앞쪽에 둔다.
   const edge: CardData[] = [
@@ -133,6 +138,18 @@ function buildCards(): CardData[] {
   return cards;
 }
 
+/** U05 검수용 학습자 프로필. 권위 저장소는 RoomConfig.learners 다. */
+const LEARNERS = {
+  "L-07": {
+    learnerId: "L-07", displayName: "학생 07", rosterStatus: "active" as const,
+    createdAt: FIXED_NOW, updatedAt: FIXED_NOW, version: 1, avatarAnimalId: "fox",
+  },
+  "L-vn": {
+    learnerId: "L-vn", displayName: "응우옌티민카이", rosterStatus: "active" as const,
+    createdAt: FIXED_NOW, updatedAt: FIXED_NOW, version: 1, avatarAnimalId: "penguin",
+  },
+};
+
 const FIXTURE: BoardFixture = {
   columns: [
     { id: "fx-col-1", title: "🙋 자기소개 / Introduce", color: "#F59E0B", order: 0 },
@@ -140,6 +157,28 @@ const FIXTURE: BoardFixture = {
     { id: "fx-col-3", title: "🌟 칭찬해요 / Praise", color: "#43C59E", order: 2 },
   ],
   cards: buildCards(),
+  /**
+   * U06 검수용 반응 조합. 실제 노드와 같은 모양 `{ clientId: 값 }` 이고
+   * 내 clientId 는 아래 컴포넌트가 넘기는 "fx-client-17" 이다.
+   *
+   * 02 §3.B 가 요구한 경계를 한 화면에서 다 보이게 깔았다:
+   *  - fx-a1     : 옛 `true` 만 3개. '좋아요' 로 집계돼야 하고 사라지면 안 된다.
+   *  - fx-b-long : 옛 `true` 와 신·구 반응 문자열이 섞임 + 내 선택이 옛 `true`.
+   *                (내 것이 like 로 선택 표시돼야 하고, 바꾸면 합계가 유지돼야 한다)
+   *  - fx-b-0    : 신규 like/cheer 만. 새 종류가 제대로 집계되는지.
+   *  - fx-b-1    : 내가 nice 를 고른 상태. 재선택 취소·교체를 눌러 볼 수 있다.
+   *  - 나머지    : 반응 0개 — 개수 칩이 아예 안 나오는 상태.
+   */
+  reactions: {
+    "fx-a1": { "fx-c-a": true, "fx-c-b": true, "fx-c-c": true },
+    "fx-b-long": {
+      "fx-client-17": true,
+      "fx-c-a": "thanks", "fx-c-b": "same", "fx-c-c": "nice",
+      "fx-c-d": "like", "fx-c-e": "cheer", "fx-c-f": true,
+    },
+    "fx-b-0": { "fx-c-a": "like", "fx-c-b": "like", "fx-c-c": "cheer" },
+    "fx-b-1": { "fx-client-17": "nice", "fx-c-a": "thanks" },
+  },
 };
 
 export default function BoardFixtureScreen() {
@@ -159,10 +198,17 @@ export default function BoardFixtureScreen() {
         myName: isTeacher ? "테스트 교사" : "학생 07",
         isTeacher,
         teacherLangs: isTeacher ? ROOM_LANGS : [],
+        ...(isTeacher ? {} : { learnerId: "L-07", animalId: "fox" }),
       }}
       roomCode="9999"
       roomLangs={ROOM_LANGS}
-      roomConfig={{ languages: ROOM_LANGS, rosterMode: true, roster: ["학생 07"] }}
+      roomConfig={{
+        languages: ROOM_LANGS, rosterMode: true, roster: ["학생 07"],
+        /* U05 — 카드의 authorLearnerId 가 여기로 이어져 작성자 아바타에 그
+           아이의 동물이 나온다. 프로필이 없는 옛 글은 결정적 폴백 동물로
+           떨어지므로 둘을 한 화면에서 비교할 수 있다. */
+        learners: LEARNERS,
+      }}
       myClientId="fx-client-17"
       onLogout={() => console.log("[fixture] onLogout")}
       onPraiseStudent={(id, name) => console.log("[fixture] praise", id, name)}

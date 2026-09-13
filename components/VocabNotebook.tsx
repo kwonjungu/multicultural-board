@@ -91,19 +91,22 @@ export default function VocabNotebook({ progress, stickersEarned, onOpenWord, la
       {/* Unstudied — 간단 칩 */}
       {unstudied.length > 0 && (
         <Section title={`${t("vocabSectionUnstudied", lang)} (${unstudied.length})`} tone="gray">
+          {/* U07/U09: 아직 안 배운 단어 칩이 95개쯤 깔린다. 예전에는 높이 29px 라
+              태블릿에서 손가락으로 옆 칩을 누르기 쉬웠다. control 토큰으로
+              최소 크기(터치 48px / 마우스 44px)를 걸고, 오터치 방지 간격도 준다. */}
           <div style={{
-            display: "flex", flexWrap: "wrap", gap: 6,
+            display: "flex", flexWrap: "wrap", gap: "var(--ux-space-2)",
           }}>
             {unstudied.map((w) => (
               <button
                 key={w.id}
                 onClick={() => onOpenWord(w)}
+                data-ux-role="control"
                 style={{
                   background: "#fff",
                   border: "1.5px solid #E5E7EB",
                   borderRadius: 999,
-                  padding: "6px 12px",
-                  fontSize: 13, fontWeight: 800, color: "#4B5563",
+                  fontWeight: 800, color: "#4B5563",
                   cursor: "pointer", fontFamily: "inherit",
                 }}
               >{w.ko}</button>

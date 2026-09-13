@@ -139,12 +139,44 @@ check('음성은 한 번에 하나, 떠날 때 정리한다 (AUDIO-01)', () => {
   assert.ok(!/autoplay|\.play\(\)/.test(cc.replace(/allow="[^"]*"/g, '')), '자동 재생 금지');
 });
 
+/* U06 로 반응 로직이 lib/cardReactions.ts 로 분리됐다. 옛 `true` 호환처럼
+   눈으로 판단할 수 없는 규칙은 scripts/test-card-reactions.mjs 가 **실제로
+   실행해서** 검사한다(9건). 여기서는 화면 쪽 계약만 본다. */
 check('반응은 의미 있는 말이고, 기존 좋아요 데이터를 보존한다', () => {
-  assert.match(cc, /reactThanks/); assert.match(cc, /reactSame/); assert.match(cc, /reactNice/);
+  const reactions = read('lib/cardReactions.ts');
+  for (const key of ['reactThanks', 'reactSame', 'reactNice', 'reactLike', 'reactCheer']) {
+    assert.match(reactions, new RegExp(key), `반응 라벨 키가 없다: ${key}`);
+  }
+  // 저장된 값이 그대로 이 id 라 이름을 바꾸면 옛 반응이 사라진다.
+  for (const id of ['"thanks"', '"same"', '"nice"']) {
+    assert.match(reactions, new RegExp(`id: ${id}`), `기존 반응 id 가 바뀌었다: ${id}`);
+  }
   assert.match(cc, /rooms\/\$\{roomCode\}\/cards\/\$\{card\.id\}\/likes/, '반응 저장 경로(likes)를 바꾸지 말 것');
-  assert.match(cc, /let legacy = 0;/, '옛 true 값을 세는 호환 어댑터가 없다');
-  assert.match(cc, /cardLegacyLikes/, '예전 좋아요가 화면에서 사라졌다');
+  assert.match(reactions, /let legacy = 0;/, '옛 true 값을 세는 호환 어댑터가 없다');
+  // 예전 좋아요는 이제 '좋아요'(like)로 집계돼 화면 개수에 그대로 남는다.
+  assert.match(reactions, /val === true\s*\?\s*"like"/, '옛 true 가 좋아요로 집계되지 않는다');
   assert.ok(!/sort\(\(a, b\) => b\.likeCount/.test(cc), '인기 순위를 기본 노출하지 말 것');
+});
+
+check('U06: 세부 반응은 눌러야 열리고 disclosure 계약을 지킨다', () => {
+  // 예전에는 반응 버튼 3개가 카드마다 상시 자리를 차지해, 카드 50개 화면의
+  // 조작이 318개였다. 기본은 버튼 하나여야 한다.
+  assert.match(cc, /aria-expanded=\{reactOpen\}/, '트리거에 aria-expanded 가 없다');
+  assert.match(cc, /aria-controls=\{reactPanelId\}/, '트리거가 패널을 가리키지 않는다');
+  assert.match(cc, /id=\{reactPanelId\}/, '패널에 id 가 없다');
+  assert.match(cc, /aria-label=\{t\("cardReactions"/, '패널에 이름이 없다');
+  assert.match(cc, /e\.key !== "Escape"/, 'Escape 로 닫히지 않는다');
+  assert.match(cc, /pointerdown/, '바깥 클릭으로 닫히지 않는다');
+  assert.match(cc, /reactTriggerRef\.current\?\.focus\(\)/, '닫을 때 포커스를 트리거로 되돌리지 않는다');
+  // menu 역할을 붙이면 화살표 키 계약까지 구현해야 한다 — 일반 group 으로 둔다.
+  assert.ok(!/role="menu"/.test(cc), 'menu 역할은 키보드 계약을 함께 구현해야 한다');
+});
+
+check('U06: 저장 실패를 성공처럼 보이게 두지 않고 연타를 직렬화한다', () => {
+  assert.match(cc, /reactQueue/, '반응 쓰기가 직렬화되지 않아 연타가 겹친다');
+  assert.match(cc, /setReactError\(t\("cardReactFailed"/, '저장 실패를 알리지 않는다');
+  // 실패하면 낙관적 표시를 이전 선택으로 되돌려야 한다.
+  assert.match(cc, /if \(prevMine\) copy\[myClientId\] = prevMine;/, '실패 시 이전 선택으로 복원하지 않는다');
 });
 
 check('선택 상태는 색 말고도 알린다', () => {
@@ -200,6 +232,8 @@ check('새 문구는 15개 언어 키를 모두 갖는다', () => {
     'cardRetryTranslate', 'cardShowOriginal', 'cardReadMore', 'cardListen', 'cardStop', 'cardReply',
     'cardAlsoKorean', 'cardOtherLangs', 'cardImageFailed', 'cardLegacyLikes',
     'reactThanks', 'reactSame', 'reactNice',
+    // U06 신규
+    'reactLike', 'reactCheer', 'cardReactOpen', 'cardReactChange', 'cardReactFailed',
   ];
   for (const key of keys) {
     const block = i18n.split(new RegExp(`\\n  ${key}: \\{`))[1];
@@ -209,6 +243,32 @@ check('새 문구는 15개 언어 키를 모두 갖는다', () => {
       assert.ok(new RegExp(`\\b${l}:\\s*"`).test(body), `${key} 에 ${l} 없음`);
     }
   }
+});
+
+/* ── U04: 게시글·댓글의 상대시간 표시 제거 ────────────────────────────
+   표시만 없앤 것이지 timestamp 필드를 지운 게 아니다. 정렬·수정 가능 시간·
+   댓글 승인 대기 판정은 계속 timestamp 를 읽어야 한다. 두 가지를 같이 검사한다. */
+check('U04: 카드·댓글에 상대시간 문자열을 그리지 않는다', () => {
+  const forbidden = [
+    /시간 전/, /분 전/, /초 전/, /["'`]방금["'`]/,
+    /timeAgo\s*\(/, /\bformatAgo\b/, /\brelativeTime\b/,
+  ];
+  for (const re of forbidden) {
+    assert.ok(!re.test(cc), `PadletCard 에 상대시간 표시가 남아 있다: ${re}`);
+    assert.ok(!re.test(bc), `PadletBoard 에 상대시간 표시가 남아 있다: ${re}`);
+  }
+  // 이름은 그대로 보여야 한다 — 시간만 뺀 것이지 작성자를 지운 게 아니다.
+  assert.match(cc, /card\.authorName/, '작성자 이름 표시가 사라졌다');
+  assert.match(cc, /comment\.authorName/, '댓글 작성자 이름 표시가 사라졌다');
+});
+
+check('U04: timestamp 데이터 계약은 그대로다', () => {
+  assert.match(cc, /EDIT_WINDOW_MS/, '수정 가능 시간 판정이 사라졌다');
+  assert.match(cc, /now - card\.timestamp < EDIT_WINDOW_MS/, '수정 가능 시간 경계가 바뀌었다');
+  assert.match(cc, /comment\.timestamp/, '댓글 승인 대기 판정이 timestamp 를 쓰지 않는다');
+  assert.match(cc, /timestamp:\s*Date\.now\(\)/, '새 댓글이 timestamp 를 더 이상 쓰지 않는다');
+  // 정렬은 보드 쪽 계약이다.
+  assert.match(bc, /timestamp/, 'PadletBoard 가 timestamp 를 읽지 않는다 — 정렬 회귀 의심');
 });
 
 console.log(`\n${count} checks passed — DOM/음성/시각 검사는 shot-board.mjs 와 Q 하네스에서 별도 수행`);

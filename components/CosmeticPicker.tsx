@@ -24,6 +24,15 @@ import type {
   StudentCosmetics, SkinId, HatId, PetId, TrophyId, BackdropId, AuraId, HeldId, AccId,
 } from "@/lib/types";
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않는다. '저장' 을 눌러도 로컬 미리보기만 갱신될 뿐
+ * setCosmetics 쓰기는 나가지 않는다.
+ */
+export interface CosmeticFixture {
+  current?: StudentCosmetics;
+}
+
 interface Props {
   open: boolean;
   roomCode: string;
@@ -33,6 +42,7 @@ interface Props {
   onClose: () => void;
   onSaved?: () => void;
   onSaveError?: (msg: string) => void;
+  fixture?: CosmeticFixture;
 }
 
 const ALL_SKINS: SkinId[] = ["classic", "orange", "green", "sky", "pink", "purple"];
@@ -80,9 +90,12 @@ export default function CosmeticPicker({
   onClose,
   onSaved,
   onSaveError,
+  fixture,
 }: Props) {
-  const [current, setCurrent] = useState<StudentCosmetics>(DEFAULT_COSMETICS);
-  const [draft, setDraft] = useState<StudentCosmetics>(DEFAULT_COSMETICS);
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
+  const [current, setCurrent] = useState<StudentCosmetics>(fixture?.current ?? DEFAULT_COSMETICS);
+  const [draft, setDraft] = useState<StudentCosmetics>(fixture?.current ?? DEFAULT_COSMETICS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,6 +147,7 @@ export default function CosmeticPicker({
   // only mirror into `current` so the local "last saved" baseline stays fresh.
   const seededRef = useRef(false);
   useEffect(() => {
+    if (offline) return;
     if (!open || !myClientId) return;
     seededRef.current = false;
     const unsub = subscribeCosmetics(roomCode, myClientId, (c) => {
@@ -144,7 +158,7 @@ export default function CosmeticPicker({
       }
     });
     return () => { unsub(); };
-  }, [open, roomCode, myClientId]);
+  }, [open, roomCode, myClientId, offline]);
 
   // Reset error on open / close
   useEffect(() => {
@@ -182,6 +196,7 @@ export default function CosmeticPicker({
     setSaving(false);
     onSaved?.();
     onClose();
+    if (offline) return; // fixture: 코스메틱 저장 쓰기 금지
     setCosmetics(roomCode, myClientId, snapshot).catch((e) => {
       console.error("cosmetic save error:", e);
       onSaveError?.((e as Error).message || "저장 실패");

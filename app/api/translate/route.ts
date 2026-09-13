@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { LANGUAGES } from "@/lib/constants";
 import { TranslateRequest } from "@/lib/types";
+import { isAnimalId } from "@/lib/animals";
 import { withGroqKeyFallback } from "@/lib/groq-client";
 import {
   validateTranslation, cleanTranslation, batchValidity,
@@ -40,6 +41,8 @@ export async function POST(req: NextRequest) {
       youtubeId,
       status,
       authorClientId,
+      authorLearnerId,
+      authorAnimalId,
     } = body;
 
     if (!fromLang || (!colId && cardType !== "comment")) {
@@ -90,6 +93,10 @@ export async function POST(req: NextRequest) {
       ...(youtubeId ? { youtubeId } : {}),
       ...(status ? { status } : {}),
       ...(authorClientId ? { authorClientId } : {}),
+      // U05 — 동물은 allowlist 를 통과한 값만 저장한다. 클라이언트가 보낸
+      // 문자열을 그대로 쓰면 임의 값이 프로필 표시에 섞인다.
+      ...(authorLearnerId ? { authorLearnerId } : {}),
+      ...(isAnimalId(authorAnimalId) ? { authorAnimalId } : {}),
     };
 
     await cardRef.set(cardData);
