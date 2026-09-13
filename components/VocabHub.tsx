@@ -51,27 +51,44 @@ const SUB_ICON: Record<string, string> = {
   "인사": "👋",
 };
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않고 /api/* 도 부르지 않는다. 운영 방(1111)의 학생 진도·
+ * 표현 기록을 fixture 로 복제하지 않는다 — 여기 값은 전부 지어낸 것이다.
+ */
+export interface VocabFixture {
+  progress?: ProgressMap;
+  learner?: LearnerState | null;
+  expressions?: ExpressionEntry[];
+  /** 소통창에서 긁어온 문장. 자동 스캔은 서버 대신 로컬 추출로만 돈다. */
+  cardTexts?: string[];
+  stickersEarned?: number;
+}
+
 interface Props {
   user: UserConfig;
   roomCode: string;
   onBack: () => void;
+  fixture?: VocabFixture;
 }
 
-export default function VocabHub({ user, roomCode, onBack }: Props) {
+export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
   const lang = user.myLang;
-  const [progress, setProgress] = useState<ProgressMap>({});
+  const [progress, setProgress] = useState<ProgressMap>(fixture?.progress ?? {});
   const [activeSub, setActiveSub] = useState<string | "all">("all");
   const [openWord, setOpenWord] = useState<VocabWord | null>(null);
 
   // 소통창 카드 텍스트 수집
-  const [cardTexts, setCardTexts] = useState<string[]>([]);
+  const [cardTexts, setCardTexts] = useState<string[]>(fixture?.cardTexts ?? []);
   const [matched, setMatched] = useState<MatchedWord[]>([]);
   const [scanState, setScanState] = useState<"idle" | "scanning" | "error">("idle");
   const scanOnce = useRef(false);
 
   // 자동 보상 축하 큐
   const [awardQueue, setAwardQueue] = useState<RewardRule[]>([]);
-  const [stickersEarned, setStickersEarned] = useState(0);
+  const [stickersEarned, setStickersEarned] = useState(fixture?.stickersEarned ?? 0);
 
   // 뷰 모드 (트리 / 그리드 / 단어장) — 듀오링고 스타일 트리가 기본
   const [viewMode, setViewMode] = useState<"tree" | "grid" | "notebook">("tree");
@@ -84,24 +101,26 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
   const [studyQueue, setStudyQueue] = useState<VocabWord[] | null>(null);
   const [studyIdx, setStudyIdx] = useState(0);
   const [teacherView, setTeacherView] = useState(false);
-  const [learner, setLearner] = useState<LearnerState | null>(null);
+  const [learner, setLearner] = useState<LearnerState | null>(fixture?.learner ?? null);
   const [now, setNow] = useState(Date.now());
   const [goalToast, setGoalToast] = useState<string | null>(null);
   const goalAdjustedRef = useRef(false);
-  const [expressions, setExpressions] = useState<ExpressionEntry[]>([]);
+  const [expressions, setExpressions] = useState<ExpressionEntry[]>(fixture?.expressions ?? []);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [showWriteSheet, setShowWriteSheet] = useState(false);
   const [showDictation, setShowDictation] = useState(false);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeLearner(roomCode, user.myName, setLearner);
     return unsub;
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeExpressions(roomCode, user.myName, setExpressions);
     return unsub;
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   // 하트 회복 카운트다운 1초마다
   useEffect(() => {
@@ -111,6 +130,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
 
   // 단어카드 진입 시 1회 — 최근 학습 데이터로 데일리 골 자동 조정
   useEffect(() => {
+    if (offline) return;
     if (!learner) return;
     if (goalAdjustedRef.current) return;
     goalAdjustedRef.current = true;
@@ -130,14 +150,16 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [learner, roomCode, user.myName]);
+  }, [offline, learner, roomCode, user.myName]);
 
   useEffect(() => {
+    if (offline) return;
     setProgress(loadProgress(roomCode, user.myName));
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   // Firebase 진행도 구독 — 원격 변경을 로컬과 머지 (doneSentences 합집합, 최대 lastStudied)
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeProgress(roomCode, user.myName, (remote) => {
       setProgress((local) => {
         const merged = mergeProgress(local, remote);
@@ -149,24 +171,27 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       });
     });
     return () => unsub();
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   // 받은 vocab 스티커 수 (지급 기록 개수)
   useEffect(() => {
+    if (offline) return;
     let cancelled = false;
     getAwardedIds(roomCode, user.myName).then((s) => {
       if (!cancelled) setStickersEarned(s.size);
     });
     return () => { cancelled = true; };
-  }, [roomCode, user.myName, awardQueue.length]); // 큐 변경 시 새로고침
+  }, [offline, roomCode, user.myName, awardQueue.length]); // 큐 변경 시 새로고침
 
   // Hub 마운트 시 30일 넘은 녹음 정리 (백그라운드, 1회)
   useEffect(() => {
+    if (offline) return;
     cleanupExpiredRecordings(roomCode, user.myName).catch(() => { /* silent */ });
-  }, [roomCode, user.myName]);
+  }, [offline, roomCode, user.myName]);
 
   // 카드 구독 — originalText + translations.ko 수집
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const cardsRef = ref(db, `rooms/${roomCode}/cards`);
     const unsub = onValue(cardsRef, (snap) => {
@@ -184,7 +209,7 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
       setCardTexts(texts);
     });
     return () => unsub();
-  }, [roomCode]);
+  }, [offline, roomCode]);
 
   // 카드가 처음 들어왔을 때 1회 자동 스캔
   useEffect(() => {
@@ -197,6 +222,8 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
 
   async function runScan() {
     if (cardTexts.length === 0) { setMatched([]); return; }
+    // fixture 에서는 서버를 부르지 않는다 — 같은 로컬 추출기로만 채운다.
+    if (offline) { setMatched(extractVocabLocal(cardTexts, 12)); setScanState("idle"); return; }
     setScanState("scanning");
     try {
       const res = await fetch("/api/vocab-extract", {
@@ -217,6 +244,8 @@ export default function VocabHub({ user, roomCode, onBack }: Props) {
 
   function persist(next: ProgressMap, opts?: { checkRewards?: boolean; touchedWordId?: string }) {
     setProgress(next);
+    // fixture 에서는 화면 상태만 움직이고 localStorage/Firebase/보상은 건드리지 않는다.
+    if (offline) return;
     saveProgress(roomCode, user.myName, next);
 
     // 변경된 단어만 Firebase 에 싱크 — 낙관적 fire-and-forget

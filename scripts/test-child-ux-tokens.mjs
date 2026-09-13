@@ -46,12 +46,31 @@ check('흰 글자를 밝은 노랑 위에 쓰지 않는다', () => {
 const rem = (v) => { const m = /^([\d.]+)rem$/.exec(v); return m ? parseFloat(m[1]) * 16 : NaN; };
 const px = (v) => { const m = /^([\d.]+)px$/.exec(v); return m ? parseFloat(m[1]) : NaN; };
 
-check('기본 글자 크기가 최소 규격을 만족', () => {
-  assert.ok(rem(T.typography.body.basic) >= 20, '본문 20px 상당 미만');
-  assert.ok(rem(T.typography['body-emphasis'].basic) >= 24);
-  assert.ok(rem(T.typography.label.basic) >= 18, '라벨 18px 상당 미만');
-  assert.ok(rem(T.typography.secondary.basic) >= 16);
+/* 계약 개정 v2 (2026-09-13, docs/child-ux-20260913/responsive-plan.md §1).
+   핵심 기기를 휴대폰이 아닌 태블릿·크롬북·노트북으로 확정하며 역할별 크기를
+   내렸다(U02/U09). 하한을 지우는 게 아니라 근거 있는 값으로 옮긴 것이다 —
+   대비 검사와 조작 영역 검사는 아래에 그대로 남아 있다. */
+check('기본 글자 크기가 개정 규격(v2)을 만족', () => {
+  assert.ok(rem(T.typography.body.basic) >= 16, '본문 16px 상당 미만 — 더 내리지 말 것');
+  assert.ok(rem(T.typography['body-emphasis'].basic) >= 18);
+  assert.ok(rem(T.typography.label.basic) >= 15, '버튼 라벨 15px 상당 미만');
+  assert.ok(rem(T.typography.secondary.basic) >= 13, '보조 13px 하한 — 필수 지시에는 쓰지 않는 역할');
   assert.ok(parseFloat(T.lineHeight.reading.basic) >= 1.6, '다국어 결합문자 잘림 방지');
+});
+
+check('학습 읽기 역할이 일반 본문과 분리되어 있고 더 크다', () => {
+  const body = rem(T.typography.body.basic);
+  assert.ok(rem(T.typography['learn-sentence'].basic) > body, '학습 예문이 일반 본문보다 크지 않다');
+  assert.ok(rem(T.typography['learn-word'].basic) >= 28, '집중 학습 단어 28px 상당 미만');
+  // 게시판 밀도를 올려도 학습 크기가 따라 내려가면 안 된다 — 같은 토큰이면 그렇게 된다.
+  assert.notEqual(T.typography['learn-sentence'].basic, T.typography.body.basic);
+});
+
+check('제목이 본문보다 확실히 크다', () => {
+  const titleMin = /clamp\(\s*([\d.]+)rem/.exec(T.typography.title.basic);
+  assert.ok(titleMin, 'title 이 clamp 형식이 아니다');
+  assert.ok(parseFloat(titleMin[1]) * 16 >= 24, '화면 제목 24px 상당 미만');
+  assert.ok(parseFloat(titleMin[1]) * 16 > rem(T.typography.body.basic));
 });
 
 check('큰 글씨는 어떤 항목도 기본보다 작아지지 않는다', () => {
@@ -64,12 +83,30 @@ check('큰 글씨는 어떤 항목도 기본보다 작아지지 않는다', () =
   }
 });
 
-check('조작 영역 크기 (제품 기준 56px / 주 동작 64px)', () => {
-  assert.ok(px(T.controls['control-min'].basic) >= 56);
-  assert.ok(px(T.controls['action-min'].basic) >= 64);
-  assert.ok(px(T.controls['control-min'].large) >= 64);
-  assert.ok(px(T.controls['action-min'].large) >= 72);
+check('조작 영역 크기 (v2: 터치 48px / 주 동작 56px)', () => {
+  // WCAG 2.5.5(44px)·2.5.8(24px) 을 모두 넘는 값이다. 이 아래로는 내리지 않는다.
+  assert.ok(px(T.controls['control-min'].basic) >= 48, '터치 조작 48px 미만');
+  assert.ok(px(T.controls['action-min'].basic) >= 56, '주 동작 56px 미만');
+  assert.ok(px(T.controls['control-min'].large) >= 56);
+  assert.ok(px(T.controls['action-min'].large) >= 64);
   assert.ok(px(T.controls['control-gap-min'].basic) >= 8, '오터치 방지 간격');
+});
+
+/* ── 2b. 넓은 화면 밀도가 JSON 단일 소스 안에 있는가 (v2) ────────── */
+check('넓은 화면 값이 tokens.json 에 있고 TS 에 하드코딩되어 있지 않다', () => {
+  const r = T.responsive;
+  assert.ok(r, 'responsive 블록이 없다');
+  assert.match(r.denseFrom, /^\d+px$/);
+  for (const [k, v] of Object.entries(r.denseTypography)) {
+    assert.ok(Number.isFinite(rem(v)), `denseTypography.${k}=${v} 가 rem 이 아니다`);
+    assert.ok(rem(v) <= rem(T.typography[k].basic), `${k}: 넓은 화면 값이 기본보다 크다`);
+  }
+  // 조밀해져도 읽을 수 없을 만큼 작아지면 안 된다.
+  assert.ok(rem(r.denseTypography.body) >= 15, '넓은 화면 본문 15px 상당 미만');
+  assert.ok(rem(r.denseTypography.secondary) >= 13, '넓은 화면 보조 13px 상당 미만');
+  // 마우스 전용으로 줄이는 값도 WCAG 2.5.5 의 44px 아래로는 못 간다.
+  assert.ok(px(r.finePointerControls['control-min']) >= 44, 'fine pointer 조작 44px 미만');
+  assert.ok(px(r.finePointerControls['action-min']) >= 44);
 });
 
 check('간격은 4px 배수', () => {
@@ -106,6 +143,23 @@ check('토큰 CSS 가 모든 값을 실제로 내보낸다', () => {
     assert.ok(new RegExp(`tokens\.${group}`).test(css), `${group} 이 크기별 블록에서 빠졌다`);
   }
   assert.match(css, /:root\[data-ux-text="large"\]/, '큰 글씨 블록 없음');
+  // v2: 넓은 화면 값을 TS 리터럴로 되돌리면 JSON 검사를 다시 우회하게 된다.
+  assert.ok(/tokens\.responsive|r\.denseTypography/.test(css), 'responsive 가 CSS 생성에서 빠졌다');
+  const code = stripComments(css);
+  assert.ok(
+    !/@media \(min-width: \d+px\)\{[^}]*--ux-font-[a-z-]+:\s*[\d.]+rem/.test(code.replace(/\s+/g, ' ')),
+    '넓은 화면 글자 값이 TS 안에 리터럴로 박혀 있다 — tokens.json 의 responsive 로 옮길 것'
+  );
+});
+
+check('넓은 화면에서 조작 영역은 폭이 아니라 포인터 정밀도로 줄인다', () => {
+  // 폭만 보고 줄이면 1366px 터치 크롬북·1180px 태블릿 가로에서 손가락 대상이 작아진다.
+  const code = stripComments(tokensTs).replace(/\s+/g, ' ');
+  assert.match(code, /pointer: fine/, 'fine pointer 조건 없이 조작 영역을 줄이고 있다');
+  const ctrlBlocks = code.match(/@media[^{]*\{[^{]*\{[^}]*--ux-control-min[^}]*\}/g) || [];
+  for (const b of ctrlBlocks) {
+    assert.match(b, /pointer: fine/, `조작 영역을 폭만으로 줄이는 블록이 있다: ${b.slice(0, 80)}`);
+  }
 });
 
 check('layout 이 토큰을 한 번만 주입하고 부팅 컴포넌트를 단다', () => {

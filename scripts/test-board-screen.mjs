@@ -211,4 +211,30 @@ check('새 문구는 15개 언어 키를 모두 갖는다', () => {
   }
 });
 
+/* ── U04: 게시글·댓글의 상대시간 표시 제거 ────────────────────────────
+   표시만 없앤 것이지 timestamp 필드를 지운 게 아니다. 정렬·수정 가능 시간·
+   댓글 승인 대기 판정은 계속 timestamp 를 읽어야 한다. 두 가지를 같이 검사한다. */
+check('U04: 카드·댓글에 상대시간 문자열을 그리지 않는다', () => {
+  const forbidden = [
+    /시간 전/, /분 전/, /초 전/, /["'`]방금["'`]/,
+    /timeAgo\s*\(/, /\bformatAgo\b/, /\brelativeTime\b/,
+  ];
+  for (const re of forbidden) {
+    assert.ok(!re.test(cc), `PadletCard 에 상대시간 표시가 남아 있다: ${re}`);
+    assert.ok(!re.test(bc), `PadletBoard 에 상대시간 표시가 남아 있다: ${re}`);
+  }
+  // 이름은 그대로 보여야 한다 — 시간만 뺀 것이지 작성자를 지운 게 아니다.
+  assert.match(cc, /card\.authorName/, '작성자 이름 표시가 사라졌다');
+  assert.match(cc, /comment\.authorName/, '댓글 작성자 이름 표시가 사라졌다');
+});
+
+check('U04: timestamp 데이터 계약은 그대로다', () => {
+  assert.match(cc, /EDIT_WINDOW_MS/, '수정 가능 시간 판정이 사라졌다');
+  assert.match(cc, /now - card\.timestamp < EDIT_WINDOW_MS/, '수정 가능 시간 경계가 바뀌었다');
+  assert.match(cc, /comment\.timestamp/, '댓글 승인 대기 판정이 timestamp 를 쓰지 않는다');
+  assert.match(cc, /timestamp:\s*Date\.now\(\)/, '새 댓글이 timestamp 를 더 이상 쓰지 않는다');
+  // 정렬은 보드 쪽 계약이다.
+  assert.match(bc, /timestamp/, 'PadletBoard 가 timestamp 를 읽지 않는다 — 정렬 회귀 의심');
+});
+
 console.log(`\n${count} checks passed — DOM/음성/시각 검사는 shot-board.mjs 와 Q 하네스에서 별도 수행`);

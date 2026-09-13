@@ -30,6 +30,14 @@ const tokens = raw as unknown as {
   textSizes: TextSize[];
   legacyZoom: Record<TextSize, number>;
   contrastPairs: { id: string; fg: string; bg: string; min: number; note?: string }[];
+  responsive: {
+    note: string;
+    denseFrom: string;
+    denseTypography: Record<string, string>;
+    finePointerControls: Record<string, string>;
+    containers: { upTo: string; layout: string; maxWidth?: string }[];
+    minReadingColumn: string;
+  };
 };
 
 export const CHILD_UX = tokens;
@@ -45,6 +53,40 @@ export const ux = {
   radius: (k: keyof typeof tokens.radius & string) => `var(--ux-radius-${k})`,
   motion: (k: keyof typeof tokens.motion & string) => `var(--ux-motion-${k})`,
 } as const;
+
+/**
+ * 넓은 화면 밀도 — 값은 전부 `tokens.json` 의 `responsive` 에서 온다.
+ * v1 에서는 이 블록의 숫자가 TS 안에 리터럴로 박혀 있어 JSON 만 읽는 검증
+ * 스크립트의 사각지대였다. 여기서는 조립만 한다.
+ *
+ * 두 축을 분리한다:
+ *  - **글자 밀도는 폭으로.** 960px 이상이면 한 단계 조밀하게. 20px 본문은
+ *    손가락으로 휴대폰을 쓰는 아이 기준이라, 태블릿·크롬북에서 그대로 두면
+ *    화면이 '세로로 늘린 휴대폰' 이 된다.
+ *  - **조작 영역은 포인터 정밀도로.** 폭만 보고 줄이면 1366px 터치 크롬북과
+ *    1180px 태블릿 가로에서 손가락 대상이 작아진다. `pointer: fine` — 마우스·
+ *    트랙패드일 때만 줄인다.
+ *
+ * '큰 글씨' 를 고른 사용자에게는 어느 쪽도 적용하지 않는다 — 크게 보려고
+ * 고른 설정을 화면 폭이나 입력 장치가 되돌리면 안 된다.
+ */
+function responsiveCss(): string {
+  const r = tokens.responsive;
+  const type = Object.entries(r.denseTypography)
+    .map(([k, v]) => `--ux-font-${k}:${v};`)
+    .join("");
+  const ctrl = Object.entries(r.finePointerControls)
+    .filter(([k]) => k !== "note")
+    .map(([k, v]) => `--ux-${k}:${v};`)
+    .join("");
+  return `
+@media (min-width: ${r.denseFrom}){
+  :root:not([data-ux-text="large"]){${type}}
+}
+@media (min-width: ${r.denseFrom}) and (pointer: fine){
+  :root:not([data-ux-text="large"]){${ctrl}}
+}`;
+}
 
 function block(size: TextSize): string {
   const lines: string[] = [];
@@ -84,22 +126,7 @@ export function childUxCss(): string {
 :root[data-ux-text="large"] [data-ux-root]:not([data-ux-root] *){ zoom: calc(1 / var(--ux-legacy-zoom)); }
 [data-ux-legacy]{ zoom: var(--ux-legacy-zoom, 1); }
 
-/* ── 넓은 화면 밀도 ───────────────────────────────────────────────────
-   20~24px 본문과 56px 조작 영역은 손가락으로 휴대폰을 쓰는 아이 기준이다.
-   마우스를 쓰는 데스크톱에서 그대로 두면 화면이 '세로로 늘린 휴대폰' 이
-   되어 한 번에 보이는 내용이 너무 적다. 1024px 이상에서는 한 단계 줄인다.
-   '큰 글씨' 를 고른 사용자에게는 적용하지 않는다 — 크게 보려고 고른 설정을
-   화면 폭이 되돌리면 안 된다. */
-@media (min-width: 1024px){
-  :root:not([data-ux-text="large"]){
-    --ux-font-body: 1.0625rem;
-    --ux-font-body-emphasis: 1.25rem;
-    --ux-font-label: 1rem;
-    --ux-font-secondary: .9375rem;
-    --ux-control-min: 44px;
-    --ux-action-min: 52px;
-  }
-}
+${responsiveCss()}
 
 /* 아이 조작 영역: 글이 길면 가로가 아니라 세로로 늘어난다. */
 [data-ux-role="control"]{
@@ -124,6 +151,15 @@ export function childUxCss(): string {
 [data-ux-role="label"]{ font-size: var(--ux-font-label); line-height: var(--ux-lh-tight); }
 [data-ux-role="secondary"]{ font-size: var(--ux-font-secondary); line-height: var(--ux-lh-tight); color: var(--ux-ink-soft); }
 [data-ux-role="title"]{ font-size: var(--ux-font-title); line-height: var(--ux-lh-tight); }
+
+/* 학습 읽기 역할 — 일반 카드 본문과 분리한다. 게시판 밀도를 올려도(U02)
+   단어 학습의 읽기 크기는 지켜야 하므로 같은 토큰을 쓰지 않는다. */
+[data-ux-role="learn-sentence"]{ font-size: var(--ux-font-learn-sentence); line-height: var(--ux-lh-reading); }
+[data-ux-role="learn-word"]{ font-size: var(--ux-font-learn-word); line-height: var(--ux-lh-tight); font-weight: 700; }
+
+/* 긴 한국어는 어절 단위로 끊고, 공백 없는 긴 문자열만 강제로 접는다.
+   베트남어 등 긴 번역문이 카드 밖으로 넘치던 것을 막는다. */
+[data-ux-role]{ overflow-wrap: anywhere; word-break: keep-all; }
 
 [data-ux-surface]{ background: var(--ux-surface); border-radius: var(--ux-radius-surface); }
 [data-ux-surface="panel"]{ border-radius: var(--ux-radius-panel); }

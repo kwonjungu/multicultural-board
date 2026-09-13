@@ -48,12 +48,10 @@ export function readReactions(raw: RawReactions | null | undefined, myClientId?:
   return { counts, legacy, mine };
 }
 
-function timeAgo(ts: number) {
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return "방금";
-  if (s < 3600) return `${Math.floor(s / 60)}분 전`;
-  return `${Math.floor(s / 3600)}시간 전`;
-}
+/* U04: 게시글·댓글의 상대시간 표시를 없앴다. '선00 · 1995시간 전' 처럼 시간이
+   작성자 옆에서 가장 먼저 읽히는 것이 아이에게 아무 의미가 없다는 사용자 요구다.
+   `card.timestamp` 자체는 그대로 둔다 — 정렬, 수정 가능 시간(EDIT_WINDOW_MS),
+   댓글 승인 대기 판정이 모두 이 값을 쓴다. 표시만 뺀 것이지 필드를 지운 게 아니다. */
 
 interface Props {
   card: CardData;
@@ -431,12 +429,15 @@ export default function PadletCard({
         </span>
         <span className="pc-who-text">
           <span data-ux-role="label" className="pc-name"><bdi>{card.authorName}</bdi></span>
-          <span data-ux-role="secondary" className="pc-meta">
-            {timeAgo(card.timestamp)}
-            {card.isTeacher ? ` · ${t("teacherTag", viewerLang)}` : ""}
-            {card.editedAt ? " · 수정됨" : ""}
-            {isPending ? " · 선생님이 확인하고 있어요" : ""}
-          </span>
+          {(card.isTeacher || card.editedAt || isPending) && (
+            <span data-ux-role="secondary" className="pc-meta">
+              {[
+                card.isTeacher ? t("teacherTag", viewerLang) : null,
+                card.editedAt ? "수정됨" : null,
+                isPending ? "선생님이 확인하고 있어요" : null,
+              ].filter(Boolean).join(" · ")}
+            </span>
+          )}
         </span>
         {(canEdit || (canDelete && onDelete) || (isTeacher && onPraise && !card.isTeacher)) && (
           <span className="pc-owner-tools">
@@ -708,7 +709,7 @@ export default function PadletCard({
               return (
                 <div key={comment.id} className="pc-comment">
                   <p data-ux-role="secondary" className="pc-comment-who">
-                    <bdi>{comment.authorName}</bdi> · {timeAgo(comment.timestamp)}
+                    <bdi>{comment.authorName}</bdi>
                     {isPendingComment ? ` · ${t("commentPending", viewerLang)}` : ""}
                   </p>
                   <p data-ux-role="body" data-ux-reading className="pc-body">{displayText}</p>
