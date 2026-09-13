@@ -1069,6 +1069,8 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
       {/* Expression review modal */}
       {reviewOpen && (
         <ExpressionReview
+          offline={offline}
+          fixtureExpressions={expressions}
           roomCode={roomCode}
           clientId={user.myName}
           studentName={user.myName}
@@ -1094,6 +1096,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
       {/* Test modal */}
       {quiz && (
         <VocabTest
+          offline={offline}
           questions={quiz}
           roomCode={roomCode}
           clientId={user.myName}

@@ -186,13 +186,13 @@ export default function PostFixture() {
 
   return (
     <main style={{ padding: 16, display: "grid", gap: 16, maxWidth: 900, margin: "0 auto", overflowWrap: "anywhere" }}>
-      <h1 style={{ fontSize: "1.4rem", margin: 0 }}>작성 흐름 fixture (개발 전용)</h1>
-      <p style={{ margin: 0 }}>
+      <h1 data-fixture-chrome style={{ fontSize: "1.4rem", margin: 0 }}>작성 흐름 fixture (개발 전용)</h1>
+      <p data-fixture-chrome style={{ margin: 0 }}>
         운영 방·Firebase·원격 API 를 쓰지 않는다. 저장은 아래 가짜 함수가 받고,
         <code> /api/* </code> 는 이 화면이 가로챈다.
       </p>
 
-      <section style={{ display: "grid", gap: 8 }}>
+      <section data-fixture-chrome style={{ display: "grid", gap: 8 }}>
         <strong>저장 시나리오</strong>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {SCENARIOS.map((s) => (
@@ -233,7 +233,7 @@ export default function PostFixture() {
         </div>
       </section>
 
-      <section style={{ display: "grid", gap: 8 }}>
+      <section data-fixture-chrome style={{ display: "grid", gap: 8 }}>
         <strong>가짜 저장소 기록 (같은 clientRequestId 는 한 번만 저장)</strong>
         <ol data-fx="log" style={{ margin: 0, paddingLeft: 20 }}>
           {logs.map((l) => (
@@ -246,7 +246,7 @@ export default function PostFixture() {
         <p data-fx="store-size" style={{ margin: 0 }}>저장된 카드 수: {storeRef.current.size} / 호출 수: {logs.length}</p>
       </section>
 
-      <section style={{ display: "grid", gap: 8 }}>
+      <section data-fixture-chrome style={{ display: "grid", gap: 8 }}>
         <strong>결함 주입 재생 (순수 reducer — 네트워크 없음)</strong>
         {/* 넓은 표는 문서가 아니라 자기 상자 안에서 가로 스크롤한다 (HARNESS §4). */}
         <div style={{ overflowX: "auto", maxWidth: "100%" }}>

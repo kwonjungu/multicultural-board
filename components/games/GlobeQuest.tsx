@@ -516,17 +516,30 @@ function ExploreMode({ viewerLang, onBack, initialCountryCode }: {
 function QuizMode({ viewerLang, friendLang, onBack }: {
   viewerLang: string; friendLang: string; onBack: () => void;
 }) {
-  const [rounds, setRounds] = useState<GlobeCountry[]>(() => pickN(GLOBE_COUNTRIES, QUIZ_ROUNDS));
+  /**
+   * 첫 렌더는 **비워 둔다.** 여기서 pickN 을 부르면 서버와 클라이언트가 서로
+   * 다른 나라를 뽑아 하이드레이션이 어긋나고, React 가 루트 전체를 클라이언트
+   * 렌더로 되돌린다(개발 모드에서는 에러 오버레이가 화면을 덮었다).
+   * 실제 문제는 마운트 뒤에 뽑는다.
+   */
+  const [rounds, setRounds] = useState<GlobeCountry[]>([]);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [missedFirst, setMissedFirst] = useState(false); // 이번 라운드 오답 여부
   const [flash, setFlash] = useState<{ kind: "ok" | "again"; text: string } | null>(null);
-  const [startedAt] = useState(() => Date.now());
+  // 시각도 서버와 클라이언트가 다르다 — 0 으로 시작해 마운트 뒤에 채운다.
+  const [startedAt, setStartedAt] = useState(0);
   const [, setTick] = useState(0);
   const [done, setDone] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const lockRef = useRef(false);
   const flashTimer = useRef<number | null>(null);
+
+  // 마운트 뒤 한 번: 이번 판의 문제와 시작 시각을 정한다.
+  useEffect(() => {
+    setRounds(pickN(GLOBE_COUNTRIES, QUIZ_ROUNDS));
+    setStartedAt(Date.now());
+  }, []);
 
   // 경과시간 표시용 틱
   useEffect(() => {
@@ -628,7 +641,9 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
               <>
                 <GameStat icon="📍" label="문제" value={`${idx + 1} / ${rounds.length}`} />
                 <GameStat icon="⭐" label="점수" value={score} tone="key" />
-                <GameStat icon="⏱" label="시간" value={`${Math.floor((Date.now() - startedAt) / 1000)}s`} />
+                {/* 렌더 도중 Date.now() 를 부르면 서버/클라이언트 값이 달라진다.
+                    이미 틱으로 갱신되는 elapsedMs 를 쓴다. */}
+                <GameStat icon="⏱" label="시간" value={`${Math.floor(elapsedMs / 1000)}s`} />
               </>
             }
           />

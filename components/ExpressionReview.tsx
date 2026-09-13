@@ -24,6 +24,14 @@ interface Props {
   studentName: string;
   studentLang: string;
   onClose: () => void;
+  /**
+   * 검수용 화면(fixture)에서 켠다. 켜지면 진도·XP·퀘스트를 **하나도 쓰지
+   * 않는다.** 화면은 그대로 돌아가고 저장만 건너뛴다 — 캡처를 찍자고 아이의
+   * 실제 기록을 건드릴 수는 없다.
+   */
+  offline?: boolean;
+  /** offline 일 때 쓸 표현 목록. 구독 대신 이걸 그대로 쓴다. */
+  fixtureExpressions?: ExpressionEntry[];
 }
 
 let serverTtsAudio: HTMLAudioElement | null = null;
@@ -48,6 +56,8 @@ async function speakKo(text: string) {
 }
 
 export default function ExpressionReview({
+  offline = false,
+  fixtureExpressions,
   roomCode, clientId, studentName, studentLang, onClose,
 }: Props) {
   const [all, setAll] = useState<ExpressionEntry[]>([]);
@@ -59,9 +69,13 @@ export default function ExpressionReview({
   const [earnedXp, setEarnedXp] = useState(0);
 
   useEffect(() => {
+    // 검수 화면은 Firebase 를 구독하지 않는다. 구독하면 로컬에서 DB URL 이 없어
+    // FIREBASE FATAL ERROR 로 화면이 통째로 죽고(하네스가 vocab-result 를 감사
+    // 못 한 원인), 설정된 환경에서는 아이의 실제 기록을 읽게 된다.
+    if (offline) { setAll(fixtureExpressions ?? []); return; }
     const unsub = subscribeExpressions(roomCode, clientId, setAll);
     return unsub;
-  }, [roomCode, clientId]);
+  }, [roomCode, clientId, offline, fixtureExpressions]);
 
   // 세션 진입 시 due 표현을 한 번 고정 — 복습 중에 새 due 가 들어와도 이번 세션엔 포함 안 함.
   const [session, setSession] = useState<ExpressionEntry[] | null>(null);
@@ -80,7 +94,7 @@ export default function ExpressionReview({
     if (!current || busy) return;
     setBusy(true);
     try {
-      await recordReviewResult(roomCode, clientId, current.id, remembered);
+      if (!offline) await recordReviewResult(roomCode, clientId, current.id, remembered);
       setReviewedCount((c) => c + 1);
       if (remembered) {
         setCorrectCount((c) => c + 1);
@@ -89,13 +103,15 @@ export default function ExpressionReview({
       // 다음 카드로
       if (idx + 1 >= total) {
         // 세션 종료 → XP 일괄 적립
-        if (remembered) {
-          // 마지막 카드 보상 포함해서 적립
-          await awardXp(roomCode, clientId, earnedXp + XP_PER_REVIEW);
-        } else if (earnedXp > 0) {
-          await awardXp(roomCode, clientId, earnedXp);
+        if (!offline) {
+          if (remembered) {
+            // 마지막 카드 보상 포함해서 적립
+            await awardXp(roomCode, clientId, earnedXp + XP_PER_REVIEW);
+          } else if (earnedXp > 0) {
+            await awardXp(roomCode, clientId, earnedXp);
+          }
+          reportQuestEvent(roomCode, clientId, "expression_review"); // 📋 일일 퀘스트 — 세션 종료 1회
         }
-        reportQuestEvent(roomCode, clientId, "expression_review"); // 📋 일일 퀘스트 — 세션 종료 1회
         setPhase("done");
       } else {
         setIdx((i) => i + 1);

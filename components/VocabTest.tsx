@@ -51,13 +51,19 @@ interface Props {
   studentName: string;
   // Duolingo 스타일 — 레슨 컨텍스트
   lessonId?: string;
-  lessonTitle?: string;
+  lessonTitle?: string;
+  /**
+   * 검수용 화면(fixture)에서 켠다. 켜지면 XP·하트·퀘스트·레슨 결과를 하나도
+   * 쓰지 않는다. 화면 흐름은 그대로 두고 저장만 건너뛴다.
+   */
+  offline?: boolean;
 }
 
 type QPhase = "answering" | "checking" | "feedback";
 
 export default function VocabTest({
   questions, onWordResult, onClose, roomCode, clientId, studentName, lessonId, lessonTitle,
+  offline = false,
 }: Props) {
   const [queue, setQueue] = useState<QuizItem[]>(() => questions);
   const [qIdx, setQIdx] = useState(0);
@@ -203,15 +209,18 @@ export default function VocabTest({
       } else {
         setCombo(0);
         // 하트 차감 (final fail only)
-        loseHeart(roomCode, clientId).then((s) => {
-          const live = effectiveHearts(s);
-          if (live <= 0) setOutOfHearts(true);
-        }).catch(() => undefined);
+        // 검수 화면에서는 하트를 실제로 깎지 않는다.
+        if (!offline) {
+          loseHeart(roomCode, clientId).then((s) => {
+            const live = effectiveHearts(s);
+            if (live <= 0) setOutOfHearts(true);
+          }).catch(() => undefined);
+        }
       }
       setFinishedCount((c) => c + 1);
       onWordResult(currentQ.wordId, correct);
       const sentenceIdx = "sentenceIdx" in currentQ ? currentQ.sentenceIdx : undefined;
-      logAttempt({
+      if (!offline) logAttempt({
         roomCode,
         clientId,
         studentName,
@@ -232,6 +241,8 @@ export default function VocabTest({
     if (finalizedRef.current) return;
     finalizedRef.current = true;
     setFinalizing(true);
+    // 검수 화면(fixture)에서는 아무것도 쓰지 않는다 — 결과 화면은 그대로 뜬다.
+    if (offline) { setFinalizing(false); return; }
     reportQuestEvent(roomCode, clientId, "vocab_session"); // 📋 일일 퀘스트 — 세션 1회 (finalizedRef 가드)
     try {
       if (sessionXp > 0) {
