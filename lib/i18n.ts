@@ -2720,12 +2720,14 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     ru: "Hide Korean", uz: "Hide Korean", hi: "Hide Korean",
     id: "Hide Korean", ar: "Hide Korean", my: "Hide Korean",
   },
+  /* 카드 아래 보조 버튼이라 짧게 — 지구본 하나에 각 언어로 "번역".
+     "다른 언어로 보기" 는 좁은 칼럼에서 버튼 하나가 두 줄을 먹었다. */
   cardOtherLangs: {
-    ko: "다른 언어로 보기", en: "Other languages", vi: "Other languages",
-    zh: "Other languages", fil: "Other languages", ja: "Other languages",
-    th: "Other languages", km: "Other languages", mn: "Other languages",
-    ru: "Other languages", uz: "Other languages", hi: "Other languages",
-    id: "Other languages", ar: "Other languages", my: "Other languages",
+    ko: "🌐 번역", en: "🌐 Translate", vi: "🌐 Dịch",
+    zh: "🌐 翻译", fil: "🌐 Salin", ja: "🌐 翻訳",
+    th: "🌐 แปล", km: "🌐 បកប្រែ", mn: "🌐 Орчуулга",
+    ru: "🌐 Перевод", uz: "🌐 Tarjima", hi: "🌐 अनुवाद",
+    id: "🌐 Terjemahan", ar: "🌐 ترجمة", my: "🌐 ဘာသာပြန်",
   },
   cardImageFailed: {
     ko: "그림을 불러오지 못했어요", en: "We couldn't load the picture", vi: "We couldn't load the picture",
@@ -2807,7 +2809,7 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
     my: "This animal is used for this session only.",
   },
   cardReactOpen: {
-    ko: "공감하기", en: "React", vi: "React",
+    ko: "공감", en: "React", vi: "React",
     zh: "React", fil: "React", ja: "React",
     th: "React", km: "React", mn: "React",
     ru: "React", uz: "React", hi: "React",

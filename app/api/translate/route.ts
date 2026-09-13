@@ -56,7 +56,16 @@ export async function POST(req: NextRequest) {
     let safe = true;
     let reason = "";
 
-    if ((cardType === "text" || cardType === "comment") && targetLangs && targetLangs.length > 0) {
+    /**
+     * 번역 여부는 **카드 종류가 아니라 글이 있는지** 로 정한다.
+     *
+     * 예전에는 text·comment 만 번역했다. 그런데 활동지를 올리면 사진에서
+     * 뽑은 글(OCR)이 **이미지 카드**의 본문으로 들어온다 — 종류가 image 라
+     * 여기서 걸려 한국어 그대로 박제됐다(사용자 신고: "활동지를 올리면",
+     * "한글이 추출되는데 이를 번역도 해줘야지"). 유튜브 카드에 붙인 설명도
+     * 같은 이유로 번역되지 않았다.
+     */
+    if (text && text.trim() && targetLangs && targetLangs.length > 0) {
       const result = await translateWithFallback({
         text,
         fromLang,

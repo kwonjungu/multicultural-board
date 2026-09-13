@@ -93,6 +93,8 @@ export default function PadletCard({
   // 듣기 — 재생 중인 것은 카드 전체에서 하나뿐이다 (AUDIO-01).
   const [speaking, setSpeaking] = useState<string | null>(null);
   const playToken = useRef(0);
+  /** 언마운트 정리에서 "지금 이 카드가 읽고 있었나" 를 보기 위한 거울. */
+  const speakingRef = useRef<string | null>(null);
 
   // YouTube 자막 번역 상태
   const [transcriptOpen, setTranscriptOpen] = useState(false);
@@ -126,9 +128,18 @@ export default function PadletCard({
     return () => clearInterval(interval);
   }, []);
 
-  /** 카드가 사라지거나 다른 카드로 넘어가면 재생 중인 음성을 반드시 끊는다. */
+  useEffect(() => { speakingRef.current = speaking; }, [speaking]);
+
+  /**
+   * 카드가 사라지면 그 카드가 읽던 음성을 끊는다.
+   *
+   * 예전에는 무조건 cancelSpeak() 을 불렀다. 그런데 cancelSpeak() 은 **전역**
+   * 정지다 — 실시간 방에서는 새 글이 올라오거나 목록이 바뀔 때 다른 카드가
+   * 언마운트되고, 그때마다 지금 듣고 있던 글이 통째로 끊겼다. 읽고 있던
+   * 카드일 때만 끊는다.
+   */
   useEffect(() => {
-    return () => { cancelSpeak(); };
+    return () => { if (speakingRef.current) cancelSpeak(); };
   }, [card.id]);
 
   // 반응 listener — 개수는 항상 보이게 상시 구독
@@ -459,10 +470,15 @@ export default function PadletCard({
       <button
         type="button"
         data-ux-role="control"
-        className="pc-btn"
+        className="pc-btn pc-listen"
         aria-pressed={on}
         onClick={() => toggleSpeak(id, text, lang)}
-      >{(on ? tPlain("cardStop", viewerLang) : tPlain("cardListen", viewerLang)) + suffix}</button>
+      >
+        <span aria-hidden className="pc-btn-ico">{on ? "⏹" : "🔊"}</span>
+        <span className="pc-btn-lb">
+          {(on ? tPlain("cardStop", viewerLang) : tPlain("cardListen", viewerLang)) + suffix}
+        </span>
+      </button>
     );
   }
 
@@ -717,9 +733,16 @@ export default function PadletCard({
         </div>
       )}
 
-      {/* ── 5. 조작 한 줄: 왼쪽 읽기 보조 · 오른쪽 대화 ──
-             읽기 보조(듣기)와 대화 동작(답장·공감)은 성격이 다르다. 같은 무게로
-             나란히 쌓으면 카드가 버튼 더미가 된다. */}
+      {/* ── 5. 조작 한 줄 ──
+             듣기(읽기 보조)는 왼쪽에서 낮은 강조, 답장·공감(대화)은 오른쪽.
+             예전에는 이 줄과 공감 줄이 **따로** 있어 카드마다 조작이 두 줄로
+             늘어났다(사용자 지적: "결국 1행에 다 끝나지게"). 한 줄로 합치고,
+             칼럼이 좁아지면 컨테이너 질의로 글자 라벨만 접어 아이콘 + 숫자로
+             남긴다 — 줄이 늘어나는 대신 라벨이 접힌다.
+
+             반응 요약 칩은 이 줄에서 뺐다. 한 줄 안에 칩까지 두면 좁은 칼럼에서
+             반드시 넘친다. 어떤 공감이 몇 개인지는 하트를 눌러 여는 패널이
+             그대로 보여준다(패널의 pc-react-n). 줄에는 합계만 남긴다. */}
       <div className="pc-actions">
         <div className="pc-act-read">
           <ListenButton
@@ -729,55 +752,40 @@ export default function PadletCard({
           />
         </div>
         <div className="pc-act-talk">
+          {/* 답장 — 편지 */}
           <button
             type="button"
             data-ux-role="control"
-            className="pc-btn"
+            className="pc-btn pc-reply"
             aria-expanded={commentsOpen}
             onClick={() => setCommentsOpen((v) => !v)}
-          >{tPlain("cardReply", viewerLang)}{commentCount > 0 ? ` ${commentCount}` : ""}</button>
-        </div>
-      </div>
+          >
+            <span aria-hidden className="pc-btn-ico">💌</span>
+            <span className="pc-btn-lb">{tPlain("cardReply", viewerLang)}</span>
+            {commentCount > 0 && <span className="pc-btn-n">{commentCount}</span>}
+          </button>
 
-      {/* ── 반응 (U06): 기본은 '공감하기' 한 버튼. 누르면 세부 5종 패널이 열린다.
-             예전에는 3종 버튼이 카드마다 상시 자리를 차지해, 카드 50개 화면에서
-             조작이 318개가 됐다. 요약 칩은 0보다 큰 반응만 보여준다. ── */}
-      <div className="pc-reactbar">
-        <button
-          type="button"
-          ref={reactTriggerRef}
-          data-ux-role="control"
-          className={mine ? "pc-btn on" : "pc-btn"}
-          aria-expanded={reactOpen}
-          aria-controls={reactPanelId}
-          aria-disabled={!myClientId}
-          onClick={() => setReactOpen((v) => !v)}
-        >
-          {mine
-            ? `${myReaction?.icon ?? ""} ${tPlain(myReaction?.key ?? "", viewerLang)} ✓`
-            : tPlain("cardReactOpen", viewerLang)}
-        </button>
-
-        {/* 요약: 0보다 큰 반응만. 누르면 같은 패널이 열린다 — 별도 토글을 만들어
-            아이를 헷갈리게 하지 않는다. */}
-        {total > 0 && (
+          {/* 공감 — 하트 하나로 열고, 세부 5종은 아래 패널에서 고른다.
+              이미 고른 아이에게는 자기가 고른 아이콘이 하트 자리에 온다. */}
           <button
             type="button"
+            ref={reactTriggerRef}
             data-ux-role="control"
-            className="pc-chipsum"
+            className={mine ? "pc-btn pc-heart on" : "pc-btn pc-heart"}
             aria-expanded={reactOpen}
             aria-controls={reactPanelId}
+            aria-disabled={!myClientId}
             onClick={() => setReactOpen((v) => !v)}
           >
-            {REACTIONS.filter((r) => counts[r.id] > 0).map((r) => (
-              <span key={r.id} className="pc-chip">
-                <span aria-hidden>{r.icon}</span>
-                <span className="pc-chip-n">{counts[r.id]}</span>
-                <span className="pc-sr">{tPlain(r.key, viewerLang)}</span>
-              </span>
-            ))}
+            <span aria-hidden className="pc-btn-ico">
+              {mine ? (myReaction?.icon ?? "❤️") : "🤍"}
+            </span>
+            <span className="pc-btn-lb">
+              {mine ? tPlain(myReaction?.key ?? "", viewerLang) : tPlain("cardReactOpen", viewerLang)}
+            </span>
+            {total > 0 && <span className="pc-btn-n">{total}</span>}
           </button>
-        )}
+        </div>
       </div>
 
       {reactOpen && (
@@ -892,6 +900,10 @@ export const CARD_CSS = `
 .pc-card{
   display: grid; gap: var(--ux-space-3);
   width: 100%; box-sizing: border-box;
+  /* 조작 줄이 칼럼 폭에 반응해야 한다. 뷰포트 질의로는 안 된다 — 패들렛은
+     넓은 화면에서도 칼럼 하나가 250px 안팎이라 "화면은 넓은데 카드는 좁은"
+     상황이 정상이다. 카드 자신을 컨테이너로 삼아 카드 폭으로 판단한다. */
+  container-type: inline-size;
   background: var(--ux-surface);
   border: 2px solid var(--ux-primary-border);
   border-inline-start: 8px solid var(--ux-primary-border);
@@ -960,22 +972,30 @@ export const CARD_CSS = `
 .pc-note{ margin: 0; word-break: keep-all; overflow-wrap: anywhere; }
 .pc-label{ font-weight: 800; color: var(--ux-ink); }
 
-/* 카드 아래 조작 줄.
-   예전에는 버튼 5개(원문 보기·듣기·답장·공감·요약)가 전부 같은 굵은 갈색
-   테두리로 **3줄에 걸쳐 왼쪽에 쌓여** 본문(2줄)보다 큰 덩어리가 됐다.
-   전부 왼쪽에 몰려 오른쪽이 비는 것도 좌편향으로 보였다(사용자 지적).
+/* 카드 아래 조작 줄 — **한 줄로 끝난다**.
+   예전에는 조작 줄(듣기·답장)과 공감 줄이 따로 있어 카드마다 두 줄이 됐고,
+   flex-wrap:wrap 이라 칼럼이 좁아지면 세 줄, 네 줄로 계속 늘어났다
+   (사용자 지적: "반응형으로 결국 1행에 다 끝나지게, 지금 봐봐 늘어나").
 
-   고친 규칙:
-    - 한 줄로 두고 좌우로 나눈다. 읽기 보조(듣기·원문)는 왼쪽에서 **낮은 강조**,
-      대화 동작(답장·공감)은 오른쪽에서 평소 강조.
-    - 굵은 갈색 테두리를 모든 버튼에 두르지 않는다. 보조는 테두리 없이 두고
-      hover/focus 에서만 바탕을 준다 — 조작 영역 크기는 그대로 지킨다. */
+   규칙:
+    - 한 줄. nowrap 이다. 좁아지면 줄을 늘리는 대신 **글자 라벨을 접는다**.
+    - 왼쪽은 읽기 보조(듣기) — 테두리 없이 낮은 강조.
+    - 오른쪽은 대화(답장 편지 · 공감 하트) — 평소 강조.
+    - 라벨을 접어도 아이콘과 숫자는 남고, 뜻은 aria-label 이 아니라 버튼 안의
+      .pc-btn-lb 가 스크린리더용으로 계속 읽힌다(감추는 건 시각뿐). */
 .pc-actions{
-  display: flex; gap: var(--ux-space-2); flex-wrap: wrap;
-  align-items: center; justify-content: space-between;
+  display: flex; gap: var(--ux-space-2); flex-wrap: nowrap;
+  align-items: center; justify-content: space-between; min-width: 0;
 }
-.pc-act-read, .pc-act-talk{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; align-items: center; }
-.pc-act-talk{ margin-left: auto; }
+.pc-act-read, .pc-act-talk{
+  display: flex; gap: var(--ux-space-2); flex-wrap: nowrap;
+  align-items: center; min-width: 0;
+}
+/* 읽기 쪽은 줄어들 수 있어야 한다. 안 그러면 자기 상자를 넘쳐 흘러 오른쪽
+   대화 버튼 **아래로 깔리고**, 그 위를 답장 버튼이 덮어 듣기가 안 눌린다
+   (한 줄로 합치면서 실제로 그렇게 됐다). 넘치는 대신 라벨이 접히게 둔다. */
+.pc-act-read{ flex: 0 1 auto; }
+.pc-act-talk{ margin-left: auto; flex: 0 0 auto; }
 /* 보조 조작 — 크기는 유지하고 시각 무게만 낮춘다. */
 .pc-actions .pc-act-read .pc-btn{
   border-color: transparent; background: transparent; font-weight: 700;
@@ -985,28 +1005,51 @@ export const CARD_CSS = `
 .pc-actions .pc-act-read .pc-btn:focus-visible{
   background: var(--ux-surface-sunk); color: var(--ux-ink);
 }
+
+/* 버튼 속 아이콘 · 라벨 · 숫자 */
+.pc-actions .pc-btn{
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap; min-width: 0;
+}
+.pc-btn-ico{ font-size: 1.15em; line-height: 1; flex: 0 0 auto; }
+.pc-btn-lb{ min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pc-btn-n{
+  font-weight: 800; flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 공감 하트 — 고른 뒤에는 테두리와 바탕으로도 알린다(색만으로 알리지 않는다). */
+.pc-heart.on{
+  border-color: var(--ux-selected-border);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+}
+
+/* 좁은 칼럼: 글자 라벨을 접고 아이콘 + 숫자만 남긴다. 줄은 절대 늘리지 않는다.
+   패들렛 칼럼은 250px 안팎이다 — 그 폭에서는 라벨이 들어가므로 남기고,
+   "큰 글씨" 를 고른 아이는 글자가 커서 더 일찍 접어야 한다. */
+@container (max-width: 260px){
+  .pc-actions .pc-btn-lb{
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
+/* "큰 글씨" 를 고른 아이는 같은 폭에 글자가 더 크다 — 더 일찍 접는다. */
+@container (max-width: 400px){
+  :root[data-ux-text="large"] .pc-actions .pc-btn-lb{
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
+@container (max-width: 230px){
+  .pc-act-read .pc-btn-lb, .pc-act-read .pc-btn{ min-width: 0; }
+  .pc-actions{ gap: var(--ux-space-1); }
+}
 .pc-reactions{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
 
 /* ── 반응 (U06) ─────────────────────────────────────────────────────
-   기본은 '공감하기' 한 버튼 + 0보다 큰 반응의 요약 칩. 세부 5종은 눌러야
-   열린다 — 카드마다 5개를 상시 깔면 카드 50개 화면에서 조작이 폭발한다. */
-/* 공감 줄도 조작 줄과 같은 축에 맞춘다 — 왼쪽에 요약, 오른쪽에 공감하기.
-   전부 왼쪽에 몰리면 카드 오른쪽이 계속 비어 좌편향으로 보인다. */
-.pc-reactbar{
-  display: flex; gap: var(--ux-space-2); flex-wrap: wrap; align-items: center;
-  justify-content: space-between;
-}
-.pc-reactbar > .pc-btn{ order: 2; margin-left: auto; }
-.pc-reactbar > .pc-chipsum{ order: 1; }
-.pc-chipsum{
-  display: inline-flex; gap: var(--ux-space-2); align-items: center;
-  background: transparent; border: 2px solid transparent; cursor: pointer;
-  padding: var(--ux-space-1) var(--ux-space-2); border-radius: var(--ux-radius-pill);
-  font-family: inherit; color: var(--ux-ink-soft);
-}
-.pc-chipsum:hover{ background: var(--ux-surface-sunk); }
-.pc-chip{ display: inline-flex; gap: 2px; align-items: center; font-size: var(--ux-font-secondary); }
-.pc-chip-n{ font-weight: 700; color: var(--ux-ink); }
+   조작 줄의 하트 하나로 열고, 세부 5종은 아래 패널에서 고른다 — 카드마다
+   5개를 상시 깔면 카드 50개 화면에서 조작이 폭발한다. 어떤 공감이 몇 개인지도
+   이 패널이 보여준다(요약 칩을 따로 두면 조작 줄이 한 줄을 넘긴다). */
 /* 스크린리더에만 읽히는 반응 이름 — 아이콘만으로 뜻이 남지 않게 한다. */
 .pc-sr{
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;

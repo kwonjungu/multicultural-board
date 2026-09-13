@@ -415,11 +415,12 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
     setPosting(true);
 
-    // 교사가 설정한 방 언어 목록으로 번역 (학생도 동일하게 적용)
-    const targetLangs =
-      cardType === "text"
-        ? teacherLangs.filter((l) => l !== writeLang)
-        : [];
+    // 교사가 설정한 방 언어 목록으로 번역 (학생도 동일하게 적용).
+    // 종류가 아니라 **글이 있는지** 로 정한다 — 활동지(이미지 + OCR 글)와
+    // 설명을 붙인 유튜브 카드도 번역되어야 한다.
+    const targetLangs = text && text.trim()
+      ? teacherLangs.filter((l) => l !== writeLang)
+      : [];
 
     const tempId = `temp_${Date.now()}`;
     const tempCard: CardData = {
@@ -1408,7 +1409,15 @@ const BOARD_CSS = `
 .bd-col-title{ flex: 1 1 100%; min-width: 0; font-weight: 900; color: var(--ux-ink); white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
 .bd-col-count{ flex-shrink: 0; color: var(--ux-ink); margin-left: auto; }
 .bd-col-tools{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
-.bd-col-body{ display: grid; gap: var(--ux-space-3); max-height: clamp(320px, 62svh, 900px); overflow-y: auto; }
+/* 튜토리얼 대화상자(화면 아래 고정)가 떠 있는 동안 칼럼 안쪽에 그만큼 스크롤
+   여백을 준다. 없으면 칼럼 맨 아래 카드의 듣기·답장·공감 버튼이 상자에 가려
+   끝까지 내려도 눌리지 않는다. --tutorial-dialogue-h 는 DialogueBox 가 떠
+   있는 동안에만 존재하므로 평소 레이아웃은 그대로다. */
+.bd-col-body{
+  display: grid; gap: var(--ux-space-3);
+  max-height: clamp(320px, 62svh, 900px); overflow-y: auto;
+  padding-bottom: var(--tutorial-dialogue-h, 0px);
+}
 .bd-col-empty{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }
 .bd-col-add{
   width: clamp(180px, 16vw, 220px); flex-shrink: 0; align-self: stretch;

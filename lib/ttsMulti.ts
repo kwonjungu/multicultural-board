@@ -118,6 +118,11 @@ const WEBSPEECH_UNRELIABLE = new Set(["fil", "km", "mn", "uz", "my"]);
 // Tracks the current HTML5 audio element so cancelSpeak() can stop it.
 let currentAudio: HTMLAudioElement | null = null;
 
+// Chrome 은 긴 글을 읽다가 15초쯤에서 스스로 멈춘다. 살아 있는 동안 resume()
+// 을 계속 넣어 끊기지 않게 한다. cancelSpeak() 이 함께 정리한다.
+let keepAlive: ReturnType<typeof setInterval> | null = null;
+function clearKeepAlive() { if (keepAlive) { clearInterval(keepAlive); keepAlive = null; } }
+
 /**
  * Split long text into ≤200-char chunks (Google Translate TTS hard limit).
  * Breaks on sentence-ending punctuation when possible, else on whitespace.
@@ -192,6 +197,9 @@ export async function speak(text: string, langShort: string): Promise<void> {
   // 이전 재생 정지 — 이 파일 것과 버스 것 양쪽 모두.
   cancelSpeak();
   stopAll();
+  // Chrome 은 cancel() 바로 뒤에 온 speak() 를 통째로 삼키는 일이 있다.
+  // 한 틱 쉬어 큐가 비워질 시간을 준다 — 아이가 못 느낄 만큼 짧다.
+  await new Promise((r) => setTimeout(r, 60));
 
   // For reliably-unsupported languages, skip browser entirely.
   const goServerFirst = WEBSPEECH_UNRELIABLE.has(langShort);
@@ -209,15 +217,41 @@ export async function speak(text: string, langShort: string): Promise<void> {
         u.rate = tuning.rate;
         u.pitch = tuning.pitch;
         u.volume = tuning.volume;
-        // 재생 완료까지 대기 — 자동 읽기(연속 재생)와 speaking 표시의 기준.
-        // cancelSpeak() 호출 시에도 end/error 가 발화되어 resolve 된다.
-        await new Promise<void>((resolve) => {
-          const done = () => resolve();
-          u.addEventListener("end", done, { once: true });
-          u.addEventListener("error", done, { once: true });
+
+        /**
+         * 브라우저 음성은 **조용히 실패한다.** cancel() 직후의 speak() 를
+         * 삼키는 Chrome 버그, 목소리는 목록에 있는데 실제로는 안 나오는 경우,
+         * OS 음성 서비스가 죽은 경우 — 어느 쪽이든 end 도 error 도 오지 않고
+         * 아이는 "듣기가 안 된다" 만 겪는다. start 가 제때 안 오면 브라우저를
+         * 포기하고 서버 TTS(/api/tts) 로 내려간다. 서버 경로는 15개 언어를
+         * 모두 덮는다.
+         */
+        const spoke = await new Promise<boolean>((resolve) => {
+          let started = false;
+          let settled = false;
+          const finish = (ok: boolean) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(watchdog);
+            clearKeepAlive();
+            resolve(ok);
+          };
+          u.addEventListener("start", () => { started = true; }, { once: true });
+          u.addEventListener("end", () => finish(true), { once: true });
+          u.addEventListener("error", () => finish(false), { once: true });
+          const watchdog = setTimeout(() => {
+            if (started) return;              // 말하는 중이면 그대로 둔다
+            try { synth.cancel(); } catch { /* 무시 */ }
+            finish(false);
+          }, 1500);
+          clearKeepAlive();
+          keepAlive = setInterval(() => {
+            try { if (synth.speaking) synth.resume(); } catch { /* 무시 */ }
+          }, 5000);
           synth.speak(u);
         });
-        return;
+        if (spoke) return;
+        // 브라우저가 조용했다 — 아래 서버 TTS 로 이어진다.
       }
     }
     // else: no voice found → fall through to server TTS
@@ -239,6 +273,7 @@ export async function speak(text: string, langShort: string): Promise<void> {
 
 export function cancelSpeak() {
   if (typeof window === "undefined") return;
+  clearKeepAlive();
   window.speechSynthesis?.cancel();
   if (currentAudio) {
     try { currentAudio.pause(); } catch {}

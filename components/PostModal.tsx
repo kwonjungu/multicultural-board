@@ -7,6 +7,7 @@ import { UI_TEXT, t } from "@/lib/i18n";
 import { UserConfig, PostData, CardType, CardData, CardStatus } from "@/lib/types";
 import DrawBoard from "./DrawBoard";
 import WorksheetTab from "./WorksheetTab";
+import { detectScriptLang } from "@/lib/detectScriptLang";
 import { WorksheetAnalyzeView } from "./WorksheetAnalyzeModal";
 import { compressToUnder1MB, fmtBytes } from "@/lib/imageUtils";
 import ScopedStyle from "./ui/child/ScopedStyle";
@@ -909,13 +910,18 @@ export default function PostModal({
                 submitLabel={t("postSend", lang)}
                 requireConfirm={true}
                 onComplete={async ({ content: ocrText, previewUrl }) => {
+                  /* 사진에서 뽑은 글은 **올린 사람의 언어가 아니다.** 베트남 학생이
+                     한국어 활동지를 찍어 올리면 글은 한국어다. 여기서 draft.writeLang
+                     을 그대로 쓰면 카드가 "베트남어" 로 붙어 번역이 어긋난다.
+                     글자 모양으로 확실할 때만 바꾸고, 모르겠으면 원래 값을 쓴다. */
+                  const ocrLang = detectScriptLang(ocrText) ?? draft.writeLang;
                   try {
                     const compressed = await compressToUnder1MB(dataUrlToBlob(previewUrl));
                     const imageUrl = await uploadToServer(compressed);
-                    await submitPrepared({ kind: "image", text: ocrText, writeLang: draft.writeLang, mediaRef: imageUrl }, { imageUrl });
+                    await submitPrepared({ kind: "image", text: ocrText, writeLang: ocrLang, mediaRef: imageUrl }, { imageUrl });
                   } catch (err) {
                     console.error("활동지 이미지 업로드 실패 → 텍스트 카드로 폴백:", err);
-                    await submitPrepared({ kind: "text", text: ocrText, writeLang: draft.writeLang, mediaRef: null }, {});
+                    await submitPrepared({ kind: "text", text: ocrText, writeLang: ocrLang, mediaRef: null }, {});
                   }
                 }}
               />
