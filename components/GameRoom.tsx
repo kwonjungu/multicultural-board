@@ -7,6 +7,7 @@ import { useBackLayer } from "@/lib/backStack";
 import { GameText, prefetchGameTexts } from "@/lib/gameI18n";
 import { reportQuestEvent } from "@/lib/quests";
 import { gt, type LangMap } from "./games/uiText";
+import ScopedStyle from "./ui/child/ScopedStyle";
 import BeeMascot from "./BeeMascot";
 import CountryGuess from "./games/CountryGuess";
 import WordMemory from "./games/WordMemory";
@@ -139,6 +140,103 @@ function GameIcon({ icon, iconImg, size }: { icon: string; iconImg?: string; siz
   );
 }
 
+/**
+ * 게임 로비 CSS — U01/U09 재배치 (04 §5).
+ *
+ * 이전에는 이 화면이 토큰 시스템을 전혀 쓰지 않고 인라인 px 로 색·크기를
+ * 다 정해서, 게임마다 다른 파스텔(연보라/노랑/분홍)이 카드를 채우고 언어
+ * 카드가 첫 화면의 1/4 을 가져갔다. 여기서부터는:
+ *  - 언어 선택은 접힌 칩 요약(.gr-lang-bar) 이 기본, 펼침(.gr-lang-panel)은
+ *    누른 사람만 본다 — 매번 놀이를 고르기 전에 언어부터 볼 필요는 없다.
+ *  - 카드 색은 게임과 무관하게 전부 같은 토큰(surface/primary-border) —
+ *    구분은 아이콘·라벨이 맡는다. 게임별 그라디언트를 다시 만들지 않는다.
+ *  - 그리드 열 수는 폭으로만 정한다(640px/1200px). tokens.json 의
+ *    responsive.containers 값과 같은 경계다.
+ */
+const LOBBY_CSS = `
+.gr-header{
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-3);
+  display: flex; align-items: center; gap: var(--ux-space-3);
+  flex-shrink: 0; position: relative; z-index: 2;
+}
+.gr-close{
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  color: var(--ux-primary-ink); font-weight: 900; flex-shrink: 0;
+}
+.gr-header-text{ flex: 1; min-width: 0; }
+.gr-title{ color: var(--ux-ink); display: flex; align-items: center; gap: 6px; font-weight: 900; }
+.gr-subtitle{ margin-top: 2px; }
+.gr-bee{ width: 56px; height: 56px; flex-shrink: 0; filter: drop-shadow(0 4px 12px rgba(245,158,11,.35)); }
+
+/* 언어 요약 바 — 기본은 칩 두 개만. 카드 전체를 다시 펼치지 않는다. */
+.gr-lang-bar{
+  margin: 0 var(--ux-space-4); padding: var(--ux-space-2) var(--ux-space-3);
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface);
+  display: flex; align-items: center; gap: var(--ux-space-2);
+  flex-wrap: wrap; position: relative; z-index: 2;
+}
+.gr-lang-bar-label{ flex-shrink: 0; }
+.gr-lang-chips{ display: flex; align-items: center; gap: var(--ux-space-2); flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+.gr-chip{
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ux-bg); border: 2px solid var(--ux-primary-border);
+  color: var(--ux-ink); font-weight: 800; font-family: inherit;
+}
+.gr-chip[data-ux-role="control"]{ padding: var(--ux-space-1) var(--ux-space-3); }
+.gr-chip.me.on{ background: var(--ux-primary-fill); border-color: var(--ux-selected-border); }
+.gr-chip.friend.on{ background: var(--ux-hint-lavender); border-color: var(--ux-selected-border); }
+.gr-chip-flag{ font-size: 1.3em; line-height: 1; }
+.gr-lang-swap{ color: var(--ux-ink-soft); font-weight: 900; flex-shrink: 0; }
+
+.gr-lang-panel{
+  margin: var(--ux-space-2) var(--ux-space-4) 0;
+  padding: var(--ux-space-3); background: var(--ux-surface-sunk);
+  border-radius: var(--ux-radius-surface);
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--ux-space-2);
+  position: relative; z-index: 2;
+}
+@media (min-width: 640px){ .gr-lang-panel{ grid-template-columns: repeat(6, 1fr); } }
+.gr-lang-opt{
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: var(--ux-surface); border: 2px solid transparent; color: var(--ux-ink); font-family: inherit;
+}
+.gr-lang-opt.on{ background: var(--ux-primary-fill); border-color: var(--ux-selected-border); color: var(--ux-primary-ink); }
+.gr-lang-opt-flag{ font-size: 1.4em; line-height: 1; }
+
+.gr-grid-wrap{ flex: 1; overflow: auto; padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-8); position: relative; z-index: 2; }
+.gr-grid-heading{ margin-bottom: var(--ux-space-3); display: flex; align-items: center; gap: 6px; color: var(--ux-ink); font-weight: 900; }
+.gr-grid-count{ font-weight: 700; color: var(--ux-ink-soft); }
+
+/* 그리드 열 수는 폭으로만 정한다 (04 §5 / tokens.json responsive.containers):
+   ~639px 2열 · 640~1199px 3열 · 1200px+ 4열. */
+.gr-grid{ display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--ux-space-3); }
+@media (min-width: 640px){ .gr-grid{ grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1200px){ .gr-grid{ grid-template-columns: repeat(4, 1fr); } }
+
+/* 카드 = 하나의 버튼. 색은 게임과 무관하게 전부 같은 토큰 —
+   구분은 아이콘·라벨의 몫이지 배경색의 몫이 아니다. */
+.gr-card{
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface); text-align: left; font-family: inherit;
+  position: relative; box-shadow: 0 4px 12px rgba(137,83,0,.10);
+  transition: border-color var(--ux-motion-state) var(--ux-motion-ease), transform var(--ux-motion-press) var(--ux-motion-ease);
+}
+.gr-card[data-ux-role="control"]{ min-height: 128px; padding: var(--ux-space-3) var(--ux-space-4); }
+.gr-card:hover, .gr-card:focus-visible{ border-color: var(--ux-selected-border); }
+.gr-card:active{ transform: scale(0.97); }
+.gr-card-icon{
+  width: 48px; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--ux-hint-apricot); border-radius: var(--ux-radius-surface);
+}
+.gr-card-title{ color: var(--ux-ink); font-weight: 900; }
+.gr-card-title-alt{ display: block; color: var(--ux-ink-soft); font-weight: 700; }
+.gr-card-sub{ color: var(--ux-ink-soft); }
+/* PLAY 표시는 장식으로만 내린다 — 카드 전체가 이미 버튼이라 중첩 버튼을 만들지 않는다. */
+.gr-card-play{ position: absolute; top: var(--ux-space-2); right: var(--ux-space-2); color: var(--ux-primary-border); opacity: .55; }
+`;
+
 const DEFAULT_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
 
 /**
@@ -211,25 +309,21 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
 
       {!ActiveGame ? (
         <>
+          <ScopedStyle css={LOBBY_CSS} />
           {/* Header */}
-          <div data-tutorial-id="games-header" style={{
-            padding: "18px 16px 12px",
-            display: "flex", alignItems: "center", gap: 12,
-            flexShrink: 0, position: "relative", zIndex: 2,
-          }}>
+          <div data-tutorial-id="games-header" className="gr-header">
             <button
+              type="button"
+              data-ux-role="control"
+              className="gr-close"
               onClick={onClose}
               aria-label="닫기"
-              style={{
-                width: 44, height: 44, borderRadius: 14, border: "2px solid rgba(180,83,9,0.3)",
-                background: "rgba(255,255,255,0.9)", fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
-              }}
             >←</button>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", display: "flex", alignItems: "center", gap: 6 }}>
+            <div className="gr-header-text">
+              <div data-ux-role="title" className="gr-title">
                 🎮 {gt(GR.title, viewerLang)}
               </div>
-              <div style={{ fontSize: 12, color: "#78350F", fontWeight: 700, marginTop: 2 }}>
+              <div data-ux-role="secondary" className="gr-subtitle">
                 {gt(GR.subtitle, viewerLang)}
               </div>
             </div>
@@ -237,148 +331,105 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
               src="/mascot/bee-celebrate.png"
               alt=""
               aria-hidden="true"
-              style={{ width: 56, height: 56, flexShrink: 0, filter: "drop-shadow(0 4px 12px rgba(245,158,11,0.35))" }}
+              className="gr-bee"
             />
           </div>
 
-          {/* 언어 쌍 카드 */}
-          <div style={{ padding: "4px 16px 0", position: "relative", zIndex: 2 }}>
-            <div style={{
-              background: "#fff", borderRadius: 24,
-              padding: "16px 18px",
-              border: "3px solid rgba(180,83,9,0.12)",
-              boxShadow: "0 10px 28px rgba(180,83,9,0.15)",
-            }}>
-              <div style={{ fontSize: 12, fontWeight: 900, color: "#92400E", letterSpacing: 1, marginBottom: 12 }}>
-                👫 {gt(GR.friendLangHeader, viewerLang)}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {/* 나 — 누르면 내 언어도 바로 바꿀 수 있다 (게임룸 번역이 안 바뀐다는 혼동 방지) */}
-                <button
-                  onClick={() => setShowLangPick((v) => (v === "me" ? null : "me"))}
-                  style={{
-                    flex: 1, padding: "14px 10px", borderRadius: 18,
-                    background: showLangPick === "me" ? "linear-gradient(135deg, #FDE68A, #FCD34D)" : "linear-gradient(135deg, #FEF3C7, #FDE68A)",
-                    border: `2px solid ${showLangPick === "me" ? "#D97706" : "#FBBF24"}`,
-                    textAlign: "center", cursor: "pointer",
-                  }}
-                >
-                  <div style={{ fontSize: 10, fontWeight: 900, color: "#92400E", letterSpacing: 1 }}>
-                    {gt(GR.me, viewerLang)} {showLangPick === "me" ? "▴" : "▾"}
-                  </div>
-                  <div style={{ fontSize: 36, marginTop: 4 }}>{LANGUAGES[viewerLang]?.flag}</div>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: "#1F2937", marginTop: 2 }}>
-                    {LANGUAGES[viewerLang]?.label}
-                  </div>
-                </button>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                  <div style={{ fontSize: 20 }}>⇄</div>
-                  <div style={{ fontSize: 10, fontWeight: 900, color: "#92400E", whiteSpace: "nowrap" }}>{gt(GR.teachEachOther, viewerLang)}</div>
-                </div>
-                {/* 친구 */}
-                <button
-                  onClick={() => setShowLangPick((v) => (v === "friend" ? null : "friend"))}
-                  style={{
-                    flex: 1, padding: "14px 10px", borderRadius: 18,
-                    background: showLangPick === "friend" ? "linear-gradient(135deg, #DBEAFE, #BFDBFE)" : "linear-gradient(135deg, #E0E7FF, #DBEAFE)",
-                    border: `2px solid ${showLangPick === "friend" ? "#3B82F6" : "#60A5FA"}`,
-                    textAlign: "center", cursor: "pointer",
-                  }}
-                >
-                  <div style={{ fontSize: 10, fontWeight: 900, color: "#1E40AF", letterSpacing: 1 }}>
-                    {gt(GR.friend, viewerLang)} {showLangPick === "friend" ? "▴" : "▾"}
-                  </div>
-                  <div style={{ fontSize: 36, marginTop: 4 }}>{LANGUAGES[friendLang]?.flag}</div>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: "#1F2937", marginTop: 2 }}>
-                    {LANGUAGES[friendLang]?.label}
-                  </div>
-                </button>
-              </div>
-
-              {showLangPick && (
-                <div style={{
-                  marginTop: 12, display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)", gap: 6,
-                }}>
-                  {(showLangPick === "me" ? Object.keys(LANGUAGES) : availableFriendLangs).map((c) => {
-                    const isMe = showLangPick === "me";
-                    const active = c === (isMe ? viewerLang : friendLang);
-                    const activeBg = isMe ? "#F59E0B" : "#3B82F6";
-                    const activeBorder = isMe ? "#B45309" : "#1E40AF";
-                    return (
-                      <button
-                        key={c}
-                        onClick={() => {
-                          if (isMe) onChangeMyLang?.(c);
-                          else setFriendLang(c);
-                          setShowLangPick(null);
-                        }}
-                        style={{
-                          padding: "10px 4px", borderRadius: 12,
-                          background: active ? activeBg : "#F3F4F6",
-                          border: active ? `2px solid ${activeBorder}` : "2px solid transparent",
-                          color: active ? "#fff" : "#1F2937",
-                          fontSize: 11, fontWeight: 800, cursor: "pointer",
-                          display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                        }}
-                      >
-                        <span style={{ fontSize: 22 }}>{LANGUAGES[c]?.flag}</span>
-                        <span style={{ fontSize: 10 }}>{LANGUAGES[c]?.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+          {/* 언어 요약 — 접힌 칩 두 개. 펼치면 아래 gr-lang-panel 이 나온다.
+              매번 놀이를 고르기 전에 언어부터 다시 정할 일은 드물어서, 큰 카드
+              대신 한 줄 요약 + '바꾸는 경로'(칩 자체가 토글)로 내렸다. */}
+          <div data-lobby-langpanel className="gr-lang-bar" role="group" aria-label={gt(GR.friendLangHeader, viewerLang)}>
+            <span data-ux-role="secondary" className="gr-lang-bar-label">👫 {gt(GR.friendLangHeader, viewerLang)}</span>
+            <div className="gr-lang-chips">
+              {/* 나 — 누르면 내 언어도 바로 바꿀 수 있다 (게임룸 번역이 안 바뀐다는 혼동 방지) */}
+              <button
+                type="button"
+                data-ux-role="control"
+                className={showLangPick === "me" ? "gr-chip me on" : "gr-chip me"}
+                aria-expanded={showLangPick === "me"}
+                aria-controls="gr-lang-panel"
+                onClick={() => setShowLangPick((v) => (v === "me" ? null : "me"))}
+              >
+                <span aria-hidden className="gr-chip-flag">{LANGUAGES[viewerLang]?.flag}</span>
+                <span>{gt(GR.me, viewerLang)}: {LANGUAGES[viewerLang]?.label}</span>
+                <span aria-hidden>{showLangPick === "me" ? "▴" : "▾"}</span>
+              </button>
+              <span aria-hidden className="gr-lang-swap">⇄</span>
+              {/* 친구 */}
+              <button
+                type="button"
+                data-ux-role="control"
+                className={showLangPick === "friend" ? "gr-chip friend on" : "gr-chip friend"}
+                aria-expanded={showLangPick === "friend"}
+                aria-controls="gr-lang-panel"
+                onClick={() => setShowLangPick((v) => (v === "friend" ? null : "friend"))}
+              >
+                <span aria-hidden className="gr-chip-flag">{LANGUAGES[friendLang]?.flag}</span>
+                <span>{gt(GR.friend, viewerLang)}: {LANGUAGES[friendLang]?.label}</span>
+                <span aria-hidden>{showLangPick === "friend" ? "▴" : "▾"}</span>
+              </button>
             </div>
           </div>
 
-          {/* 게임 그리드 */}
-          <div style={{ flex: 1, overflow: "auto", padding: "16px 16px 28px", position: "relative", zIndex: 2 }}>
-            <div style={{
-              fontSize: 14, fontWeight: 900, color: "#78350F", marginBottom: 10,
-              display: "flex", alignItems: "center", gap: 6,
-            }}>
+          {showLangPick && (
+            <div id="gr-lang-panel" className="gr-lang-panel" role="group" aria-label={gt(showLangPick === "me" ? GR.me : GR.friend, viewerLang)}>
+              {(showLangPick === "me" ? Object.keys(LANGUAGES) : availableFriendLangs).map((c) => {
+                const isMe = showLangPick === "me";
+                const active = c === (isMe ? viewerLang : friendLang);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    data-ux-role="control"
+                    className={active ? "gr-lang-opt on" : "gr-lang-opt"}
+                    aria-pressed={active}
+                    onClick={() => {
+                      if (isMe) onChangeMyLang?.(c);
+                      else setFriendLang(c);
+                      setShowLangPick(null);
+                    }}
+                  >
+                    <span aria-hidden className="gr-lang-opt-flag">{LANGUAGES[c]?.flag}</span>
+                    <span data-ux-role="label">{LANGUAGES[c]?.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 게임 그리드 — 04 §5: 폭에 따라 2~4열. 색은 게임과 무관하게 통일하고
+              아이콘·라벨로만 구분한다 (관찰4). 카드 자체가 버튼이라 PLAY 는
+              장식 표시로만 남긴다 (관찰5). */}
+          <div className="gr-grid-wrap">
+            <div data-ux-role="secondary" className="gr-grid-heading">
               🎯 {gt(GR.whichGame, viewerLang)}
-              <span style={{ color: "#92400E", fontSize: 12, fontWeight: 700 }}>
+              <span className="gr-grid-count">
                 · {viewerLang === "ko" ? `${GAMES.length}개 준비됨` : `${GAMES.length} ${gt(GR.gamesReady, viewerLang)}`}
               </span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div data-lobby-grid className="gr-grid">
               {GAMES.map((g) => (
                 <button
                   key={g.id}
+                  type="button"
+                  data-lobby-card
+                  data-ux-role="control"
+                  className="gr-card"
                   onClick={() => setGameId(g.id)}
-                  style={{
-                    minHeight: 136, borderRadius: 22,
-                    background: g.bg,
-                    border: `2px solid ${g.color}55`,
-                    cursor: "pointer",
-                    padding: "14px 12px", textAlign: "left",
-                    display: "flex", flexDirection: "column", gap: 4,
-                    position: "relative",
-                    boxShadow: `0 6px 16px ${g.color}33`,
-                    transition: "transform 0.12s",
-                  }}
-                  onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                  onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                 >
-                  <GameIcon icon={g.icon} iconImg={g.iconImg} size={42} />
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937", marginTop: 6 }}>
+                  <span aria-hidden className="gr-card-icon">
+                    <GameIcon icon={g.icon} iconImg={g.iconImg} size={32} />
+                  </span>
+                  <span data-ux-role="label" className="gr-card-title">
                     <GameText map={{ ko: g.name }} lang={viewerLang} />
                     {viewerLang !== "ko" && (
-                      <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6B7280" }}>{g.name}</span>
+                      <span className="gr-card-title-alt">{g.name}</span>
                     )}
-                  </div>
-                  <div style={{ fontSize: 12, color: g.color, fontWeight: 800 }}>
+                  </span>
+                  <span data-ux-role="secondary" className="gr-card-sub">
                     <GameText map={{ ko: g.sub }} lang={viewerLang} />
-                  </div>
-                  <div style={{
-                    position: "absolute", top: 10, right: 10,
-                    fontSize: 14, fontWeight: 900, color: "#fff",
-                    background: g.color, padding: "6px 14px", borderRadius: 999,
-                    letterSpacing: 0.5, boxShadow: `0 3px 8px ${g.color}66`,
-                  }}>PLAY ▶</div>
+                  </span>
+                  <span aria-hidden className="gr-card-play">▶</span>
                 </button>
               ))}
             </div>
