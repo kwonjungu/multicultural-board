@@ -18,6 +18,12 @@ export interface ActionPanelProps {
   dispatch: Dispatch<Action>;
   onRoll: () => void;
   /**
+   * 지금 주사위가 굴러가는 중인가. 예전에는 이 값을 `phase === "moving"` 에서
+   * 스스로 만들어, 말이 움직이는 내내 주사위가 돌고 확정 숫자는 이동이 끝나야
+   * 보였다(06 §5 와 반대). 굴림 구간은 위에서 관리하고 여기서는 받아 쓴다.
+   */
+  rolling?: boolean;
+  /**
    * "center":  compact card for the middle of the board ring (default).
    * "overlay": full-board modal card (chance / quiz), rendered above the ring.
    *
@@ -53,6 +59,7 @@ export function ActionPanel({
   langB,
   dispatch,
   onRoll,
+  rolling = false,
   slot = "center",
 }: ActionPanelProps) {
   const phase = state.phase;
@@ -219,9 +226,26 @@ export function ActionPanel({
   }
 
   if (phase.kind === "landed") {
+    /**
+     * 도착 요약 — 06 §2 "결과: 이동/획득의 의미가 이해되는 요약".
+     * 예전에는 "칸 #6" 과 턴 종료 버튼뿐이라 판 가운데가 통째로 비었고,
+     * 아이가 자기가 굴린 수와 지금 선 자리를 이을 근거가 화면에 없었다.
+     * 누가 · 몇을 굴려 · 어디에 왔는지를 한 카드에 모은다.
+     */
+    const landedWho = state.players[phase.who];
+    const landedTile = TILES[phase.tile];
+    const sum = state.diceA + state.diceB;
     return (
       <CenterCard>
-        <p data-ux-role="secondary">칸 #{phase.tile}</p>
+        <p data-ux-role="label" className="mb-actturn" style={{ color: PLAYER_COLOR[phase.who] }}>
+          {landedWho?.name || phase.who}
+        </p>
+        <p data-ux-role="body-emphasis" className="mb-landspot">
+          🎲 {state.diceA} + {state.diceB} = {sum} 칸
+        </p>
+        <p data-ux-role="body" className="mb-landname">
+          📍 {landedTile?.landmark ? tr(landedTile.landmark, langA) : `칸 ${phase.tile}`}
+        </p>
         <button
           data-ux-role="control"
           className="mb-actprimary"
@@ -235,7 +259,8 @@ export function ActionPanel({
   }
 
   // Default: rolling / moving → dice + turn label + mini log.
-  const rolling = phase.kind === "moving";
+  // 이동 중에는 **확정된 숫자를 그대로 보여준다** — 그래야 아이가 자기 말이
+  // 왜 그만큼 가는지 눈으로 잇는다.
   const canRoll = phase.kind === "rolling";
   const whoId = "who" in phase ? phase.who : state.turn;
   const who = state.players[whoId];
@@ -287,6 +312,8 @@ const ACTION_CSS = `
 .mb-acticon{ font-size: clamp(1.75rem, 5vw, 2.75rem); line-height: 1; }
 .mb-acttitle{ font-weight: 900; overflow-wrap: anywhere; }
 .mb-actprice{ font-weight: 900; color: var(--ux-primary-ink); }
+.mb-landspot{ margin: 0; color: var(--ux-ink); }
+.mb-landname{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }
 .mb-actturn{ font-weight: 900; line-height: var(--ux-lh-tight); }
 .mb-actrank{ display: grid; gap: var(--ux-space-1); width: 100%; }
 .mb-actrankhead{ font-weight: 800; color: var(--ux-primary-ink); }

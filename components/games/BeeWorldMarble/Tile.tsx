@@ -97,20 +97,35 @@ export function Tile({
       ? friendText
       : "";
 
+  /**
+   * 칸은 판 위에 놓인 **낮은 블록**이다(06 §2 "작은 입체 랜드마크·높이 차").
+   * 아래 모서리를 어둡게 한 띠가 두께로 읽히고, 상태에 따라 높이가 달라진다.
+   *   기본 → 1px 두께
+   *   내가 가진 칸 → 2px (조금 솟음)
+   *   지금 도착한 칸 → 3px + 위로 이동 + 빛 (색만으로 알리지 않게 테두리도 함께)
+   * 글씨는 판과 같은 평면에 그대로 둔다 — 기울이지 않는다.
+   */
+  const lift = highlight ? 3 : ownerColor ? 2 : 1;
   const style: CSSProperties = {
     position: "relative",
     width: "100%",
     height: "100%",
     background: bg,
     border: highlight ? "2.5px solid #F59E0B" : "1px solid #D1D5DB",
-    borderRadius: 5,
+    borderRadius: 6,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "space-between",
     padding: "4%",
     overflow: "hidden",
-    boxShadow: highlight ? "0 0 10px rgba(245,158,11,0.6)" : undefined,
+    boxShadow: [
+      `0 ${lift}px 0 rgba(120,53,15,.28)`,
+      `0 ${lift + 2}px ${lift + 3}px -1px rgba(120,53,15,.22)`,
+      highlight ? "0 0 12px rgba(245,158,11,.65)" : "",
+    ].filter(Boolean).join(", "),
+    transform: highlight ? "translateY(-2px)" : undefined,
+    transition: "transform .16s ease, box-shadow .16s ease",
     boxSizing: "border-box",
     fontSize: "clamp(9px, 1.4vw, 12px)",
   };

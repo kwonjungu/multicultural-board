@@ -161,16 +161,28 @@ export function Board({
     return null;
   })();
 
+  /**
+   * 판 자체. 기울이지 않는다 — 30칸의 작은 글씨가 원근으로 찌그러지면
+   * 06 §2 가 금지한 "글씨가 기울어 읽기 어려워지는" 상태가 된다.
+   * 깊이는 아래쪽 두께(옆면)와 책상에 닿는 그림자로만 만든다.
+   */
   const outer: CSSProperties = {
     width: "min(96vw, 720px)",
     aspectRatio: "1 / 1",
     margin: "0 auto",
     position: "relative",
-    background: "#FEF3C7",
+    background: "linear-gradient(#FFFBEB, #FEF3C7)",
     border: "3px solid #F59E0B",
-    borderRadius: 14,
+    borderRadius: 16,
     boxSizing: "border-box",
-    boxShadow: "0 8px 20px rgba(245,158,11,0.2)",
+    boxShadow: [
+      // 판의 옆면 — 아래로 갈수록 어두워지는 얇은 띠가 두께로 읽힌다.
+      "0 6px 0 #E8A63A",
+      "0 10px 0 #C9821F",
+      // 책상에 닿는 접촉 그림자 — 가까운 쪽은 진하고 좁게, 먼 쪽은 넓게.
+      "0 14px 10px -6px rgba(120,53,15,.35)",
+      "0 26px 34px -12px rgba(120,53,15,.28)",
+    ].join(", "),
     overflow: "hidden",
   };
 
@@ -198,6 +210,9 @@ export function Board({
   };
 
   return (
+    // 두께와 접촉 그림자가 판 밖으로 나가므로 바깥에 여백을 준다.
+    // 이 여백이 없으면 그림자가 잘려 판이 종이처럼 보인다.
+    <div style={{ padding: "0 0 30px" }}>
     <div style={outer} aria-label="비마블 보드">
       {/* 벌 토큰 통통 튀는 모션 (이동 중인 타일에서) */}
       <style jsx global>{`
@@ -258,6 +273,7 @@ export function Board({
           {overlay}
         </div>
       )}
+    </div>
     </div>
   );
 }

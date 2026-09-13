@@ -18,6 +18,29 @@ import { LogTicker } from "./LogTicker";
 import { PlayerHud } from "./PlayerHud";
 import { sfx } from "./marbleSfx";
 
+/** 한 판의 칸 수. 이동 총 시간을 남은 칸으로 나눌 때 쓴다. */
+const TILE_COUNT = 30;
+/** 06 §5 — 굴림 0.6~1초. 아이가 "굴렸다" 를 느끼는 최소 길이. */
+const ROLL_MS = 700;
+/** 06 §5 — 긴 이동도 총 연출 2초 이내. 여유를 두고 1.5초를 예산으로 쓴다. */
+const MOVE_BUDGET_MS = 1500;
+
+/**
+ * 움직임 줄이기 설정. 기기 설정이 바뀌면 그 자리에서 따른다.
+ * 06 §5: "흔들림·점프·카메라 이동을 생략하고 결과/도착 상태를 바로 보여준다".
+ */
+function useReduceMotion(): boolean {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setReduce(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return reduce;
+}
+
 export default function BeeWorldMarble({
   langA,
   langB,
@@ -29,6 +52,9 @@ export default function BeeWorldMarble({
 
   // 설계서 항목 12: 방 언어 세트에 필요한 게임 텍스트 번역을 시작 시 1회
   // 배치 프리페치 — 라운드 중 번역 지연 제거. 실패해도 useGameText 가
+  /** 움직임 줄이기 — 굴림·이동 연출을 건너뛸지 정한다(06 §5). */
+  const reduceMotion = useReduceMotion();
+
   // 개별 재시도하므로 fire-and-forget.
   useEffect(() => {
     const maps = [
@@ -39,16 +65,29 @@ export default function BeeWorldMarble({
     if (langB !== langA) prefetchGameTexts(maps, langB).catch(() => {});
   }, [langA, langB]);
 
-  // Movement animation: tick every 200ms while moving. Each tick plays a
-  // short "move" tone so a multi-tile move is audible.
+  /**
+   * 칸별 이동. 예전에는 칸당 200ms 고정이라 12칸 이동이 2.4초로 예산(총 2초)
+   * 을 넘겼다. 남은 칸 수로 나눠 총 시간을 묶고, 한 칸이 너무 빨라 눈으로
+   * 쫓을 수 없게 되지 않도록 아래로도 막는다.
+   *
+   * 움직임 줄이기를 켠 아이에게는 칸을 하나씩 밟는 연출 대신 도착 상태로
+   * 바로 간다(06 §5).
+   */
   useEffect(() => {
-    if (state.phase.kind !== "moving") return;
+    const ph = state.phase;
+    if (ph.kind !== "moving") return;
+    const total = ((ph.to - ph.from + TILE_COUNT) % TILE_COUNT) || TILE_COUNT;
+    const left = Math.max(1, total - ph.step);
+    const per = reduceMotion
+      ? 0
+      : Math.max(90, Math.min(200, Math.round(MOVE_BUDGET_MS / left)));
     const id = setInterval(() => {
       sfx.move();
       dispatch({ type: "advance" });
-    }, 200);
+    }, per);
     return () => clearInterval(id);
-  }, [state.phase.kind]);
+    // step 이 바뀔 때마다 남은 칸으로 간격을 다시 잡는다.
+  }, [state.phase, reduceMotion]);
 
   // Fire phase-entry sfx (buy / toll / quiz / festival / jail / win). These
   // run reactively after a dispatch settles, which is always downstream of a
@@ -96,12 +135,29 @@ export default function BeeWorldMarble({
     dispatch({ type: "start", players });
   };
 
+  /**
+   * 주사위 굴림 — 06 §5 의 타임라인.
+   *
+   * 값은 **누르는 순간** 정해 ref 에 담는다. 연출이 끝날 때 그 값을 그대로
+   * reducer 에 넘기므로, 굴러가는 그림이 결과를 다시 뽑는 일은 없다
+   * ("시각 물리가 재추첨하지 않음").
+   */
+  const [rollAnim, setRollAnim] = useState(false);
+  const rollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (rollTimer.current) clearTimeout(rollTimer.current); }, []);
+
   const handleRoll = () => {
-    if (state.phase.kind !== "rolling") return;
+    if (state.phase.kind !== "rolling" || rollAnim) return;
     sfx.diceRoll();
     const a = 1 + Math.floor(Math.random() * 6);
     const b = 1 + Math.floor(Math.random() * 6);
-    dispatch({ type: "rollResult", a, b });
+    if (reduceMotion) { dispatch({ type: "rollResult", a, b }); return; }
+    setRollAnim(true);
+    rollTimer.current = setTimeout(() => {
+      rollTimer.current = null;
+      setRollAnim(false);
+      dispatch({ type: "rollResult", a, b });
+    }, ROLL_MS);
   };
 
   // Intercept specific Actions to play sfx in direct response to the user
@@ -134,6 +190,7 @@ export default function BeeWorldMarble({
     langB,
     dispatch: dispatchWithSfx,
     onRoll: handleRoll,
+    rolling: rollAnim,
   });
 
   const boardNode = (
