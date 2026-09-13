@@ -144,6 +144,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
   const activeCol = columns.find((c) => c.id === activeColId) ?? columns[0] ?? null;
 
+  /** '어디에 올릴까요' 를 묻는 중인지. 주제가 둘 이상일 때만 뜬다. */
+  const [askTopic, setAskTopic] = useState(false);
+
   // Undo snackbar
   const [undoToast, setUndoToast] = useState<{
     message: string;
@@ -858,13 +861,19 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                       className="bd-btn"
                       onClick={(e) => { e.stopPropagation(); openCompose(col); }}
                     >{t("addHere", lang)}</button>
-                    <button
-                      type="button"
-                      data-ux-role="control"
-                      className="bd-btn"
-                      aria-pressed={colManageOpen === col.id}
-                      onClick={(e) => { e.stopPropagation(); setColManageOpen((prev) => (prev === col.id ? null : col.id)); }}
-                    >주제 관리</button>
+                    {/* 주제 관리는 교사 도구다. 단일 주제 보기에서는 이미
+                       isTeacher 로 가려 두었는데 전체 보기에서만 빠져 있어
+                       아이 화면에도 나왔다(사용자 지적: "아이 입장에서 주제
+                       관리가 뭐야?"). 같은 규칙으로 맞춘다. */}
+                    {isTeacher && (
+                      <button
+                        type="button"
+                        data-ux-role="control"
+                        className="bd-btn"
+                        aria-pressed={colManageOpen === col.id}
+                        onClick={(e) => { e.stopPropagation(); setColManageOpen((prev) => (prev === col.id ? null : col.id)); }}
+                      >주제 관리</button>
+                    )}
                   </div>
                   {colManageOpen === col.id && (
                     <div onClick={(e) => e.stopPropagation()}><ColumnAdmin col={col} /></div>
@@ -915,8 +924,49 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             data-ux-role="action"
             className="bd-cta"
             data-tutorial-id="board-fab"
-            onClick={() => openCompose(activeCol)}
+            onClick={() => {
+              // 주제가 하나면 물을 것이 없다.
+              if (columns.length <= 1) { openCompose(activeCol); return; }
+              setAskTopic(true);
+            }}
           >{t("boardWriteMine", lang)}</button>
+        </div>
+      )}
+
+      {/* ── 어디에 올릴까요 ── */}
+      {askTopic && (
+        <div
+          className="bd-modal-back"
+          role="dialog" aria-modal="true" aria-labelledby="bd-asktopic-title"
+          onClick={(e) => { if (e.target === e.currentTarget) setAskTopic(false); }}
+        >
+          <div className="bd-modal" data-ux-surface="panel">
+            <div className="bd-modal-head">
+              <h2 id="bd-asktopic-title" data-ux-role="body-emphasis" className="bd-modal-title">
+                {t("boardAskTopic", lang)}
+              </h2>
+              <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setAskTopic(false)}>
+                {t("boardAskTopicCancel", lang)}
+              </button>
+            </div>
+            <div className="bd-topicpick">
+              {columns.map((col) => (
+                <button
+                  key={col.id}
+                  type="button"
+                  data-ux-role="control"
+                  className="bd-topicpick-btn"
+                  style={{ ['--col-tint' as string]: col.color }}
+                  onClick={() => { setAskTopic(false); setActiveColId(col.id); openCompose(col); }}
+                >
+                  <span data-ux-role="label" className="bd-topicpick-name">{cleanTitle(col.title)}</span>
+                  <span data-ux-role="secondary">
+                    {tFmt("boardStoryCount", lang, { n: cards.filter((c) => c.colId === col.id).length })}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1400,15 +1450,34 @@ const BOARD_CSS = `
 .bd-col[data-ux-surface]{
   background: color-mix(in srgb, var(--col-tint, var(--ux-surface)) 14%, var(--ux-surface));
 }
+/* 주제 머리 — 가운데 정렬.
+   예전에는 그림이 왼쪽, 개수가 오른쪽 끝(margin-left:auto)에 붙어 한 칸 안에서
+   좌우로 벌어져 보였다. 칼럼이 여러 개 늘어서면 그 어긋남이 더 눈에 띈다
+   (사용자 지적: "이것들을 중앙 정렬"). 그림·이름·개수를 한 축에 가운데로 모은다. */
 .bd-col-head{
-  /* 좁아진 컬럼에서 주제 이름이 잘리면 안 된다 — 두 줄로 내려온다. */
-  display: flex; align-items: center; flex-wrap: wrap; gap: var(--ux-space-2);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: var(--ux-space-1);
   border-radius: var(--ux-radius-surface); padding: var(--ux-space-2) var(--ux-space-3);
 }
 .bd-col-art{ width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; background: var(--ux-surface); border-radius: var(--ux-radius-surface); }
-.bd-col-title{ flex: 1 1 100%; min-width: 0; font-weight: 900; color: var(--ux-ink); white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
-.bd-col-count{ flex-shrink: 0; color: var(--ux-ink); margin-left: auto; }
-.bd-col-tools{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+/* 좁아진 컬럼에서 주제 이름이 잘리면 안 된다 — 두 줄로 내려온다. */
+.bd-col-title{ width: 100%; min-width: 0; font-weight: 900; color: var(--ux-ink); white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+.bd-col-count{ color: var(--ux-ink); }
+/* 추가·관리 버튼도 같은 축에 가운데로. */
+.bd-col-tools{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; justify-content: center; }
+
+/* 어디에 올릴까요 — 주제를 색과 이름으로 고른다. 아이가 글을 쓰기 전에
+   어디로 가는지 알아야 한다. */
+.bd-topicpick{ display: grid; gap: var(--ux-space-3); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.bd-topicpick-btn{
+  display: grid; gap: 2px; justify-items: center; text-align: center;
+  padding: var(--ux-space-3);
+  background: color-mix(in srgb, var(--col-tint, var(--ux-surface)) 18%, var(--ux-surface));
+  border: 3px solid color-mix(in srgb, var(--col-tint, var(--ux-primary-border)) 60%, var(--ux-primary-border));
+  border-radius: var(--ux-radius-surface);
+  font-family: inherit; cursor: pointer; color: var(--ux-ink);
+}
+.bd-topicpick-name{ font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
 /* 튜토리얼 대화상자(화면 아래 고정)가 떠 있는 동안 칼럼 안쪽에 그만큼 스크롤
    여백을 준다. 없으면 칼럼 맨 아래 카드의 듣기·답장·공감 버튼이 상자에 가려
    끝까지 내려도 눌리지 않는다. --tutorial-dialogue-h 는 DialogueBox 가 떠

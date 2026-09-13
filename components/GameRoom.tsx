@@ -166,7 +166,12 @@ const LOBBY_CSS = `
 .gr-header-text{ flex: 1; min-width: 0; }
 .gr-title{ color: var(--ux-ink); display: flex; align-items: center; gap: 6px; font-weight: 900; }
 .gr-subtitle{ margin-top: 2px; }
-.gr-bee{ width: 56px; height: 56px; flex-shrink: 0; filter: drop-shadow(0 4px 12px rgba(245,158,11,.35)); }
+/* 로고를 키우고 오른쪽 끝에 붙인다 — 왼쪽 뒤로, 가운데 글, 오른쪽 그림으로
+   세 구역이 갈린다. 좁은 화면에서는 글자 자리를 뺏지 않게 줄인다. */
+.gr-bee{ width: 96px; height: 96px; flex-shrink: 0; margin-left: auto; object-fit: contain; }
+@media (max-width: 560px){ .gr-bee{ width: 64px; height: 64px; } }
+/* 머리와 목록 사이 경계 — 공간 분리 */
+.gr-header{ border-bottom: 2px dashed var(--ux-primary-border); }
 
 /* 언어 요약 바 — 기본은 칩 두 개만. 카드 전체를 다시 펼치지 않는다. */
 .gr-lang-bar{
@@ -323,12 +328,15 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
               <div data-ux-role="title" className="gr-title">
                 🎮 {gt(GR.title, viewerLang)}
               </div>
-              <div data-ux-role="secondary" className="gr-subtitle">
+              {/* 설명은 작은 보조 글씨가 아니라 본문 크기로 — 여기가 무엇을
+                 하는 곳인지 아이가 한 번에 읽어야 한다. */}
+              <div data-ux-role="body" className="gr-subtitle">
                 {gt(GR.subtitle, viewerLang)}
               </div>
             </div>
+            {/* 게임기를 든 꿀벌 — 머리 영역과 게임 목록을 눈으로 갈라 준다. */}
             <img
-              src="/mascot/bee-celebrate.png"
+              src="/ui-icons/v1/scene/bee-gamer-256.png"
               alt=""
               aria-hidden="true"
               className="gr-bee"
@@ -448,7 +456,7 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
               onClick={() => { reportGamePlayed(); setGameId(null); }}
               aria-label="게임 목록으로"
               style={{
-                width: 44, height: 44, borderRadius: 12, border: `2px solid ${ActiveGame.color}44`,
+                width: "var(--ux-control-min)", height: "var(--ux-control-min)", borderRadius: 12, border: `2px solid ${ActiveGame.color}44`,
                 background: "#fff", fontSize: 18, fontWeight: 900, color: ActiveGame.color, cursor: "pointer",
               }}
             >←</button>
@@ -469,7 +477,7 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
               onClick={() => { reportGamePlayed(); onClose(); }}
               aria-label="게임룸 닫기"
               style={{
-                width: 44, height: 44, borderRadius: 12, border: "2px solid #FDE68A",
+                width: "var(--ux-control-min)", height: "var(--ux-control-min)", borderRadius: 12, border: "2px solid #FDE68A",
                 background: "#FFFBEB", fontSize: 16, fontWeight: 900, color: "#92400E", cursor: "pointer",
               }}
             >✕</button>

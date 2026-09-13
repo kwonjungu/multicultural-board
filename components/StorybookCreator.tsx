@@ -407,7 +407,7 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
             disabled={stage === "generating"}
             aria-label="back"
             style={{
-              width: 44, height: 44, borderRadius: 14,
+              width: "var(--ux-control-min)", height: "var(--ux-control-min)", borderRadius: 14,
               background: "#fff", border: "2px solid #FDE68A",
               fontSize: 18, fontWeight: 900, color: "#92400E",
               cursor: stage === "generating" ? "not-allowed" : "pointer",

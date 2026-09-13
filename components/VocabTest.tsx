@@ -411,13 +411,16 @@ export default function VocabTest({
         display: "flex", alignItems: "center", justifyContent: "space-between",
         gap: 8, paddingBottom: 10, borderBottom: `2px solid ${PURPLE_LIGHT}`,
       }}>
+        {/* 36x33 이라 아이 손가락으로 옆 것을 누르기 쉬웠다. padding·minWidth 로
+            크기를 정하지 않고 control 토큰에 맡긴다. */}
         <button
           onClick={onClose}
           aria-label="나가기"
+          data-ux-role="control"
           style={{
             background: PURPLE_LIGHT, border: "none", borderRadius: 10,
-            padding: "6px 10px", fontSize: 16, fontWeight: 900, color: PURPLE_DARK,
-            cursor: "pointer", fontFamily: "inherit", minWidth: 36,
+            fontWeight: 800, color: PURPLE_DARK,
+            cursor: "pointer", fontFamily: "inherit",
           }}
         >✕</button>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}>

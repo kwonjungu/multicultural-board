@@ -307,6 +307,8 @@ export default function TutorChat({
           type="button"
           data-ux-role="control"
           className="tc-fab"
+          aria-label={t("tutorOpenLabel", lang)}
+          title={t("tutorOpenLabel", lang)}
           style={{ bottom: 84 + vp.bottomInset }}
           onClick={() => { setOpen(true); setCollapsed(false); }}
         >
@@ -442,7 +444,27 @@ const TC_CSS = `
   box-shadow: 0 6px 18px rgba(137,83,0,.28);
 }
 .tc-fab-img{ width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
-.tc-fab-label{ white-space: nowrap; }
+/* 평소에는 접어 둔다.
+   화면 위에 늘 떠 있는 물건이라 글자까지 펼쳐 두면 아이 화면을 계속 가린다
+   (사용자 지시: "접어놔 학생 것에서"). 뜻은 aria-label 과 title 이 지키고,
+   마우스를 올리거나 키보드 포커스가 오면 이름이 펼쳐진다 — 아이콘만 남겨
+   뜻이 사라지는 것은 피한다. */
+.tc-fab{ border-radius: 50%; padding: 0; }
+.tc-fab-label{
+  white-space: nowrap;
+  max-width: 0; overflow: hidden; opacity: 0;
+  transition: max-width .18s ease, opacity .18s ease, margin-inline-end .18s ease;
+  margin-inline-end: 0;
+}
+.tc-fab:hover, .tc-fab:focus-visible{ border-radius: var(--ux-radius-pill); }
+.tc-fab:hover .tc-fab-label, .tc-fab:focus-visible .tc-fab-label{
+  max-width: 12rem; opacity: 1; margin-inline-end: var(--ux-space-2);
+}
+/* 손가락만 쓰는 기기에서는 hover 가 없다 — 접힌 채로 두고 뜻은 라벨이 아니라
+   꿀비 그림과 aria-label 이 나른다. */
+@media (hover: none){
+  .tc-fab:hover .tc-fab-label{ max-width: 0; opacity: 0; margin-inline-end: 0; }
+}
 
 .tc-panel{
   position: fixed; right: 8px; left: 8px; z-index: 320;

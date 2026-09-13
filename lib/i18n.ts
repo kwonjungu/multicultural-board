@@ -2722,12 +2722,27 @@ export const UI_TEXT: Record<string, Record<string, string>> = {
   },
   /* 카드 아래 보조 버튼이라 짧게 — 지구본 하나에 각 언어로 "번역".
      "다른 언어로 보기" 는 좁은 칼럼에서 버튼 하나가 두 줄을 먹었다. */
+  /* 내 이야기 올리기 → 어느 주제에 올릴지 먼저 묻는 화면. */
+  boardAskTopic: {
+    ko: "어느 주제에 올릴까요?", en: "Which topic?", vi: "Chủ đề nào?",
+    zh: "放到哪个主题?", fil: "Aling paksa?", ja: "どのテーマに?",
+    th: "หัวข้อไหน?", km: "ប្រធានបទណា?", mn: "Аль сэдэв рүү?",
+    ru: "В какую тему?", uz: "Qaysi mavzuga?", hi: "किस विषय में?",
+    id: "Topik yang mana?", ar: "أي موضوع؟", my: "ဘယ်ခေါင်းစဉ်မှာလဲ?",
+  },
+  boardAskTopicCancel: {
+    ko: "그만두기", en: "Cancel", vi: "Hủy",
+    zh: "取消", fil: "Kanselahin", ja: "やめる",
+    th: "ยกเลิก", km: "បោះបង់", mn: "Болих",
+    ru: "Отмена", uz: "Bekor", hi: "रद्द",
+    id: "Batal", ar: "إلغاء", my: "ပယ်ဖျက်",
+  },
   cardOtherLangs: {
-    ko: "🌐 번역", en: "🌐 Translate", vi: "🌐 Dịch",
-    zh: "🌐 翻译", fil: "🌐 Salin", ja: "🌐 翻訳",
-    th: "🌐 แปล", km: "🌐 បកប្រែ", mn: "🌐 Орчуулга",
-    ru: "🌐 Перевод", uz: "🌐 Tarjima", hi: "🌐 अनुवाद",
-    id: "🌐 Terjemahan", ar: "🌐 ترجمة", my: "🌐 ဘာသာပြန်",
+    ko: "번역", en: "Translate", vi: "Dịch",
+    zh: "翻译", fil: "Salin", ja: "翻訳",
+    th: "แปล", km: "បកប្រែ", mn: "Орчуулга",
+    ru: "Перевод", uz: "Tarjima", hi: "अनुवाद",
+    id: "Terjemahan", ar: "ترجمة", my: "ဘာသာပြန်",
   },
   cardImageFailed: {
     ko: "그림을 불러오지 못했어요", en: "We couldn't load the picture", vi: "We couldn't load the picture",

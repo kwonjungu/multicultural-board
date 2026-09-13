@@ -650,12 +650,11 @@ export default function PadletCard({
             </div>
           )}
 
-          {otherLangs.length > 0 && (
+          {/* 펼친 다른 언어 본문만 여기 남는다. 여는 버튼은 아래 조작 줄로
+              옮겼다 — 번역·스피커·댓글·하트가 한 행에 있어야 한다. */}
+          {otherLangs.length > 0 && showOthers && (
             <div className="pc-sub">
-              <button type="button" data-ux-role="control" className="pc-btn" aria-pressed={showOthers} onClick={() => setShowOthers((v) => !v)}>
-                {tPlain("cardOtherLangs", viewerLang)}
-              </button>
-              {showOthers && otherLangs.map((l) => (
+              {otherLangs.map((l) => (
                 <div key={l} className="pc-alt">
                   <span data-ux-role="secondary" className="pc-read-tag">{LANGUAGES[l]?.label}</span>
                   <p data-ux-role="body" data-ux-reading lang={l} className="pc-body">{card.translations[l]}</p>
@@ -767,6 +766,19 @@ export default function PadletCard({
              그대로 보여준다(패널의 pc-react-n). 줄에는 합계만 남긴다. */}
       <div className="pc-actions">
         <div className="pc-act-read">
+          {/* 번역 — 다른 언어로 같은 글을 볼 수 있을 때만 나온다. */}
+          {otherLangs.length > 0 && (
+            <button
+              type="button"
+              data-ux-role="control"
+              className="pc-btn pc-tr"
+              aria-pressed={showOthers}
+              onClick={() => setShowOthers((v) => !v)}
+            >
+              <span aria-hidden className="pc-btn-ico">🌐</span>
+              <span className="pc-btn-lb">{tPlain("cardOtherLangs", viewerLang)}</span>
+            </button>
+          )}
           <ListenButton
             id="mine"
             text={translating || translateFailed ? card.originalText : readingText}

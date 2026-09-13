@@ -52,6 +52,7 @@ import { readChatStream } from "@/lib/chatStreamClient";
 import MicButton from "./MicButton";
 import DrawBoard, { type DrawBoardHandle } from "./DrawBoard";
 import ImageLightbox from "./ImageLightbox";
+import ScopedStyle from "./ui/child/ScopedStyle";
 import { speak as speakText, cancelSpeak } from "@/lib/ttsMulti";
 import StorybookCreator from "./StorybookCreator";
 import StorybookWordQuiz from "./StorybookWordQuiz";
@@ -528,13 +529,17 @@ function TeacherSetup({
     >
       <div style={{ maxWidth: 620, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          {/* 크기를 인라인으로 박으면 control 토큰의 최소 크기(터치 48px /
+              마우스 44px)가 무력화된다 — 실제로 44x44 로 고정돼 터치 계약에
+              미달했다. 크기는 토큰에 맡기고 생김새만 여기서 정한다. */}
           <button
             onClick={onBack}
             aria-label="back"
+            data-ux-role="control"
             style={{
-              width: 44, height: 44, borderRadius: 14,
+              borderRadius: 14,
               background: "#fff", border: "2px solid #FDE68A",
-              fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
+              fontWeight: 800, color: "#92400E", cursor: "pointer",
             }}
           >←</button>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
@@ -780,11 +785,12 @@ function StudentWaiting({ lang, onBack }: { lang: string; onBack: () => void }) 
       <button
         onClick={onBack}
         aria-label="back"
+        data-ux-role="control"
         style={{
           position: "absolute", top: 20, left: 20,
-          width: 44, height: 44, borderRadius: 14,
+          borderRadius: 14,
           background: "#fff", border: "2px solid #FDE68A",
-          fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
+          fontWeight: 800, color: "#92400E", cursor: "pointer",
         }}
       >←</button>
       <img
@@ -899,29 +905,18 @@ function StudentFreeLibrary({
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      // 🐝 협곡 풍경 배경 (그림책 일러스트 보호 위해 흰 오버레이 88%로 은은하게)
-      background: "linear-gradient(rgba(255,251,235,0.88), rgba(253,230,138,0.88)), url('/landing/game-canyon.webp') center / cover no-repeat",
-      backgroundAttachment: "fixed",
-      fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
-      padding: "20px 16px 40px",
-    }}>
-      <div style={{ maxWidth: 620, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <button
-            onClick={onBack}
-            aria-label="back"
-            style={{
-              width: 44, height: 44, borderRadius: 14,
-              background: "#fff", border: "2px solid #FDE68A",
-              fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
-            }}
-          >←</button>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-            📚 그림책 읽기
-          </h1>
-        </div>
+    <div className="sbl-root">
+      <ScopedStyle css={SBL_CSS} />
+      <div className="sbl-shell">
+        <header className="sbl-head">
+          <button onClick={onBack} aria-label="back" data-ux-role="control" className="sbl-back">←</button>
+          {/* 꿀벌 사서 선생님 — 이 방이 무엇을 하는 곳인지 그림 하나로 말한다. */}
+          <img src="/ui-icons/v1/library/bee-librarian-256.png" alt="" aria-hidden="true" className="sbl-librarian" />
+          <div className="sbl-headtext">
+            <h1 data-ux-role="title" className="sbl-title">그림책 도서관</h1>
+            <p data-ux-role="body" className="sbl-sub">읽고 싶은 책을 골라 보세요</p>
+          </div>
+        </header>
 
         {books === null ? (
           <div style={{ textAlign: "center", padding: 30, color: "#92400E", fontWeight: 700 }}>
@@ -937,45 +932,25 @@ function StudentFreeLibrary({
             아직 읽을 수 있는 그림책이 없어요.<br/>선생님이 책을 열어주면 여기에 보여요!
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="sbl-shelf">
             {books.map((b) => (
               <button
                 key={b.id}
                 onClick={() => open(b.id)}
                 disabled={loadingBook}
-                style={{
-                  display: "grid", gridTemplateColumns: "72px 1fr auto",
-                  alignItems: "center", gap: 14, textAlign: "left",
-                  padding: "12px 14px",
-                  background: "linear-gradient(135deg, #FAF5FF, #EDE9FE)",
-                  border: "3px solid #8B5CF655", borderRadius: 18,
-                  boxShadow: "0 6px 20px rgba(180,83,9,0.12)",
-                  cursor: loadingBook ? "wait" : "pointer", fontFamily: "inherit",
-                }}
+                data-ux-role="control"
+                className="sbl-book"
+                style={{ cursor: loadingBook ? "wait" : "pointer" }}
               >
-                {b.coverImageUrl ? (
-                  <div style={{ width: 72, height: 72, borderRadius: 12, overflow: "hidden", background: "#fff", border: "2px solid #fff" }}>
-                    <img src={b.coverImageUrl} alt="" aria-hidden="true" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  </div>
-                ) : (
-                  <div style={{ width: 72, height: 72, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.6)", fontSize: 38 }}>
-                    {b.coverEmoji}
-                  </div>
+                <span className="sbl-cover">
+                  {b.coverImageUrl
+                    ? <img src={b.coverImageUrl} alt="" aria-hidden="true" />
+                    : <span aria-hidden className="sbl-coveremoji">{b.coverEmoji}</span>}
+                </span>
+                <span data-ux-role="label" className="sbl-booktitle">{b.titleKo}</span>
+                {b.wordQuizEnabled && b.hasVocab && (
+                  <span data-ux-role="secondary" className="sbl-quiz">📝 단어 퀴즈 먼저</span>
                 )}
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1F2937", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {b.titleKo}
-                  </div>
-                  {b.wordQuizEnabled && b.hasVocab && (
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#6D28D9", marginTop: 2 }}>
-                      📝 단어 퀴즈 먼저 풀어요
-                    </div>
-                  )}
-                </div>
-                <span style={{
-                  fontSize: 12, fontWeight: 900, color: "#fff",
-                  background: "#8B5CF6", padding: "6px 12px", borderRadius: 999, whiteSpace: "nowrap",
-                }}>읽기 ▶</span>
               </button>
             ))}
           </div>
@@ -984,6 +959,83 @@ function StudentFreeLibrary({
     </div>
   );
 }
+
+/* 전자 도서관 — 표지가 주인공이다. */
+const SBL_CSS = `
+.sbl-root{
+  min-height: 100vh;
+  /* 꿀벌 도서관 배경. 그 위에 카드와 글자가 얹히므로 크림 막을 덮어 대비를
+     지킨다 — 배경이 예뻐도 글을 못 읽으면 소용이 없다. */
+  background:
+    linear-gradient(rgba(255,251,235,.62), rgba(253,230,138,.66)),
+    url("/backgrounds/bee-library.jpg") center / cover no-repeat;
+  background-attachment: fixed;
+  padding: var(--ux-space-5) var(--ux-space-4) var(--ux-space-12);
+}
+.sbl-shell{ max-width: 1040px; margin: 0 auto; }
+
+.sbl-head{
+  display: flex; align-items: center; gap: var(--ux-space-3);
+  margin-bottom: var(--ux-space-5);
+}
+.sbl-back{
+  border-radius: 14px; background: var(--ux-surface);
+  border: 2px solid var(--ux-primary-border);
+  font-weight: 800; color: var(--ux-ink); cursor: pointer; flex: 0 0 auto;
+}
+.sbl-librarian{ width: 72px; height: 72px; object-fit: contain; flex: 0 0 auto; }
+.sbl-headtext{ min-width: 0; }
+.sbl-title{ margin: 0; color: var(--ux-ink); font-weight: 800; }
+.sbl-sub{ margin: 2px 0 0; color: var(--ux-ink-soft); }
+
+/* 서가 — 한 권이 한 칸. 표지가 크게 보이도록 세로로 긴 칸을 쓴다. */
+.sbl-shelf{
+  display: grid; gap: var(--ux-space-4);
+  /* auto-fill + 1fr 이면 책이 두 권일 때도 다섯 칸이 생겨 왼쪽에 쏠린 채
+     빈 칸이 남는다. 칸 폭을 묶고 무리를 가운데로 모은다. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 190px));
+  justify-content: center;
+}
+.sbl-book{
+  display: grid; gap: var(--ux-space-2); justify-items: center; text-align: center;
+  padding: var(--ux-space-3) var(--ux-space-2) var(--ux-space-4);
+  background: var(--ux-surface);
+  border: 3px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface);
+  /* 아래쪽 굵은 선이 책이 선반에 놓인 느낌을 만든다. */
+  border-bottom-width: 10px;
+  box-shadow: 0 8px 20px rgba(137,83,0,.16);
+  font-family: inherit; cursor: pointer;
+  transition: transform .14s ease, box-shadow .14s ease;
+}
+.sbl-book:hover, .sbl-book:focus-visible{
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px rgba(137,83,0,.24);
+}
+/* 표지 — 책 비율(3:4). 예전 72px 썸네일과 달리 이게 화면의 주인공이다. */
+.sbl-cover{
+  display: block; width: 100%; aspect-ratio: 3 / 4;
+  border-radius: 12px; overflow: hidden;
+  background: var(--ux-surface-sunk);
+  border: 2px solid var(--ux-primary-border);
+}
+.sbl-cover img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.sbl-coveremoji{
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  font-size: 44px;
+}
+.sbl-booktitle{
+  color: var(--ux-ink); font-weight: 800; line-height: var(--ux-lh-tight);
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.sbl-quiz{ color: var(--ux-ink-soft); }
+
+/* 폰에서는 두 권씩 — 한 권씩 크게 깔면 스크롤만 길어진다. */
+@media (max-width: 520px){
+  .sbl-shelf{ grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ux-space-3); }
+  .sbl-librarian{ width: 56px; height: 56px; }
+}
+`;
 
 // [신규] 자유 리더 — 학생이 스스로 페이지를 넘기며 읽고 듣는다 (질문/핫시팅 없음).
 // 책에 단어 퀴즈가 켜져 있고 어휘가 4개 이상이면 읽기 전에 퀴즈를 먼저 푼다(규칙).
@@ -1050,7 +1102,7 @@ function StorybookFreeReader({
             onClick={onBack}
             aria-label="back"
             style={{
-              width: 44, height: 44, borderRadius: 14,
+              width: "var(--ux-control-min)", height: "var(--ux-control-min)", borderRadius: 14,
               background: "#fff", border: "2px solid #FDE68A",
               fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
             }}

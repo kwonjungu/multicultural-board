@@ -165,7 +165,7 @@ function NotebookRow({
         alt=""
         aria-hidden="true"
         style={{
-          width: 44, height: 44, objectFit: "contain",
+          width: "var(--ux-control-min)", height: "var(--ux-control-min)", objectFit: "contain",
           background: "rgba(255,255,255,0.6)",
           borderRadius: 10, padding: 3, flexShrink: 0,
         }}

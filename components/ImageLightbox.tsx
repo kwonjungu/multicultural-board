@@ -64,7 +64,7 @@ export default function ImageLightbox({
         aria-label="닫기"
         style={{
           position: "fixed", top: 14, right: 14,
-          width: 44, height: 44, borderRadius: 14,
+          width: "var(--ux-control-min)", height: "var(--ux-control-min)", borderRadius: 14,
           background: "rgba(255,255,255,0.92)", border: "2px solid #FDE68A",
           fontSize: 17, fontWeight: 900, color: "#92400E", cursor: "pointer",
           boxShadow: "0 6px 18px rgba(0,0,0,0.3)",

@@ -371,7 +371,7 @@ export default function Home() {
       <div className="root-shell">
         <BeeBanner />
 
-        <main className="root-panel" data-ux-surface="panel">
+        <main className={view === "join" ? "root-panel join" : "root-panel"} data-ux-surface="panel">
           {/* ── 기본 화면: 우리 교실에 들어가요 ─────────────────────── */}
           {view === "join" && (
             <>
@@ -386,6 +386,11 @@ export default function Home() {
                 </p>
               </div>
 
+              {/* 가로로 넓고 세로로 짧은 크롬북·노트북에서는 안내(왼쪽)와
+                  입력(오른쪽)을 두 열로 나눈다. 한 열로 쌓으면 1366x768 에서
+                  문서가 1130px 이 되어 정작 들어가기 가 화면 밖(y=770)으로
+                  밀렸다 — 첫 화면에서 아이가 스크롤을 해야 하는 상태였다. */}
+              <div className="root-entry">
               {/* 네 자리 표시 — 지금 어디를 누르는지 보이게 한다 */}
               <div className="root-digits" role="status" aria-label={`교실 번호 ${joinCode || "없음"}`}>
                 {[0, 1, 2, 3].map((i) => {
@@ -490,6 +495,7 @@ export default function Home() {
               <p id="root-cta-hint" data-ux-role="secondary" className="root-cta-hint">
                 {joinReady ? "교실 번호가 다 채워졌어요" : "네 자리를 모두 눌러야 들어갈 수 있어요"}
               </p>
+              </div>
 
               {/* 교사 도구는 아이의 흐름에서 비켜난 보조 링크다. */}
               <div className="root-teacher-links">
@@ -710,7 +716,22 @@ const ROOT_CSS = `
   box-shadow: 0 10px 30px rgba(137,83,0,.14);
   display: grid; gap: var(--ux-space-4);
 }
+.root-entry{ display: grid; gap: var(--ux-space-4); }
 .root-hero{ text-align: center; display: grid; gap: var(--ux-space-2); justify-items: center; }
+
+/* 크롬북·노트북(넓고 짧은 가로 화면): 안내와 입력을 두 열로.
+   문턱을 뷰포트 폭 + 가로 방향으로 잡는다 — 폭만 보면 태블릿 세로에서도
+   걸려 오히려 좁아진다. 세로 화면과 좁은 폭은 지금처럼 한 열이다. */
+@media (min-width: 900px) and (orientation: landscape){
+  .root-shell{ max-width: 1000px; }
+  .root-panel.join{
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--ux-space-6);
+  }
+  /* 교사 도구는 아이 흐름 밖이라 아래에 한 줄로 깐다. */
+  .root-panel.join > .root-teacher-links{ grid-column: 1 / -1; }
+}
 .root-hero-bee{ width: 96px; height: 96px; object-fit: contain; }
 .root-title{ margin: 0; color: var(--ux-ink); font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
 .root-title.small{ flex: 1; min-width: 0; text-align: left; }

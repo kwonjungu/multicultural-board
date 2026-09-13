@@ -47,7 +47,10 @@ function textCard(over: Partial<CardData> & { id: string; colId: string }): Card
     authorName: "학생 01",
     isTeacher: false,
     originalText: KO_SENTENCES[0],
-    translations: { ko: KO_SENTENCES[0], vi: VI_SENTENCES[0] },
+    /* 세 번째 언어를 하나 둔다 — 보는 사람 언어도 원문 언어도 아닌 번역이
+       있어야 카드에 '번역' 버튼이 나온다. 이게 없으면 그 버튼이 fixture 에서
+       아예 렌더되지 않아 검수에서 빠진다. */
+    translations: { ko: KO_SENTENCES[0], vi: VI_SENTENCES[0], en: "Today the rice was really tasty." },
     paletteIdx: 0,
     timestamp: FIXED_NOW - 3600_000,
     flagged: false,

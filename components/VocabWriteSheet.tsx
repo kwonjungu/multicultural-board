@@ -99,6 +99,14 @@ export default function VocabWriteSheet({ words, onClose, studentName }: Props) 
           boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
         }}
       >
+        {/* 받아쓰기 하는 꿀벌 — 이 화면이 무엇을 하는 곳인지 그림으로 먼저 말한다.
+           인쇄할 때는 아래 인쇄 전용 CSS 가 화면 크롬과 함께 숨긴다. */}
+        <img
+          src="/ui-icons/v1/scene/bee-writing-256.png"
+          alt=""
+          aria-hidden="true"
+          style={{ width: 64, height: 64, objectFit: "contain", flexShrink: 0 }}
+        />
         <div style={{ flex: 1, minWidth: 0, color: "#fff" }}>
           <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: -0.3 }}>
             📄 단어 쓰기 학습지

@@ -299,7 +299,7 @@ export default function PptxTranslateModal({ defaultFromLang, defaultToLang, onC
             background: "#F8F9FC", borderRadius: 14, border: "1px solid #E9ECF5",
           }}>
             <div style={{
-              width: 44, height: 44, borderRadius: "50%", margin: "0 auto 16px",
+              width: "var(--ux-control-min)", height: "var(--ux-control-min)", borderRadius: "50%", margin: "0 auto 16px",
               border: "3px solid #E5E7EB", borderTopColor: "#F59E0B",
               animation: "spin 0.8s linear infinite",
             }} />

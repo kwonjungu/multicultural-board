@@ -150,6 +150,11 @@ function chunkText(text: string, limit = 180): string[] {
   return out;
 }
 
+/** 재생이 시작조차 못 하면 이 시간 안에 실패로 본다. */
+const AUDIO_START_MS = 2000;
+/** 길이를 알기 전까지 쓰는 임시 상한. 알게 되면 실제 길이로 좁힌다. */
+const AUDIO_MAX_MS = 15000;
+
 async function playServerTts(text: string, langShort: string): Promise<void> {
   const chunks = chunkText(text);
   for (const part of chunks) {
@@ -160,17 +165,46 @@ async function playServerTts(text: string, langShort: string): Promise<void> {
       const tuning = TUNING[langShort] || DEFAULT_TUNING;
       audio.playbackRate = tuning.rate;
       audio.volume = tuning.volume;
-      audio.addEventListener("ended", () => {
+
+      /**
+       * 'ended' 만 기다리면 재생이 시작되지 못했을 때 영영 끝나지 않는다.
+       * 그러면 호출부의 finally 가 안 돌아 듣기 버튼이 눌린 채로 굳는다
+       * (실제 신고된 증상). 시작과 종료 양쪽에 시간을 못 박는다.
+       */
+      let started = false;
+      let settled = false;
+      const done = (ok: boolean, why?: string) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(startGuard);
+        window.clearTimeout(maxGuard);
         if (currentAudio === audio) currentAudio = null;
-        resolve();
+        if (ok) resolve();
+        else {
+          try { audio.pause(); } catch { /* 무시 */ }
+          reject(new Error(why || "audio failed"));
+        }
+      };
+      const startGuard = window.setTimeout(() => {
+        if (!started) done(false, "audio did not start");
+      }, AUDIO_START_MS);
+      let maxGuard = window.setTimeout(() => done(true), AUDIO_MAX_MS);
+      // 길이를 알면 그 길이에 맞춰 상한을 좁힌다 — 끝 이벤트가 안 와도
+      // 버튼이 오래 물려 있지 않게 한다.
+      audio.addEventListener("loadedmetadata", () => {
+        const d = audio.duration;
+        if (!Number.isFinite(d) || d <= 0) return;
+        window.clearTimeout(maxGuard);
+        const rate = audio.playbackRate || 1;
+        maxGuard = window.setTimeout(() => done(true), (d / rate) * 1000 + 1200);
       }, { once: true });
-      audio.addEventListener("error", () => {
-        if (currentAudio === audio) currentAudio = null;
-        reject(new Error("audio error"));
-      }, { once: true });
-      audio.play().catch(reject);
+
+      audio.addEventListener("playing", () => { started = true; }, { once: true });
+      audio.addEventListener("ended", () => done(true), { once: true });
+      audio.addEventListener("error", () => done(false, "audio error"), { once: true });
+      audio.play().then(() => { started = true; }).catch((e) => done(false, String(e && e.name)));
     });
-    // If speaking was cancelled between chunks, stop
+    // 도중에 취소됐으면 다음 조각으로 넘어가지 않는다.
     if (!currentAudio) break;
   }
 }
@@ -197,9 +231,9 @@ export async function speak(text: string, langShort: string): Promise<void> {
   // 이전 재생 정지 — 이 파일 것과 버스 것 양쪽 모두.
   cancelSpeak();
   stopAll();
-  // Chrome 은 cancel() 바로 뒤에 온 speak() 를 통째로 삼키는 일이 있다.
-  // 한 틱 쉬어 큐가 비워질 시간을 준다 — 아이가 못 느낄 만큼 짧다.
-  await new Promise((r) => setTimeout(r, 60));
+  // 여기서 기다리지 않는다. 기다리면 클릭에서 이어지는 '사용자 제스처 창' 을
+  // 벗어나 브라우저가 재생을 막는다. cancel 직후 speak 을 삼키는 Chrome 버그는
+  // 아래 감시견이 서버 경로로 넘겨 받는다.
 
   // For reliably-unsupported languages, skip browser entirely.
   const goServerFirst = WEBSPEECH_UNRELIABLE.has(langShort);

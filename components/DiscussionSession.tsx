@@ -513,8 +513,12 @@ export default function DiscussionSession({
 
   return (
     <div style={overlayStyle}>
+      {/* 폭을 560px 로 못박아 두면 1366px 크롬북에서도 폰 폭 한 줄이 되어
+         좌우가 텅 비고 세로 스크롤만 길어진다. 화면 폭에 따라 넓어지게 하면
+         안쪽 친구 글 격자(auto-fill minmax 160px)가 열을 더 쓴다.
+         상한 980px 은 한 줄이 지나치게 길어져 읽기 나빠지는 것을 막는다. */}
       <div style={{
-        width: "100%", maxWidth: 560, maxHeight: "90vh",
+        width: "100%", maxWidth: "clamp(320px, 94vw, 980px)", maxHeight: "90vh",
         background: "#fff", borderRadius: 20, overflow: "hidden",
         boxShadow: "0 32px 80px rgba(0,0,0,0.3)",
         display: "flex", flexDirection: "column",
@@ -1123,7 +1127,7 @@ function FruitDetailModal({
             paddingBottom: 14, borderBottom: "1px dashed #E5E7EB",
           }}>
             <div style={{
-              width: 44, height: 44, borderRadius: 14,
+              width: "var(--ux-control-min)", height: "var(--ux-control-min)", borderRadius: 14,
               background: "#FEF3C7", display: "flex", alignItems: "center",
               justifyContent: "center", fontSize: 22, border: "2px solid #FDE68A",
             }}>{LANGUAGES[resp.authorLang]?.flag || "🌐"}</div>

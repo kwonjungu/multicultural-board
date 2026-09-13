@@ -43,12 +43,10 @@ const BANNER_CSS = `
   overflow-wrap: anywhere;
 }
 .bee-banner-emoji{ margin-inline-end: var(--ux-space-2); }
-.bee-banner-text{
-  background: linear-gradient(90deg, #F59E0B 0%, #FB7185 22%, #A78BFA 45%, #60A5FA 65%, #34D399 85%, #F59E0B 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  /* background-clip 미지원 브라우저 폴백 — 크림 배경 위 4.5:1 을 만족하는 갈색 */
-  color: #8A4B00;
-}
+/* 예전에는 이 글자에 여섯 색 무지개 그라디언트를 깔았다(주황·분홍·보라·파랑·
+   초록). 첫 화면에서 가장 크고 가장 눈에 띄는 글자가 앱의 꿀색 팔레트와 따로
+   놀았고, 글자마다 색이 달라 읽기도 더 어려웠다. 한 색으로 되돌린다 —
+   크림 배경 위에서 4.5:1 을 넘는 갈색이라 대비도 그대로다.
+   강조는 색을 늘리는 것이 아니라 크기와 굵기로 한다. */
+.bee-banner-text{ color: var(--ux-ink); }
 `;

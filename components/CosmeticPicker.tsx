@@ -261,7 +261,7 @@ export default function CosmeticPicker({
             aria-label="close"
             style={{
               background: "#fff", border: "2px solid #FDE68A", borderRadius: 14,
-              width: 44, height: 44, fontSize: 16,
+              width: "var(--ux-control-min)", height: "var(--ux-control-min)", fontSize: 16,
               cursor: saving ? "not-allowed" : "pointer",
               color: "#92400E", fontWeight: 900,
               display: "flex", alignItems: "center", justifyContent: "center",

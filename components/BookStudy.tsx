@@ -289,7 +289,7 @@ export default function BookStudy({
           display: "flex", alignItems: "center", gap: 12, marginBottom: 20,
         }}>
           <button onClick={onBack} style={{
-            width: 44, height: 44, borderRadius: 14,
+            width: "var(--ux-control-min)", height: "var(--ux-control-min)", borderRadius: 14,
             background: "#fff", border: "2px solid #FDE68A",
             fontSize: 18, fontWeight: 900, color: "#92400E", cursor: "pointer",
           }}>←</button>

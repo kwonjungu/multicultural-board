@@ -274,17 +274,17 @@ export default function PraiseHive({
             boxShadow: "0 8px 24px rgba(180,83,9,0.12)",
           }}
         >
+          {/* 크기는 control 토큰이 보장한다(터치 48px / 마우스 44px).
+              인라인으로 44x44 를 박아 두면 터치에서 계약에 미달한다. */}
           <button
             onClick={onBack}
             aria-label="back"
+            data-ux-role="control"
             style={{
-              width: 44,
-              height: 44,
               borderRadius: 14,
               background: "#fff",
               border: `2px solid ${HONEY.h200}`,
-              fontSize: 18,
-              fontWeight: 900,
+              fontWeight: 800,
               color: HONEY.h800,
               cursor: "pointer",
               flexShrink: 0,
@@ -2646,11 +2646,12 @@ function GalleryPopover({
         <button
           onClick={onClose}
           aria-label="close"
+          data-ux-role="control"
           style={{
             position: "absolute", top: 6, right: 6,
-            width: 44, height: 44, borderRadius: 10,
+            borderRadius: 10,
             background: HONEY.h50, border: `1.5px solid ${HONEY.h200}`,
-            fontSize: 14, fontWeight: 900, color: HONEY.h800, cursor: "pointer",
+            fontWeight: 800, color: HONEY.h800, cursor: "pointer",
           }}
         >✕</button>
 
