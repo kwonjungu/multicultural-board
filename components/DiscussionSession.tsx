@@ -27,6 +27,17 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([arr], { type: mime });
 }
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않는다. 운영 방(1111)의 실제 세션·응답을 fixture 로
+ * 복제하지 않는다 — 여기 값은 전부 지어낸 것이다.
+ */
+export interface DiscussionFixture {
+  meta: SessionMeta;
+  responses?: SessionResponse[];
+  presence?: Record<string, PresenceEntry>;
+}
+
 interface Props {
   roomCode: string;
   sessionId: string;
@@ -35,6 +46,7 @@ interface Props {
   myName: string;
   myLang: string;
   onExit: () => void;
+  fixture?: DiscussionFixture;
 }
 
 export default function DiscussionSession({
@@ -45,10 +57,13 @@ export default function DiscussionSession({
   myName,
   myLang,
   onExit,
+  fixture,
 }: Props) {
-  const [meta, setMeta] = useState<SessionMeta | null>(null);
-  const [responses, setResponses] = useState<SessionResponse[]>([]);
-  const [presence, setPresence] = useState<Record<string, PresenceEntry>>({});
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
+  const [meta, setMeta] = useState<SessionMeta | null>(fixture?.meta ?? null);
+  const [responses, setResponses] = useState<SessionResponse[]>(fixture?.responses ?? []);
+  const [presence, setPresence] = useState<Record<string, PresenceEntry>>(fixture?.presence ?? {});
   const [draft, setDraft] = useState("");
   const [composerMode, setComposerMode] = useState<"text" | "draw">("text");
   const drawRef = useRef<DrawBoardHandle>(null);
@@ -62,16 +77,18 @@ export default function DiscussionSession({
 
   // ── Meta listener ──
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const metaRef = ref(db, `${basePath}/meta`);
     const cb = onValue(metaRef, (snap) => {
       setMeta(snap.val() as SessionMeta | null);
     });
     return () => off(metaRef, "value", cb);
-  }, [basePath]);
+  }, [basePath, offline]);
 
   // ── Responses listener ──
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const respRef = ref(db, `${basePath}/responses`);
     const cb = onValue(respRef, (snap) => {
@@ -85,10 +102,11 @@ export default function DiscussionSession({
       setResponses(list);
     });
     return () => off(respRef, "value", cb);
-  }, [basePath]);
+  }, [basePath, offline]);
 
   // ── Presence listener (teacher + for stats) ──
   useEffect(() => {
+    if (offline) return;
     const db = getClientDb();
     const presRef = ref(db, `${basePath}/presence`);
     const cb = onValue(presRef, (snap) => {
@@ -96,10 +114,11 @@ export default function DiscussionSession({
       setPresence(val);
     });
     return () => off(presRef, "value", cb);
-  }, [basePath]);
+  }, [basePath, offline]);
 
   // ── Own presence: heartbeat + onDisconnect cleanup (students only) ──
   useEffect(() => {
+    if (offline) return;
     if (isTeacher) return;
     const db = getClientDb();
     const myRef = ref(db, `${basePath}/presence/${myClientId}`);
@@ -116,7 +135,7 @@ export default function DiscussionSession({
       set(ref(db, `${basePath}/presence/${myClientId}/lastSeen`), Date.now()).catch(() => {});
     }, 15000);
     return () => clearInterval(heartbeat);
-  }, [basePath, isTeacher, myClientId, myName, myLang]);
+  }, [basePath, isTeacher, myClientId, myName, myLang, offline]);
 
   // Has current student submitted?
   const myResponse = useMemo(
@@ -129,6 +148,8 @@ export default function DiscussionSession({
 
   async function handleSubmit() {
     if (submitting || isClosed || isTeacher) return;
+    // fixture: 실제 제출을 만들지 않는다 — 화면은 ?state 로 고정된 값만 보여준다.
+    if (offline) return;
 
     // ── 그림 모드 ── (빈 draft 가드를 적용하지 않는다)
     if (composerMode === "draw") {
@@ -225,6 +246,7 @@ export default function DiscussionSession({
     if (!isTeacher || closing) return;
     if (!confirm("세션을 종료하면 학생이 더 이상 제출할 수 없고, 모든 응답이 공개됩니다. 계속할까요?"))
       return;
+    if (offline) return;
     setClosing(true);
     try {
       const db = getClientDb();
@@ -239,6 +261,7 @@ export default function DiscussionSession({
   async function handleDeleteSession() {
     if (!isTeacher) return;
     if (!confirm("세션과 모든 응답을 영구 삭제합니다. 되돌릴 수 없습니다. 계속할까요?")) return;
+    if (offline) { onExit(); return; }
     const db = getClientDb();
     await remove(ref(db, basePath));
     await set(ref(db, `rooms/${roomCode}/activeSession`), null);
@@ -296,6 +319,7 @@ export default function DiscussionSession({
               myClientId={myClientId}
               myName={myName}
               targetLangs={meta?.targetLangs || []}
+              offline={offline}
             />
           )}
         </div>
@@ -430,6 +454,7 @@ export default function DiscussionSession({
                   myClientId={myClientId}
                   myName={myName}
                   targetLangs={meta?.targetLangs || []}
+                  offline={offline}
                 />
               </div>
             )}
@@ -659,6 +684,7 @@ export default function DiscussionSession({
                 myClientId={myClientId}
                 myName={myName}
                 targetLangs={meta?.targetLangs || []}
+                offline={offline}
               />
             </div>
           )}
@@ -716,7 +742,7 @@ const CARD_COLORS = [
 const REACTIONS = ["👍", "❤️", "😮", "👏"];
 
 function ResponseCard({
-  resp, idx, myLang, basePath, myClientId, myName, targetLangs,
+  resp, idx, myLang, basePath, myClientId, myName, targetLangs, offline,
 }: {
   resp: SessionResponse;
   idx: number;
@@ -725,6 +751,7 @@ function ResponseCard({
   myClientId: string;
   myName: string;
   targetLangs: string[];
+  offline?: boolean;
 }) {
   const bg = CARD_COLORS[idx % CARD_COLORS.length];
   const text = resp.translations?.[myLang] || resp.text;
@@ -748,6 +775,7 @@ function ResponseCard({
   const myReaction = resp.reactions?.[myClientId];
 
   function toggleReaction(emoji: string) {
+    if (offline) return;
     const db = getClientDb();
     const myRef = ref(db, `${basePath}/responses/${resp.id}/reactions/${myClientId}`);
     if (myReaction === emoji) {
@@ -765,6 +793,7 @@ function ResponseCard({
   async function sendReply() {
     const t = replyDraft.trim();
     if (!t || sending) return;
+    if (offline) return;
     setSending(true);
     try {
       const targets = targetLangs.filter((l) => l !== myLang);
@@ -1258,7 +1287,7 @@ function FruitTree({
 
 // 다인원 응답을 한눈에 — 과일나무 대신 격자 카드로 보는 모드 (가독 보장).
 function ResponseGrid({
-  responses, myLang, basePath, myClientId, myName, targetLangs,
+  responses, myLang, basePath, myClientId, myName, targetLangs, offline,
 }: {
   responses: SessionResponse[];
   myLang: string;
@@ -1266,6 +1295,7 @@ function ResponseGrid({
   myClientId: string;
   myName: string;
   targetLangs: string[];
+  offline?: boolean;
 }) {
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px 28px" }}>
@@ -1284,6 +1314,7 @@ function ResponseGrid({
             myClientId={myClientId}
             myName={myName}
             targetLangs={targetLangs}
+            offline={offline}
           />
         ))}
       </div>

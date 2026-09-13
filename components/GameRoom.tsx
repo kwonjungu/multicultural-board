@@ -141,7 +141,21 @@ function GameIcon({ icon, iconImg, size }: { icon: string; iconImg?: string; siz
 
 const DEFAULT_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
 
-export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, roomCode, questClientId }: {
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). GameRoom 은 그 자체로 Firebase 를
+ * 구독하지 않지만, "게임 1판 종료" 계측(reportQuestEvent)과 언어 번역 프리페치
+ * (fetch("/api/storybook-translate"))가 이 화면에서 fire-and-forget 으로 나간다.
+ * fixture 가 주입되면 이 두 경로를 모두 끈다 — 운영 방(1111)의 퀘스트 기록에
+ * fixture 조회가 섞이지 않게 하기 위함이다.
+ */
+export interface GameRoomFixture {
+  /** 처음 보여줄 화면. "lobby"=언어 카드+게임 그리드, "langpick"=언어 선택 펼친 상태. */
+  initialView?: "lobby" | "langpick";
+  /** initialView가 "langpick"일 때 펼칠 카드. 기본 "me". */
+  langPickTarget?: "me" | "friend";
+}
+
+export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, roomCode, questClientId, fixture }: {
   myLang: string;
   onClose: () => void;
   /** "나" 카드에서 내 언어를 바꿀 때 호출 — 상위에서 UserConfig.myLang 갱신(localStorage 저장). */
@@ -150,11 +164,16 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
   /** 📋 일일 퀘스트 계측용 (선택) — 없으면 계측 생략. questClientId = 학생 이름 (교사는 미전달). */
   roomCode?: string;
   questClientId?: string;
+  fixture?: GameRoomFixture;
 }) {
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
   const friendLangCodes = roomLangs && roomLangs.length > 0 ? roomLangs : DEFAULT_LANG_CODES;
   const defaultFriend = friendLangCodes.find((c) => c !== (myLang || "ko")) || "en";
   const [friendLang, setFriendLang] = useState<string>(defaultFriend);
-  const [showLangPick, setShowLangPick] = useState<"me" | "friend" | null>(null);
+  const [showLangPick, setShowLangPick] = useState<"me" | "friend" | null>(
+    fixture?.initialView === "langpick" ? (fixture.langPickTarget ?? "me") : null
+  );
   const [gameId, setGameId] = useState<string | null>(null);
 
   const viewerLang = myLang || "ko";
@@ -162,13 +181,15 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
 
   // 게임 이름/부제 번역 프리페치 — 뷰어 언어가 사전에 없는 언어여도 목록이 바로 번역돼 보이게.
   useEffect(() => {
+    if (offline) return;
     prefetchGameTexts(GAMES.flatMap((g) => [{ ko: g.name }, { ko: g.sub }]), viewerLang);
-  }, [viewerLang]);
+  }, [viewerLang, offline]);
 
   // 📋 일일 퀘스트 — 게임 1판 종료 계측. 개별 게임(20종)은 종료 신호를 셸로
   // 올리지 않으므로 "활성 게임에서 나가기"를 공통 종료 지점으로 사용 (1곳 원칙).
   // fire-and-forget — 기존 화면 전환 흐름은 그대로.
   const reportGamePlayed = () => {
+    if (offline) return;
     if (roomCode && questClientId) reportQuestEvent(roomCode, questClientId, "game_play");
   };
 

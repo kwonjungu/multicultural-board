@@ -16,6 +16,7 @@ import {
   pushWhiteboardSnapshot,
   subscribeWhiteboardBoards,
   clearWhiteboardBoards,
+  type WhiteboardMeta,
   type WhiteboardBoard,
 } from "@/lib/whiteboard";
 
@@ -23,24 +24,40 @@ const CANVAS_W = 720;
 const CANVAS_H = 480;
 const PAGE_BG = "linear-gradient(rgba(255,251,235,0.9), rgba(253,230,138,0.9)), url('/landing/game-canyon.webp') center / cover no-repeat";
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않는다. 운영 방(1111) 학생 보드를 fixture 로 복제하지 않는다.
+ */
+export interface WhiteboardFixture {
+  meta?: WhiteboardMeta;
+  /** 교사 갤러리에 채울 학생 보드 — dataUrl 은 지어낸 그림(데이터 URL)이어야 한다. */
+  boards?: WhiteboardBoard[];
+  /** 학생 화면 자신의 캔버스에 심을 초기 그림(빈 캔버스 방지). */
+  myBoardImageDataUrl?: string;
+}
+
 interface Props {
   user: UserConfig;
   roomCode: string;
   myClientId: string;
   onBack: () => void;
+  fixture?: WhiteboardFixture;
 }
 
-export default function WhiteboardRoom({ user, roomCode, myClientId, onBack }: Props) {
-  const [prompt, setPrompt] = useState("");
-  const [active, setActive] = useState(false);
+export default function WhiteboardRoom({ user, roomCode, myClientId, onBack, fixture }: Props) {
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
+  const [prompt, setPrompt] = useState(fixture?.meta?.prompt || "");
+  const [active, setActive] = useState(!!fixture?.meta?.active);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeWhiteboardMeta(roomCode, (m) => {
       setPrompt(m.prompt || "");
       setActive(!!m.active);
     });
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   return (
     <div style={{
@@ -75,9 +92,16 @@ export default function WhiteboardRoom({ user, roomCode, myClientId, onBack }: P
         </div>
 
         {user.isTeacher ? (
-          <TeacherWhiteboard roomCode={roomCode} prompt={prompt} active={active} />
+          <TeacherWhiteboard roomCode={roomCode} prompt={prompt} active={active} offline={offline} initialBoards={fixture?.boards ?? []} />
         ) : (
-          <StudentWhiteboard roomCode={roomCode} myClientId={myClientId} name={user.myName} prompt={prompt} />
+          <StudentWhiteboard
+            roomCode={roomCode}
+            myClientId={myClientId}
+            name={user.myName}
+            prompt={prompt}
+            offline={offline}
+            initialImageDataUrl={fixture?.myBoardImageDataUrl}
+          />
         )}
       </div>
     </div>
@@ -85,8 +109,10 @@ export default function WhiteboardRoom({ user, roomCode, myClientId, onBack }: P
 }
 
 // ════════════════════ 교사: 갤러리 + 프롬프트 ════════════════════
-function TeacherWhiteboard({ roomCode, prompt, active }: { roomCode: string; prompt: string; active: boolean }) {
-  const [boards, setBoards] = useState<WhiteboardBoard[]>([]);
+function TeacherWhiteboard({
+  roomCode, prompt, active, offline, initialBoards,
+}: { roomCode: string; prompt: string; active: boolean; offline: boolean; initialBoards: WhiteboardBoard[] }) {
+  const [boards, setBoards] = useState<WhiteboardBoard[]>(initialBoards);
   const [draft, setDraft] = useState(prompt);
   const [saving, setSaving] = useState(false);
   const [enlarged, setEnlarged] = useState<WhiteboardBoard | null>(null);
@@ -95,25 +121,29 @@ function TeacherWhiteboard({ roomCode, prompt, active }: { roomCode: string; pro
   useEffect(() => { setDraft(prompt); }, [prompt]);
 
   async function toggleActive() {
+    if (offline) return;
     setToggling(true);
     try { await setWhiteboardActive(roomCode, !active); } catch { /* noop */ }
     setToggling(false);
   }
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeWhiteboardBoards(roomCode, setBoards);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   useBackLayer(enlarged !== null, () => setEnlarged(null));
 
   async function savePrompt() {
+    if (offline) return;
     setSaving(true);
     try { await setWhiteboardPrompt(roomCode, draft.trim()); } catch { /* noop */ }
     setSaving(false);
   }
 
   async function clearAll() {
+    if (offline) return;
     if (!window.confirm("모든 학생의 그림을 지웁니다. 계속할까요?")) return;
     try { await clearWhiteboardBoards(roomCode); } catch { /* noop */ }
   }
@@ -277,12 +307,15 @@ function TeacherWhiteboard({ roomCode, prompt, active }: { roomCode: string; pro
 
 // ════════════════════ 학생: 공용 DrawBoard + 자동 업로드 ════════════════════
 function StudentWhiteboard({
-  roomCode, myClientId, name, prompt,
-}: { roomCode: string; myClientId: string; name: string; prompt: string }) {
-  const [synced, setSynced] = useState(false);
+  roomCode, myClientId, name, prompt, offline, initialImageDataUrl,
+}: { roomCode: string; myClientId: string; name: string; prompt: string; offline: boolean; initialImageDataUrl?: string }) {
+  // fixture 에서는 "선생님이 보고 있어요" 상태를 이미 동기화된 것으로 보여준다
+  // (검수 화면이 계속 "연결 중…"으로 멈춰 있지 않도록).
+  const [synced, setSynced] = useState(offline);
 
   // 빈 보드 1회 등장 + 그릴 때마다 스냅샷 업로드 (공용 DrawBoard onChange).
   const handleChange = (dataUrl: string) => {
+    if (offline) return;
     pushWhiteboardSnapshot(roomCode, myClientId, name, dataUrl)
       .then(() => setSynced(true))
       .catch(() => { /* noop */ });
@@ -311,7 +344,10 @@ function StudentWhiteboard({
         </span>
       </div>
 
-      <DrawBoard width={CANVAS_W} height={CANVAS_H} onChange={handleChange} />
+      <DrawBoard
+        width={CANVAS_W} height={CANVAS_H} onChange={handleChange}
+        fixture={initialImageDataUrl ? { initialImageDataUrl } : undefined}
+      />
     </div>
   );
 }
