@@ -62,8 +62,18 @@ const ITP_CSS = `
   display: flex; flex-direction: column;
   background: var(--ux-bg);
   transform: translateY(100%); transition: transform .28s cubic-bezier(.22,.61,.36,1);
+  /* 닫힌 시트는 반드시 화면에서 '없는 것'이어야 한다. transform/opacity 만으로
+     숨기면 fixed 판이 그대로 남아 그 아래 화면의 클릭을 전부 삼킨다 — 실제로
+     860px 이상에서 홈 허브가 통째로 안 눌리는 사고가 났다(2026-09-13).
+     visibility 는 포커스·스크린리더에서도 함께 빼 준다. */
+  visibility: hidden; pointer-events: none;
+  transition: transform .28s cubic-bezier(.22,.61,.36,1), visibility 0s linear .28s;
 }
-.itp-sheet.on{ transform: none; }
+.itp-sheet.on{
+  transform: none;
+  visibility: visible; pointer-events: auto;
+  transition: transform .28s cubic-bezier(.22,.61,.36,1);
+}
 @media (min-width: 860px){
   /* 넓은 화면에서는 전체를 덮지 않고 가운데 큰 판으로 — 교실에서 책상에
      올려놓고 마주 보는 물건처럼. */
@@ -72,8 +82,13 @@ const ITP_CSS = `
     border: 3px solid var(--ux-primary-border);
     box-shadow: 0 24px 60px rgba(41,37,31,.3);
     transform: translateY(8px) scale(.98); opacity: 0;
+    transition: transform .28s cubic-bezier(.22,.61,.36,1), opacity .2s,
+                visibility 0s linear .28s;
   }
-  .itp-sheet.on{ transform: none; opacity: 1; }
+  .itp-sheet.on{
+    transform: none; opacity: 1;
+    transition: transform .28s cubic-bezier(.22,.61,.36,1), opacity .2s;
+  }
 }
 
 .itp-head{
