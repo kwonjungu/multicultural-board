@@ -17,6 +17,7 @@ import { pickN } from "@/lib/gameData";
 import { playSequence, playTone } from "@/lib/gameSfx";
 import { cancelSpeak, speak } from "@/lib/ttsMulti";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 
 const GLOBE_R = 100;
 const QUIZ_ROUNDS = 8;
@@ -313,10 +314,17 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
 
 type Mode = "menu" | "explore" | "quiz";
 
-export default function GlobeQuest({ langA, langB, initialMode }: {
+export default function GlobeQuest({ langA, langB, initialMode, initialCountryCode }: {
   langA: string; langB: string;
   /** fixture 전용 — 메뉴를 거치지 않고 특정 모드로 바로 연다. 실제 게임룸은 넘기지 않는다. */
   initialMode?: Mode;
+  /**
+   * fixture 전용 — 공부하기 모드를 "나라 하나를 이미 고른" 상태로 연다.
+   * 정보 패널이 열린 채의 2열 배치를 브라우저로 실측하려면 3D 스프라이트를
+   * 레이캐스트로 정확히 눌러야 하는데, 그건 측정 스크립트가 신뢰할 수 있는
+   * 경로가 아니다. 실제 게임룸은 이 prop 을 넘기지 않는다.
+   */
+  initialCountryCode?: string;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode ?? "menu");
 
@@ -355,7 +363,13 @@ export default function GlobeQuest({ langA, langB, initialMode }: {
   }
 
   if (mode === "explore") {
-    return <ExploreMode viewerLang={langA} onBack={() => setMode("menu")} />;
+    return (
+      <ExploreMode
+        viewerLang={langA}
+        onBack={() => setMode("menu")}
+        initialCountryCode={initialCountryCode}
+      />
+    );
   }
   return <QuizMode viewerLang={langA} friendLang={langB} onBack={() => setMode("menu")} />;
 }
@@ -383,11 +397,20 @@ function ModeCard({ emoji, title, sub, onClick }: {
 // 다시 fit 한다 — 별도 배선 없이 기존 관찰 대상만으로 해결된다.
 // `overlay` 는 여전히 필요하다 — 게임하기 모드의 정오답 토스트(.gq-flashlayer)처럼
 // 화면 위를 스치듯 지나가는 알림은 stage 공간을 뺏지 않는 절대배치가 맞다.
-function GlobeShell({ topBar, children, overlay, panel }: {
+function GlobeShell({ topBar, children, overlay, panel, panelPlaceholder }: {
   topBar: React.ReactNode;
   children: React.ReactNode; // GlobeCanvas
   overlay?: React.ReactNode; // 스쳐 지나가는 토스트 — 여전히 절대배치, stage 크기에 영향 없음
   panel?: React.ReactNode; // 상시 정보 패널 — 폭에 따라 stage 옆/아래로 정상 흐름 배치
+  /**
+   * 2열(가로 넓은 화면)에서 아직 나라를 고르지 않았을 때 **옆 칸을 미리 비워
+   * 두기 위한** 안내 문구. 이게 있으면 패널이 열리기 전에도 같은 폭의 칸이
+   * 자리를 잡아, 나라를 누른 순간 지구본이 1366px → 994px 로 튀며 줄어드는
+   * 일이 없어진다(실측: 2열에서 27% 축소 → 0%). 1열(좁은/세로)에서는
+   * `.gq-panel[data-empty]` 가 display:none 이라 세로 공간을 먹지 않는다.
+   * 정보 패널이 없는 모드(게임하기)는 넘기지 않는다 — 지구본이 전폭을 쓴다.
+   */
+  panelPlaceholder?: React.ReactNode;
 }) {
   return (
     <div data-ux-root className="gq-shell">
@@ -395,28 +418,32 @@ function GlobeShell({ topBar, children, overlay, panel }: {
       <div className="gq-topbar">{topBar}</div>
       <div className="gq-stagewrap">
         <div className="gq-stage">{children}</div>
-        {panel}
+        {panel ?? (panelPlaceholder ? (
+          <div className="gq-panel" data-empty>
+            <p data-ux-role="secondary" className="gq-panelhint">{panelPlaceholder}</p>
+          </div>
+        ) : null)}
       </div>
       {overlay}
     </div>
   );
 }
 
-/** 아이콘만 있는 버튼은 만들지 않는다 — 짧은 글자 라벨을 함께 둔다. */
-function BackButton({ onBack }: { onBack: () => void }) {
-  return (
-    <button data-ux-role="control" className="gq-back" onClick={onBack}>
-      ← 모드 선택
-    </button>
-  );
-}
+/* U01: BackButton('← 모드 선택')은 공용 GameHeader 의 왼쪽 뒤로 버튼이 대신한다.
+   지구본만 뒤로가 있고 다른 게임에는 없던 상태를 없애는 것이 이번 변경의 요지다. */
 
 // ============================================================
 // 📖 공부하기 — 자유 탐험
 // ============================================================
 
-function ExploreMode({ viewerLang, onBack }: { viewerLang: string; onBack: () => void }) {
-  const [selected, setSelected] = useState<GlobeCountry | null>(null);
+function ExploreMode({ viewerLang, onBack, initialCountryCode }: {
+  viewerLang: string; onBack: () => void;
+  /** fixture 전용 (GlobeQuest 의 같은 이름 prop 참고). 소리는 내지 않는다. */
+  initialCountryCode?: string;
+}) {
+  const [selected, setSelected] = useState<GlobeCountry | null>(
+    () => GLOBE_COUNTRIES.find((c) => c.code === initialCountryCode) ?? null,
+  );
 
   useEffect(() => {
     return () => { stopSpeak(); };
@@ -425,14 +452,27 @@ function ExploreMode({ viewerLang, onBack }: { viewerLang: string; onBack: () =>
   return (
     <GlobeShell
       topBar={
-        <div className="gq-topinner">
-          <BackButton onBack={onBack} />
-          <div className="gq-toptext">
-            <span data-ux-role="label">📖 지구본 공부하기</span>
-            <span data-ux-role="secondary">돌려보고, 나라를 눌러보세요!</span>
-          </div>
-        </div>
+        /* U01 공용 헤더 — 예전에는 이 게임만 '← 모드 선택' 버튼 + 두 줄 글이었다.
+           이제 왼쪽 뒤로 / 가운데 게임 이름 / 오른쪽 상태로 다른 게임과 맞춘다. */
+        <GameHeader
+          gameId="globe"
+          title="다문화 지구본"
+          icon="🌍"
+          onBack={onBack}
+          backLabel="모드"
+          status={
+            <>
+              <GameStat icon="📖" label="모드" value="공부하기" tone="key" />
+              <GameStat
+                icon="🚩"
+                label="고른 나라"
+                value={selected ? globeCountryName(selected, viewerLang) : "아직 없어요"}
+              />
+            </>
+          }
+        />
       }
+      panelPlaceholder="🌍 지구본을 돌려 나라를 눌러보세요. 여기에 국기와 인사말이 나와요."
       panel={selected && (
         <div className="gq-panel">
           <div className="gq-card">
@@ -574,11 +614,27 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
   return (
     <GlobeShell
       topBar={
-        <div className="gq-topinner">
-          <BackButton onBack={onBack} />
+        <>
+          {/* U01 공용 헤더 — 점수·시간은 다른 게임과 같은 오른쪽 상태 칩으로.
+              찾아야 할 나라(그 판의 물음)는 헤더가 아니라 바로 아래 줄에 남긴다. */}
+          <GameHeader
+            gameId="globe"
+            title="다문화 지구본"
+            icon="🌍"
+            onBack={onBack}
+            backLabel="모드"
+            progress={{ value: idx, max: rounds.length }}
+            status={
+              <>
+                <GameStat icon="📍" label="문제" value={`${idx + 1} / ${rounds.length}`} />
+                <GameStat icon="⭐" label="점수" value={score} tone="key" />
+                <GameStat icon="⏱" label="시간" value={`${Math.floor((Date.now() - startedAt) / 1000)}s`} />
+              </>
+            }
+          />
           <div className="gq-quizbar">
             <div className="gq-quizask">
-              <span data-ux-role="secondary">🔍 이 나라를 찾아 탭! ({idx + 1}/{rounds.length})</span>
+              <span data-ux-role="secondary">🔍 이 나라를 찾아 탭!</span>
               <span data-ux-role="body-emphasis">
                 {target ? globeCountryName(target, viewerLang) : ""}
                 {target && viewerLang !== friendLang && (
@@ -588,12 +644,8 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
                 )}
               </span>
             </div>
-            <div className="gq-quizstat">
-              <span data-ux-role="label">⭐ {score}</span>
-              <span data-ux-role="secondary">⏱ {Math.floor((Date.now() - startedAt) / 1000)}s</span>
-            </div>
           </div>
-        </div>
+        </>
       }
       overlay={flash && (
         <div className="gq-flashlayer">
@@ -663,15 +715,7 @@ const GQ_CSS = `
   container-type: inline-size;
 }
 .gq-topbar{ padding: var(--ux-space-3); flex-shrink: 0; }
-.gq-topinner{ display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap; }
-.gq-toptext{ display: grid; gap: var(--ux-space-1); min-width: 0; }
-.gq-toptext [data-ux-role="label"]{ color: #fff; font-weight: 900; }
-.gq-toptext [data-ux-role="secondary"]{ color: #C7D2FE; }
-.gq-back[data-ux-role="control"]{
-  background: rgba(255,255,255,.12); color: #fff;
-  border: 2px solid rgba(255,255,255,.4); font-family: inherit; font-weight: 800;
-  white-space: nowrap; flex-shrink: 0;
-}
+/* U01: .gq-topinner / .gq-toptext / .gq-back 은 공용 GameHeader 로 대체됐다. */
 /* 지구본은 넓은 화면에서 더 크게 본다 — 판을 키우는 쪽이 아이에게 유리하다.
    min-height 는 이제 "목표 크기"가 아니라 저높이/큰 글씨에서도 stage 가 0 으로
    짜부라지지 않게 하는 바닥값이다 — 정상 상황의 실제 크기는 위 .gq-shell 의
@@ -700,16 +744,34 @@ const GQ_CSS = `
    min-height 바닥값과 합쳐 화면보다 커지면, 이 셸은 스스로 자르지 않고
    바깥(GameRoom 스테이지)의 overflow:auto 가 그대로 스크롤을 허용한다. */
 .gq-panel{ flex-shrink: 0; display: flex; justify-content: center; container-type: inline-size; }
+/* 빈 칸(아직 나라를 고르기 전)은 1열에서는 아예 없는 것과 같다 — 세로로 쌓이는
+   배치에서 안내 문구가 지구본 높이를 먹으면 안 된다. 2열에서만 되살린다. */
+.gq-panel[data-empty]{ display: none; }
+.gq-panelhint{
+  margin: 0; color: #C7D2FE; text-align: center;
+  border: 2px dashed rgba(255,255,255,.28); border-radius: var(--ux-radius-panel);
+  padding: var(--ux-space-4); width: 100%;
+}
 
-/* 폭이 충분(≈크롬북/노트북/가로 태블릿)하면 stage 옆에 패널 — 07 "가로/크롬북/
-   노트북은 큰 stage + 옆 정보 패널". 800px 처럼 애매하게 좁은 분할화면은 이
-   문턱 아래라 계속 아래 배치를 쓴다("최소 stage 공간이 부족하면 아래로"). */
-@container (min-width: 960px){
-  .gq-stagewrap{ flex-direction: row; align-items: stretch; }
-  .gq-stage{ min-width: 0; }
-  .gq-panel{
-    width: min(360px, 34cqi); max-width: 360px; min-height: 0;
-    overflow-y: auto; align-items: flex-start;
+/* 폭이 충분하고 **가로가 세로보다 긴** 화면(≈크롬북/노트북/가로 태블릿)이면
+   stage 옆에 패널 — 07 "가로/크롬북/노트북은 큰 stage + 옆 정보 패널".
+   - 폭 문턱 900px: 800px 같은 분할화면은 이 아래라 계속 위·아래 배치를 쓴다.
+   - orientation 은 @media(=뷰포트)로 본다. 세로로 긴 창(예: 1000x1200)에서
+     옆 패널을 만들면 stage 가 좁고 길어져 구체가 오히려 작아진다.
+   - 폭은 @container 로 본다(=이 셸이 실제로 받은 폭). 나중에 바깥 레이아웃이
+     셸을 좁히면 뷰포트가 넓어도 옳게 1열로 돌아간다.
+   조건부 그룹 규칙 중첩(@media 안의 @container)은 표준이며 Chrome 105+ 지원. */
+@media (orientation: landscape){
+  @container (min-width: 900px){
+    .gq-stagewrap{ flex-direction: row; align-items: stretch; }
+    .gq-stage{ min-width: 0; }
+    /* 고정 px 대신 clamp — 좁은 크롬북에서는 패널이 양보해 지구본이 커지고,
+       넓은 노트북에서도 360px 을 넘어 읽기 폭만 늘어나지 않는다. */
+    .gq-panel{
+      width: clamp(260px, 28cqi, 360px); min-height: 0;
+      overflow-y: auto; align-items: flex-start;
+    }
+    .gq-panel[data-empty]{ display: flex; align-items: center; }
   }
 }
 
@@ -723,8 +785,7 @@ const GQ_CSS = `
 .gq-quizask{ display: grid; gap: var(--ux-space-1); min-width: 0; flex: 1; }
 .gq-quizask [data-ux-role="body-emphasis"]{ font-weight: 900; }
 .gq-friendname{ margin-left: var(--ux-space-2); }
-.gq-quizstat{ display: flex; gap: var(--ux-space-3); align-items: baseline; flex-wrap: wrap; }
-.gq-quizstat [data-ux-role="label"]{ color: var(--ux-primary-ink); font-weight: 900; }
+/* U01: .gq-quizstat(점수·시간)은 공용 GameHeader 의 상태 칩으로 옮겼다. */
 
 .gq-card{
   width: min(560px, 100%);

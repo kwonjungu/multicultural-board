@@ -5,6 +5,7 @@ import { LangMap, TREASURE_SCENES, TreasureScene, tr } from "@/lib/gameData";
 import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 
 // ============================================================
 // Types & reducer
@@ -192,12 +193,19 @@ export default function BeeTreasureHunt({ langA, langB }: { langA: string; langB
     <div data-ux-root className="bth-root">
       <ScopedStyle css={BTH_CSS} />
 
-      <div className="bth-head">
-        <p data-ux-role="title" className="bth-title">🗺️ {lab(L.title, langA, langB)}</p>
-        <p data-ux-role="secondary" className="bth-sub">
-          {lab(L.round, langA, langB)} {state.round} / 2
-        </p>
-      </div>
+      {/* U01 공용 헤더 — 예전에는 이름·라운드가 가운데 정렬 두 줄이라 다른
+          게임과 눈 가는 곳이 달랐다. 뒤로는 이 게임의 준비 화면으로. */}
+      <GameHeader
+        gameId="treasure"
+        title={lab(L.title, langA, langB)}
+        icon="🗺️"
+        onBack={state.phase === "setup" ? undefined : () => dispatch({ type: "RESET" })}
+        backLabel="준비"
+        progress={{ value: state.round - 1, max: 2 }}
+        status={
+          <GameStat icon="📍" label={lab(L.round, langA, langB)} value={`${state.round} / 2`} tone="key" />
+        }
+      />
 
       {state.phase === "setup" && (
         <SetupView langA={langA} langB={langB} state={state}
@@ -542,9 +550,7 @@ const BTH_CSS = `
   padding: var(--ux-space-3) var(--ux-space-2) var(--ux-space-12);
 }
 .bth-root p, .bth-root h2{ margin: 0; }
-.bth-head{ text-align: center; margin-bottom: var(--ux-space-4); }
-.bth-title{ font-weight: 900; }
-.bth-sub{ margin-top: var(--ux-space-1); }
+/* U01: .bth-head(이름+라운드 두 줄)은 공용 GameHeader 로 대체됐다. */
 
 .bth-setup{ display: grid; gap: var(--ux-space-6); align-items: start; }
 .bth-panel{ display: grid; gap: var(--ux-space-3); min-width: 0; }

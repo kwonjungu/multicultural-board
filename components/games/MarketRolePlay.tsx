@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 
 type Step = {
   speaker: "shop" | "you";
@@ -95,6 +96,12 @@ export default function MarketRolePlay({ langA, langB }: { langA: string; langB:
     a.play().catch(() => { /* 소리가 없어도 글자로 계속 읽을 수 있다 */ });
   }, [stopAudio]);
 
+  /** 09 §11: 결과에서 다시 한 판. 재생 중이던 음성도 먼저 멈춘다. */
+  function restart() {
+    stopAudio();
+    setIdx(0); setPicks([]); setFinished(false);
+  }
+
   function handlePick(opIdx: number) {
     setPicks((p) => [...p, opIdx]);
     if (idx + 1 >= SCENE.length) setFinished(true);
@@ -110,10 +117,20 @@ export default function MarketRolePlay({ langA, langB }: { langA: string; langB:
     return (
       <div data-ux-root className="mk-root mk-center">
         <ScopedStyle css={MK_CSS} />
+        {/* 09 §11: 결과가 막다른 화면이면 안 된다 — 헤더(나가기)와 다시 하기를 둔다. */}
+        <GameHeader
+          gameId="market"
+          title="시장 역할극"
+          icon="🍜"
+          status={<GameStat icon="⭐" label="잘한 대답" value={`${good} / ${total}`} tone="key" />}
+        />
         <BeeMascot size={120} mood={good === total ? "cheer" : "happy"} />
-        <h1 data-ux-role="title">
+        <p data-ux-role="body-emphasis">
           🛒 {good === total ? "완벽한 대화!" : `${good} / ${total}`}
-        </h1>
+        </p>
+        <button data-ux-role="action" className="mk-primary" onClick={restart}>
+          🔁 다시 하기
+        </button>
       </div>
     );
   }
@@ -123,7 +140,18 @@ export default function MarketRolePlay({ langA, langB }: { langA: string; langB:
   return (
     <div data-ux-root className="mk-root">
       <ScopedStyle css={MK_CSS} />
-      <p data-ux-role="label" className="mk-kicker">🍎 시장 역할극</p>
+      {/* U01 공용 헤더 — 예전에는 이름만 작은 회색 한 줄(.mk-kicker)이라
+          진행 상태를 어디서도 볼 수 없었다. 이제 대화 진행이 오른쪽에 보인다. */}
+      <GameHeader
+        gameId="market"
+        introOpen
+        title="시장 역할극"
+        icon="🍜"
+        progress={{ value: idx, max: SCENE.length }}
+        status={
+          <GameStat icon="💬" label="대화" value={`${idx + 1} / ${SCENE.length}`} tone="key" />
+        }
+      />
 
       <div className="mk-play">
         <div className="mk-thread">
@@ -197,7 +225,7 @@ const MK_CSS = `
   width: 100%; max-width: 1200px; margin: 0 auto; box-sizing: border-box;
 }
 .mk-center{ display: grid; justify-items: center; gap: var(--ux-space-3); text-align: center; padding-top: var(--ux-space-8); }
-.mk-kicker{ display: block; text-align: center; color: var(--ux-ink-soft); margin: 0 0 var(--ux-space-4); }
+/* U01: .mk-kicker(작은 회색 이름 줄)는 공용 GameHeader 로 대체됐다. */
 
 /* 넓은 화면: 대화는 왼쪽, 지금 고를 것은 오른쪽에 붙여 둔다. */
 .mk-play{ display: grid; gap: var(--ux-space-4); }

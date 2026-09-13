@@ -14,6 +14,7 @@ import {
 import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import { gt, UI, type LangMap } from "./uiText";
 import { gp } from "./plainText";
 
@@ -382,7 +383,7 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
       // AskModal 도 이 루트 안에 둔다 — 화면 분기마다 data-ux-root 는 하나뿐이어야 한다.
       <div data-ux-root className="tq-root tq-play">
         <ScopedStyle css={TQ_CSS} />
-        <PlayHeader category={category!} remaining={remaining} langA={langA} />
+        <PlayHeader category={category!} remaining={remaining} langA={langA} onBack={resetAll} />
 
         <div className="tq-cols">
           <section className="tq-logcol" data-ux-surface="panel" aria-live="polite">
@@ -492,18 +493,34 @@ export default function TwentyQuestions({ langA, langB }: { langA: string; langB
 // Sub-components
 // ============================================================
 
+/**
+ * U01: 예전에는 카테고리 이름이 가운데 오는 자체 머리(.tq-head)였다. 이제
+ * 가운데는 어느 게임에서나 게임 이름이고, 카테고리는 오른쪽 상태 칩이 된다.
+ */
 function PlayHeader({
-  category, remaining, langA,
-}: { category: TwentyQCategory; remaining: number; langA: string }) {
+  category, remaining, langA, onBack,
+}: { category: TwentyQCategory; remaining: number; langA: string; onBack: () => void }) {
   const m = CATEGORY_META[category];
   return (
-    <div className="tq-head" data-cat={category}>
-      <span className="tq-art-emoji" aria-hidden="true">{m.emoji}</span>
-      <span data-ux-role="body-emphasis" className="tq-headname">{gt(m.label, langA)}</span>
-      <span data-ux-role="label" className="tq-remain">
-        {gp(TQ.remain, langA)} {remaining} / {TOTAL_QUESTIONS}
-      </span>
-    </div>
+    <GameHeader
+      gameId="twentyq"
+      title="스무고개"
+      icon="🔎"
+      onBack={onBack}
+      backLabel="처음"
+      progress={{ value: TOTAL_QUESTIONS - remaining, max: TOTAL_QUESTIONS }}
+      status={
+        <>
+          <GameStat icon={m.emoji} label={gp(TQ.pickCategory, langA)} value={gp(m.label, langA)} />
+          <GameStat
+            icon="❓"
+            label={gp(TQ.remain, langA)}
+            value={`${remaining} / ${TOTAL_QUESTIONS}`}
+            tone={remaining <= 3 ? "warn" : "key"}
+          />
+        </>
+      }
+    />
   );
 }
 
@@ -686,24 +703,7 @@ const TQ_CSS = `
 .tq-art-emoji[data-size="lg"]{ font-size: calc(var(--ux-font-title) * 1.8); }
 
 .tq-play{ min-height: 100svh; background: var(--ux-bg); }
-.tq-head{
-  display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap;
-  padding: var(--ux-space-3) var(--ux-space-4);
-  border-radius: var(--ux-radius-panel);
-  border: 2px solid var(--ux-primary-border);
-  background: var(--ux-surface);
-  margin-bottom: var(--ux-space-4);
-}
-.tq-head[data-cat="country"]{ background: var(--ux-hint-apricot); }
-.tq-head[data-cat="food"]{ background: var(--ux-hint-mint); }
-.tq-head[data-cat="person"]{ background: var(--ux-hint-lavender); }
-.tq-headname{ font-weight: 900; flex: 1; min-width: 0; }
-.tq-remain{
-  font-weight: 900; white-space: nowrap;
-  padding: var(--ux-space-1) var(--ux-space-3);
-  border-radius: var(--ux-radius-pill);
-  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
-}
+/* U01: .tq-head(카테고리 머리)는 공용 GameHeader 로 대체됐다. */
 
 .tq-cols{ display: grid; gap: var(--ux-space-4); }
 .tq-logcol{ order: 2; padding: var(--ux-space-4); border: 2px solid var(--ux-primary-border); }

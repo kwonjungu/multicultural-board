@@ -5,6 +5,7 @@ import { VOCAB, pickN } from "@/lib/gameData";
 import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import VocabImage from "./VocabImage";
 import { gt, UI, type LangMap } from "./uiText";
 import { gp } from "./plainText";
@@ -137,16 +138,24 @@ export default function WordTower({ langA, langB }: { langA: string; langB: stri
     <div data-ux-root className="wt-root">
       <ScopedStyle css={WT_CSS} />
 
+      {/* U01 공용 헤더 — 층수·목숨은 판 안쪽 막대가 아니라 다른 게임과 같은
+          오른쪽 상태 자리로 올린다. */}
+      <GameHeader
+        gameId="tower"
+        introOpen
+        title="단어 탑 쌓기"
+        icon="🏗️"
+        status={
+          <>
+            <GameStat icon="🏗️" label={gt(WT_HEIGHT, langA)} value={`${height}${gt(WT_FLOOR, langA)}`} tone="key" />
+            <GameStat icon="❤️" label={gt(WT_LIVES, langA)} value={lives} tone={lives <= 1 ? "warn" : "plain"} />
+          </>
+        }
+      />
+
       <div className="wt-cols">
         {/* Quiz */}
         <div className="wt-quiz">
-          <div className="wt-bar">
-            <span data-ux-role="label" className="wt-floors">🏗️ {height}{gt(WT_FLOOR, langA)}</span>
-            <span data-ux-role="label" className="wt-lives" aria-label={`${gt(WT_LIVES, langA)}: ${lives}`}>
-              {"❤️".repeat(lives)}
-            </span>
-          </div>
-
           <div className="wt-card">
             <div data-ux-role="secondary" className="wt-langs">
               {cur.askLang.toUpperCase()} → {cur.ansLang.toUpperCase()}
@@ -155,7 +164,9 @@ export default function WordTower({ langA, langB }: { langA: string; langB: stri
               {/* key 로 라운드마다 리마운트 — onError 폴백 상태가 다음 단어로 새어가지 않게 */}
               <VocabImage key={cur.correct.key} vocabKey={cur.correct.key} emoji={cur.correct.emoji} size={64} />
             </div>
-            <div data-ux-role="title" className="wt-word">
+            {/* U01: 화면의 title 은 헤더의 게임 이름 하나뿐이다. 문제 낱말은
+                'learn-word'(집중 학습 단어) 역할 — 크기는 그대로 크게 유지된다. */}
+            <div data-ux-role="learn-word" className="wt-word">
               <GameText map={cur.correct.translations} lang={cur.askLang} />
             </div>
           </div>
@@ -235,12 +246,7 @@ const WT_CSS = `
   align-items: start;
 }
 .wt-quiz{ min-width: 0; }
-.wt-bar{
-  display: flex; justify-content: space-between; align-items: center;
-  gap: var(--ux-space-2); flex-wrap: wrap; margin-bottom: var(--ux-space-3);
-}
-.wt-floors{ color: var(--ux-success); font-weight: 800; }
-.wt-lives{ letter-spacing: .08em; }
+/* U01: .wt-bar(층수+목숨)은 공용 GameHeader 의 상태 칩으로 옮겼다. */
 .wt-card{
   background: var(--ux-surface);
   border: 2px solid var(--ux-primary-border);

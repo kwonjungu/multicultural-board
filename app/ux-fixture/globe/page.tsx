@@ -9,6 +9,8 @@ import GlobeFixture from "./fixture";
  * 쿼리:
  *   ?mode=explore|quiz|menu   기본 explore — GlobeQuest 를 메뉴 없이 바로 연다
  *                             (측정 스크립트가 매번 카드를 눌러 진입하지 않도록).
+ *   ?country=KR               공부하기 모드를 그 나라를 이미 고른 상태(정보 패널
+ *                             열림)로 연다 — 2열 배치 실측용. 실제 게임룸은 안 쓴다.
  *   ?chrome=game|bare         기본 game — GameRoom 의 실제 "게임 진행 중" 셸
  *                             (고정 헤더 + flex:1 overflow:auto 스테이지)을 재현한다.
  *                             bare 는 셸 없이 GlobeQuest 만 100dvh 에 그대로 둔다.
@@ -26,5 +28,7 @@ export default function Page({
   const rawMode = pick("mode");
   const mode = rawMode === "quiz" || rawMode === "menu" ? rawMode : "explore";
   const chrome = pick("chrome") === "bare" ? "bare" : "game";
-  return <GlobeFixture mode={mode} chrome={chrome} />;
+  // ?country=KR — 공부하기 모드를 정보 패널이 열린 상태로 연다(2열 배치 실측용).
+  const country = (pick("country") ?? "").toUpperCase().slice(0, 2) || undefined;
+  return <GlobeFixture mode={mode} chrome={chrome} country={country} />;
 }

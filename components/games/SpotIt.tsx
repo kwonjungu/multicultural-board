@@ -11,6 +11,7 @@ import {
 } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import { gt, UI, type LangMap } from "./uiText";
 import { gp } from "./plainText";
 
@@ -576,16 +577,26 @@ export default function SpotIt({ langA, langB }: { langA: string; langB: string 
     <div data-ux-root className="si-root si-play">
       <ScopedStyle css={SI_CSS} />
 
-      {/* HUD */}
-      <div className="si-hud">
-        <span data-ux-role="label" className="si-chip si-chip-warm">
-          🂠 {gp(SI.remaining, langA)} {remaining}
-        </span>
-        <span data-ux-role="label" className="si-chip">
-          🎯 {gp(SI.goal, langA)} {WIN_SCORE} · {playerCount} {gp(UI.players, langA)} ·{" "}
-          {gp(DIFF_INFO[difficulty].label, langA)}
-        </span>
-      </div>
+      {/* U01 공용 헤더 — 가운데 정렬 칩 두 개(.si-hud) 대신 다른 게임과 같은
+          '왼쪽 뒤로 / 가운데 이름 / 오른쪽 상태'. 뒤로는 설정 화면으로. */}
+      <GameHeader
+        gameId="spotit"
+        title="꿀벌 스팟잇"
+        icon="🕵️"
+        onBack={() => setPhase("intro")}
+        backLabel="설정"
+        status={
+          <>
+            <GameStat icon="🂠" label={gp(SI.remaining, langA)} value={remaining} />
+            <GameStat icon="🎯" label={gp(SI.goal, langA)} value={WIN_SCORE} tone="key" />
+            <GameStat
+              icon="🙋"
+              label={gp(UI.players, langA)}
+              value={`${playerCount} · ${gp(DIFF_INFO[difficulty].label, langA)}`}
+            />
+          </>
+        }
+      />
 
       {/* 플레이 영역 */}
       <div
@@ -1037,13 +1048,7 @@ const SI_CSS = `
   border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 800;
 }
 
-.si-hud{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); justify-content: center; }
-.si-chip{
-  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
-  border-radius: var(--ux-radius-pill); padding: var(--ux-space-1) var(--ux-space-3);
-  font-weight: 800;
-}
-.si-chip-warm{ background: var(--ux-surface-sunk); }
+/* U01: .si-hud / .si-chip (가운데 정렬 상태 칩)은 공용 GameHeader 로 옮겼다. */
 
 .si-scores{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); justify-content: center; }
 .si-scorecard{

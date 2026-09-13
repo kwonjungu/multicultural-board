@@ -5,6 +5,7 @@ import { initialMemoryState, memoryReducer } from "@/lib/wordMemoryState";
 import { VOCAB, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import VocabImage from "./VocabImage";
 import { gt, UI, type LangMap } from "./uiText";
 
@@ -64,9 +65,30 @@ function CardBack() {
 
 export default function WordMemory({ langA, langB }: { langA: string; langB: string }) {
   const [pairCount, setPairCount] = useState<PairCount>(8);
+  // U01: 시도 수·맞춘 짝은 라운드(자식) 안의 .wm-hud 에 있었다. 헤더 자리를 다른
+  // 게임과 맞추려면 부모가 알아야 해서, 라운드가 값이 바뀔 때만 올려 준다.
+  const [status, setStatus] = useState({ moves: 0, matched: 0 });
   return (
     <div data-ux-root className="wm-root">
       <ScopedStyle css={WM_CSS} />
+      <GameHeader
+        gameId="memory"
+        introOpen
+        title="기억 카드"
+        icon="🎴"
+        progress={{ value: status.matched, max: pairCount }}
+        status={
+          <>
+            <GameStat icon="🔁" label={gt(WM.tries, langA)} value={status.moves} />
+            <GameStat
+              icon="✅"
+              label={gt(WM.matchedPairs, langA)}
+              value={`${status.matched} / ${pairCount}`}
+              tone="key"
+            />
+          </>
+        }
+      />
       <div className="wm-sizebar">
         <span data-ux-role="label">{gt(WM.howMany, langA)}</span>
         <div className="wm-sizebtns">
@@ -86,12 +108,17 @@ export default function WordMemory({ langA, langB }: { langA: string; langB: str
       <MemoryRound
         key={JSON.stringify([langA, langB, pairCount])}
         langA={langA} langB={langB} pairCount={pairCount}
+        onStatus={setStatus}
       />
     </div>
   );
 }
 
-function MemoryRound({ langA, langB, pairCount }: { langA: string; langB: string; pairCount: PairCount }) {
+function MemoryRound({ langA, langB, pairCount, onStatus }: {
+  langA: string; langB: string; pairCount: PairCount;
+  /** 헤더에 보여줄 값만 부모로 올린다. 게임 규칙은 여전히 이 안의 reducer 가 정한다. */
+  onStatus: (s: { moves: number; matched: number }) => void;
+}) {
   const [{ flipped, matched, moves }, dispatch] = useReducer(memoryReducer, undefined, initialMemoryState);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -118,6 +145,13 @@ function MemoryRound({ langA, langB, pairCount }: { langA: string; langB: string
     audioRef.current = null;
   }, []);
 
+  // 헤더용 값 올리기. 값이 실제로 바뀔 때만 부른다 — onStatus 는 setState 라
+  // 부모가 다시 그리고, 이 effect 가 다시 돌아도 값이 같으면 setState 가
+  // 무시되므로 루프가 생기지 않는다.
+  useEffect(() => {
+    onStatus({ moves, matched: matched.length });
+  }, [moves, matched.length, onStatus]);
+
   function playTts(text: string, lang: string) {
     const url = `/api/tts?text=${encodeURIComponent(text)}&lang=${lang}`;
     audioRef.current?.pause();
@@ -140,7 +174,7 @@ function MemoryRound({ langA, langB, pairCount }: { langA: string; langB: string
     return (
       <div className="wm-done">
         <BeeMascot size={120} mood="cheer" />
-        <p data-ux-role="title">🎉 {gt(WM.allMatched, langA)}</p>
+        <p data-ux-role="body-emphasis">🎉 {gt(WM.allMatched, langA)}</p>
         <p data-ux-role="body">{gt(WM.tries, langA)} {moves}</p>
       </div>
     );
@@ -148,11 +182,6 @@ function MemoryRound({ langA, langB, pairCount }: { langA: string; langB: string
 
   return (
     <div className="wm-board">
-      <div className="wm-hud">
-        <span data-ux-role="label">{gt(WM.tries, langA)} {moves}</span>
-        <span data-ux-role="label">{gt(WM.matchedPairs, langA)} {matched.length} / {pairCount}</span>
-      </div>
-
       <div className="wm-grid" data-pairs={pairCount}>
         {cards.map((c) => {
           const isFlipped = flipped.includes(c.id) || matched.includes(c.pairKey);
@@ -204,7 +233,7 @@ const WM_CSS = `
 }
 .wm-size[aria-pressed="true"]{ border: 3px solid var(--ux-selected-border); }
 .wm-board{ display: grid; gap: var(--ux-space-3); }
-.wm-hud{ display: flex; justify-content: space-between; gap: var(--ux-space-3); flex-wrap: wrap; }
+/* U01: .wm-hud(시도 수·맞춘 짝)는 공용 GameHeader 의 상태로 옮겼다. */
 .wm-grid{ display: grid; gap: var(--ux-space-2); }
 .wm-grid[data-pairs="4"]{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .wm-grid[data-pairs="8"]{ grid-template-columns: repeat(4, minmax(0, 1fr)); }

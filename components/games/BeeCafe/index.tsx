@@ -3,7 +3,8 @@
 import { useEffect, useReducer } from "react";
 import ScopedStyle from "../../ui/child/ScopedStyle";
 import { gp } from "../plainText";
-import { gt, UI } from "../uiText";
+import { gt, UI, type LangMap } from "../uiText";
+import GameHeader, { GameStat } from "../../ui/game/GameHeader";
 import Kitchen from "./Kitchen";
 import MenuDeck from "./MenuDeck";
 import OrderScene from "./OrderScene";
@@ -18,6 +19,12 @@ interface Props {
   langA: string;
   langB: string;
 }
+
+/** 헤더 시간 칩 라벨. uiText 에 time 키가 없어 여기서만 쓴다. */
+const TIME_LABEL: LangMap = {
+  ko: "시간", en: "Time", vi: "Thời gian", zh: "时间", fil: "Oras",
+  ja: "じかん", th: "เวลา", id: "Waktu", ru: "Время", hi: "समय", ar: "الوقت",
+};
 
 // BeeCafe — cooperative cooking game: 2 players take customer/chef roles,
 // play 3 rounds of {pick menu → order TTS → pick ingredients → arrange
@@ -53,28 +60,37 @@ export default function BeeCafe({ langA, langB }: Props) {
   const timerLevel =
     state.timer <= 10 ? "low" : state.timer <= 25 ? "mid" : "ok";
 
+  // U01 공용 헤더 — 예전에는 왼쪽에 "☕️ BeeCafe · 라운드 n/3", 오른쪽에 타이머·별이
+  // 붙은 이 게임만의 줄이었다. 이제 왼쪽은 뒤로, 가운데는 게임 이름, 오른쪽은 상태다.
+  // 뒤로는 역할 고르기(이 게임의 준비 화면)로 돌아간다.
   const header =
     state.phase === "role" ? null : (
-      <div className="bc-header">
-        <span data-ux-role="label" className="bc-brand">
-          ☕️ BeeCafe · {gp(UI.round, langA)} {Math.min(3, state.completedCount + 1)}/3
-        </span>
-        <span className="bc-headright">
-          {!state.unlimited && cooking && (
-            <span
-              data-ux-role="label"
-              className="bc-timer"
-              data-level={timerLevel}
-              role="status"
-            >
-              ⏱ {state.timer}s
-            </span>
-          )}
-          <span data-ux-role="label" className="bc-stars">
-            ⭐ {gp(CAFE.starsLabel, langA)} {state.totalStars}
-          </span>
-        </span>
-      </div>
+      <GameHeader
+        gameId="cafe"
+        title="꿀벌 카페"
+        icon="🍳"
+        onBack={() => dispatch({ type: "RESET" })}
+        backLabel="준비"
+        progress={{ value: state.completedCount, max: 3 }}
+        status={
+          <>
+            <GameStat
+              icon="📍"
+              label={gp(UI.round, langA)}
+              value={`${Math.min(3, state.completedCount + 1)} / 3`}
+            />
+            {!state.unlimited && cooking && (
+              <GameStat
+                icon="⏱"
+                label={gp(TIME_LABEL, langA)}
+                value={`${state.timer}s`}
+                tone={timerLevel === "ok" ? "plain" : "warn"}
+              />
+            )}
+            <GameStat icon="⭐" label={gp(CAFE.starsLabel, langA)} value={state.totalStars} tone="key" />
+          </>
+        }
+      />
     );
 
   // Phase switch ----------------------------------------------------------
@@ -203,22 +219,7 @@ const BC_CSS = `
   padding: var(--ux-space-3) var(--ux-space-4) var(--ux-space-8);
   display: grid; gap: var(--ux-space-4); align-content: start;
 }
-.bc-header{
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--ux-space-3);
-  justify-content: space-between;
-  padding: var(--ux-space-2) var(--ux-space-3);
-  background: var(--ux-surface); border-radius: var(--ux-radius-panel);
-}
-.bc-brand{ font-weight: 800; }
-.bc-headright{ display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap; }
-.bc-timer{
-  font-weight: 800; padding: var(--ux-space-1) var(--ux-space-3);
-  border-radius: var(--ux-radius-pill); background: var(--ux-hint-mint);
-  border: 2px solid transparent;
-}
-.bc-timer[data-level="mid"]{ background: var(--ux-hint-apricot); }
-.bc-timer[data-level="low"]{ background: var(--ux-hint-apricot); border-color: var(--ux-primary-border); }
-.bc-stars{ color: var(--ux-ink-soft); font-weight: 800; }
+/* U01: .bc-header(브랜드+타이머+별)는 공용 GameHeader 로 대체됐다. */
 
 .bc-done{
   display: grid; justify-items: center; gap: var(--ux-space-3);

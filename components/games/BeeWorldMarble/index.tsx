@@ -10,6 +10,7 @@ import {
 import { CHANCES, JAIL_INDEX, TILES } from "@/lib/marbleData";
 import { prefetchGameTexts } from "@/lib/gameI18n";
 import ScopedStyle from "../../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../../ui/game/GameHeader";
 import { renderActionPanels } from "./ActionPanel";
 import { Board } from "./Board";
 import { CharacterSetup } from "./CharacterSetup";
@@ -155,11 +156,32 @@ export default function BeeWorldMarble({
     />
   );
 
+  // U01 공용 헤더 — 이 게임에는 머리 부분이 없었다. 라운드는 화면 맨 아래 띠
+  // (.mb-round)에, 차례는 HUD 카드 안에 있어서 다른 게임과 보는 곳이 달랐다.
+  // 뒤로는 캐릭터 설정(이 게임의 준비 화면)으로 돌아간다.
+  const turnPlayer = state.players[state.turn];
+  const headerNode = (
+    <GameHeader
+      gameId="marble"
+      title="꿀벌 월드 마블"
+      icon="🎲"
+      onBack={() => dispatch({ type: "restart" })}
+      backLabel="준비"
+      progress={{ value: Math.min(state.round, MAX_ROUNDS) - 1, max: MAX_ROUNDS }}
+      status={
+        <>
+          <GameStat icon="⏰" label="라운드" value={`${Math.min(state.round, MAX_ROUNDS)} / ${MAX_ROUNDS}`} />
+          <GameStat icon="🙋" label="차례" value={turnPlayer?.name ?? "-"} tone="key" />
+          <GameStat icon="🍯" label="꿀" value={turnPlayer?.cash ?? 0} />
+        </>
+      }
+    />
+  );
+
   const footerNode = (
     <div style={footerBar}>
-      <span data-ux-role="secondary" className="mb-round">
-        ⏰ {Math.min(state.round, MAX_ROUNDS)}/{MAX_ROUNDS}
-      </span>
+      {/* U01: 라운드(.mb-round)는 헤더의 상태 칩으로 올렸다 — 화면 맨 아래와
+          맨 위에 같은 값을 두 번 두지 않는다. 로그와 다시 시작만 남긴다. */}
       <LogTicker log={state.log} variant="footer" />
       {/* 아이콘만 있는 버튼은 만들지 않는다 — 짧은 글자 라벨을 함께 둔다. */}
       <button
@@ -178,6 +200,9 @@ export default function BeeWorldMarble({
     return (
       <div data-ux-root style={rootWide}>
         <ScopedStyle css={ROOT_CSS} />
+        {/* 2열 그리드라 헤더는 두 열을 가로지른다 — 헤더 위치가 판 폭에 따라
+            흔들리면 '항상 같은 자리' 라는 계약이 깨진다. */}
+        <div style={headerSpan}>{headerNode}</div>
         <div style={boardCol}>{boardNode}</div>
         <aside style={sideCol} aria-label="플레이어 정보">
           {hudNode}
@@ -191,6 +216,7 @@ export default function BeeWorldMarble({
   return (
     <div data-ux-root style={root}>
       <ScopedStyle css={ROOT_CSS} />
+      {headerNode}
       <div style={topBar}>{hudNode}</div>
       <div style={boardWrap}>{boardNode}</div>
       <div style={{ width: "100%" }}>{footerNode}</div>
@@ -243,6 +269,12 @@ const rootIntro: CSSProperties = {
 
 const topBar: CSSProperties = {
   width: "100%",
+};
+
+/** 넓은 화면(2열 그리드)에서 공용 헤더가 두 열을 모두 차지하게 한다. */
+const headerSpan: CSSProperties = {
+  gridColumn: "1 / -1",
+  minWidth: 0,
 };
 
 const boardWrap: CSSProperties = {

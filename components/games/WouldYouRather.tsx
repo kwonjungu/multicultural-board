@@ -5,6 +5,7 @@ import { WYR_CARDS, WYRCard, WYRCategory, tr, pickN } from "@/lib/gameData";
 import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import { gt, type LangMap } from "./uiText";
 import { gp } from "./plainText";
 
@@ -409,7 +410,7 @@ export default function WouldYouRather({ langA, langB }: { langA: string; langB:
     return (
       <div data-ux-root className="wyr-root wyr-play">
         <ScopedStyle css={WYR_CSS} />
-        <StatsBar stats={stats} idx={idx} total={deck.length} langA={langA} />
+        <StatsBar stats={stats} idx={idx} total={deck.length} langA={langA} onBack={restartFromSummary} />
         <div className="wyr-arena">
           <OptionSide
             option="A" card={card} langA={langA} langB={langB}
@@ -430,7 +431,7 @@ export default function WouldYouRather({ langA, langB }: { langA: string; langB:
   return (
     <div data-ux-root className="wyr-root wyr-play">
       <ScopedStyle css={WYR_CSS} />
-      <StatsBar stats={stats} idx={idx} total={deck.length} langA={langA} />
+      <StatsBar stats={stats} idx={idx} total={deck.length} langA={langA} onBack={restartFromSummary} />
       <RevealPanel
         card={card}
         langA={langA}
@@ -506,28 +507,36 @@ function IntroPanel({
 // ==============================================================
 // Stats bar (progress + match rate)
 // ==============================================================
+/**
+ * U01: 예전에는 이 게임만의 상태 바(.wyr-statsbar)였다. 이제 공용 GameHeader 의
+ * 상태·진행 자리에 같은 값을 넣는다 — 게임을 바꿔도 점수를 찾는 곳이 같다.
+ */
 function StatsBar({
-  stats, idx, total, langA,
+  stats, idx, total, langA, onBack,
 }: {
   stats: StatsState;
   idx: number;
   total: number;
   langA: string;
+  onBack: () => void;
 }) {
   const rate = stats.played > 0 ? Math.round((stats.matched / stats.played) * 100) : 0;
-  const pct = ((idx) / total) * 100;
   return (
-    <div className="wyr-statsbar">
-      <div className="wyr-statsbar-row">
-        <span data-ux-role="label">📘 {gp(WYR.card, langA)} {idx + 1} / {total}</span>
-        <span data-ux-role="label">
-          {gp(WYR.cardsTogether, langA)} {stats.played} · {gp(WYR.matchRate, langA)} {rate}%
-        </span>
-      </div>
-      <div className="wyr-progress" aria-hidden="true">
-        <div className="wyr-progress-fill" style={{ width: `${pct}%` }} />
-      </div>
-    </div>
+    <GameHeader
+      gameId="wyr"
+      title="이거 저거 고르기"
+      icon="🎲"
+      onBack={onBack}
+      backLabel="처음"
+      progress={{ value: idx, max: total }}
+      status={
+        <>
+          <GameStat icon="📘" label={gp(WYR.card, langA)} value={`${idx + 1} / ${total}`} tone="key" />
+          <GameStat icon="🤝" label={gp(WYR.cardsTogether, langA)} value={stats.played} />
+          <GameStat icon="💞" label={gp(WYR.matchRate, langA)} value={`${rate}%`} />
+        </>
+      }
+    />
   );
 }
 
@@ -1148,28 +1157,8 @@ const WYR_CSS = `
 .wyr-seat-bee{ font-size: calc(var(--ux-font-title) * 1.2); line-height: 1; }
 .wyr-seat-name{ font-weight: 800; }
 
-/* ── play: 진행 바 ───────────────────────────────────────── */
-.wyr-statsbar{
-  background: var(--ux-surface);
-  border: 2px solid var(--ux-primary-border);
-  border-radius: var(--ux-radius-surface);
-  padding: var(--ux-space-3) var(--ux-space-4);
-  margin-bottom: var(--ux-space-4);
-}
-.wyr-statsbar-row{
-  display: flex; flex-wrap: wrap; gap: var(--ux-space-2) var(--ux-space-4);
-  justify-content: space-between; align-items: center;
-  font-weight: 800;
-}
-.wyr-progress{
-  margin-top: var(--ux-space-2); height: 8px; border-radius: var(--ux-radius-pill);
-  background: var(--ux-surface-sunk); overflow: hidden;
-}
-.wyr-progress-fill{
-  display: block; height: 100%;
-  background: var(--ux-primary-fill);
-  transition: width var(--ux-motion-state) var(--ux-motion-ease);
-}
+/* ── play: 진행 바 ─────────────────────────────────────────
+   U01: .wyr-statsbar / .wyr-progress 는 공용 GameHeader 로 옮겼다. */
 
 /* ── play: 좌/우 대결 무대 ───────────────────────────────── */
 .wyr-arena{

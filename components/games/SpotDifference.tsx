@@ -5,6 +5,7 @@ import { LangMap, SPOT_DIFF_SCENES, SpotDiffScene, pickN, tr } from "@/lib/gameD
 import { playTone } from "@/lib/gameSfx";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 
 // ============================================================
 // Spot the Difference (틀린 그림 찾기)
@@ -217,18 +218,40 @@ export default function SpotDifference({ langA, langB }: Props) {
     <div data-ux-root className="sd-root sd-play">
       <ScopedStyle css={SD_CSS} />
 
-      {/* Header */}
-      <div className="sd-header">
-        <span data-ux-role="secondary" className="sd-scenenum">
-          {lab(L.sceneLabel, langA, langB)} {sceneIdx + 1} / {order.length}
-        </span>
-        <span data-ux-role="body-emphasis" className="sd-scenename">
-          {lab(scene.name, langA, langB)}
-        </span>
-        <span data-ux-role="secondary" className="sd-clock">
-          ⏱ {Math.floor(elapsedSec / 60)}:{(elapsedSec % 60).toString().padStart(2, "0")}
-        </span>
-      </div>
+      {/* U01 공용 헤더 — 뒤로는 이 게임의 시작 화면으로 돌아간다.
+          예전에는 장면 이름이 가운데에 있어 게임마다 가운데 글자가 달라졌다.
+          가운데는 이제 어느 게임에서나 게임 이름이고, 장면 이름은 판 위로 내렸다. */}
+      <GameHeader
+        gameId="spot"
+        title="틀린 그림 찾기"
+        icon="🔍"
+        onBack={handleReplay}
+        backLabel="처음"
+        progress={{ value: sceneIdx, max: order.length }}
+        status={
+          <>
+            <GameStat
+              icon="🖼"
+              label={lab(L.sceneLabel, langA, langB)}
+              value={`${sceneIdx + 1} / ${order.length}`}
+            />
+            <GameStat
+              icon="✅"
+              label={lab(L.progress, langA, langB)}
+              value={`${found.size} / ${scene.differences.length}`}
+              tone="key"
+            />
+            <GameStat
+              icon="⏱"
+              label={lab(L.totalTime, langA, langB)}
+              value={`${Math.floor(elapsedSec / 60)}:${(elapsedSec % 60).toString().padStart(2, "0")}`}
+            />
+          </>
+        }
+      />
+      <p data-ux-role="body-emphasis" className="sd-scenename">
+        {lab(scene.name, langA, langB)}
+      </p>
 
       {/* A/B images — 좁은 화면 위아래, 768 이상 좌우 2단 */}
       <div className="sd-images">
@@ -372,14 +395,9 @@ const SD_CSS = `
 
 .sd-play{ display: flex; flex-direction: column; gap: var(--ux-space-4); }
 
-.sd-header{
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: var(--ux-space-2);
-  padding: 0 var(--ux-space-1);
-}
-.sd-scenename{ font-weight: 900; flex: 1 1 auto; min-width: 0; text-align: center; }
-.sd-scenenum{ color: var(--ux-primary-border); font-weight: 800; }
-.sd-clock{ white-space: nowrap; }
+/* U01: 장면 번호·시계는 공용 GameHeader 의 상태로 옮겼다(.sd-header 삭제).
+   남은 장면 이름은 판 바로 위의 한 줄. */
+.sd-scenename{ margin: 0; font-weight: 900; min-width: 0; text-align: center; }
 
 .sd-images{
   display: grid;

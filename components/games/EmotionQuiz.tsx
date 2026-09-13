@@ -5,8 +5,8 @@ import { EMOTIONS, EmotionItem, pickN } from "@/lib/gameData";
 import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
-import { ProgressBar } from "./CountryGuess";
-import { gt, type LangMap } from "./uiText";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
+import { gt, UI, type LangMap } from "./uiText";
 import EmotionGlyph from "./EmotionGlyph";
 
 const SITUATION: LangMap = {
@@ -50,6 +50,8 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
   const [round, setRound] = useState(0);
   const [score, setScore] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
+  /** '다시 하기' 로 문제를 새로 뽑기 위한 씨앗. 09 §11: 결과 화면이 막다른 길이면 안 된다. */
+  const [seed, setSeed] = useState(0);
 
   /** 예약된 타이머 전부 — unmount 시 유령 타이머가 남지 않게 한 곳에서 정리한다. */
   const timersRef = useRef<number[]>([]);
@@ -81,7 +83,13 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
     const distractors = pickN(wrongs, 3);
     const choices = [...distractors, ans.emoji].sort(() => Math.random() - 0.5);
     return { answer: ans, choices };
-  }), []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [seed]);
+
+  function restart() {
+    clearTimers();
+    setRound(0); setScore(0); setPicked(null); setSeed((n) => n + 1);
+  }
 
   const cur = rounds[round];
   const done = round >= rounds.length;
@@ -100,8 +108,19 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
     return (
       <div data-ux-root className="eq-root eq-center">
         <ScopedStyle css={EQ_CSS} />
+        {/* 09 §11: 결과에서도 나가기/다시 하기가 있어야 한다 — 예전에는 점수만
+            보여주고 아무 길이 없는 막다른 화면이었다. */}
+        <GameHeader
+          gameId="emotion"
+          title="이 마음은?"
+          icon="💗"
+          status={<GameStat icon="⭐" label={gt(UI.score, langA)} value={`${score} / ${rounds.length}`} tone="key" />}
+        />
         <BeeMascot size={120} mood="cheer" />
-        <h1 data-ux-role="title">🎉 {score} / {rounds.length}</h1>
+        <p data-ux-role="body-emphasis">🎉 {score} / {rounds.length}</p>
+        <button data-ux-role="action" className="eq-primary" onClick={restart}>
+          🔁 {gt(UI.playAgain, langA)}
+        </button>
       </div>
     );
   }
@@ -111,7 +130,20 @@ export default function EmotionQuiz({ langA, langB }: { langA: string; langB: st
   return (
     <div data-ux-root className="eq-root">
       <ScopedStyle css={EQ_CSS} />
-      <ProgressBar value={round} max={rounds.length} score={score} />
+      {/* U01 공용 헤더. 이 게임에는 이전 단계가 없어 뒤로는 게임 목록으로 나간다. */}
+      <GameHeader
+        gameId="emotion"
+        introOpen
+        title="이 마음은?"
+        icon="💗"
+        progress={{ value: round, max: rounds.length }}
+        status={
+          <>
+            <GameStat icon="📍" label={gt(UI.round, langA)} value={`${Math.min(round + 1, rounds.length)} / ${rounds.length}`} />
+            <GameStat icon="⭐" label={gt(UI.score, langA)} value={score} tone="key" />
+          </>
+        }
+      />
 
       <div className="eq-play">
         <div className="eq-card">
@@ -161,6 +193,10 @@ const EQ_CSS = `
   color: var(--ux-ink);
   padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-8);
   width: 100%; max-width: 1200px; margin: 0 auto; box-sizing: border-box;
+}
+.eq-primary[data-ux-role="action"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
 }
 .eq-center{ display: grid; justify-items: center; gap: var(--ux-space-3); text-align: center; padding-top: var(--ux-space-8); }
 

@@ -4,6 +4,7 @@ import { useMemo, useState, useRef, useEffect, KeyboardEvent } from "react";
 import { VOCAB, pickN, tr } from "@/lib/gameData";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import VocabImage from "./VocabImage";
 import { gt, UI, type LangMap } from "./uiText";
 import { gp } from "./plainText";
@@ -76,6 +77,8 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
     return pickN(drawable, 15);
   }, []);
 
+  /** '다시 하기' 로 문제를 새로 뽑기 위한 씨앗. 09 §11: 막다른 결과 화면 금지. */
+  const [seed, setSeed] = useState(0);
   const [round, setRound] = useState(0);
   const [input, setInput] = useState("");
   const [revealed, setRevealed] = useState(false);
@@ -87,6 +90,11 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
   const cur = rounds[round];
   const done = round >= rounds.length;
 
+  function restart() {
+    setRound(0); setInput(""); setRevealed(false); setScore(0);
+    setWrongCount(0); setFeedback("idle"); setSeed((n) => n + 1);
+  }
+
   useEffect(() => {
     if (!done && !revealed) {
       inputRef.current?.focus();
@@ -97,9 +105,19 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
     return (
       <div data-ux-root className="dg-root dg-center">
         <ScopedStyle css={DG_CSS} />
+        {/* 09 §11: 결과가 막다른 화면이면 안 된다 — 헤더(나가기)와 다시 하기를 둔다. */}
+        <GameHeader
+          gameId="draw"
+          title="그림 맞히기"
+          icon="🎨"
+          status={<GameStat icon="⭐" label={gt(UI.score, langA)} value={`${score} / ${rounds.length}`} tone="key" />}
+        />
         <BeeMascot size={120} mood="cheer" />
-        <h1 data-ux-role="title">🎉 {gt(UI.allDone, langA)}</h1>
+        <p data-ux-role="body-emphasis">🎉 {gt(UI.allDone, langA)}</p>
         <p data-ux-role="body">{gt(UI.score, langA)}: {score} / {rounds.length}</p>
+        <button data-ux-role="action" className="dg-primary" onClick={restart}>
+          🔁 {gp(UI.playAgain, langA)}
+        </button>
       </div>
     );
   }
@@ -157,12 +175,24 @@ export default function DrawGuess({ langA, langB }: { langA: string; langB: stri
     <div data-ux-root className="dg-root">
       <ScopedStyle css={DG_CSS} />
 
-      <div className="dg-top">
-        <span data-ux-role="body-emphasis" className="dg-ask">{gt(DG.whatDrawing, langA)}</span>
-        <span data-ux-role="label" className="dg-progress">
-          {gt(UI.score, langA)} {score} · {round + 1} / {rounds.length}
-        </span>
-      </div>
+      {/* U01 공용 헤더 — 점수·라운드는 다른 게임과 같은 자리(오른쪽)로. */}
+      <GameHeader
+        gameId="draw"
+        introOpen
+        title="그림 맞히기"
+        icon="🎨"
+        progress={{ value: round, max: rounds.length }}
+        status={
+          <>
+            <GameStat icon="📍" label={gt(UI.round, langA)} value={`${round + 1} / ${rounds.length}`} />
+            <GameStat icon="⭐" label={gt(UI.score, langA)} value={score} tone="key" />
+          </>
+        }
+      />
+
+      {/* 문제 지문은 헤더가 아니라 그림 바로 위에 둔다 — 헤더는 어느 게임에서나
+          같은 것(이름·상태)만 담고, 그 판의 물음은 판 옆에 있어야 읽힌다. */}
+      <p data-ux-role="body-emphasis" className="dg-ask">{gt(DG.whatDrawing, langA)}</p>
 
       <div className="dg-cols">
         <div className="dg-pic">
@@ -266,17 +296,20 @@ const DG_CSS = `
   max-width: 1180px; margin: 0 auto;
   padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-12);
 }
+.dg-primary[data-ux-role="action"]{
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
+}
 .dg-center{
   display: grid; justify-items: center; gap: var(--ux-space-3);
   padding: var(--ux-space-12) var(--ux-space-4); text-align: center;
 }
 .dg-center h1, .dg-center p{ margin: 0; }
-.dg-top{
-  display: flex; justify-content: space-between; align-items: baseline;
-  gap: var(--ux-space-3); flex-wrap: wrap; margin-bottom: var(--ux-space-4);
+/* U01: .dg-top(질문+점수 한 줄)은 공용 GameHeader 로 옮겼다. 남은 것은 질문뿐. */
+.dg-ask{
+  margin: 0 0 var(--ux-space-4); font-weight: 800;
+  word-break: keep-all; overflow-wrap: anywhere; min-width: 0;
 }
-.dg-ask{ font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; min-width: 0; }
-.dg-progress{ color: var(--ux-ink-soft); white-space: nowrap; }
 .dg-cols{ display: grid; gap: var(--ux-space-4); align-items: start; }
 .dg-pic{
   position: relative; aspect-ratio: 1 / 1; width: 100%;

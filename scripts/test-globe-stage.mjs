@@ -182,7 +182,10 @@ check('예전 .gq-cardlayer(하단 절대배치 시트)가 더 남아있지 않�
 });
 
 check('GlobeShell 이 상시 정보는 panel(정상 흐름), 스쳐가는 토스트는 overlay(절대배치)로 분리한다', () => {
-  assert.match(c, /function\s+GlobeShell\s*\(\s*\{\s*topBar\s*,\s*children\s*,\s*overlay\s*,\s*panel\s*\}/,
+  // prop 이 더 늘어나는 것은 허용한다(예: panelPlaceholder — 2열에서 옆 칸을 미리
+  // 비워 두어 나라를 누른 순간 지구본이 줄지 않게 하는 자리표시자). 계약은
+  // "topBar/children/overlay/panel 네 경로가 그대로 있는가" 이지 prop 개수가 아니다.
+  assert.match(c, /function\s+GlobeShell\s*\(\s*\{\s*topBar\s*,\s*children\s*,\s*overlay\s*,\s*panel\s*[,}]/,
     'GlobeShell 이 panel prop 을 받지 않는다');
   assert.match(c, /<div className="gq-stagewrap">/, '.gq-stagewrap 컨테이너가 없다');
 });
@@ -212,7 +215,9 @@ check('폭이 충분하면 컨테이너 쿼리로 stage 옆에 패널을 두고,
   const wideBlock = extractBalancedBlock(c, idx) ?? '';
   assert.match(wideBlock, /\.gq-stagewrap\{[^}]*flex-direction:\s*row/,
     '넓을 때 .gq-stagewrap 을 가로(row)로 바꿔 stage 옆에 패널을 두는 규칙이 없다');
-  assert.match(wideBlock, /\.gq-panel\{[^}]*(?:width|max-width):\s*min\(\s*\d+px|\.gq-panel\{[^}]*max-width:\s*\d+px/,
+  // 상한이 있으면 된다 — min(…px, …) / clamp(…, …, …px) / max-width:…px 모두 인정.
+  // clamp 는 하한(좁은 크롬북에서 안 찌그러짐)까지 같이 정하므로 오히려 낫다.
+  assert.match(wideBlock, /\.gq-panel\{[^}]*(?:width|max-width):\s*(?:min\(\s*\d+px|clamp\([^)]*\d+px\s*\)|\d+px)/,
     '넓을 때 .gq-panel 폭이 제한되지 않는다 — "정보 패널 폭은 제한" 계약 위반(패널이 stage 를 밀어낼 수 있다)');
 });
 

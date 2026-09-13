@@ -7,6 +7,7 @@ import { LANGUAGES } from "@/lib/constants";
 import { cancelSpeak } from "@/lib/ttsMulti";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import { gt, UI } from "./uiText";
 import { gp } from "./plainText";
 
@@ -337,10 +338,8 @@ function PlayerBadge({ player, turn, lang }: { player: Player; turn: Player; lan
   );
 }
 
-/** 진행 막대 폭만 인라인 (값이 상태에 따라 변한다). */
-function barWidth(ratio: number): React.CSSProperties {
-  return { width: `${Math.max(0, Math.min(1, ratio)) * 100}%` };
-}
+/* U01: barWidth() 는 자체 진행 막대용이었다. 진행 막대는 공용 GameHeader 의
+   progress 로 옮겨 여기서는 쓰지 않는다. */
 
 // ============================================================
 // Main
@@ -402,14 +401,28 @@ export default function StoryCubes({ langA, langB }: { langA: string; langB: str
     <div data-ux-root className="sc-root sc-play">
       <ScopedStyle css={SC_CSS} />
 
+      {/* U01 공용 헤더 — 진행(문장 수)은 다른 게임과 같이 헤더로 올린다.
+          차례 뱃지와 건너뛰기/다시 굴리기는 그 판의 조작이라 아래 줄에 남긴다.
+          뒤로는 이 게임의 준비(모드 고르기) 화면으로. */}
+      <GameHeader
+        gameId="story"
+        title="이야기 주사위"
+        icon="📖"
+        onBack={() => dispatch({ type: "RESTART" })}
+        backLabel="준비"
+        progress={{ value: state.entries.length, max: total }}
+        status={
+          <>
+            <GameStat icon="✍️" label={gp(SC2.sentenceLabel, currentLang)} value={`${state.entries.length} / ${total}`} tone="key" />
+            <GameStat icon="🙋" label={gp(SC.player, currentLang)} value={state.turn} />
+          </>
+        }
+      />
+
       <div className="sc-head" data-ux-surface="panel">
         <div className="sc-badges">
           <PlayerBadge player="A" turn={state.turn} lang={langA} />
           <PlayerBadge player="B" turn={state.turn} lang={langB} />
-        </div>
-        <div className="sc-progress">
-          <span data-ux-role="secondary">{state.entries.length} / {total}</span>
-          <div className="sc-track"><div className="sc-fill" style={barWidth(state.entries.length / total)} /></div>
         </div>
         <div className="sc-headbtns">
           <button
@@ -783,10 +796,9 @@ const SC_CSS = `
 .sc-badge[data-active]{ background: var(--ux-primary-fill); color: var(--ux-primary-ink); }
 .sc-badge[data-player="A"][data-active]{ background: var(--ux-hint-mint); color: var(--ux-ink); }
 .sc-badge[data-player="B"][data-active]{ background: var(--ux-hint-lavender); color: var(--ux-ink); }
-.sc-progress{ flex: 1; min-width: 8rem; display: grid; gap: var(--ux-space-1); }
-.sc-track{ height: 10px; background: var(--ux-surface-sunk); border-radius: var(--ux-radius-pill); overflow: hidden; }
-.sc-fill{ height: 100%; background: var(--ux-primary-fill); transition: width var(--ux-motion-state) var(--ux-motion-ease); }
-.sc-headbtns{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+/* U01: 진행 막대(.sc-progress/.sc-track/.sc-fill)는 공용 GameHeader 의
+   progress 로 옮겼다. 남은 .sc-head 는 차례 뱃지 + 판 조작 줄이다. */
+.sc-headbtns{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; margin-left: auto; }
 .sc-mini{
   background: var(--ux-surface); color: var(--ux-ink);
   border: 2px solid var(--ux-primary-border); font-weight: 800; white-space: nowrap;

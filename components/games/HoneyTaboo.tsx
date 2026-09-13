@@ -10,6 +10,7 @@ import { GameText } from "@/lib/gameI18n";
 import { ChildButton, ChildCard, ChildText } from "../ui/child";
 import ScopedStyle from "../ui/child/ScopedStyle";
 import BeeMascot from "../BeeMascot";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 
 const DECK_SIZE = 12;
 const MAX_PASSES = 3;
@@ -147,11 +148,28 @@ export default function HoneyTaboo({ langA, langB }: { langA: string; langB: str
 
       {state.phase === "play" && (
         <div className="taboo-play">
-          <div className="taboo-hud">
-            <HudBox label="남은 시간" value={seconds === null ? "∞" : `${seconds}초`} />
-            <HudBox label="맞힌 카드" value={`${state.score}`} />
-            <HudBox label="남은 패스" value={`${state.passesLeft}`} />
-          </div>
+          {/* U01 공용 헤더 — 시간·점수·패스를 3칸 HUD 대신 다른 게임과 같은
+              오른쪽 상태 칩으로. 뒤로는 이 게임의 준비 화면으로 돌아간다. */}
+          <GameHeader
+            gameId="taboo"
+            title="꿀벌 금칙어"
+            icon="🚫"
+            onBack={() => dispatch({ type: "reset", mode })}
+            backLabel="준비"
+            progress={{ value: state.idx, max: state.deck.length }}
+            status={
+              <>
+                <GameStat
+                  icon="⏱"
+                  label="남은 시간"
+                  value={seconds === null ? "∞" : `${seconds}초`}
+                  tone={seconds !== null && seconds <= 10 ? "warn" : "plain"}
+                />
+                <GameStat icon="⭐" label="맞힌 카드" value={state.score} tone="key" />
+                <GameStat icon="⏭" label="남은 패스" value={state.passesLeft} />
+              </>
+            }
+          />
           <ChildText role="secondary" as="p" className="taboo-policy">
             {MODE_TEXT[state.mode].icon} {MODE_TEXT[state.mode].name} · {MODE_TEXT[state.mode].hud}
           </ChildText>
@@ -175,9 +193,11 @@ export default function HoneyTaboo({ langA, langB }: { langA: string; langB: str
               <ChildText role="secondary" as="p" className="taboo-center">
                 🎤 설명하는 사람 {LANG_EMOJI[giverLang] ?? "🌐"} {giverLang.toUpperCase()}
               </ChildText>
-              <ChildText role="title" as="p" className="taboo-answer">
+              {/* U01: 화면의 title 은 헤더의 게임 이름 하나뿐. 설명할 낱말은
+                  'learn-word'(집중 학습 단어) — 크기는 그대로 크다. */}
+              <p data-ux-role="learn-word" className="taboo-answer">
                 <GameText map={cur.answer} lang={giverLang} />
-              </ChildText>
+              </p>
 
               <div className="taboo-taboos">
                 <ChildText role="label" as="p" className="taboo-tabooshead">
@@ -237,15 +257,6 @@ export default function HoneyTaboo({ langA, langB }: { langA: string; langB: str
           onExit={() => dispatch({ type: "reset", mode })}
         />
       )}
-    </div>
-  );
-}
-
-function HudBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="taboo-hudbox">
-      <ChildText role="secondary" as="div">{label}</ChildText>
-      <ChildText role="body-emphasis" as="div">{value}</ChildText>
     </div>
   );
 }
@@ -418,17 +429,12 @@ const TABOO_CSS = `
 .taboo-moderule{ display: block; font-size: var(--ux-font-secondary); color: var(--ux-ink-soft); line-height: var(--ux-lh-reading); }
 .taboo-catgrid{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ux-space-3); }
 @media (max-width: 360px){ .taboo-catgrid{ grid-template-columns: 1fr; } }
-.taboo-hud{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ux-space-2); }
-.taboo-hudbox{
-  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
-  border-radius: var(--ux-radius-surface); padding: var(--ux-space-2);
-  text-align: center; min-width: 0;
-}
+/* U01: .taboo-hud 3칸 HUD 는 공용 GameHeader 의 상태 칩으로 옮겼다. */
 .taboo-policy{ text-align: center; }
 .taboo-pause{ background: var(--ux-surface-sunk); text-align: center; }
 .taboo-card{ display: grid; gap: var(--ux-space-3); }
 .taboo-cardtop{ display: flex; align-items: center; justify-content: space-between; gap: var(--ux-space-2); }
-.taboo-answer{ text-align: center; word-break: keep-all; overflow-wrap: anywhere; }
+.taboo-answer{ margin: 0; text-align: center; word-break: keep-all; overflow-wrap: anywhere; }
 .taboo-taboos{
   background: var(--ux-surface-sunk); border: 2px dashed var(--ux-error);
   border-radius: var(--ux-radius-surface); padding: var(--ux-space-3); display: grid; gap: var(--ux-space-2);

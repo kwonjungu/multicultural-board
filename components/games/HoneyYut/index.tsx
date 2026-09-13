@@ -10,6 +10,7 @@ import { pickN } from "@/lib/gameData";
 import type { PieceId, Throw } from "@/lib/yutTypes";
 import BeeMascot from "../../BeeMascot";
 import ScopedStyle from "../../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../../ui/game/GameHeader";
 import YutBoard, { TEAM_COLOR } from "./YutBoard";
 import YutSticks from "./YutSticks";
 import CultureCard from "./CultureCard";
@@ -71,9 +72,34 @@ export default function HoneyYut({ langA }: { langA: string; langB: string }) {
 
   const lastLog = state.log[state.log.length - 1] ?? "";
 
+  // U01 헤더 상태 — 골인한 말 수. 규칙은 reducer 가 정하고 여기서는 세기만 한다.
+  const allPieces = Object.values(state.pieces);
+  const TOTAL_PIECES = allPieces.length;
+  const homeDone = allPieces.filter((p) => p.pos.kind === "goal").length;
+
   return (
     <div data-ux-root className="hy-root">
       <ScopedStyle css={HY_CSS} />
+
+      {/* U01 공용 헤더 — 이 게임에는 머리 부분이 아예 없어서, 게임 이름도 진행
+          상황도 화면 위쪽에서 볼 수 없었다(차례는 판 옆 알약 하나뿐). 차례와
+          '집에 들어온 말'을 다른 게임과 같은 오른쪽 상태 자리에 올린다.
+          뒤로는 판을 처음부터 다시. */}
+      <GameHeader
+        gameId="yut"
+        introOpen
+        title="꿀벌 윷놀이"
+        icon="🪵"
+        onBack={() => dispatch({ type: "restart" })}
+        backLabel="처음"
+        progress={{ value: homeDone, max: TOTAL_PIECES }}
+        status={
+          <>
+            <GameStat icon="🎯" label="차례" value={`${state.turn}팀`} tone="key" />
+            <GameStat icon="🏁" label="들어온 말" value={`${homeDone} / ${TOTAL_PIECES}`} />
+          </>
+        }
+      />
 
       <div className="hy-play">
         {/* 보드 — 넓은 화면에서는 더 크게 */}

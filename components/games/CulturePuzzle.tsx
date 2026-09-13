@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 
 type Topic = {
   key: string;
@@ -134,13 +135,26 @@ export default function CulturePuzzle({ langA, langB }: { langA: string; langB: 
     <div data-ux-root className="cp-root">
       <ScopedStyle css={CP_CSS} />
 
+      {/* U01 공용 헤더 — 예전에는 판 컬럼 안에 '🧩 조각을 맞춰보세요 … n/N' 한 줄이
+          있어 다른 게임과 위치·크기가 달랐다. 뒤로는 첫 퍼즐부터 다시. */}
+      <GameHeader
+        gameId="puzzle"
+        introOpen
+        title="문화 퍼즐"
+        icon="🧩"
+        onBack={handleRestart}
+        backLabel="처음"
+        progress={{ value: stageIdx, max: ordered.length }}
+        status={
+          <>
+            <GameStat icon="📍" label="퍼즐" value={`${stageIdx + 1} / ${ordered.length}`} tone="key" />
+            <GameStat icon="✅" label="맞은 조각" value={`${cells.filter((c) => c.correctIdx === c.currentIdx).length} / ${cells.length}`} />
+          </>
+        }
+      />
+
       <div className="cp-play">
         <div className="cp-boardcol">
-          <div className="cp-top">
-            <span data-ux-role="label">🧩 조각을 맞춰보세요</span>
-            <span data-ux-role="label" className="cp-count">{stageIdx + 1} / {ordered.length}</span>
-          </div>
-
           {/* 진행 도트 */}
           <div className="cp-dots" aria-hidden>
             {ordered.map((_, i) => (
@@ -223,8 +237,7 @@ const CP_CSS = `
 @media (min-width: 900px){ .cp-play{ grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; } }
 
 .cp-boardcol{ display: grid; gap: var(--ux-space-2); min-width: 0; }
-.cp-top{ display: flex; justify-content: space-between; gap: var(--ux-space-2); }
-.cp-count{ color: var(--ux-primary-ink); font-weight: 900; }
+/* U01: .cp-top(안내+진행 수)은 공용 GameHeader 로 대체됐다. */
 .cp-dots{ display: flex; justify-content: center; gap: var(--ux-space-1); flex-wrap: wrap; }
 .cp-dot{ width: 10px; height: 10px; border-radius: var(--ux-radius-pill); background: var(--ux-surface-sunk); border: 1px solid var(--ux-ink-soft); }
 .cp-dot[data-state="done"]{ background: var(--ux-success); border-color: var(--ux-success); }

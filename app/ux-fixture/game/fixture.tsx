@@ -22,6 +22,7 @@ import CountryGuess from "@/components/games/CountryGuess";
 import EmotionQuiz from "@/components/games/EmotionQuiz";
 import GreetingRelay from "@/components/games/GreetingRelay";
 import MarketRolePlay from "@/components/games/MarketRolePlay";
+import { GameShellProvider } from "@/components/ui/game/GameShellContext";
 
 /**
  * 이번 라운드에 손댄 게임만 올린다. 나머지 게임은 아직 토큰으로 옮기지 않았고,
@@ -56,6 +57,7 @@ type Key = keyof typeof GAMES;
 
 export default function GameFixture() {
   const [key, setKey] = useState<Key>("taboo");
+  const [exited, setExited] = useState(0);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("game");
@@ -87,7 +89,18 @@ export default function GameFixture() {
         ))}
       </nav>
       {/* 게임 쪽 data-ux-root 가 화면당 하나가 되도록 여기서는 달지 않는다. */}
-      <Active langA="ko" langB="vi" />
+      {/* U01: 공용 GameHeader 의 '뒤로'는 게임이 onBack 을 주지 않으면 셸 밖으로
+          나간다. 실제 앱에서는 GameRoom 의 backStack 레이어가 그 역할을 하지만
+          fixture 에는 셸이 없으므로 여기서 직접 준다 — 그래야 측정 스크립트가
+          비활성 버튼이 아닌 진짜 버튼의 크기·히트를 잰다. */}
+      <GameShellProvider onExit={() => setExited((n) => n + 1)}>
+        <Active langA="ko" langB="vi" />
+      </GameShellProvider>
+      {exited > 0 && (
+        <p data-fixture-chrome style={{ padding: 8, margin: 0, background: "#111", color: "#9CA3AF", font: "12px monospace" }}>
+          fixture: 게임 목록으로 나가기 {exited}회 호출됨
+        </p>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { COUNTRIES, pickN, tr, type CountryDifficulty } from "@/lib/gameData";
 import { GameText } from "@/lib/gameI18n";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import { gt, UI, type LangMap } from "./uiText";
 
 /**
@@ -285,7 +286,22 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
   return (
     <div data-ux-root className="cg-root">
       <ScopedStyle css={CG_CSS} />
-      <ProgressBar value={round} max={rounds.length} score={score} />
+      {/* U01 공용 헤더 — 뒤로/이름/상태 자리를 모든 게임과 맞춘다.
+          뒤로는 난이도 고르기(이 게임의 이전 단계)로 돌아간다. */}
+      <GameHeader
+        gameId="country"
+        title="이 나라는 어디?"
+        icon="🌏"
+        onBack={resetToDifficultyPick}
+        backLabel="난이도"
+        progress={{ value: round, max: rounds.length }}
+        status={
+          <>
+            <GameStat icon="📍" label={gt(UI.round, langA)} value={`${Math.min(round + 1, rounds.length)} / ${rounds.length}`} />
+            <GameStat icon="⭐" label={gt(UI.score, langA)} value={score} tone="key" />
+          </>
+        }
+      />
 
       <div className="cg-play">
         <div className="cg-flagcard">
@@ -345,29 +361,11 @@ export default function CountryGuess({ langA, langB }: { langA: string; langB: s
   );
 }
 
-export function ProgressBar({ value, max, score }: { value: number; max: number; score: number }) {
-  return (
-    <div className="cg-progress">
-      <ScopedStyle css={PROGRESS_CSS} />
-      <div className="cg-progresstop">
-        <span data-ux-role="secondary">{Math.min(value + 1, max)} / {max}</span>
-        <span data-ux-role="secondary" className="cg-star">⭐ {score}</span>
-      </div>
-      <div className="cg-track">
-        <div className="cg-fill" style={{ width: `${(value / max) * 100}%` }} />
-      </div>
-    </div>
-  );
-}
-
-/* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
-const PROGRESS_CSS = `
-.cg-progress{ margin-bottom: var(--ux-space-4); }
-.cg-progresstop{ display: flex; justify-content: space-between; gap: var(--ux-space-2); margin-bottom: var(--ux-space-1); }
-.cg-star{ color: var(--ux-primary-ink); font-weight: 800; }
-.cg-track{ height: 10px; background: var(--ux-surface-sunk); border-radius: var(--ux-radius-pill); overflow: hidden; }
-.cg-fill{ height: 100%; background: var(--ux-primary-fill); border-right: 2px solid var(--ux-primary-border); transition: width var(--ux-motion-celebrate) var(--ux-motion-ease); }
-`;
+/* U01: 예전의 `ProgressBar`(진행 막대 + ⭐점수)는 이 파일에서 export 되어
+   EmotionQuiz·GreetingRelay 가 가져다 썼다. 세 게임만 같은 머리를 갖고 나머지
+   18개는 제각각이었던 셈이다. 이제 진행 막대와 점수는 공용
+   `components/ui/game/GameHeader` 의 progress/status 로 들어간다 — 여기서
+   다시 만들지 말 것. */
 
 const CG_CSS = `
 .cg-root{

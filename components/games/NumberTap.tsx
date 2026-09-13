@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import { gt, UI, type LangMap } from "./uiText";
 
 // 게임 고유 UI 문구 (제목·설명)
@@ -174,6 +175,14 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
     later(() => pickTarget(1), 200);
   }, [clearTimers, stopAudio, later, pickTarget]);
 
+  /** U01 헤더의 '뒤로' — 이 게임의 시작 화면으로. 예약된 타이머·음성을 먼저 끈다. */
+  const backToReady = useCallback(() => {
+    clearTimers();
+    stopAudio();
+    solvedRef.current = true;
+    setPhase("ready");
+  }, [clearTimers, stopAudio]);
+
   const stop = useCallback(() => {
     clearTimers();
     stopAudio();
@@ -246,6 +255,28 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
   return (
     <div data-ux-root className="nt-root nt-play">
       <ScopedStyle css={NT_CSS} />
+
+      {/* U01 공용 헤더 — 이 게임은 두 사람이 한 기기를 마주 보고 쓰기 때문에
+          라운드·점수가 화면 한복판 띠(.nt-bar)에만 있었다. 그래서 다른 게임에서
+          오른쪽 위를 보던 아이가 여기서만 가운데를 찾아야 했다. 상태는 헤더로
+          올리고, 가운데 띠에는 두 사람이 함께 쓰는 '듣기' 조작만 남긴다.
+          뒤로는 이 게임의 시작 화면으로. */}
+      <GameHeader
+        gameId="number"
+        title="숫자 빨리 누르기"
+        icon="🔢"
+        onBack={backToReady}
+        backLabel="처음"
+        progress={{ value: round - 1, max: ROUND_COUNT }}
+        status={
+          <>
+            <GameStat icon="📍" label={gt(UI.round, langA)} value={`${round} / ${ROUND_COUNT}`} />
+            <GameStat icon="⭐" label={`A ${gt(UI.score, langA)}`} value={`A ${scoreA}`} tone="key" />
+            <GameStat icon="⭐" label={`B ${gt(UI.score, langA)}`} value={`B ${scoreB}`} tone="key" />
+          </>
+        }
+      />
+
       <PlayerArea
         player="B" lang={langB} score={scoreB} rotated
         flash={flashB} locked={nowTs < lockB} onTap={(n) => handleTap("B", n)}
@@ -253,10 +284,8 @@ export default function NumberTap({ langA, langB }: { langA: string; langB: stri
 
       <div className="nt-bar">
         <div className="nt-barinfo">
-          <span data-ux-role="secondary">{gt(UI.round, langA)} {round}/{ROUND_COUNT}</span>
           <span data-ux-role="label">🎧 {target?.lang.toUpperCase()} · {targetWord}</span>
         </div>
-        <span data-ux-role="label" className="nt-score">A: {scoreA} · B: {scoreB}</span>
         <button
           data-ux-role="control" className="nt-replay"
           onClick={replayTts} aria-label={gt(UI.replay, langA)}
@@ -368,9 +397,9 @@ const NT_CSS = `
   background: var(--ux-primary-fill); color: var(--ux-primary-ink);
   border-top: 3px solid var(--ux-surface); border-bottom: 3px solid var(--ux-surface);
 }
-.nt-barinfo{ display: grid; gap: var(--ux-space-1); min-width: 0; }
+.nt-barinfo{ display: grid; gap: var(--ux-space-1); min-width: 0; flex: 1; }
 .nt-barinfo [data-ux-role="secondary"]{ color: inherit; }
-.nt-score{ flex: 1; text-align: center; }
+/* U01: 점수는 공용 GameHeader 로 옮겼다. */
 .nt-replay{
   background: var(--ux-surface); color: var(--ux-ink);
   border: 2px solid var(--ux-primary-border);

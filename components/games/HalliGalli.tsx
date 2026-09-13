@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import BeeMascot from "../BeeMascot";
 import ScopedStyle from "../ui/child/ScopedStyle";
+import GameHeader, { GameStat } from "../ui/game/GameHeader";
 import { LangMap, tr } from "@/lib/gameData";
 import { playSequence, playTone } from "@/lib/gameSfx";
 
@@ -305,6 +306,28 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
   }
 
   // play
+  // U01 공용 헤더 — 이 게임에는 머리 부분이 없었다. 점수는 플레이어마다 자기
+  // 구역 안에 흩어져 있어, 다른 게임에서 오른쪽 위를 보던 아이가 여기서는
+  // 전체 상황을 한눈에 볼 곳이 없었다. 플레이어별 점수는 자기 구역에 그대로
+  // 두고(마주 앉은 사람에게는 그게 맞다), 공통 상황만 헤더로 올린다.
+  // 뒤로는 인원 고르기(이 게임의 준비 화면)로.
+  const playHeader = (
+    <GameHeader
+      gameId="halligalli"
+      title="할리갈리"
+      icon="🔔"
+      onBack={reset}
+      backLabel="준비"
+      status={
+        <>
+          <GameStat icon="🙋" label="차례" value={`P ${PLAYER_LABEL[turn] ?? "?"}`} tone="key" />
+          <GameStat icon="🃏" label="남은 카드" value={decks.reduce((a, d) => a + d.length, 0)} />
+          <GameStat icon="🏆" label="최고 점수" value={Math.max(0, ...scores)} />
+        </>
+      }
+    />
+  );
+
   if (playerCount === 2) {
     // 기존 split-screen + 180도 회전 유지.
     const topA = piles[0]?.[0];
@@ -312,6 +335,7 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
     return (
       <div data-ux-root className="hg-root hg-play2">
         <ScopedStyle css={HG_CSS} />
+        {playHeader}
         {/* Player B controls (top, rotated 180° toward opposite player) */}
         <PlayerControls
           label="B"
@@ -349,6 +373,7 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
   return (
     <div data-ux-root className="hg-root hg-playn">
       <ScopedStyle css={HG_CSS} />
+      {playHeader}
       <div className="hg-panels">
         {Array.from({ length: playerCount }).map((_, i) => {
           const top = piles[i]?.[0];

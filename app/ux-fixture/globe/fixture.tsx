@@ -21,9 +21,12 @@ type Mode = "menu" | "explore" | "quiz";
 export default function GlobeFixture({
   mode: initialModeProp,
   chrome,
+  country,
 }: {
   mode: Mode;
   chrome: "game" | "bare";
+  /** 미리 고를 나라의 ISO 코드(예: "KR"). 정보 패널이 열린 상태를 재려고 쓴다. */
+  country?: string;
 }) {
   const [mode, setMode] = useState<Mode>(initialModeProp);
   const [blocked, setBlocked] = useState<string[]>([]);
@@ -48,7 +51,13 @@ export default function GlobeFixture({
   }, []);
 
   const globe = (
-    <GlobeQuest key={mode} langA="ko" langB="vi" initialMode={mode === "menu" ? undefined : mode} />
+    <GlobeQuest
+      key={mode + ":" + (country ?? "")}
+      langA="ko"
+      langB="vi"
+      initialMode={mode === "menu" ? undefined : mode}
+      initialCountryCode={country}
+    />
   );
 
   return (
