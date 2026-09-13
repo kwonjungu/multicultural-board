@@ -145,44 +145,29 @@ check('AppIcon 이 decorative 기본값 true 를 유지한다(라벨과 함께 �
 /* ── 3. HomeHub — 아이콘만 두고 라벨을 지우지 않았다 ─────────────── */
 const homeHubSrc = stripComments(read('components/HomeHub.tsx'));
 
-check('HomeHub 이 AppIcon 을 실제로 import 해서 쓴다', () => {
-  assert.match(homeHubSrc, /import AppIcon from ["']\.\/ui\/child\/AppIcon["']/);
-  assert.match(homeHubSrc, /<AppIcon\s/, 'AppIcon 을 렌더하는 곳이 없다');
+/* 한때 홈 활동 타일 4개를 이 아이콘들로 바꿨다가, 사용자가 "홈은 아이콘
+   원래거 그대로 둬" 라고 해서 되돌렸다(2026-09-13). 아이콘 기반 시설
+   (manifest·AppIcon·파생본)은 남겨 두되 **홈에는 쓰지 않는다** — 다시 몰래
+   끼워 넣지 않도록 여기서 못 박는다. */
+check('홈 활동 타일은 기존 마스코트를 그대로 쓴다 (아이콘으로 바꾸지 않는다)', () => {
+  assert.doesNotMatch(homeHubSrc, /<AppIcon/,
+    '홈이 다시 AppIcon 을 쓰고 있다 — 사용자가 원래 마스코트를 유지하라고 했다');
+  assert.doesNotMatch(homeHubSrc, /icon:\s*"(globe|storybook|praise|friends|speaker|enter)"/,
+    '홈 ACTIVITIES 에 아이콘 매핑이 다시 들어왔다');
+  assert.match(homeHubSrc, /className="hub-point-bee"/, '마스코트 렌더가 사라졌다');
 });
 
-check('연결한 4개 활동(board/storybook/dashboard/games)이 03 에셋가이드 아이콘과 정확히 대응한다', () => {
-  const wantIcon = { board: 'globe', storybook: 'storybook', dashboard: 'praise', games: 'friends' };
-  for (const [id, icon] of Object.entries(wantIcon)) {
-    const re = new RegExp(`id:\\s*"${id}"[^}]*icon:\\s*"${icon}"`);
-    assert.match(homeHubSrc, re, `${id} → icon:"${icon}" 매핑을 찾지 못함`);
-  }
-  // vocab 은 아직 만들어진 아이콘이 없다 — 있는 척 채우지 않는다.
-  const vocabLine = /id:\s*"vocab"[^\n]*/.exec(homeHubSrc);
-  assert.ok(vocabLine, 'vocab 항목을 찾지 못함');
-  assert.doesNotMatch(vocabLine[0], /icon:/, 'vocab 에 아직 없는 아이콘을 억지로 붙였다');
-});
-
-check('활동 타일 렌더가 아이콘만 두지 않고 글자 라벨을 항상 함께 그린다', () => {
-  // ACTIVITIES.map(...) 블록 하나를 통째로 뽑아서, 그 안에 AppIcon(또는 mascot
-  // img) 과 hub-point-label 이 둘 다 있는지 —  즉 라벨이 조건부로 사라지지
-  // 않는지 확인한다.
+check('활동 타일에 글자 라벨이 항상 붙어 있다', () => {
   const mapBlock = /\{ACTIVITIES\.map\([\s\S]*?\)\)\}/.exec(homeHubSrc);
   assert.ok(mapBlock, 'ACTIVITIES.map 렌더 블록을 찾지 못함');
-  const block = mapBlock[0];
-  assert.match(block, /<AppIcon/, '활동 타일에서 AppIcon 을 쓰지 않는다');
-  assert.match(block, /hub-point-label/, '활동 타일에 라벨이 없다');
-  // 라벨 span 이 삼항/조건부(a.icon &&, ? :) 안에 있어 아이콘이 있을 때만
-  // 사라지는 구조가 아닌지 — 라벨 줄 자체에는 그런 분기가 없어야 한다.
-  const labelLine = /<span[^>]*hub-point-label[^>]*>[\s\S]*?<\/span>/.exec(block);
-  assert.ok(labelLine, '라벨 span 을 못 찾음');
-  assert.doesNotMatch(labelLine[0], /a\.icon\s*\?/, '라벨이 아이콘 유무에 따라 조건부로 사라질 수 있다');
+  assert.match(mapBlock[0], /hub-point-label/, '활동 타일에 라벨이 없다');
 });
 
-check('아이콘을 쓰는 활동은 decorative(라벨 병기) 로 렌더한다 — 아이콘이 유일한 안내가 아니다', () => {
-  const appIconCall = /<AppIcon\s+name=\{a\.icon\}[^/]*\/>/.exec(homeHubSrc);
-  assert.ok(appIconCall, 'AppIcon 호출을 찾지 못함');
-  assert.match(appIconCall[0], /decorative/, 'decorative 를 명시하지 않았다');
-  assert.doesNotMatch(appIconCall[0], /decorative=\{false\}/, '라벨이 있는 자리인데 decorative=false 로 대체 텍스트를 만들었다');
+check('아이콘 기반 시설은 남아 있다 (다음에 쓸 자리를 위해)', () => {
+  // 홈에서 뺐다고 manifest·컴포넌트·파생본까지 지우면 다음 연결 때 처음부터
+  // 다시 만들어야 한다. 자산과 계약은 유지한다.
+  assert.ok(existsSync(abs('lib/uiIcons.ts')), 'uiIcons manifest 가 사라졌다');
+  assert.ok(existsSync(abs('components/ui/child/AppIcon.tsx')), 'AppIcon 이 사라졌다');
 });
 
 console.log(`\n${count} checks passed`);
