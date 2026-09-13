@@ -41,6 +41,17 @@ export interface LearnerProfile {
    */
   markId?: string;
   /**
+   * U05 — 아이가 고른 내 동물(lib/animals.ts 의 AnimalId allowlist).
+   *
+   * clientId 가 아니라 여기(learnerId 아래)에 두는 이유: clientId 는 브라우저
+   * 단위라 공용 태블릿을 A→B→A 가 돌려 쓰면 선택이 섞인다. 이름·기기가 바뀌어도
+   * 따라가야 하는 값이므로 프로필이 권위다.
+   *
+   * 없으면 고르지 않은 것이고, 화면은 room+안정 식별자로 정해지는 결정적
+   * 폴백 동물을 보여준다(렌더마다 random 아님).
+   */
+  avatarAnimalId?: string;
+  /**
    * 이 학습자의 기록이 과거에 쓰던 이름 후보. 최근 이름이 앞에 온다.
    * 이름을 고칠 때마다 이전 이름을 앞에 넣는다. 이관 전 읽기 폴백에만 쓰고,
    * 쓰기 경로를 따로 만드는 데는 쓰지 않는다.

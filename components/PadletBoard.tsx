@@ -439,6 +439,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       youtubeId,
       ...(status ? { status } : {}),
       ...(authorClientId ? { authorClientId } : {}),
+      // U05 — 내 동물이 내가 쓴 글에도 바로 보이게 한다.
+      ...(user.learnerId ? { authorLearnerId: user.learnerId } : {}),
+      ...(user.animalId ? { authorAnimalId: user.animalId } : {}),
     };
     setCards((prev) => [tempCard, ...prev]);
     // 올린 글이 어느 주제로 갔는지 눈으로 확인되도록 그 주제로 이동한다.
@@ -456,6 +459,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           roomCode, cardType, imageUrl, youtubeId,
           ...(data.status ? { status: data.status } : {}),
           ...(data.authorClientId ? { authorClientId: data.authorClientId } : {}),
+          ...(user.learnerId ? { authorLearnerId: user.learnerId } : {}),
+          ...(user.animalId ? { authorAnimalId: user.animalId } : {}),
         }),
       });
       if (!res.ok) throw new Error("API 오류");
@@ -605,6 +610,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         roomLangs={teacherLangs}
         approvalMode={roomConfigState.approvalMode}
         fixture={offline}
+        learners={roomConfigState.learners}
         fixtureReactions={fixture?.reactions?.[card.id]}
       />
     );

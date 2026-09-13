@@ -11,6 +11,8 @@ import {
   REACTIONS, readReactions, nextReaction,
   type ReactionKind, type RawReactions,
 } from "@/lib/cardReactions";
+import { resolveAnimal } from "@/lib/animals";
+import AnimalArt from "./ui/child/AnimalArt";
 import ImageLightbox from "./ImageLightbox";
 
 const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
@@ -45,6 +47,11 @@ interface Props {
   /** 개발용 fixture — Firebase 구독과 외부 API 호출을 하지 않는다 (HARNESS §2). */
   fixture?: boolean;
   /**
+   * U05 — learnerId → 프로필. RoomConfig.learners 를 그대로 넘긴다.
+   * 작성자의 현재 동물을 찾는 데만 쓴다(이름으로 찾지 않는다).
+   */
+  learners?: Record<string, { avatarAnimalId?: string } | undefined>;
+  /**
    * fixture 에서 반응 노드의 초기값을 주입한다. 구독을 끄면 반응이 늘 비어 있어
    * 옛 `true` 호환·개수 표시·내 선택 상태를 화면으로 검수할 수 없다.
    * 모양은 실제 노드와 같다: `{ [clientId]: 반응문자열 | true }`.
@@ -67,6 +74,7 @@ export default function PadletCard({
   roomLangs,
   approvalMode,
   fixture,
+  learners,
   fixtureReactions,
 }: Props) {
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
@@ -133,6 +141,16 @@ export default function PadletCard({
     });
     return () => { off(likesRef); void unsub; };
   }, [roomCode, card.id, fixture]);
+
+  /* U05 — 작성자의 동물. 검증된 learnerId → 프로필 → 글에 저장된 스냅샷 →
+     결정적 폴백. stableId 는 신원 판단이 아니라 폴백 해시 재료일 뿐이다. */
+  const authorAnimal = resolveAnimal({
+    roomCode,
+    authorLearnerId: card.authorLearnerId,
+    profiles: learners,
+    snapshotAnimalId: card.authorAnimalId,
+    stableId: card.authorClientId || card.authorName,
+  }).id;
 
   const { counts, legacy, mine, total } = readReactions(reactRaw, myClientId);
   const myReaction = REACTIONS.find((r) => r.id === mine) ?? null;
@@ -456,8 +474,11 @@ export default function PadletCard({
     >
       {/* ── 1. 누가 썼는지 ── */}
       <header className="pc-who">
+        {/* U05 — 작성자의 내 동물. 교사는 동물을 고르지 않으므로 종전 표시를 유지한다.
+            해석 순서는 검증된 learnerId → 프로필 → 글에 저장된 스냅샷 → 결정적 폴백.
+            이름으로 프로필을 찾지 않는다(동명이인 병합 금지). */}
         <span aria-hidden className="pc-avatar" style={{ background: colColor }}>
-          {card.isTeacher ? "🧑‍🏫" : card.authorName.charAt(0).toUpperCase()}
+          {card.isTeacher ? "🧑‍🏫" : <AnimalArt id={authorAnimal} size={30} />}
         </span>
         <span className="pc-who-text">
           <span data-ux-role="label" className="pc-name"><bdi>{card.authorName}</bdi></span>

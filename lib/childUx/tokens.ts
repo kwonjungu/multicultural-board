@@ -158,8 +158,14 @@ ${responsiveCss()}
 [data-ux-role="learn-word"]{ font-size: var(--ux-font-learn-word); line-height: var(--ux-lh-tight); font-weight: 700; }
 
 /* 긴 한국어는 어절 단위로 끊고, 공백 없는 긴 문자열만 강제로 접는다.
-   베트남어 등 긴 번역문이 카드 밖으로 넘치던 것을 막는다. */
-[data-ux-role]{ overflow-wrap: anywhere; word-break: keep-all; }
+   베트남어 등 긴 번역문이 카드 밖으로 넘치던 것을 막는다.
+
+   anywhere 가 아니라 break-word 다. anywhere 는 min-content 폭 계산에도
+   반영돼서, flex 안의 라벨이 한 글자 폭까지 짜부라진다 — 동물 선택 카드에서
+   "토끼" 가 12px 폭에 두 줄로 쪼개지는 것을 실제로 만들었다. break-word 는
+   정말로 넘칠 때만 끊고 칸의 최소 폭은 가장 긴 단어를 지킨다.
+   (이 주석은 template literal 안이라 백틱을 쓰면 문자열이 끊긴다.) */
+[data-ux-role]{ overflow-wrap: break-word; word-break: keep-all; }
 
 [data-ux-surface]{ background: var(--ux-surface); border-radius: var(--ux-radius-surface); }
 [data-ux-surface="panel"]{ border-radius: var(--ux-radius-panel); }
