@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import AppIcon from "@/components/ui/child/AppIcon";
 import { useRouter } from "next/navigation";
 import { LANGUAGES } from "@/lib/constants";
 import BeeBanner from "@/components/BeeBanner";
@@ -479,7 +480,13 @@ export default function Home() {
                   if (!joinReady) return;
                   void handleJoin();
                 }}
-              >{joinState.kind === "checking" ? "들어가는 중…" : "🐝 들어가기"}</button>
+              >
+                {/* U03 — 입장 CTA 에 03 에셋가이드의 enter 그림 아이콘.
+                    확인 중에는 글자만 남긴다(그림이 바뀌면 상태가 헷갈린다). */}
+                {joinState.kind === "checking"
+                  ? "들어가는 중…"
+                  : <><AppIcon name="enter" size={28} className="root-cta-ico" />들어가기</>}
+              </button>
               <p id="root-cta-hint" data-ux-role="secondary" className="root-cta-hint">
                 {joinReady ? "교실 번호가 다 채워졌어요" : "네 자리를 모두 눌러야 들어갈 수 있어요"}
               </p>
@@ -774,7 +781,12 @@ const ROOT_CSS = `
   width: 100%; font-family: inherit; font-weight: 900;
   background: var(--ux-primary-fill); color: var(--ux-primary-ink);
   border: 2px solid var(--ux-primary-border);
+  /* 그림 아이콘과 글자를 한 줄 가운데로. 아이콘은 AppIcon 이 인라인 width/height
+     를 직접 박으므로(그 편이 로딩 중 밀림이 없다) 여기서는 정렬만 맡는다. */
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--ux-space-2);
 }
+.root-cta-ico{ flex: 0 0 auto; }
 /* 아직 누를 수 없는 상태도 읽히게 둔다. 회색 위 회색 글자는 쓰지 않는다. */
 .root-cta[aria-disabled="true"]{
   background: var(--ux-surface-sunk); color: var(--ux-ink-soft);

@@ -13,6 +13,7 @@ import {
 } from "@/lib/cardReactions";
 import { resolveAnimal } from "@/lib/animals";
 import AnimalArt from "./ui/child/AnimalArt";
+import AppIcon from "./ui/child/AppIcon";
 import ImageLightbox from "./ImageLightbox";
 
 const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
@@ -474,7 +475,11 @@ export default function PadletCard({
         aria-pressed={on}
         onClick={() => toggleSpeak(id, text, lang)}
       >
-        <span aria-hidden className="pc-btn-ico">{on ? "⏹" : "🔊"}</span>
+        {/* U03 — 듣기에는 03 에셋가이드의 speaker 그림 아이콘을 쓴다.
+            멈춤에 해당하는 그림은 manifest 에 없으므로 그때만 기호를 쓴다. */}
+        {on
+          ? <span aria-hidden className="pc-btn-ico">⏹</span>
+          : <AppIcon name="speaker" size={22} className="pc-btn-ico" />}
         <span className="pc-btn-lb">
           {(on ? tPlain("cardStop", viewerLang) : tPlain("cardListen", viewerLang)) + suffix}
         </span>

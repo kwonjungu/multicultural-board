@@ -165,6 +165,25 @@ check('활동 타일에 글자 라벨이 항상 붙어 있다', () => {
   assert.match(mapBlock[0], /hub-point-label/, '활동 타일에 라벨이 없다');
 });
 
+/* ── 4. U03 실제 연결 — speaker 는 듣기 버튼, enter 는 입장 CTA ───── */
+const cardSrc = stripComments(read('components/PadletCard.tsx'));
+const rootSrc = stripComments(read('app/page.tsx'));
+
+check('듣기 버튼이 speaker 아이콘을 쓴다', () => {
+  assert.ok(cardSrc.includes('<AppIcon name="speaker"'), '듣기에 speaker 아이콘이 없다');
+  assert.ok(cardSrc.includes('from "./ui/child/AppIcon"'), 'AppIcon import 가 없다');
+});
+
+check('입장 CTA 가 enter 아이콘을 쓴다', () => {
+  assert.ok(rootSrc.includes('<AppIcon name="enter"'), '입장 CTA 에 enter 아이콘이 없다');
+});
+
+check('아이콘을 붙여도 글자 라벨을 지우지 않았다', () => {
+  /* 아이콘만 남기면 뜻이 모호해진다(04 문서). 두 자리 모두 글자가 함께 있어야 한다. */
+  assert.ok(rootSrc.includes('들어가기'), '입장 CTA 의 글자가 사라졌다');
+  assert.ok(cardSrc.includes('cardListen'), '듣기 버튼의 라벨 키가 사라졌다');
+});
+
 check('아이콘 기반 시설은 남아 있다 (다음에 쓸 자리를 위해)', () => {
   // 홈에서 뺐다고 manifest·컴포넌트·파생본까지 지우면 다음 연결 때 처음부터
   // 다시 만들어야 한다. 자산과 계약은 유지한다.
