@@ -34,9 +34,21 @@ import VocabWriteSheet from "./VocabWriteSheet";
 import DictationSheetModal from "./DictationSheetModal";
 import TeacherVocabDashboard from "./TeacherVocabDashboard";
 
-const PURPLE = "#8B5CF6";
-const PURPLE_DARK = "#6D28D9";
-const PURPLE_LIGHT = "#F5F3FF";
+/**
+ * U07 — 보라는 "단어 배우기" 의 정체성 색이지만 면을 통째로 칠하면 화면이
+ * 보라로 덮인다(사용자 지적). 가는 강조에만 남기고 면·글자는 공통 토큰을 쓴다.
+ * VocabCard 와 같은 규칙이라 두 화면이 따로 놀지 않는다.
+ */
+const ACCENT = "var(--c-vocab)";
+const PURPLE = ACCENT;                           /* 옛 이름 유지 — 호출부가 많다 */
+const PURPLE_DARK = "var(--ux-ink)";
+const PURPLE_LIGHT = "var(--ux-surface-sunk)";
+const INK_STRONG = "var(--ux-ink)";
+const INK_SOFT = "var(--ux-ink-soft)";
+const OK_INK = "var(--ok-text)";
+
+/** `accentAlpha(40)` 같은 hex 알파 이어붙이기는 var() 에서 깨진다. */
+const accentAlpha = (pct: number) => `color-mix(in srgb, ${ACCENT} ${pct}%, transparent)`;
 
 const SUBCATEGORIES: string[] = [
   "감정", "지칭어", "의사표현", "학교생활", "일상동사", "일상형용사", "인사",
@@ -372,7 +384,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
         maxWidth: 760, margin: "0 auto",
         display: "flex", alignItems: "center", gap: 12,
         background: "#fff", borderRadius: 20, padding: "12px 16px",
-        border: "2px solid " + PURPLE + "33",
+        border: "2px solid " + accentAlpha(20),
         boxShadow: "0 8px 24px rgba(109, 40, 217, 0.12)",
         marginBottom: 18,
       }}>
@@ -385,13 +397,13 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
           data-ux-role="control"
           style={{
             background: PURPLE_LIGHT, border: "none",
-            fontWeight: 800, color: PURPLE_DARK,
+            fontWeight: 700, color: PURPLE_DARK,
             cursor: "pointer", fontFamily: "inherit",
           }}
         >{t("vocabBack", lang)}</button>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
+          <div style={{ fontSize: "var(--ux-font-body-emphasis)", fontWeight: 800, color: INK_STRONG, letterSpacing: -0.3 }}>
             📚 {t("hubSectionVocab", lang)}
           </div>
           {/* U07: 아직 아무것도 안 한 학생에게 '0/100 완료' 를 먼저 보여주지
@@ -408,10 +420,10 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             onClick={() => setTeacherView(true)}
             data-ux-role="control"
             style={{
-              background: "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")",
+              background: "var(--ux-primary-fill)",
               color: "#fff", border: "none",
-              fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
-              boxShadow: "0 4px 10px " + PURPLE + "55",
+              fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
+              boxShadow: "0 4px 10px " + accentAlpha(33),
             }}
           >👨‍🏫 반 전체 보기</button>
         )}
@@ -432,7 +444,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                   : PURPLE_LIGHT,
                 color: dueCount > 0 ? "#fff" : PURPLE_DARK,
                 border: "none",
-                fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
+                fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
                 boxShadow: dueCount > 0 ? "0 4px 12px rgba(234,88,12,0.45)" : "none",
               }}
             >
@@ -441,7 +453,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                 <span style={{
                   position: "absolute", top: -6, right: -6,
                   background: "#fff", color: "#EA580C",
-                  fontSize: 11, fontWeight: 900,
+                  fontSize: "var(--ux-font-secondary)", fontWeight: 800,
                   minWidth: 20, height: 20, borderRadius: 999,
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   padding: "0 5px",
@@ -455,7 +467,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
 
         <div style={{
           background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
-          color: "#78350F", fontSize: 14, fontWeight: 900,
+          color: INK_STRONG, fontSize: "var(--ux-font-label)", fontWeight: 800,
           padding: "8px 14px", borderRadius: 14,
           boxShadow: "0 4px 10px rgba(245,158,11,0.35)",
         }}>
@@ -507,9 +519,9 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            <div aria-hidden style={{ fontSize: 30, flexShrink: 0 }}>🎧</div>
+            <div aria-hidden style={{ fontSize: "var(--ux-font-title)", flexShrink: 0 }}>🎧</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div data-ux-role="label" style={{ fontWeight: 800, color: "var(--ux-ink)" }}>
+              <div data-ux-role="label" style={{ fontWeight: 700, color: "var(--ux-ink)" }}>
                 나의 단어 챌린지
               </div>
               <div data-ux-role="secondary" style={{ marginTop: 2 }}>
@@ -519,7 +531,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             <div style={{
               background: "var(--ux-primary-fill)", color: "var(--ux-primary-ink)",
               border: "2px solid var(--ux-primary-border)",
-              fontSize: "var(--ux-font-label)", fontWeight: 800,
+              fontSize: "var(--ux-font-label)", fontWeight: 700,
               padding: "8px 14px", borderRadius: 12, flexShrink: 0,
             }}>시작 →</div>
           </button>
@@ -536,7 +548,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
               style={{
                 display: "flex", alignItems: "center", gap: 12, textAlign: "left",
                 background: "#fff",
-                border: "2px solid " + PURPLE + "44",
+                border: "2px solid " + accentAlpha(27),
                 borderRadius: 16, padding: "12px 16px",
                 cursor: "pointer", fontFamily: "inherit",
                 boxShadow: "0 4px 12px rgba(139, 92, 246, 0.12)",
@@ -546,18 +558,18 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
               onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
               onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
             >
-              <div style={{ fontSize: 30, flexShrink: 0 }}>📄</div>
+              <div style={{ fontSize: "var(--ux-font-title)", flexShrink: 0 }}>📄</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2 }}>
+                <div style={{ fontSize: "var(--ux-font-label)", fontWeight: 800, color: INK_STRONG, letterSpacing: -0.2 }}>
                   쓰기 학습지 만들기
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2 }}>
+                <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_SOFT, marginTop: 2 }}>
                   🖨 핵심 단어를 손으로 따라 쓰는 인쇄용 연습지
                 </div>
               </div>
               <div style={{
                 background: PURPLE_LIGHT, color: PURPLE_DARK,
-                fontSize: 13, fontWeight: 900, padding: "8px 14px", borderRadius: 12,
+                fontSize: "var(--ux-font-secondary)", fontWeight: 800, padding: "8px 14px", borderRadius: 12,
                 flexShrink: 0,
               }}>만들기 →</div>
             </button>
@@ -578,18 +590,18 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                 onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                 onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
-                <div style={{ fontSize: 30, flexShrink: 0 }}>✏️</div>
+                <div style={{ fontSize: "var(--ux-font-title)", flexShrink: 0 }}>✏️</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2 }}>
-                    받아쓰기 학습지 <span style={{ fontSize: 10, fontWeight: 900, color: "#C2410C", background: "#FFF7ED", padding: "2px 6px", borderRadius: 999, verticalAlign: "middle" }}>교사</span>
+                  <div style={{ fontSize: "var(--ux-font-label)", fontWeight: 800, color: INK_STRONG, letterSpacing: -0.2 }}>
+                    받아쓰기 학습지 <span style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 800, color: "#C2410C", background: "#FFF7ED", padding: "2px 6px", borderRadius: 999, verticalAlign: "middle" }}>교사</span>
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2 }}>
+                  <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_SOFT, marginTop: 2 }}>
                     🖨 테마별 15챕터 + 오답노트 · 받침 단어 따라 쓰기
                   </div>
                 </div>
                 <div style={{
                   background: "#FFF7ED", color: "#C2410C",
-                  fontSize: 13, fontWeight: 900, padding: "8px 14px", borderRadius: 12,
+                  fontSize: "var(--ux-font-secondary)", fontWeight: 800, padding: "8px 14px", borderRadius: 12,
                   flexShrink: 0,
                 }}>열기 →</div>
               </button>
@@ -640,9 +652,9 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            <div aria-hidden style={{ fontSize: 30, flexShrink: 0 }}>📝</div>
+            <div aria-hidden style={{ fontSize: "var(--ux-font-title)", flexShrink: 0 }}>📝</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div data-ux-role="label" style={{ fontWeight: 800, color: "var(--ux-ink)" }}>
+              <div data-ux-role="label" style={{ fontWeight: 700, color: "var(--ux-ink)" }}>
                 오늘의 단어 시험
               </div>
               <div data-ux-role="secondary" style={{ marginTop: 2 }}>
@@ -652,7 +664,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             <div style={{
               background: "var(--ux-primary-fill)", color: "var(--ux-primary-ink)",
               border: "2px solid var(--ux-primary-border)",
-              fontSize: "var(--ux-font-label)", fontWeight: 800,
+              fontSize: "var(--ux-font-label)", fontWeight: 700,
               padding: "8px 14px", borderRadius: 12, flexShrink: 0,
             }}>시작 →</div>
           </button>
@@ -664,7 +676,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
         maxWidth: 760, margin: "0 auto 14px",
         display: "flex", gap: 4,
         background: "#fff", padding: 4, borderRadius: 14,
-        border: "2px solid " + PURPLE + "22",
+        border: "2px solid " + accentAlpha(13),
       }}>
         {([
           { k: "tree" as const, label: "🌳 단원" },
@@ -679,11 +691,11 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             style={{
               flex: 1,
               background: viewMode === v.k
-                ? "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")"
+                ? "var(--ux-primary-fill)"
                 : "transparent",
               color: viewMode === v.k ? "#fff" : "#374151",
               border: "none",
-              fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
+              fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
               boxShadow: viewMode === v.k ? "0 6px 14px rgba(139, 92, 246, 0.3)" : "none",
             }}
           >{v.label}</button>
@@ -706,16 +718,16 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
           display: "flex", alignItems: "center", justifyContent: "space-between",
           marginBottom: 8, padding: "0 2px",
         }}>
-          <div style={{ fontSize: 14, fontWeight: 900, color: PURPLE_DARK }}>
+          <div style={{ fontSize: "var(--ux-font-label)", fontWeight: 800, color: PURPLE_DARK }}>
             {t("vocabFromBoard", lang)}
           </div>
           <button
             onClick={runScan}
             disabled={scanState === "scanning" || cardTexts.length === 0}
             style={{
-              background: "transparent", border: "1.5px solid " + PURPLE + "66",
+              background: "transparent", border: "1.5px solid " + accentAlpha(40),
               borderRadius: 999, padding: "4px 10px",
-              fontSize: 11, fontWeight: 800, color: PURPLE_DARK,
+              fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: PURPLE_DARK,
               cursor: scanState === "scanning" ? "default" : "pointer",
               fontFamily: "inherit",
               opacity: cardTexts.length === 0 ? 0.5 : 1,
@@ -724,9 +736,9 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
         </div>
         {matched.length === 0 ? (
           <div style={{
-            background: "#fff", border: "2px dashed " + PURPLE + "44",
+            background: "#fff", border: "2px dashed " + accentAlpha(27),
             borderRadius: 14, padding: "14px",
-            fontSize: 13, color: "#6B7280", fontWeight: 700, textAlign: "center",
+            fontSize: "var(--ux-font-secondary)", color: INK_SOFT, fontWeight: 700, textAlign: "center",
           }}>
             {t("vocabFromBoardNone", lang)}
           </div>
@@ -745,7 +757,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                   onClick={() => setOpenWord(w)}
                   style={{
                     flexShrink: 0, width: 108,
-                    background: "linear-gradient(145deg, #fff, " + PURPLE_LIGHT + ")",
+                    background: "var(--ux-surface-sunk)",
                     border: "2.5px solid " + PURPLE,
                     borderRadius: 16, padding: "10px 6px",
                     display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
@@ -763,9 +775,9 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                     }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                   />
-                  <div style={{ fontSize: 13, fontWeight: 900, color: "#1F2937" }}>{w.ko}</div>
+                  <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 800, color: INK_STRONG }}>{w.ko}</div>
                   <div style={{
-                    fontSize: 10, fontWeight: 800, color: PURPLE_DARK,
+                    fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: PURPLE_DARK,
                     letterSpacing: 1,
                   }}>
                     {"★".repeat(Math.max(1, Math.min(5, m.score)))}
@@ -872,7 +884,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                 />
               </div>
               <div style={{
-                fontSize: 14, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2,
+                fontSize: "var(--ux-font-label)", fontWeight: 800, color: INK_STRONG, letterSpacing: -0.2,
                 textAlign: "center", lineHeight: 1.1,
               }}>{word.ko}</div>
 
@@ -892,7 +904,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
               {mastered && (
                 <div style={{
                   position: "absolute", top: 6, right: 6,
-                  fontSize: 14,
+                  fontSize: "var(--ux-font-label)",
                 }}>🏆</div>
               )}
             </button>
@@ -925,10 +937,10 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             }}
           >
             <BeeMascot size={84} mood="welcome" />
-            <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", margin: "8px 0 2px" }}>
+            <div style={{ fontSize: "var(--ux-font-body)", fontWeight: 800, color: INK_STRONG, margin: "8px 0 2px" }}>
               {lessonSheet.unit.emoji} {lessonSheet.unit.title} · {lessonSheet.lesson.title}
             </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 12 }}>
+            <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_SOFT, marginBottom: 12 }}>
               이번 레슨에서 배우는 단어
             </div>
             {/* 단어 미리보기 */}
@@ -945,7 +957,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                     style={{ width: 36, height: 36, objectFit: "contain" }}
                   />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: "#374151" }}>{w.ko}</span>
+                  <span style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_STRONG }}>{w.ko}</span>
                 </div>
               ))}
             </div>
@@ -958,7 +970,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                 style={{
                   background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
                   color: "#fff", border: "none", borderRadius: 16,
-                  padding: "14px", fontSize: 16, fontWeight: 900, cursor: "pointer",
+                  padding: "14px", fontSize: "var(--ux-font-body)", fontWeight: 800, cursor: "pointer",
                   boxShadow: "0 6px 16px rgba(245,158,11,0.4)",
                 }}
               >📖 단어 카드 공부 (그림·상황 카드)</button>
@@ -977,15 +989,15 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                 style={{
                   background: `linear-gradient(135deg, ${PURPLE}, ${PURPLE_DARK})`,
                   color: "#fff", border: "none", borderRadius: 16,
-                  padding: "14px", fontSize: 16, fontWeight: 900, cursor: "pointer",
+                  padding: "14px", fontSize: "var(--ux-font-body)", fontWeight: 800, cursor: "pointer",
                   boxShadow: `0 6px 16px ${PURPLE}55`,
                 }}
               >⚡ 시험 보기 (XP 도전!)</button>
               <button
                 onClick={() => setLessonSheet(null)}
                 style={{
-                  background: "#F3F4F6", color: "#6B7280", border: "none",
-                  borderRadius: 14, padding: "10px", fontSize: 13, fontWeight: 800, cursor: "pointer",
+                  background: "#F3F4F6", color: INK_SOFT, border: "none",
+                  borderRadius: 14, padding: "10px", fontSize: "var(--ux-font-secondary)", fontWeight: 700, cursor: "pointer",
                 }}
               >닫기</button>
             </div>
@@ -1022,7 +1034,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             zIndex: 1300, pointerEvents: "none",
             background: "#1F2937", color: "#fff",
             borderRadius: 999, padding: "7px 16px",
-            fontSize: 13, fontWeight: 900,
+            fontSize: "var(--ux-font-secondary)", fontWeight: 800,
             boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
             display: "flex", alignItems: "center", gap: 8,
           }}>
@@ -1107,18 +1119,18 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
             zIndex: 1200,
             background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
-            color: "#78350F",
+            color: INK_STRONG,
             borderRadius: 20, padding: "14px 22px",
-            fontSize: 15, fontWeight: 900, letterSpacing: -0.2,
+            fontSize: "var(--ux-font-label)", fontWeight: 800, letterSpacing: -0.2,
             boxShadow: "0 14px 40px rgba(245, 158, 11, 0.5)",
             display: "flex", alignItems: "center", gap: 10,
             animation: "rewardPop 0.4s ease",
             maxWidth: "90vw",
           }}
         >
-          <span style={{ fontSize: 24 }}>🏆</span>
+          <span style={{ fontSize: "var(--ux-font-title)" }}>🏆</span>
           <div>
-            <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.8 }}>스티커 획득</div>
+            <div style={{ fontSize: "var(--ux-font-secondary)", letterSpacing: 1, opacity: 0.8 }}>스티커 획득</div>
             <div>{currentAward.label}</div>
           </div>
         </div>
@@ -1132,10 +1144,10 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
           style={{
             position: "fixed", top: 20, left: "50%",
             transform: "translateX(-50%)",
-            background: "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")",
+            background: "var(--ux-primary-fill)",
             color: "#fff",
             padding: "12px 20px", borderRadius: 999,
-            fontSize: 14, fontWeight: 900,
+            fontSize: "var(--ux-font-label)", fontWeight: 800,
             boxShadow: "0 10px 28px rgba(109,40,217,0.45)",
             zIndex: 1500,
             animation: "goalToastIn 0.35s ease",
@@ -1192,12 +1204,12 @@ function LearnerHUD({ learner, now }: { learner: LearnerState | null; now: numbe
         display: "flex", flexDirection: "column", gap: 2,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 18 }}>❤️</span>
-          <span style={{ fontSize: 18, fontWeight: 900, color: "#B91C1C" }}>{hearts}</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#9CA3AF" }}>/ {MAX_HEARTS}</span>
+          <span style={{ fontSize: "var(--ux-font-body)" }}>❤️</span>
+          <span style={{ fontSize: "var(--ux-font-body)", fontWeight: 800, color: "#B91C1C" }}>{hearts}</span>
+          <span style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_SOFT }}>/ {MAX_HEARTS}</span>
         </div>
         {hearts < MAX_HEARTS && heartMs > 0 && (
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280" }}>
+          <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_SOFT }}>
             다음 +1: {heartMin}:{String(heartSec).padStart(2, "0")}
           </div>
         )}
@@ -1214,21 +1226,21 @@ function LearnerHUD({ learner, now }: { learner: LearnerState | null; now: numbe
         display: "flex", flexDirection: "column", gap: 2,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 18 }}>🔥</span>
-          <span style={{ fontSize: 18, fontWeight: 900 }}>{streak}</span>
+          <span style={{ fontSize: "var(--ux-font-body)" }}>🔥</span>
+          <span style={{ fontSize: "var(--ux-font-body)", fontWeight: 800 }}>{streak}</span>
         </div>
-        <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.85 }}>연속 학습</div>
+        <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, opacity: 0.85 }}>연속 학습</div>
       </div>
 
       {/* XP + 데일리 골 */}
       <div style={{
         background: "#fff", borderRadius: 14, padding: "10px 12px",
-        border: "2px solid " + PURPLE + "55",
+        border: "2px solid " + accentAlpha(33),
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
-          <span style={{ fontSize: 13 }}>⚡</span>
-          <span style={{ fontSize: 13, fontWeight: 900, color: PURPLE_DARK }}>Lv.{level}</span>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", marginLeft: "auto" }}>
+          <span style={{ fontSize: "var(--ux-font-secondary)" }}>⚡</span>
+          <span style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 800, color: PURPLE_DARK }}>Lv.{level}</span>
+          <span style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_SOFT, marginLeft: "auto" }}>
             {next.current}/{next.needed}
           </span>
         </div>
@@ -1236,10 +1248,10 @@ function LearnerHUD({ learner, now }: { learner: LearnerState | null; now: numbe
           <div style={{
             height: "100%",
             width: `${Math.round(next.ratio * 100)}%`,
-            background: "linear-gradient(90deg, " + PURPLE + ", " + PURPLE_DARK + ")",
+            background: "var(--ux-primary-fill)",
           }} />
         </div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", marginTop: 4 }}>
+        <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_SOFT, marginTop: 4 }}>
           🎯 오늘 {today}/{goal} XP
         </div>
       </div>
@@ -1312,11 +1324,11 @@ function SkillTreeView({
               display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
               boxShadow: `0 8px 20px ${unit.color}55`,
             }}>
-              <div style={{ fontSize: 32 }}>{unit.emoji}</div>
+              <div style={{ fontSize: "var(--ux-font-learn-word)" }}>{unit.emoji}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.9 }}>단원 {ui + 1}</div>
-                <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: -0.3 }}>{unit.title}</div>
-                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.9, marginTop: 2 }}>
+                <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, opacity: 0.9 }}>단원 {ui + 1}</div>
+                <div style={{ fontSize: "var(--ux-font-body)", fontWeight: 800, letterSpacing: -0.3 }}>{unit.title}</div>
+                <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, opacity: 0.9, marginTop: 2 }}>
                   {completedLessons} / {unit.lessons.length} 레슨 · ⭐ {completedStars}/{maxStars}
                 </div>
               </div>
@@ -1357,10 +1369,10 @@ function SkillTreeView({
                       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                       onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     >
-                      <div style={{ fontSize: 28, lineHeight: 1 }}>
+                      <div style={{ fontSize: "var(--ux-font-title)", lineHeight: 1 }}>
                         {!unlocked ? "🔒" : done ? "✓" : lesson.index}
                       </div>
-                      <div style={{ fontSize: 10, fontWeight: 900, marginTop: 2 }}>레슨 {lesson.index}</div>
+                      <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 800, marginTop: 2 }}>레슨 {lesson.index}</div>
 
                       {/* 별 표시 */}
                       {unlocked && (
@@ -1370,7 +1382,7 @@ function SkillTreeView({
                         }}>
                           {[1, 2, 3].map((s) => (
                             <span key={s} style={{
-                              fontSize: 14,
+                              fontSize: "var(--ux-font-label)",
                               opacity: s <= stars ? 1 : 0.25,
                               filter: s <= stars ? "drop-shadow(0 2px 3px rgba(245,158,11,0.5))" : "none",
                             }}>⭐</span>
@@ -1398,13 +1410,13 @@ function CatChip({
       style={{
         flexShrink: 0,
         background: active
-          ? "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")"
+          ? "var(--ux-primary-fill)"
           : "#fff",
         color: active ? "#fff" : "#374151",
         border: active ? "none" : "2px solid #E5E7EB",
         borderRadius: 999,
         padding: "8px 14px",
-        fontSize: 13, fontWeight: 800,
+        fontSize: "var(--ux-font-secondary)", fontWeight: 700,
         cursor: "pointer", fontFamily: "inherit",
         display: "flex", alignItems: "center", gap: 6,
         boxShadow: active ? "0 6px 14px rgba(139, 92, 246, 0.35)" : "none",
@@ -1416,7 +1428,7 @@ function CatChip({
       <span style={{
         background: active ? "rgba(255,255,255,0.25)" : "#F3F4F6",
         color: active ? "#fff" : "#6B7280",
-        borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 900,
+        borderRadius: 999, padding: "1px 7px", fontSize: "var(--ux-font-secondary)", fontWeight: 800,
       }}>{count}</span>
     </button>
   );

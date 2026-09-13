@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import MoodArt from "./ui/child/MoodArt";
 import {
   ref,
   onValue,
@@ -739,7 +740,22 @@ const CARD_COLORS = [
   "#FEE2E2", "#FFEDD5", "#E0F2FE", "#F3E8FF", "#FEF9C3",
 ];
 
+/**
+ * 동화책 이야기 나누기의 빠른 공감.
+ *
+ * **저장되는 값은 이모지 문자 그 자체다**(reactionCounts 의 키). 값을 바꾸면
+ * 이미 눌린 반응이 통째로 사라지므로 키는 그대로 두고, 화면에 그리는 그림만
+ * 꿀벌 감정으로 바꾼다(사용자 지시: 공감 이모티콘을 꿀벌로).
+ * 20종 전체 무드미터는 소통창 카드에 있다 — 여기는 한 줄짜리 빠른 반응이라
+ * 네 가지만 둔다.
+ */
 const REACTIONS = ["👍", "❤️", "😮", "👏"];
+const REACTION_ART: Record<string, string> = {
+  "👍": "happy",
+  "❤️": "loved",
+  "😮": "surprised",
+  "👏": "excited",
+};
 
 function ResponseCard({
   resp, idx, myLang, basePath, myClientId, myName, targetLangs, offline,
@@ -891,9 +907,12 @@ function ResponseCard({
                 color: "var(--ux-ink)",
               }}
             >
-              <span>{emoji}</span>
+              {/* 그림이 못 올라오면 MoodArt 가 알아서 이모지로 내려온다. */}
+              {REACTION_ART[emoji]
+                ? <MoodArt id={REACTION_ART[emoji]} size={26} />
+                : <span>{emoji}</span>}
               {count > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 800, color: "#6B7280" }}>{count}</span>
+                <span style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 800, color: "var(--ux-ink-soft)" }}>{count}</span>
               )}
             </button>
           );

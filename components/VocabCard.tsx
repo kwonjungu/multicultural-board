@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { VocabWord } from "@/lib/vocabWords";
+import { VocabWord, CATEGORY_KO } from "@/lib/vocabWords";
 import { speakKorean } from "@/lib/ttsKorean";
 import { t } from "@/lib/i18n";
 import VocabRecorder from "./VocabRecorder";
@@ -24,9 +24,22 @@ interface Props {
   clientId: string;
 }
 
-const PURPLE = "#8B5CF6";
-const PURPLE_DARK = "#6D28D9";
-const PURPLE_LIGHT = "#F5F3FF";
+/**
+ * U07 — 보라는 "단어 배우기" 의 정체성 색이지만, 면을 통째로 칠하면 화면이
+ * 보라로 덮인다(사용자 지적). 가는 강조선·선택 표시에만 남기고 면과 글자는
+ * 앱 공통 토큰을 쓴다. 하드코딩 hex 를 두지 않는 이유는 글자 크기 설정이나
+ * 어두운 테마가 바뀔 때 이 화면만 따로 놀기 때문이다.
+ */
+const ACCENT = "var(--c-vocab)";
+const INK_STRONG = "var(--ux-ink)";
+const INK_SOFT = "var(--ux-ink-soft)";
+const OK_INK = "var(--ok-text)";                 /* 가는 강조에만 */
+const PURPLE = ACCENT;                           /* 옛 이름 유지 — 호출부가 많다 */
+const PURPLE_DARK = "var(--ux-ink)";             /* 글자는 잉크색 */
+const PURPLE_LIGHT = "var(--ux-surface-sunk)";   /* 살짝 가라앉은 면 */
+
+/** 예전 `accentAlpha(40)` 같은 hex 알파 이어붙이기는 var() 에서 깨진다. */
+const accentAlpha = (pct: number) => `color-mix(in srgb, ${ACCENT} ${pct}%, transparent)`;
 
 export default function VocabCard({
   word, lang, doneSentences, onSentenceDone, onListenBump, onClose,
@@ -128,18 +141,18 @@ export default function VocabCard({
               <button
                 onClick={() => setPhase("intro")}
                 style={{
-                  background: "transparent", border: "1.5px solid " + PURPLE + "66",
+                  background: "transparent", border: "1.5px solid " + accentAlpha(40),
                   borderRadius: 10, padding: "5px 10px",
-                  fontSize: 11, fontWeight: 800, color: PURPLE_DARK,
+                  fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: PURPLE_DARK,
                   cursor: "pointer", fontFamily: "inherit",
                 }}
               >🔄 단어 다시</button>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#6B7280" }}>
+              <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_SOFT }}>
                 {idx + 1} / 3
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 13, fontWeight: 800, color: PURPLE_DARK }}>
+            <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: PURPLE_DARK }}>
               📖 단어 배우기
             </div>
           )}
@@ -177,13 +190,13 @@ export default function VocabCard({
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 26, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
+            <div style={{ fontSize: "var(--ux-font-title)", fontWeight: 800, color: INK_STRONG, letterSpacing: -0.3 }}>
               {word.ko}
             </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: PURPLE_DARK, marginTop: 2 }}>
-              {word.subcategory} · {word.category}
+            <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: PURPLE_DARK, marginTop: 2 }}>
+              {word.subcategory} · {CATEGORY_KO[word.category]}
               {showNative && nativeWord && (
-                <span style={{ color: "#059669", marginLeft: 8 }}>· {nativeWord}</span>
+                <span style={{ color: OK_INK, marginLeft: 8 }}>· {nativeWord}</span>
               )}
             </div>
           </div>
@@ -192,10 +205,10 @@ export default function VocabCard({
               onClick={() => setShowNative((v) => !v)}
               aria-label="모국어 번역"
               style={{
-                background: showNative ? "linear-gradient(135deg, #10B981, #059669)" : PURPLE_LIGHT,
+                background: showNative ? "var(--ok-fill)" : PURPLE_LIGHT,
                 color: showNative ? "#fff" : PURPLE_DARK,
                 border: "none", borderRadius: 10,
-                padding: "6px 10px", fontSize: 11, fontWeight: 900,
+                padding: "6px 10px", fontSize: "var(--ux-font-secondary)", fontWeight: 800,
                 cursor: "pointer", fontFamily: "inherit", flexShrink: 0,
               }}
             >🌐 {showNative ? "ON" : "OFF"}</button>
@@ -203,7 +216,7 @@ export default function VocabCard({
           {mastered && (
             <div style={{
               background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
-              color: "#78350F", fontSize: 12, fontWeight: 900,
+              color: INK_STRONG, fontSize: "var(--ux-font-secondary)", fontWeight: 800,
               padding: "6px 10px", borderRadius: 999, flexShrink: 0,
               boxShadow: "0 4px 10px rgba(245,158,11,0.35)",
             }}>{t("vocabMastered", lang)}</div>
@@ -230,7 +243,7 @@ export default function VocabCard({
         {/* Illustration */}
         <div style={{
           borderRadius: 20, overflow: "hidden", background: PURPLE_LIGHT,
-          border: "3px solid " + PURPLE + "33",
+          border: "3px solid " + accentAlpha(20),
           aspectRatio: "16/9",
           display: "flex", alignItems: "center", justifyContent: "center",
           boxShadow: "0 10px 30px rgba(139, 92, 246, 0.18)",
@@ -246,42 +259,42 @@ export default function VocabCard({
         {/* Korean sentence */}
         <div style={{
           margin: "18px 0 10px",
-          background: "linear-gradient(135deg, #FFFFFF, " + PURPLE_LIGHT + ")",
+          background: "var(--ux-surface)",
           border: "3px solid " + PURPLE_DARK,
           borderRadius: 18, padding: "18px 16px",
           textAlign: "center",
           boxShadow: "0 6px 16px rgba(109, 40, 217, 0.15)",
         }}>
           <div style={{
-            fontSize: 24, fontWeight: 900, color: "#1F2937",
+            fontSize: "var(--ux-font-title)", fontWeight: 800, color: INK_STRONG,
             letterSpacing: -0.3, lineHeight: 1.5,
           }}>
             {sentence.ko}
           </div>
           {showNative && nativeSentence && (
             <div style={{
-              fontSize: 15, color: "#059669", fontWeight: 700,
+              fontSize: "var(--ux-font-label)", color: OK_INK, fontWeight: 700,
               marginTop: 10, paddingTop: 10,
-              borderTop: "1.5px dashed " + PURPLE + "55",
+              borderTop: "1.5px dashed " + accentAlpha(33),
               lineHeight: 1.5,
             }}>
               🌐 {nativeSentence}
             </div>
           )}
           {showNative && !nativeSentence && nativeLoading && (
-            <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 10 }}>번역 중…</div>
+            <div style={{ fontSize: "var(--ux-font-secondary)", color: INK_SOFT, marginTop: 10 }}>번역 중…</div>
           )}
         </div>
 
         {/* Situation */}
         <div style={{
-          fontSize: 13, color: PURPLE_DARK, fontWeight: 700,
+          fontSize: "var(--ux-font-secondary)", color: PURPLE_DARK, fontWeight: 700,
           textAlign: "center", margin: "6px 0 16px", padding: "0 8px",
           lineHeight: 1.5,
         }}>
           {t("vocabSituation", lang)}: {sentence.situation}
           {showNative && nativeSituation && (
-            <div style={{ color: "#059669", marginTop: 4, fontWeight: 600 }}>
+            <div style={{ color: OK_INK, marginTop: 4, fontWeight: 600 }}>
               {nativeSituation}
             </div>
           )}
@@ -303,11 +316,11 @@ export default function VocabCard({
               style={{
                 flex: 1,
                 background: mode === m.k
-                  ? "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")"
+                  ? "var(--ux-primary-fill)"
                   : "transparent",
                 color: mode === m.k ? "#fff" : "#374151",
                 border: "none", borderRadius: 10,
-                padding: "10px 6px", fontSize: 13, fontWeight: 800,
+                padding: "10px 6px", fontSize: "var(--ux-font-secondary)", fontWeight: 700,
                 cursor: "pointer", fontFamily: "inherit",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 boxShadow: mode === m.k ? "0 6px 14px rgba(139, 92, 246, 0.35)" : "none",
@@ -372,10 +385,10 @@ export default function VocabCard({
           <div style={{
             marginTop: 16, padding: "10px 14px",
             background: "#FAFAFA", borderRadius: 12,
-            fontSize: 13, color: "#4B5563", fontWeight: 700,
+            fontSize: "var(--ux-font-secondary)", color: INK_SOFT, fontWeight: 700,
             textAlign: "center", lineHeight: 1.8,
           }}>
-            <span style={{ color: PURPLE_DARK, fontWeight: 900 }}>활용: </span>
+            <span style={{ color: PURPLE_DARK, fontWeight: 800 }}>활용: </span>
             {word.conjugations.join(" · ")}
           </div>
         )}
@@ -413,8 +426,8 @@ function IntroPanel({
       }}>
         <div style={{
           width: 140, height: 140, borderRadius: 28,
-          background: "linear-gradient(135deg, " + PURPLE_LIGHT + ", #EDE9FE)",
-          border: "3px solid " + PURPLE + "55",
+          background: "var(--ux-surface-sunk)",
+          border: "3px solid " + accentAlpha(33),
           display: "flex", alignItems: "center", justifyContent: "center",
           padding: 10,
           boxShadow: "0 14px 36px rgba(139, 92, 246, 0.25)",
@@ -427,7 +440,7 @@ function IntroPanel({
           />
         </div>
         <div style={{
-          fontSize: 42, fontWeight: 900, color: "#1F2937",
+          fontSize: "var(--ux-font-learn-word)", fontWeight: 800, color: INK_STRONG,
           letterSpacing: -0.5, textAlign: "center",
         }}>{word.ko}</div>
 
@@ -436,21 +449,21 @@ function IntroPanel({
           <div style={{
             display: "flex", alignItems: "center", gap: 8,
             background: showNative ? "#ECFDF5" : PURPLE_LIGHT,
-            border: "2px dashed " + (showNative ? "#10B981" : PURPLE + "55"),
+            border: "2px dashed " + (showNative ? "#10B981" : accentAlpha(33)),
             borderRadius: 12, padding: "8px 14px",
-            fontSize: 16, fontWeight: 700,
+            fontSize: "var(--ux-font-body)", fontWeight: 700,
             color: showNative ? "#059669" : PURPLE_DARK,
           }}>
             🌐
             {showNative
               ? (nativeWord ?? (nativeLoading ? "번역 중…" : "번역 없음"))
-              : <span style={{ fontSize: 13 }}>모국어로 보기</span>}
+              : <span style={{ fontSize: "var(--ux-font-secondary)" }}>모국어로 보기</span>}
             <button
               onClick={() => setShowNative(!showNative)}
               style={{
                 background: showNative ? "#10B981" : PURPLE,
                 color: "#fff", border: "none", borderRadius: 8,
-                padding: "4px 10px", fontSize: 11, fontWeight: 900,
+                padding: "4px 10px", fontSize: "var(--ux-font-secondary)", fontWeight: 800,
                 cursor: "pointer", fontFamily: "inherit",
               }}
             >{showNative ? "끄기" : "켜기"}</button>
@@ -459,19 +472,19 @@ function IntroPanel({
 
         <div style={{
           display: "flex", gap: 6,
-          fontSize: 11, fontWeight: 800, color: PURPLE_DARK,
+          fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: PURPLE_DARK,
           letterSpacing: 0.3,
         }}>
           <span style={{ background: PURPLE_LIGHT, padding: "3px 10px", borderRadius: 999 }}>
             {word.subcategory}
           </span>
           <span style={{ background: "#FEF3C7", color: "#92400E", padding: "3px 10px", borderRadius: 999 }}>
-            {word.category}
+            {CATEGORY_KO[word.category]}
           </span>
           {mastered && (
             <span style={{
               background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
-              color: "#78350F", padding: "3px 10px", borderRadius: 999,
+              color: INK_STRONG, padding: "3px 10px", borderRadius: 999,
             }}>🏆 완주</span>
           )}
         </div>
@@ -482,9 +495,9 @@ function IntroPanel({
         onClick={() => onListen(word.ko)}
         style={{
           width: "100%",
-          background: "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")",
+          background: "var(--ux-primary-fill)",
           color: "#fff", border: "none", borderRadius: 16,
-          padding: "14px", fontSize: 18, fontWeight: 900,
+          padding: "14px", fontSize: "var(--ux-font-body)", fontWeight: 800,
           cursor: "pointer", fontFamily: "inherit",
           boxShadow: "0 8px 20px rgba(139, 92, 246, 0.4)",
           marginBottom: 14,
@@ -499,7 +512,7 @@ function IntroPanel({
           padding: "12px 14px", marginBottom: 14,
           border: "1.5px solid #E5E7EB",
         }}>
-          <div style={{ fontSize: 12, fontWeight: 900, color: PURPLE_DARK, marginBottom: 8, letterSpacing: 0.3 }}>
+          <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 800, color: PURPLE_DARK, marginBottom: 8, letterSpacing: 0.3 }}>
             활용형 (탭해서 듣기)
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--ux-space-2)" }}>
@@ -510,9 +523,9 @@ function IntroPanel({
                 data-ux-role="control"
                 style={{
                   background: "#fff",
-                  border: "1.5px solid " + PURPLE + "55",
+                  border: "1.5px solid " + accentAlpha(33),
                   borderRadius: 999,
-                  fontWeight: 800, color: "#1F2937",
+                  fontWeight: 700, color: INK_STRONG,
                   cursor: "pointer", fontFamily: "inherit",
                 }}
               >🔊 {c}</button>
@@ -524,7 +537,7 @@ function IntroPanel({
       {/* Progress hint */}
       {doneCount > 0 && (
         <div style={{
-          textAlign: "center", fontSize: 12, fontWeight: 700, color: "#6B7280",
+          textAlign: "center", fontSize: "var(--ux-font-secondary)", fontWeight: 700, color: INK_SOFT,
           marginBottom: 10,
         }}>예문 {doneCount}/3 완료됨</div>
       )}
@@ -536,7 +549,7 @@ function IntroPanel({
           width: "100%",
           background: "linear-gradient(135deg, #F59E0B, #D97706)",
           color: "#fff", border: "none", borderRadius: 16,
-          padding: "16px", fontSize: 18, fontWeight: 900,
+          padding: "16px", fontSize: "var(--ux-font-body)", fontWeight: 800,
           cursor: "pointer", fontFamily: "inherit",
           boxShadow: "0 10px 24px rgba(245, 158, 11, 0.4)",
         }}
@@ -551,7 +564,7 @@ function IntroPanel({
    토큰에서 걸어 주므로 여기서 padding/fontSize 로 다시 정하지 않는다. */
 const headerBtnStyle: React.CSSProperties = {
   background: PURPLE_LIGHT, border: "none",
-  fontWeight: 800, color: PURPLE_DARK,
+  fontWeight: 700, color: PURPLE_DARK,
   cursor: "pointer", fontFamily: "inherit",
 };
 
@@ -561,7 +574,7 @@ function navBtnStyle(disabled: boolean): React.CSSProperties {
     background: disabled ? "#F3F4F6" : PURPLE_LIGHT,
     color: disabled ? "#9CA3AF" : PURPLE_DARK,
     border: "none", borderRadius: 12,
-    padding: "12px", fontSize: 14, fontWeight: 800,
+    padding: "12px", fontSize: "var(--ux-font-label)", fontWeight: 700,
     cursor: disabled ? "default" : "pointer", fontFamily: "inherit",
   };
 }

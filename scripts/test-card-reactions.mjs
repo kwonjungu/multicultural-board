@@ -19,26 +19,34 @@ let count = 0;
 const check = (name, fn) => { fn(); count++; console.log(`PASS ${name}`); };
 
 try {
-  const out = ts.transpileModule(readFileSync(join(root, 'lib/cardReactions.ts'), 'utf8'), {
+  /* cardReactions 는 이제 beeMoods 를 가져온다 — 둘 다 옮겨 놓아야 import 가 풀린다. */
+  const tsc = (rel) => ts.transpileModule(readFileSync(join(root, rel), 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
   }).outputText;
-  writeFileSync(join(dir, 'r.mjs'), out);
-  const { readReactions, nextReaction, REACTIONS } = await import(pathToFileURL(join(dir, 'r.mjs')));
+  writeFileSync(join(dir, 'beeMoods.mjs'), tsc('lib/beeMoods.ts'));
+  writeFileSync(join(dir, 'r.mjs'), tsc('lib/cardReactions.ts').split('./beeMoods').join('./beeMoods.mjs'));
+  const { readReactions, nextReaction, REACTIONS, ALL_REACTIONS, LEGACY_REACTIONS } =
+    await import(pathToFileURL(join(dir, 'r.mjs')));
 
   /* ── 종류 목록 ─────────────────────────────────────────────────── */
 
-  check('반응 5종이고 기존 id 를 바꾸지 않았다', () => {
+  check('고를 수 있는 공감은 꿀벌 감정 20종이다', () => {
     const ids = REACTIONS.map((r) => r.id);
-    assert.equal(ids.length, 5);
-    // 저장된 값이 그대로 이 문자열이다 — 이름을 고치면 옛 반응이 사라진다.
-    for (const legacyId of ['thanks', 'same', 'nice']) {
-      assert.ok(ids.includes(legacyId), `기존 반응 id 가 사라졌다: ${legacyId}`);
+    assert.equal(ids.length, 20, `고를 수 있는 공감이 ${ids.length}종`);
+    assert.equal(new Set(ids).size, 20, 'id 중복');
+    for (const r of REACTIONS) assert.ok(r.pickable, `${r.id} 가 고를 수 없다`);
+  });
+
+  check('옛 5종 id 는 지우지 않았다 — 저장된 값이 그대로 그 문자열이다', () => {
+    const all = ALL_REACTIONS.map((r) => r.id);
+    for (const legacyId of ['like', 'thanks', 'nice', 'cheer', 'same']) {
+      assert.ok(all.includes(legacyId), `옛 반응 id 가 사라졌다: ${legacyId}`);
     }
-    for (const newId of ['like', 'cheer']) {
-      assert.ok(ids.includes(newId), `U06 새 반응 id 가 없다: ${newId}`);
-    }
-    assert.equal(new Set(ids).size, 5, 'id 중복');
-    for (const r of REACTIONS) assert.ok(r.icon && r.key, `${r.id}: 아이콘/라벨 키 누락`);
+    // 옛 것은 더 고를 수 없어야 한다(새로 쌓이면 안 된다).
+    for (const r of LEGACY_REACTIONS) assert.equal(r.pickable, false, `${r.id} 가 아직 고를 수 있다`);
+    // 그림은 반드시 꿀벌 감정 중 하나를 빌려야 한다 — 빈 칸이면 깨져 보인다.
+    const moodIds = new Set(REACTIONS.map((r) => r.id));
+    for (const r of LEGACY_REACTIONS) assert.ok(moodIds.has(r.art), `${r.id} 의 그림 ${r.art} 가 목록에 없다`);
   });
 
   /* ── 옛 true 호환 ──────────────────────────────────────────────── */

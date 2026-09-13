@@ -3310,3 +3310,17 @@ export const VOCAB_BY_CATEGORY: Record<string, VocabWord[]> = {};
 for (const w of VOCAB_WORDS) {
   (VOCAB_BY_CATEGORY[w.subcategory] ??= []).push(w);
 }
+
+/**
+ * 품사의 한국어 이름.
+ *
+ * 화면에 category 를 그대로 찍으면 1~2학년 아이에게 "adjective" 라는 영어가
+ * 보인다(실제로 단어 카드에 그렇게 나오고 있었다). 한국어를 배우러 온 아이에게
+ * 영어 문법 용어를 내미는 셈이라 한국어 이름으로 바꿔 보여준다.
+ */
+export const CATEGORY_KO: Record<VocabWord["category"], string> = {
+  noun: "명사",
+  adjective: "형용사",
+  verb: "동사",
+  expression: "표현",
+};

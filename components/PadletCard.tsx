@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { ref, onValue, off, push, set, remove } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { CardData, CommentData, TranscriptData } from "@/lib/types";
@@ -14,6 +14,9 @@ import {
 import { resolveAnimal } from "@/lib/animals";
 import AnimalArt from "./ui/child/AnimalArt";
 import AppIcon from "./ui/child/AppIcon";
+import MoodArt from "./ui/child/MoodArt";
+import { LEGACY_REACTIONS, reactionLabel, reactionOption, type ReactionOption } from "@/lib/cardReactions";
+import { MOOD_QUADRANTS, moodsByQuadrant } from "@/lib/beeMoods";
 import ImageLightbox from "./ImageLightbox";
 
 const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
@@ -274,6 +277,20 @@ export default function PadletCard({
   const sameLang = viewerLang === card.authorLang;
   const myText = localTr?.[viewerLang] ?? card.translations?.[viewerLang];
   const translating = !sameLang && !!card.loading && !myText;
+  /** 무드미터 칸별 목록 — 렌더마다 다시 묶지 않는다. */
+  const byQuadrant = useMemo(() => moodsByQuadrant(), []);
+
+  /** 이미 눌려 있는 옛 5종만. 0 인 것은 보여줄 이유가 없다. */
+  const legacyWithCounts = LEGACY_REACTIONS.filter((r: ReactionOption) => (counts[r.id] ?? 0) > 0);
+
+  /** 하트 버튼에 쓸 글자. 꿀벌 감정은 이름이 데이터에 있고, 옛 5종은 i18n 키다. */
+  function reactionText(id: string | null): string {
+    if (!id) return tPlain("cardReactOpen", viewerLang);
+    const opt = reactionOption(id);
+    if (!opt) return tPlain("cardReactOpen", viewerLang);
+    return opt.key ? tPlain(opt.key, viewerLang) : reactionLabel(id, viewerLang);
+  }
+
   const translateFailed = !sameLang && !card.loading && (!!card.translateError || !myText);
   const bodyText = sameLang ? card.originalText : (myText || "");
   const readingText = bodyText || card.originalText || "";
@@ -782,12 +799,12 @@ export default function PadletCard({
             aria-disabled={!myClientId}
             onClick={() => setReactOpen((v) => !v)}
           >
-            <span aria-hidden className="pc-btn-ico">
-              {mine ? (myReaction?.icon ?? "❤️") : "🤍"}
-            </span>
-            <span className="pc-btn-lb">
-              {mine ? tPlain(myReaction?.key ?? "", viewerLang) : tPlain("cardReactOpen", viewerLang)}
-            </span>
+            {/* 고른 뒤에는 그 감정의 꿀벌이 하트 자리에 온다 — 무엇을 골랐는지
+                패널을 열지 않고도 보인다. 아직 안 골랐으면 빈 하트. */}
+            {mine
+              ? <MoodArt id={myReaction?.art ?? mine} size={24} className="pc-btn-ico" />
+              : <span aria-hidden className="pc-btn-ico">🤍</span>}
+            <span className="pc-btn-lb">{reactionText(mine)}</span>
             {total > 0 && <span className="pc-btn-n">{total}</span>}
           </button>
         </div>
@@ -801,26 +818,55 @@ export default function PadletCard({
           role="group"
           aria-label={t("cardReactions", viewerLang)}
         >
-          {REACTIONS.map((r) => {
-            const on = mine === r.id;
-            return (
-              <button
-                key={r.id}
-                type="button"
-                data-ux-role="control"
-                className={on ? "pc-react on" : "pc-react"}
-                aria-pressed={on}
-                aria-disabled={!myClientId}
-                onClick={() => pickReaction(r.id)}
-              >
-                <span aria-hidden className="pc-react-ico">{r.icon}</span>
-                <span className="pc-react-lb">{tPlain(r.key, viewerLang)}</span>
-                {/* 선택 표시는 색만으로 하지 않는다 — 체크와 테두리로도 알린다. */}
-                {on && <span aria-hidden className="pc-react-ck">✓</span>}
-                {counts[r.id] > 0 && <span className="pc-react-n">{counts[r.id]}</span>}
-              </button>
-            );
-          })}
+          {/* 무드미터 네 칸. 20종을 한 덩어리로 늘어놓으면 아이가 못 고른다 —
+              "기운이 솟을 때 / 마음이 놓일 때" 처럼 칸 이름을 붙여 나눈다. */}
+          {(["yellow", "green", "red", "blue"] as const).map((q) => (
+            <div key={q} className="pc-moodgroup">
+              <p data-ux-role="secondary" className="pc-moodhead">
+                <span aria-hidden className={`pc-mooddot ${q}`} />
+                {viewerLang === "ko" ? MOOD_QUADRANTS[q].ko : MOOD_QUADRANTS[q].en}
+              </p>
+              <div className="pc-moodrow">
+                {byQuadrant[q].map((m: { id: string }) => {
+                  const on = mine === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      data-ux-role="control"
+                      className={on ? "pc-react on" : "pc-react"}
+                      aria-pressed={on}
+                      aria-disabled={!myClientId}
+                      onClick={() => pickReaction(m.id)}
+                    >
+                      <MoodArt id={m.id} size={34} className="pc-react-ico" />
+                      <span className="pc-react-lb">{reactionLabel(m.id, viewerLang)}</span>
+                      {/* 선택 표시는 색만으로 하지 않는다 — 체크와 테두리로도 알린다. */}
+                      {on && <span aria-hidden className="pc-react-ck">✓</span>}
+                      {counts[m.id] > 0 && <span className="pc-react-n">{counts[m.id]}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* 옛 5종(좋아요·고마워…)은 더 고를 수 없지만, 이미 눌린 것은
+              사라지면 안 된다. 개수가 있을 때만 읽기 전용으로 보여준다. */}
+          {legacyWithCounts.length > 0 && (
+            <div className="pc-moodgroup">
+              <p data-ux-role="secondary" className="pc-moodhead">{tPlain("cardReactions", viewerLang)}</p>
+              <div className="pc-moodrow">
+                {legacyWithCounts.map((r: ReactionOption) => (
+                  <span key={r.id} className="pc-react past">
+                    <MoodArt id={r.art} size={28} className="pc-react-ico" />
+                    <span className="pc-react-lb">{r.key ? tPlain(r.key, viewerLang) : r.id}</span>
+                    <span className="pc-react-n">{counts[r.id]}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
       {reactError && (
@@ -1062,14 +1108,46 @@ export const CARD_CSS = `
 }
 /* 좁은 칼럼(패들렛은 250px 안팎)에서 1열 5행이 되면 패널이 카드 밖으로 밀려
    잘린다. min() 으로 최소 폭을 낮춰 최소 2열을 확보한다 (04 §5). */
+/* 무드미터 패널 — 20종을 한 격자에 늘어놓으면 아이가 못 고른다.
+   네 칸으로 나누고 칸마다 이름을 붙인다. 칸 안에서만 감싸 내려간다. */
 .pc-reactpanel{
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 86px), 1fr));
-  gap: var(--ux-space-2); margin-top: var(--ux-space-2);
+  display: grid; gap: var(--ux-space-3); margin-top: var(--ux-space-2);
   background: var(--ux-surface-sunk); border-radius: var(--ux-radius-surface);
-  padding: var(--ux-space-2);
-  /* 태블릿 세로처럼 칼럼 하나가 화면 폭을 다 쓰면 버튼이 과하게 늘어난다. */
-  max-width: 560px;
+  padding: var(--ux-space-3);
+  max-width: 620px;
+  /* 20종이면 카드 안에서 1000px 넘게 길어진다(실측 1037px). 카드가 통째로
+     늘어나면 그 아래 다른 글이 화면 밖으로 밀려난다. 패널 높이를 묶고 안에서
+     스크롤한다 — 칸 제목이 있어 어디쯤인지 잃지 않는다. */
+  max-height: min(52svh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+.pc-moodgroup{ display: grid; gap: var(--ux-space-1); }
+.pc-moodhead{
+  display: flex; align-items: center; gap: 6px; margin: 0;
+  color: var(--ux-ink-soft); font-weight: 700;
+}
+/* 칸 색은 무드미터 관례(빨강·노랑·파랑·초록)를 작은 점으로만 쓴다 —
+   면을 칠하면 화면이 알록달록해져 정작 꿀벌 그림이 안 보인다. */
+.pc-mooddot{ width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.pc-mooddot.red{ background: #EF4444; }
+.pc-mooddot.yellow{ background: #F59E0B; }
+.pc-mooddot.blue{ background: #3B82F6; }
+.pc-mooddot.green{ background: #22C55E; }
+.pc-moodrow{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); }
+/* 좁은 칼럼(패들렛은 250px 안팎)에서는 20개가 세로로 한없이 길어진다.
+   글자 라벨을 접어 그림 격자로 바꾼다 — 라벨은 스크린리더용으로 남는다.
+   조작 줄에서 쓴 것과 같은 규칙이다(줄을 늘리는 대신 글자를 접는다). */
+@container (max-width: 420px){
+  .pc-moodrow{ display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }
+  .pc-react .pc-react-lb{
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .pc-react{ justify-content: center; padding-left: var(--ux-space-1); padding-right: var(--ux-space-1); }
+}
+/* 더 고를 수 없는 옛 항목 — 눌리는 것처럼 보이면 안 된다. */
+.pc-react.past{ opacity: .75; cursor: default; border-style: dashed; }
 .pc-react{
   display: flex; align-items: center; gap: 4px; justify-content: center;
   background: var(--ux-surface); color: var(--ux-ink);
