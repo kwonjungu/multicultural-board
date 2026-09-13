@@ -19,7 +19,7 @@ import {
   royalProgress,
 } from "@/lib/stage";
 import CharacterComposite from "./CharacterComposite";
-import BeeVillage from "./BeeVillage";
+import BeeVillage, { type VillageFixture } from "./BeeVillage";
 import { type QuestEventType } from "@/lib/quests";
 import { TutorialBus } from "@/lib/tutorial/bus";
 import {
@@ -62,6 +62,31 @@ import { t, tFmt } from "@/lib/i18n";
 // current user's display name (others show as `학생 #xxxxxx`).
 // ============================================================
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않는다 — 스티커·꿀·시즌 리셋·좋아요/댓글 등 보상·재화가
+ * 걸린 쓰기 경로는 전부 offline 가드로 막힌다. `village` 는 BeeVillage(꿀벌
+ * 마을 탭) 에 그대로 내려가는 자체 fixture 다.
+ */
+export interface PraiseFixture {
+  /** 나의 꿀벌집(mine) 탭 초기값 */
+  myStickers?: IndividualSticker[];
+  myCosmetics?: StudentCosmetics;
+  /** 개인전(race) 탭 초기값 */
+  counts?: Record<string, number>;
+  allCosmetics?: Record<string, StudentCosmetics>;
+  gallery?: GalleryData;
+  /** race 탭 전시장에서 처음부터 열어 둘 대상 (view=friend 용) */
+  galleryFocus?: string;
+  /** 단체전(team)·관리(manage) 탭 초기값 */
+  team?: TeamSticker[];
+  goal?: StickerGoal | null;
+  /** 탭 라벨의 일일 퀘스트 미수령 배지 초기값 */
+  questUnclaimed?: number;
+  /** 꿀벌 마을(village) 탭 — BeeVillage 로 그대로 전달 */
+  village?: VillageFixture;
+}
+
 interface Props {
   user: UserConfig;
   roomCode: string;
@@ -78,6 +103,9 @@ interface Props {
    */
   onOpenGive: (studentClientId: string, studentName: string) => void;
   onOpenCosmetics: () => void;
+  fixture?: PraiseFixture;
+  /** fixture 검수용 — 처음 열릴 탭을 강제 지정 (없으면 기존 기본값 그대로). */
+  initialTab?: Tab;
 }
 
 type Tab = "mine" | "village" | "race" | "team" | "manage";
@@ -167,21 +195,25 @@ export default function PraiseHive({
   onBack,
   onOpenGive,
   onOpenCosmetics,
+  fixture,
+  initialTab,
 }: Props) {
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
   const lang = user.myLang;
-  const [tab, setTab] = useState<Tab>(user.isTeacher ? "race" : "mine");
+  const [tab, setTab] = useState<Tab>(initialTab ?? (user.isTeacher ? "race" : "mine"));
 
   // 📋 일일 퀘스트 미수령 보상 배지 (학생만 — 교사 뷰는 배지 없음).
   // 다른 모듈에서 활동하고 돌아왔을 때 "받을 게 있다"를 탭 라벨에서 알려준다.
-  const [questUnclaimed, setQuestUnclaimed] = useState(0);
+  const [questUnclaimed, setQuestUnclaimed] = useState(fixture?.questUnclaimed ?? 0);
   useEffect(() => {
-    if (user.isTeacher || !myClientId || !roomCode) return;
+    if (offline || user.isTeacher || !myClientId || !roomCode) return;
     const quests = dailyQuestsFor(todayKey(), myClientId);
     const unsub = subscribeTodayQuests(roomCode, myClientId, (s) => {
       setQuestUnclaimed(unclaimedCount(quests, s));
     });
     return () => unsub();
-  }, [user.isTeacher, myClientId, roomCode]);
+  }, [offline, user.isTeacher, myClientId, roomCode]);
 
   // village 탭 라벨은 한국어 하드코딩 (가드레일 — 신규 i18n 키 대량 추가 금지)
   const tabs: { id: Tab; labelKey?: string; label?: string }[] = useMemo(() => {
@@ -364,6 +396,9 @@ export default function PraiseHive({
             roomCode={roomCode}
             myClientId={myClientId}
             onOpenCosmetics={onOpenCosmetics}
+            offline={offline}
+            initialList={fixture?.myStickers}
+            initialCosmetics={fixture?.myCosmetics}
           />
         )}
         {tab === "village" && (
@@ -383,18 +418,42 @@ export default function PraiseHive({
               const dest = QUEST_NAV_DEST[event];
               if (dest) TutorialBus.emit("tutorial-navigate", dest);
             }}
+            fixture={fixture?.village}
           />
         )}
         {tab === "race" && (
-          <RaceTab lang={lang} roomCode={roomCode} user={user} myClientId={myClientId} roomConfig={roomConfig} />
+          <RaceTab
+            lang={lang}
+            roomCode={roomCode}
+            user={user}
+            myClientId={myClientId}
+            roomConfig={roomConfig}
+            offline={offline}
+            initialCounts={fixture?.counts}
+            initialAllCosmetics={fixture?.allCosmetics}
+            initialGallery={fixture?.gallery}
+            initialGalleryFocus={fixture?.galleryFocus}
+          />
         )}
-        {tab === "team" && <TeamTab lang={lang} roomCode={roomCode} />}
+        {tab === "team" && (
+          <TeamTab
+            lang={lang}
+            roomCode={roomCode}
+            offline={offline}
+            initialTeam={fixture?.team}
+            initialGoal={fixture?.goal}
+          />
+        )}
         {tab === "manage" && user.isTeacher && (
           <ManageTab
             lang={lang}
             roomCode={roomCode}
             roomConfig={roomConfig}
             onOpenGive={onOpenGive}
+            offline={offline}
+            initialCounts={fixture?.counts}
+            initialGoal={fixture?.goal}
+            initialTeam={fixture?.team}
           />
         )}
       </div>
@@ -411,32 +470,42 @@ function MyHiveTab({
   roomCode,
   myClientId,
   onOpenCosmetics,
+  offline = false,
+  initialList,
+  initialCosmetics,
 }: {
   lang: string;
   roomCode: string;
   myClientId: string;
   onOpenCosmetics: () => void;
+  offline?: boolean;
+  initialList?: IndividualSticker[];
+  initialCosmetics?: StudentCosmetics;
 }) {
-  const [list, setList] = useState<IndividualSticker[]>([]);
-  const [cosmetics, setCosmetics] = useState<StudentCosmetics>({
-    skin: "classic",
-    hat: null,
-    pet: null,
-    trophy: null,
-    held: null,
-    acc: null,
-  });
+  const [list, setList] = useState<IndividualSticker[]>(initialList ?? []);
+  const [cosmetics, setCosmetics] = useState<StudentCosmetics>(
+    initialCosmetics ?? {
+      skin: "classic",
+      hat: null,
+      pet: null,
+      trophy: null,
+      held: null,
+      acc: null,
+    },
+  );
   const [selectedSticker, setSelectedSticker] = useState<IndividualSticker | null>(null);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeStudentStickers(roomCode, myClientId, setList);
     return () => unsub();
-  }, [roomCode, myClientId]);
+  }, [roomCode, myClientId, offline]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeCosmetics(roomCode, myClientId, setCosmetics);
     return () => unsub();
-  }, [roomCode, myClientId]);
+  }, [roomCode, myClientId, offline]);
 
   const count = list.length;
   const stage = stageOf(count);
@@ -930,33 +999,46 @@ function RaceTab({
   user,
   myClientId,
   roomConfig,
+  offline = false,
+  initialCounts,
+  initialAllCosmetics,
+  initialGallery,
+  initialGalleryFocus,
 }: {
   lang: string;
   roomCode: string;
   user: UserConfig;
   myClientId: string;
   roomConfig: RoomConfig;
+  offline?: boolean;
+  initialCounts?: Record<string, number>;
+  initialAllCosmetics?: Record<string, StudentCosmetics>;
+  initialGallery?: GalleryData;
+  initialGalleryFocus?: string;
 }) {
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [counts, setCounts] = useState<Record<string, number>>(initialCounts ?? {});
   // 전시장 (설계서 항목 7): 전원 코스메틱 + 좋아요/댓글 데이터
-  const [allCosmetics, setAllCosmetics] = useState<Record<string, StudentCosmetics>>({});
-  const [gallery, setGallery] = useState<GalleryData>({});
-  const [galleryFocus, setGalleryFocus] = useState<string | null>(null);
+  const [allCosmetics, setAllCosmetics] = useState<Record<string, StudentCosmetics>>(initialAllCosmetics ?? {});
+  const [gallery, setGallery] = useState<GalleryData>(initialGallery ?? {});
+  const [galleryFocus, setGalleryFocus] = useState<string | null>(initialGalleryFocus ?? null);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeAllStudentCounts(roomCode, setCounts);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeAllCosmetics(roomCode, setAllCosmetics);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeGallery(roomCode, setGallery);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   const entries = useMemo(() => {
     // 스티커를 받았거나(counts) 꾸미기를 한(cosmetics) 학생 표시.
@@ -1120,6 +1202,7 @@ function RaceTab({
           entry={gallery[focusEntry.id]}
           myClientId={myClientId}
           myName={user.myName}
+          offline={offline}
           onClose={() => setGalleryFocus(null)}
         />
       )}
@@ -1313,19 +1396,33 @@ function RaceTab({
 // TAB 3 — Team Quest
 // ============================================================
 
-function TeamTab({ lang, roomCode }: { lang: string; roomCode: string }) {
-  const [team, setTeam] = useState<TeamSticker[]>([]);
-  const [goal, setGoal] = useState<StickerGoal | null>(null);
+function TeamTab({
+  lang,
+  roomCode,
+  offline = false,
+  initialTeam,
+  initialGoal,
+}: {
+  lang: string;
+  roomCode: string;
+  offline?: boolean;
+  initialTeam?: TeamSticker[];
+  initialGoal?: StickerGoal | null;
+}) {
+  const [team, setTeam] = useState<TeamSticker[]>(initialTeam ?? []);
+  const [goal, setGoal] = useState<StickerGoal | null>(initialGoal ?? null);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeTeamStickers(roomCode, setTeam);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeGoal(roomCode, setGoal);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   const total = team.length;
   const target = goal?.target || 100;
@@ -1535,30 +1632,41 @@ function ManageTab({
   roomCode,
   roomConfig,
   onOpenGive,
+  offline = false,
+  initialCounts,
+  initialGoal,
+  initialTeam,
 }: {
   lang: string;
   roomCode: string;
   roomConfig: RoomConfig;
   onOpenGive: (studentClientId: string, studentName: string) => void;
+  offline?: boolean;
+  initialCounts?: Record<string, number>;
+  initialGoal?: StickerGoal | null;
+  initialTeam?: TeamSticker[];
 }) {
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [goal, setGoal] = useState<StickerGoal | null>(null);
-  const [team, setTeam] = useState<TeamSticker[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>(initialCounts ?? {});
+  const [goal, setGoal] = useState<StickerGoal | null>(initialGoal ?? null);
+  const [team, setTeam] = useState<TeamSticker[]>(initialTeam ?? []);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeAllStudentCounts(roomCode, setCounts);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeGoal(roomCode, setGoal);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeTeamStickers(roomCode, setTeam);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   // Also need per-student sticker details for the 30-day bar chart,
   // but we don't want 30 individual subscriptions. We use the team
@@ -1584,6 +1692,7 @@ function ManageTab({
       return;
     }
     setPendingReset(false);
+    if (offline) return; // fixture: 시즌 리셋 쓰기 금지
     try {
       await resetSeason(roomCode);
     } catch (err) {
@@ -1599,6 +1708,7 @@ function ManageTab({
 
   const handleSaveGoal = async () => {
     const n = Math.max(1, Math.min(9999, Math.floor(Number(goalDraft) || 0)));
+    if (offline) return; // fixture: 목표치 쓰기 금지
     try {
       await setGoalTarget(roomCode, n);
     } catch (err) {
@@ -2400,6 +2510,7 @@ function GalleryPopover({
   entry,
   myClientId,
   myName,
+  offline = false,
   onClose,
 }: {
   lang: string;
@@ -2408,6 +2519,7 @@ function GalleryPopover({
   entry: GalleryEntry | undefined;
   myClientId: string;
   myName: string;
+  offline?: boolean;
   onClose: () => void;
 }) {
   const [msg, setMsg] = useState<string | null>(null);
@@ -2430,6 +2542,12 @@ function GalleryPopover({
   async function handleLike() {
     if (isSelf || busy) return;
     setBusy(true);
+    if (offline) {
+      // fixture: 실제 좋아요 쓰기 금지 — 화면 문구만 성공 경로로 보여준다.
+      setMsg("❤️ 좋아요를 보냈어요!");
+      setBusy(false);
+      return;
+    }
     try {
       const ok = await likeOncePerDay(roomCode, target.id, myClientId);
       setMsg(ok ? "❤️ 좋아요를 보냈어요!" : "오늘은 이미 좋아요를 눌렀어요 — 내일 또 눌러줘요!");
@@ -2450,6 +2568,13 @@ function GalleryPopover({
       return;
     }
     setBusy(true);
+    if (offline) {
+      // fixture: 실제 댓글 쓰기 금지 — 화면 문구만 성공 경로로 보여준다.
+      setMsg("💬 응원을 남겼어요!");
+      setDraft("");
+      setBusy(false);
+      return;
+    }
     try {
       const ok = await commentOncePerDay(
         roomCode, target.id,
