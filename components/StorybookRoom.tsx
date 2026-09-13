@@ -63,11 +63,24 @@ import { t, tFmt } from "@/lib/i18n";
 import { Fruit, FRUIT_KINDS } from "./DiscussionSession";
 import { useFurigana, RubyText } from "@/lib/furigana";
 
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 값이 있으면 이 화면은 Firebase 를
+ * 구독하지도, 쓰지도 않고 /api/* 도 부르지 않는다. 운영 방(1111)의 세션·답변·
+ * 채팅 기록을 fixture 로 복제하지 않는다 — 여기 값은 전부 지어낸 것이다.
+ */
+export interface StorybookFixture {
+  session: StorybookSession | null;
+  book: Storybook | null;
+  /** 교사 책장 · 학생 자유 도서관 목록 (shelf 뷰). */
+  generatedBooks?: BookListEntry[];
+}
+
 interface Props {
   user: UserConfig;
   roomCode: string;
   myClientId: string;
   onBack: () => void;
+  fixture?: StorybookFixture;
 }
 
 // MVP: single hard-coded book. Phase 3 will add a library.
@@ -122,22 +135,26 @@ function bilingual(
 // Main Shell — routes by session.phase & user.isTeacher
 // ============================================================
 
-export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Props) {
+export default function StorybookRoom({ user, roomCode, myClientId, onBack, fixture }: Props) {
   const lang = user.myLang;
   const isTeacher = user.isTeacher;
+  /** fixture 가 주입되면 네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
 
-  const [session, setSession] = useState<StorybookSession | null>(null);
-  const [book, setBook] = useState<Storybook | null>(null);
+  const [session, setSession] = useState<StorybookSession | null>(fixture?.session ?? null);
+  const [book, setBook] = useState<Storybook | null>(fixture?.book ?? null);
   const [bookLoading, setBookLoading] = useState(false);
 
   // Subscribe to session
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeSession(roomCode, setSession);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   // Load book when bookId changes
   useEffect(() => {
+    if (offline) return;
     if (!session?.bookId) {
       setBook(null);
       return;
@@ -161,6 +178,7 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
   // (서버는 같은 프롬프트 요청을 캐시·병합하므로 남는 중복도 1회 생성으로 수렴).
   const healedBookRef = useRef<string | null>(null);
   useEffect(() => {
+    if (offline) return;
     if (!book?.id) return;
     if (!isTeacher && session?.phase !== "after") return;
     if (healedBookRef.current === book.id) return;
@@ -216,15 +234,17 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
       }
     })();
     return () => { cancel = true; };
-  }, [book, isTeacher, session?.phase]);
+  }, [book, isTeacher, session?.phase, offline]);
 
   const handleStart = useCallback(async (bookId: string, opts?: { wordQuizEnabled?: boolean }) => {
+    if (offline) return;
     await startSession(roomCode, bookId, myClientId, opts);
-  }, [roomCode, myClientId]);
+  }, [roomCode, myClientId, offline]);
 
   const handleEnd = useCallback(async () => {
+    if (offline) return;
     await endSession(roomCode);
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   // ── No active session ────────────────────────────────────
   // bookId 없는 세션 = 유령 노드(예: wipe 이후 남은 {autoReading}) — 세션 없음과
@@ -237,11 +257,25 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
           teacherName={user.myName}
           onBack={onBack}
           onStart={handleStart}
+          offline={offline}
+          generatedBooks={fixture?.generatedBooks}
         />
       );
     }
     // [신규] 학생: 수업이 없으면 교사가 공개한 책을 자유롭게 읽을 수 있다.
-    return <StudentFreeLibrary lang={lang} viewerLang={lang} roomCode={roomCode} user={user} myClientId={myClientId} onBack={onBack} />;
+    return (
+      <StudentFreeLibrary
+        lang={lang}
+        viewerLang={lang}
+        roomCode={roomCode}
+        user={user}
+        myClientId={myClientId}
+        onBack={onBack}
+        offline={offline}
+        generatedBooks={fixture?.generatedBooks}
+        fixtureBook={fixture?.book ?? undefined}
+      />
+    );
   }
 
   // ── Loading book ─────────────────────────────────────────
@@ -277,7 +311,7 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
       }}
     >
       <div style={{ maxWidth: 840, margin: "0 auto" }}>
-        {isTeacher && <TeacherAlertBanner lang={lang} roomCode={roomCode} />}
+        {isTeacher && <TeacherAlertBanner lang={lang} roomCode={roomCode} offline={offline} />}
 
         <SessionHeader
           lang={lang}
@@ -297,6 +331,7 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
           session={session}
           book={book}
           isTeacher={isTeacher}
+          offline={offline}
         />
       </div>
     </div>
@@ -307,13 +342,14 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack }: Pr
 // Teacher Alert Banner — subscribes to storybook alerts, shows distress
 // ============================================================
 
-function TeacherAlertBanner({ lang, roomCode }: { lang: string; roomCode: string }) {
+function TeacherAlertBanner({ lang, roomCode, offline }: { lang: string; roomCode: string; offline?: boolean }) {
   const [alerts, setAlerts] = useState<StorybookAlert[]>([]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeAlerts(roomCode, setAlerts);
     return () => unsub();
-  }, [roomCode]);
+  }, [roomCode, offline]);
 
   const visible = useMemo(
     () => alerts.filter((a) => a.kind === "distress" || a.kind === "repeated_block"),
@@ -359,7 +395,7 @@ function TeacherAlertBanner({ lang, roomCode }: { lang: string; roomCode: string
               </div>
             </div>
             <button
-              onClick={() => clearAlert(roomCode, a.id)}
+              onClick={() => { if (offline) return; clearAlert(roomCode, a.id); }}
               style={{
                 minHeight: 36, padding: "6px 12px",
                 background: "#fff", border: `2px solid ${btnBorder}`,
@@ -383,21 +419,26 @@ function TeacherSetup({
   teacherName,
   onBack,
   onStart,
+  offline,
+  generatedBooks,
 }: {
   lang: string;
   teacherName: string;
   onBack: () => void;
   onStart: (bookId: string, opts?: { wordQuizEnabled?: boolean }) => void;
+  offline?: boolean;
+  generatedBooks?: BookListEntry[];
 }) {
   const [busy, setBusy] = useState(false);
   // [신규] 수업 전 단어 퀴즈 토글
   const [wordQuizEnabled, setWordQuizEnabled] = useState(false);
-  const [generated, setGenerated] = useState<BookListEntry[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
+  const [generated, setGenerated] = useState<BookListEntry[]>(generatedBooks ?? []);
+  const [loadingList, setLoadingList] = useState(!offline);
   const [creating, setCreating] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
 
   async function handleExportPptx(id: string) {
+    if (offline) return;
     if (exportingId) return;
     setExportingId(id);
     try {
@@ -413,6 +454,7 @@ function TeacherSetup({
   }
 
   useEffect(() => {
+    if (offline) return;
     let cancel = false;
     setLoadingList(true);
     listGeneratedBooks()
@@ -420,9 +462,10 @@ function TeacherSetup({
       .catch((err) => console.error("listGeneratedBooks failed", err))
       .finally(() => { if (!cancel) setLoadingList(false); });
     return () => { cancel = true; };
-  }, [creating]);
+  }, [creating, offline]);
 
   async function handleDelete(id: string) {
+    if (offline) return;
     if (!window.confirm("정말 삭제할까요?")) return;
     try {
       await deleteGeneratedBook(id);
@@ -434,6 +477,7 @@ function TeacherSetup({
 
   // [신규] 책별 공개/퀴즈 토글 — 낙관적 갱신 후 Firebase 저장.
   async function toggleFlag(id: string, key: "visible" | "wordQuizEnabled" | "chatEnabled") {
+    if (offline) return;
     const cur = generated.find((b) => b.id === id);
     if (!cur) return;
     const nextVal = !cur[key];
@@ -795,25 +839,36 @@ function FlagChip({
 // ============================================================
 
 function StudentFreeLibrary({
-  lang, viewerLang, roomCode, user, myClientId, onBack,
-}: { lang: string; viewerLang: string; roomCode: string; user: UserConfig; myClientId: string; onBack: () => void }) {
-  const [books, setBooks] = useState<BookListEntry[] | null>(null);
+  lang, viewerLang, roomCode, user, myClientId, onBack, offline, generatedBooks, fixtureBook,
+}: {
+  lang: string; viewerLang: string; roomCode: string; user: UserConfig; myClientId: string; onBack: () => void;
+  offline?: boolean; generatedBooks?: BookListEntry[]; fixtureBook?: Storybook;
+}) {
+  const [books, setBooks] = useState<BookListEntry[] | null>(
+    offline ? (generatedBooks ?? []).filter((b) => b.visible) : null
+  );
   const [openBook, setOpenBook] = useState<Storybook | null>(null);
   const [loadingBook, setLoadingBook] = useState(false);
 
   useEffect(() => {
+    if (offline) return;
     let cancel = false;
     listGeneratedBooks()
       .then((list) => { if (!cancel) setBooks(list.filter((b) => b.visible)); })
       .catch(() => { if (!cancel) setBooks([]); });
     return () => { cancel = true; };
-  }, []);
+  }, [offline]);
 
   // 뒤로 가기: 책을 읽는 중이면 도서관 목록으로 (그림책 교실에서 바로 나가지 않음).
   useBackLayer(openBook !== null, () => setOpenBook(null));
 
   async function open(id: string) {
     if (loadingBook) return;
+    if (offline) {
+      // fixture 에서는 네트워크를 부르지 않고 주어진 fixture 책만 연다.
+      setOpenBook(fixtureBook ?? null);
+      return;
+    }
     setLoadingBook(true);
     try {
       const b = await loadBook(id);
@@ -838,6 +893,7 @@ function StudentFreeLibrary({
         user={user}
         myClientId={myClientId}
         onBack={() => setOpenBook(null)}
+        offline={offline}
       />
     );
   }
@@ -932,8 +988,8 @@ function StudentFreeLibrary({
 // [신규] 자유 리더 — 학생이 스스로 페이지를 넘기며 읽고 듣는다 (질문/핫시팅 없음).
 // 책에 단어 퀴즈가 켜져 있고 어휘가 4개 이상이면 읽기 전에 퀴즈를 먼저 푼다(규칙).
 function StorybookFreeReader({
-  book, viewerLang, roomCode, user, myClientId, onBack,
-}: { book: Storybook; viewerLang: string; roomCode: string; user: UserConfig; myClientId: string; onBack: () => void }) {
+  book, viewerLang, roomCode, user, myClientId, onBack, offline,
+}: { book: Storybook; viewerLang: string; roomCode: string; user: UserConfig; myClientId: string; onBack: () => void; offline?: boolean }) {
   const quizFirst = !!book.wordQuizEnabled && (book.vocab?.length ?? 0) >= 4;
   const [quizDone, setQuizDone] = useState(false);
   // 0 = 표지, 1..N = 페이지
@@ -1031,6 +1087,7 @@ function StorybookFreeReader({
             viewerLang={viewerLang}
             user={user}
             myClientId={myClientId}
+            offline={offline}
           />
         ))}
 
@@ -1117,6 +1174,7 @@ function StorybookFreeReader({
                 book={book}
                 character={reviewChar}
                 onBack={() => setReviewCharId(null)}
+                offline={offline}
               />
             ) : (
               <CharacterPicker
@@ -1153,10 +1211,10 @@ function faDataUrlToBlob(dataUrl: string): Blob {
 }
 
 function FriendAnswers({
-  roomCode, bookId, question, viewerLang, user, myClientId,
+  roomCode, bookId, question, viewerLang, user, myClientId, offline,
 }: {
   roomCode: string; bookId: string; question: StorybookQuestion; viewerLang: string;
-  user: UserConfig; myClientId: string;
+  user: UserConfig; myClientId: string; offline?: boolean;
 }) {
   const [answers, setAnswers] = useState<StorybookResponse[]>([]);
   const [trans, setTrans] = useState<Record<string, string>>({});
@@ -1175,11 +1233,12 @@ function FriendAnswers({
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   useEffect(() => {
+    if (offline) return;
     // comments 서브트리는 raw 에 함께 실려온다 (bookAnswers 하위 저장이라
     // 별도 구독 불필요 — 댓글 추가 시 onValue 에코로 자동 갱신)
     const unsub = subscribeBookAnswers(roomCode, bookId, question.id, setAnswers);
     return () => unsub();
-  }, [roomCode, bookId, question.id]);
+  }, [roomCode, bookId, question.id, offline]);
 
   // 질문이 바뀌면 작성기 초기화
   useEffect(() => {
@@ -1193,7 +1252,7 @@ function FriendAnswers({
 
   // 새 답변 제출 — 글/말/그림/감정 공통 경로 (bookAnswers 영속 저장)
   async function submitFreeAnswer(opts?: { kind?: "text" | "drawing" | "emotion"; imageUrl?: string; textOverride?: string }) {
-    if (submitting) return;
+    if (submitting || offline) return;
     const text = (opts?.textOverride ?? answerDraft).trim();
     if (!text && opts?.kind !== "drawing") return;
     // 안전검사 (챗·댓글과 동일 레이어)
@@ -1228,7 +1287,7 @@ function FriendAnswers({
 
   // 그림 모드 제출 — 캔버스 업로드 후 drawing 답변으로
   async function submitFreeDrawing() {
-    if (submitting) return;
+    if (submitting || offline) return;
     const dataUrl = freeDrawRef.current?.getDataUrl(0.8);
     if (!dataUrl) return;
     setSubmitting(true);
@@ -1249,6 +1308,7 @@ function FriendAnswers({
   }
 
   useEffect(() => {
+    if (offline) return;
     // 답변 + 댓글 텍스트를 언어별로 묶어 배치 번역 (항목 5: 원문+번역 2줄)
     const groups: Record<string, Array<{ id: string; text: string }>> = {};
     const add = (id: string, text: string, fromLang?: string) => {
@@ -1290,6 +1350,7 @@ function FriendAnswers({
   }, [answers, viewerLang]);
 
   function handleAddComment(respId: string) {
+    if (offline) return;
     const text = draft.trim();
     if (!text) return;
     // 클라이언트 사전 안전검사 (챗과 동일 레이어)
@@ -1723,7 +1784,7 @@ function SessionHeader({
 // ============================================================
 
 function PhaseBody({
-  lang, roomCode, user, myClientId, session, book, isTeacher,
+  lang, roomCode, user, myClientId, session, book, isTeacher, offline,
 }: {
   lang: string;
   roomCode: string;
@@ -1732,6 +1793,7 @@ function PhaseBody({
   session: StorybookSession;
   book: Storybook;
   isTeacher: boolean;
+  offline?: boolean;
 }) {
   if (session.phase === "before") {
     return (
@@ -1743,6 +1805,7 @@ function PhaseBody({
         session={session}
         book={book}
         isTeacher={isTeacher}
+        offline={offline}
       />
     );
   }
@@ -1756,6 +1819,7 @@ function PhaseBody({
         session={session}
         book={book}
         isTeacher={isTeacher}
+        offline={offline}
       />
     );
   }
@@ -1769,6 +1833,7 @@ function PhaseBody({
         roomCode={roomCode}
         myClientId={myClientId}
         user={user}
+        offline={offline}
       />
     );
   }
@@ -1791,7 +1856,7 @@ function PhaseBody({
 // ============================================================
 
 function BeforePhase({
-  lang, roomCode, user, myClientId, session, book, isTeacher,
+  lang, roomCode, user, myClientId, session, book, isTeacher, offline,
 }: {
   lang: string;
   roomCode: string;
@@ -1800,6 +1865,7 @@ function BeforePhase({
   session: StorybookSession;
   book: Storybook;
   isTeacher: boolean;
+  offline?: boolean;
 }) {
   // [신규] 수업 전 단어 퀴즈 게이트 — 학생만, 토글 ON + 어휘 4개 이상일 때.
   // 학생이 퀴즈를 마치면 본문(표지/도입)으로 진행. 단계 신설 없이 로컬 게이트.
@@ -1840,6 +1906,7 @@ function BeforePhase({
           q={currentQ}
           isTeacher={isTeacher}
           book={book}
+          offline={offline}
         />
       )}
 
@@ -1849,8 +1916,8 @@ function BeforePhase({
           title={t("sbPhaseBefore", lang)}
           questions={introQuestions}
           activeQuestionId={session.currentQuestionId}
-          onShowQuestion={(id) => showQuestion(roomCode, id)}
-          onNext={() => setPhase(roomCode, "during").then(() => setPage(roomCode, 1))}
+          onShowQuestion={(id) => { if (offline) return; showQuestion(roomCode, id); }}
+          onNext={() => { if (offline) return; setPhase(roomCode, "during").then(() => setPage(roomCode, 1)); }}
           nextLabel={t("sbPhaseNextDuring", lang)}
         />
       )}
@@ -1959,7 +2026,7 @@ function CoverCard({ lang, book }: { lang: string; book: Storybook }) {
 // ============================================================
 
 function DuringPhase({
-  lang, roomCode, user, myClientId, session, book, isTeacher,
+  lang, roomCode, user, myClientId, session, book, isTeacher, offline,
 }: {
   lang: string;
   roomCode: string;
@@ -1968,6 +2035,7 @@ function DuringPhase({
   session: StorybookSession;
   book: Storybook;
   isTeacher: boolean;
+  offline?: boolean;
 }) {
   const pageIdx = Math.max(1, Math.min(book.pages.length, session.currentPage));
   const page = book.pages.find((p) => p.idx === pageIdx);
@@ -2000,7 +2068,7 @@ function DuringPhase({
   const autoAbortRef = useRef(false);
 
   async function startAutoRead() {
-    if (autoReading) return;
+    if (autoReading || offline) return;
     autoAbortRef.current = false;
     setAutoReadingLocal(true);
     setAutoReading(roomCode, true).catch(() => {});
@@ -2021,6 +2089,7 @@ function DuringPhase({
   }
 
   function stopAutoRead() {
+    if (offline) return;
     autoAbortRef.current = true;
     cancelSpeak();
     setAutoReadingLocal(false);
@@ -2047,6 +2116,7 @@ function DuringPhase({
           q={currentQ}
           isTeacher={isTeacher}
           book={book}
+          offline={offline}
         />
       )}
 
@@ -2059,10 +2129,11 @@ function DuringPhase({
           questions={availableQuestions}
           activeQuestionId={session.currentQuestionId}
           allowReviewChat={!!session.allowReviewChat}
-          onGotoAfter={() => setPhase(roomCode, "after")}
+          onGotoAfter={() => { if (offline) return; setPhase(roomCode, "after"); }}
           autoReading={autoReading}
           onStartAutoRead={startAutoRead}
           onStopAutoRead={stopAutoRead}
+          offline={offline}
         />
       )}
 
@@ -2112,6 +2183,7 @@ function DuringPhase({
                 book={book}
                 character={reviewChar}
                 onBack={() => setReviewCharId(null)}
+                offline={offline}
               />
             ) : (
               <CharacterPicker
@@ -2280,14 +2352,15 @@ function playIntroBeep(ctxRef: React.MutableRefObject<AudioContext | null>, ch: 
 
 // [#6] 교사 라이브 모니터링 갤러리 — 현재 질문에 대해 학생들이 그리는 중인 그림을
 //   화이트보드 갤러리와 같은 방식(썸네일 그리드 + 확대 + 제출 배지)으로 실시간 표시.
-function TeacherDrawMonitor({ roomCode, questionId }: { roomCode: string; questionId: string }) {
+function TeacherDrawMonitor({ roomCode, questionId, offline }: { roomCode: string; questionId: string; offline?: boolean }) {
   const [boards, setBoards] = useState<StorybookLiveBoard[]>([]);
   const [enlarged, setEnlarged] = useState<StorybookLiveBoard | null>(null);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeStorybookBoards(roomCode, questionId, setBoards);
     return () => unsub();
-  }, [roomCode, questionId]);
+  }, [roomCode, questionId, offline]);
 
   useBackLayer(enlarged !== null, () => setEnlarged(null));
 
@@ -2378,7 +2451,7 @@ function TeacherDrawMonitor({ roomCode, questionId }: { roomCode: string; questi
 }
 
 function QuestionCard({
-  lang, roomCode, user, myClientId, q, isTeacher, book,
+  lang, roomCode, user, myClientId, q, isTeacher, book, offline,
 }: {
   lang: string;
   roomCode: string;
@@ -2387,6 +2460,7 @@ function QuestionCard({
   q: StorybookQuestion;
   isTeacher: boolean;
   book?: Storybook;
+  offline?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState(false);
@@ -2419,9 +2493,10 @@ function QuestionCard({
   }, [q.id, isTeacher]);
 
   useEffect(() => {
+    if (offline) return;
     const unsub = subscribeResponses(roomCode, q.id, setResponses);
     return () => unsub();
-  }, [roomCode, q.id]);
+  }, [roomCode, q.id, offline]);
 
   const mine = responses.find((r) => r.clientId === myClientId);
   useEffect(() => { if (mine && !saved) { setSaved(true); setDraft(mine.text); } }, [mine, saved]);
@@ -2429,6 +2504,7 @@ function QuestionCard({
   // Auto-translate a response's text to the current viewer's language on demand.
   // Cached per-response. Skips when languages match or own response.
   const ensureTranslation = useCallback(async (r: StorybookResponse) => {
+    if (offline) return;
     const key = `${r.id}:${lang}`;
     if (!r.studentLang || r.studentLang === lang) return;
     if (translations[key] || translating[key]) return;
@@ -2451,7 +2527,7 @@ function QuestionCard({
         return rest;
       });
     }
-  }, [lang, translations, translating]);
+  }, [lang, translations, translating, offline]);
 
   // When the selected fruit changes, trigger translation if needed
   useEffect(() => {
@@ -2476,10 +2552,11 @@ function QuestionCard({
     setFruitComments([]);
     setCommentDraft("");
     setCommentWarn(null);
+    if (offline) return;
     if (!selectedRespId || !bookIdForComments) return;
     const unsub = subscribeResponseComments(roomCode, bookIdForComments, q.id, selectedRespId, setFruitComments);
     return () => unsub();
-  }, [roomCode, bookIdForComments, q.id, selectedRespId]);
+  }, [roomCode, bookIdForComments, q.id, selectedRespId, offline]);
 
   // 댓글도 원문+번역 2줄 규칙 (항목 5) — 도착 시 자동 번역
   useEffect(() => {
@@ -2491,6 +2568,7 @@ function QuestionCard({
   }, [fruitComments, lang, ensureTranslation]);
 
   function handleAddComment() {
+    if (offline) return;
     const text = commentDraft.trim();
     if (!text || !selectedRespId || !bookIdForComments) return;
     // 클라이언트 사전 안전검사 (챗과 동일 레이어)
@@ -2558,7 +2636,7 @@ function QuestionCard({
   }
 
   async function handleSubmit() {
-    if (busy) return;
+    if (busy || offline) return;
     // [#6] 그림 모드: 캔버스를 이미지로 업로드 후 그림 응답으로 제출.
     if (inputMode === "draw") {
       const dataUrl = drawRef.current?.getDataUrl(0.8);
@@ -2592,6 +2670,7 @@ function QuestionCard({
   // 그리는 중 라이브 스냅샷 → 교사 모니터링 (디바운스는 DrawBoard 내부에서).
   function handleDrawChange(dataUrl: string) {
     setHasDrawn(true);
+    if (offline) return;
     pushStorybookBoard(roomCode, q.id, myClientId, user.myName, dataUrl).catch(() => {});
   }
 
@@ -2875,7 +2954,7 @@ function QuestionCard({
                 quick
                 busy={busy}
                 onPick={async (emotionId) => {
-                  if (busy) return;
+                  if (busy || offline) return;
                   setBusy(true);
                   try {
                     const e = emotionById(emotionId);
@@ -2941,7 +3020,7 @@ function QuestionCard({
       )}
 
       {/* [#6] 교사 라이브 모니터링 — 학생들이 그리는 중인 그림을 실시간으로 본다. */}
-      {isTeacher && <TeacherDrawMonitor roomCode={roomCode} questionId={q.id} />}
+      {isTeacher && <TeacherDrawMonitor roomCode={roomCode} questionId={q.id} offline={offline} />}
 
       {/* ── Fruit-tree style responses (열매나무) ── */}
       {(isTeacher || saved) && responses.length > 0 && (
@@ -3323,7 +3402,7 @@ function TeacherControls({
 
 function TeacherPageControls({
   lang, roomCode, pageIdx, totalPages, questions, activeQuestionId, allowReviewChat, onGotoAfter,
-  autoReading, onStartAutoRead, onStopAutoRead,
+  autoReading, onStartAutoRead, onStopAutoRead, offline,
 }: {
   lang: string;
   roomCode: string;
@@ -3337,6 +3416,7 @@ function TeacherPageControls({
   autoReading: boolean;
   onStartAutoRead: () => void;
   onStopAutoRead: () => void;
+  offline?: boolean;
 }) {
   const prevDisabled = pageIdx <= 1;
   const isLast = pageIdx >= totalPages;
@@ -3366,7 +3446,7 @@ function TeacherPageControls({
       >{autoReading ? "⏹ 자동 읽기 멈추기" : "▶️ 자동 읽기 — 끝까지 읽어주며 넘겨요"}</button>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <button
-          onClick={() => setPage(roomCode, Math.max(1, pageIdx - 1))}
+          onClick={() => { if (offline) return; setPage(roomCode, Math.max(1, pageIdx - 1)); }}
           disabled={prevDisabled || autoReading}
           style={{
             flex: 1, minHeight: 48,
@@ -3379,7 +3459,7 @@ function TeacherPageControls({
         >{t("sbPrevPage", lang)}</button>
         {!isLast && (
           <button
-            onClick={() => setPage(roomCode, pageIdx + 1)}
+            onClick={() => { if (offline) return; setPage(roomCode, pageIdx + 1); }}
             disabled={autoReading}
             style={{
               flex: 1, minHeight: 48,
@@ -3422,7 +3502,7 @@ function TeacherPageControls({
           </div>
         </div>
         <button
-          onClick={() => setAllowReviewChat(roomCode, !allowReviewChat).catch((err) => console.error("setAllowReviewChat failed", err))}
+          onClick={() => { if (offline) return; setAllowReviewChat(roomCode, !allowReviewChat).catch((err) => console.error("setAllowReviewChat failed", err)); }}
           role="switch"
           aria-checked={allowReviewChat}
           aria-label="복습 중 캐릭터 챗봇 허용"
@@ -3450,7 +3530,7 @@ function TeacherPageControls({
             return (
               <button
                 key={q.id}
-                onClick={() => showQuestion(roomCode, active ? null : q.id)}
+                onClick={() => { if (offline) return; showQuestion(roomCode, active ? null : q.id); }}
                 style={{
                   padding: "10px 12px",
                   background: active ? "linear-gradient(135deg, #3B82F6, #2563EB)" : "#F9FAFB",
@@ -3486,7 +3566,7 @@ function TeacherPageControls({
 const MAX_TURNS = 15;
 
 function AfterPhase({
-  lang, session, book, isTeacher, roomCode, myClientId, user,
+  lang, session, book, isTeacher, roomCode, myClientId, user, offline,
 }: {
   lang: string;
   session: StorybookSession;
@@ -3495,6 +3575,7 @@ function AfterPhase({
   roomCode: string;
   myClientId: string;
   user: UserConfig;
+  offline?: boolean;
 }) {
   // Per-client local pick. session.activeCharacterId is reserved for a future
   // teacher-led "featured character" flow — students must not write it.
@@ -3514,6 +3595,7 @@ function AfterPhase({
         book={book}
         session={session}
         activeChar={activeChar}
+        offline={offline}
       />
     );
   }
@@ -3540,6 +3622,7 @@ function AfterPhase({
       book={book}
       character={activeChar}
       onBack={() => setMyCharId(null)}
+      offline={offline}
     />
   );
 }
@@ -3622,7 +3705,7 @@ function CharacterPicker({
 }
 
 function CharacterChat({
-  lang, roomCode, myClientId, user, book, character, onBack,
+  lang, roomCode, myClientId, user, book, character, onBack, offline,
 }: {
   lang: string;
   roomCode: string;
@@ -3632,6 +3715,7 @@ function CharacterChat({
   character: StorybookCharacter;
   /** 캐릭터 선택 화면으로 복귀 — 다른 챗봇과 대화 가능 (설계서 항목 4) */
   onBack?: () => void;
+  offline?: boolean;
 }) {
   const [turns, setTurns] = useState<StorybookChatTurn[]>([]);
   const [draft, setDraft] = useState("");
@@ -3642,9 +3726,10 @@ function CharacterChat({
   // 캐릭터별 분리된 로그 구독 — 캐릭터 전환 시 자동 재구독
   useEffect(() => {
     setTurns([]);
+    if (offline) return;
     const unsub = subscribeChat(roomCode, myClientId, character.id, setTurns);
     return () => unsub();
-  }, [roomCode, myClientId, character.id]);
+  }, [roomCode, myClientId, character.id, offline]);
 
   const studentTurnCount = useMemo(
     () => turns.filter((t) => t.from === "student").length,
@@ -3661,7 +3746,7 @@ function CharacterChat({
   }, [limitReached, lang, showLangExpand]);
 
   async function handleSend() {
-    if (!draft.trim() || busy || limitReached) return;
+    if (!draft.trim() || busy || limitReached || offline) return;
     const text = draft.trim();
     setDraft("");
     setBusy(true);
@@ -3931,6 +4016,7 @@ function CharacterChat({
               roomCode={roomCode}
               myClientId={myClientId}
               onClose={() => setShowLangExpand(false)}
+              offline={offline}
             />
           ) : (
             <div style={{ fontSize: 14, fontWeight: 900, color: "#92400E" }}>
@@ -4009,12 +4095,13 @@ function ChatBubble({
 }
 
 function LangExpandPanel({
-  character, roomCode, myClientId, onClose,
+  character, roomCode, myClientId, onClose, offline,
 }: {
   character: StorybookCharacter;
   roomCode: string;
   myClientId: string;
   onClose: () => void;
+  offline?: boolean;
 }) {
   const otherLangs: { code: string; flag: string; greeting: string }[] = [
     { code: "en",  flag: "🇺🇸", greeting: "Thanks for sharing with me! Goodbye!" },
@@ -4026,7 +4113,7 @@ function LangExpandPanel({
   const [picked, setPicked] = useState<string | null>(null);
 
   async function handlePick(item: typeof otherLangs[number]) {
-    if (picked) return;
+    if (picked || offline) return;
     setPicked(item.code);
     const farewell = `${item.greeting} ${character.avatarEmoji}`;
     await appendChatTurn(roomCode, myClientId, character.id, {
@@ -4081,13 +4168,14 @@ function LangExpandPanel({
 }
 
 function TeacherAfterView({
-  lang, roomCode, book, session, activeChar,
+  lang, roomCode, book, session, activeChar, offline,
 }: {
   lang: string;
   roomCode: string;
   book: Storybook;
   session: StorybookSession;
   activeChar: StorybookCharacter | null;
+  offline?: boolean;
 }) {
   return (
     <div
@@ -4153,7 +4241,7 @@ function TeacherAfterView({
         ))}
       </div>
       <button
-        onClick={() => setPhase(roomCode, "done")}
+        onClick={() => { if (offline) return; setPhase(roomCode, "done"); }}
         style={{
           width: "100%", minHeight: 48,
           background: "linear-gradient(135deg, #10B981, #059669)",
