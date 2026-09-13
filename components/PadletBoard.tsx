@@ -41,6 +41,12 @@ interface FirebaseColumn {
 export interface BoardFixture {
   columns: FirebaseColumn[];
   cards: CardData[];
+  /**
+   * 카드별 반응 노드 초기값 `{ cardId: { clientId: 반응문자열 | true } }`.
+   * 구독을 끄면 반응이 늘 비어 있어 옛 `true` 호환·개수·내 선택 상태를
+   * 화면으로 검수할 수 없다 (U06).
+   */
+  reactions?: Record<string, Record<string, string | boolean>>;
 }
 
 interface Props {
@@ -599,6 +605,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         roomLangs={teacherLangs}
         approvalMode={roomConfigState.approvalMode}
         fixture={offline}
+        fixtureReactions={fixture?.reactions?.[card.id]}
       />
     );
   }

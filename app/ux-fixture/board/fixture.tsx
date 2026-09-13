@@ -140,6 +140,28 @@ const FIXTURE: BoardFixture = {
     { id: "fx-col-3", title: "🌟 칭찬해요 / Praise", color: "#43C59E", order: 2 },
   ],
   cards: buildCards(),
+  /**
+   * U06 검수용 반응 조합. 실제 노드와 같은 모양 `{ clientId: 값 }` 이고
+   * 내 clientId 는 아래 컴포넌트가 넘기는 "fx-client-17" 이다.
+   *
+   * 02 §3.B 가 요구한 경계를 한 화면에서 다 보이게 깔았다:
+   *  - fx-a1     : 옛 `true` 만 3개. '좋아요' 로 집계돼야 하고 사라지면 안 된다.
+   *  - fx-b-long : 옛 `true` 와 신·구 반응 문자열이 섞임 + 내 선택이 옛 `true`.
+   *                (내 것이 like 로 선택 표시돼야 하고, 바꾸면 합계가 유지돼야 한다)
+   *  - fx-b-0    : 신규 like/cheer 만. 새 종류가 제대로 집계되는지.
+   *  - fx-b-1    : 내가 nice 를 고른 상태. 재선택 취소·교체를 눌러 볼 수 있다.
+   *  - 나머지    : 반응 0개 — 개수 칩이 아예 안 나오는 상태.
+   */
+  reactions: {
+    "fx-a1": { "fx-c-a": true, "fx-c-b": true, "fx-c-c": true },
+    "fx-b-long": {
+      "fx-client-17": true,
+      "fx-c-a": "thanks", "fx-c-b": "same", "fx-c-c": "nice",
+      "fx-c-d": "like", "fx-c-e": "cheer", "fx-c-f": true,
+    },
+    "fx-b-0": { "fx-c-a": "like", "fx-c-b": "like", "fx-c-c": "cheer" },
+    "fx-b-1": { "fx-client-17": "nice", "fx-c-a": "thanks" },
+  },
 };
 
 export default function BoardFixtureScreen() {

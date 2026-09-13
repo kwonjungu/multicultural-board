@@ -7,6 +7,10 @@ import { CardData, CommentData, TranscriptData } from "@/lib/types";
 import { LANGUAGES } from "@/lib/constants";
 import { t, tFmt, tPlain } from "@/lib/i18n";
 import { speak, cancelSpeak } from "@/lib/ttsMulti";
+import {
+  REACTIONS, readReactions, nextReaction,
+  type ReactionKind, type RawReactions,
+} from "@/lib/cardReactions";
 import ImageLightbox from "./ImageLightbox";
 
 const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
@@ -14,39 +18,10 @@ const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 /** 이 길이를 넘으면 '더 읽기'로 접는다. 글을 잘라 없애지 않는다. */
 const LONG_TEXT = 220;
 
-type ReactionKind = "thanks" | "same" | "nice";
-const REACTIONS: { id: ReactionKind; key: string }[] = [
-  { id: "thanks", key: "reactThanks" },
-  { id: "same", key: "reactSame" },
-  { id: "nice", key: "reactNice" },
-];
-const REACTION_IDS = new Set<string>(["thanks", "same", "nice"]);
-
-type RawReactions = Record<string, string | boolean>;
-
-/**
- * 기존 좋아요 데이터 호환 어댑터.
- *
- * 옛 스키마는 `rooms/{room}/cards/{card}/likes/{clientId} === true` 였다. 반응
- * 스키마 변경은 별도 작업이므로 노드는 그대로 두고, 값만 반응 종류 문자열로
- * 쓴다. 옛 `true` 는 지우지 않고 '예전 좋아요'로 따로 세어 보존한다
- * (기존 카운트 코드도 truthy 검사라 그대로 동작한다).
- */
-export function readReactions(raw: RawReactions | null | undefined, myClientId?: string) {
-  const counts: Record<ReactionKind, number> = { thanks: 0, same: 0, nice: 0 };
-  let legacy = 0;
-  let mine: ReactionKind | null = null;
-  for (const [clientId, val] of Object.entries(raw || {})) {
-    if (!val) continue;
-    if (typeof val === "string" && REACTION_IDS.has(val)) {
-      counts[val as ReactionKind] += 1;
-      if (myClientId && clientId === myClientId) mine = val as ReactionKind;
-    } else {
-      legacy += 1;
-    }
-  }
-  return { counts, legacy, mine };
-}
+/* 반응 데이터 계약은 lib/cardReactions.ts 로 분리했다 — 옛 `true` 호환처럼
+   눈으로 판단할 수 없는 규칙은 실제로 실행해 검사해야 한다.
+   기존 import 경로를 쓰던 코드를 위해 여기서 다시 내보낸다. */
+export { readReactions } from "@/lib/cardReactions";
 
 /* U04: 게시글·댓글의 상대시간 표시를 없앴다. '선00 · 1995시간 전' 처럼 시간이
    작성자 옆에서 가장 먼저 읽히는 것이 아이에게 아무 의미가 없다는 사용자 요구다.
@@ -69,6 +44,12 @@ interface Props {
   approvalMode?: boolean;
   /** 개발용 fixture — Firebase 구독과 외부 API 호출을 하지 않는다 (HARNESS §2). */
   fixture?: boolean;
+  /**
+   * fixture 에서 반응 노드의 초기값을 주입한다. 구독을 끄면 반응이 늘 비어 있어
+   * 옛 `true` 호환·개수 표시·내 선택 상태를 화면으로 검수할 수 없다.
+   * 모양은 실제 노드와 같다: `{ [clientId]: 반응문자열 | true }`.
+   */
+  fixtureReactions?: RawReactions;
 }
 
 export default function PadletCard({
@@ -86,6 +67,7 @@ export default function PadletCard({
   roomLangs,
   approvalMode,
   fixture,
+  fixtureReactions,
 }: Props) {
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
@@ -124,7 +106,10 @@ export default function PadletCard({
   const commentDraftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 반응 (기존 likes 노드 위의 호환 어댑터)
-  const [reactRaw, setReactRaw] = useState<RawReactions>({});
+  const [reactRaw, setReactRaw] = useState<RawReactions>(fixtureReactions ?? {});
+  /** U06: 세부 반응 패널은 눌러야 열린다 — 카드마다 상시 자리를 차지하지 않는다. */
+  const [reactOpen, setReactOpen] = useState(false);
+  const [reactError, setReactError] = useState<string | null>(null);
 
   // Tick to update edit window expiry
   useEffect(() => {
@@ -149,26 +134,73 @@ export default function PadletCard({
     return () => { off(likesRef); void unsub; };
   }, [roomCode, card.id, fixture]);
 
-  const { counts, legacy, mine } = readReactions(reactRaw, myClientId);
+  const { counts, legacy, mine, total } = readReactions(reactRaw, myClientId);
+  const myReaction = REACTIONS.find((r) => r.id === mine) ?? null;
+
+  /* U06 disclosure: 트리거·패널을 id 로 묶고, Escape·바깥 클릭으로 닫은 뒤
+     포커스를 트리거로 되돌린다. */
+  const reactPanelId = `pc-react-${card.id}`;
+  const reactTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const reactPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!reactOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setReactOpen(false);
+      reactTriggerRef.current?.focus();
+    };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (reactPanelRef.current?.contains(t) || reactTriggerRef.current?.contains(t)) return;
+      setReactOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [reactOpen]);
+
+  /**
+   * 반응 쓰기는 직렬화한다. 아이가 연타하면 요청이 겹쳐 나가고, 늦게 도착한
+   * 이전 응답이 최신 상태를 덮어쓸 수 있다. 마지막 의도만 순서대로 보낸다.
+   */
+  const reactQueue = useRef<Promise<void>>(Promise.resolve());
 
   async function pickReaction(kind: ReactionKind) {
     if (!myClientId) return;
-    const next: ReactionKind | null = mine === kind ? null : kind;
-    // 낙관적 반영 — 실패하면 구독이 서버 값으로 되돌려 준다.
+    const prevMine = mine;
+    const next = nextReaction(prevMine, kind);
+    setReactError(null);
+    // 낙관적 반영 — 실패하면 아래에서 되돌린다.
     setReactRaw((prev) => {
       const copy = { ...prev };
       if (next) copy[myClientId] = next; else delete copy[myClientId];
       return copy;
     });
+    // 고르면 패널을 닫고 포커스를 트리거로 돌려준다.
+    setReactOpen(false);
+    reactTriggerRef.current?.focus();
     if (fixture) return;
+
     const db = getClientDb();
     const myRef = ref(db, `rooms/${roomCode}/cards/${card.id}/likes/${myClientId}`);
-    try {
-      if (next) await set(myRef, next);
-      else await remove(myRef);
-    } catch {
-      // 구독 콜백이 서버 값을 다시 씌운다.
-    }
+    reactQueue.current = reactQueue.current
+      .then(async () => {
+        if (next) await set(myRef, next);
+        else await remove(myRef);
+      })
+      .catch(() => {
+        // 낙관적 상태를 영구히 남기지 않는다 — 이전 선택으로 되돌리고 알린다.
+        setReactRaw((prev) => {
+          const copy = { ...prev };
+          if (prevMine) copy[myClientId] = prevMine; else delete copy[myClientId];
+          return copy;
+        });
+        setReactError(t("cardReactFailed", viewerLang));
+      });
   }
 
   // 답장 listener (열었을 때만)
@@ -669,27 +701,79 @@ export default function PadletCard({
         >{tPlain("cardReply", viewerLang)}{commentCount > 0 ? ` ${commentCount}` : ""}</button>
       </div>
 
-      {/* ── 반응: 순위가 아니라 하고 싶은 말 ── */}
-      <div className="pc-reactions" role="group" aria-label={t("cardReactions", viewerLang)}>
-        {REACTIONS.map((r) => {
-          const on = mine === r.id;
-          return (
-            <button
-              key={r.id}
-              type="button"
-              data-ux-role="control"
-              className={on ? "pc-btn on" : "pc-btn"}
-              aria-pressed={on}
-              aria-disabled={!myClientId}
-              onClick={() => pickReaction(r.id)}
-            >
-              {tPlain(r.key, viewerLang)}{on ? " ✓" : ""}{counts[r.id] > 0 ? ` ${counts[r.id]}` : ""}
-            </button>
-          );
-        })}
+      {/* ── 반응 (U06): 기본은 '공감하기' 한 버튼. 누르면 세부 5종 패널이 열린다.
+             예전에는 3종 버튼이 카드마다 상시 자리를 차지해, 카드 50개 화면에서
+             조작이 318개가 됐다. 요약 칩은 0보다 큰 반응만 보여준다. ── */}
+      <div className="pc-reactbar">
+        <button
+          type="button"
+          ref={reactTriggerRef}
+          data-ux-role="control"
+          className={mine ? "pc-btn on" : "pc-btn"}
+          aria-expanded={reactOpen}
+          aria-controls={reactPanelId}
+          aria-disabled={!myClientId}
+          onClick={() => setReactOpen((v) => !v)}
+        >
+          {mine
+            ? `${myReaction?.icon ?? ""} ${tPlain(myReaction?.key ?? "", viewerLang)} ✓`
+            : tPlain("cardReactOpen", viewerLang)}
+        </button>
+
+        {/* 요약: 0보다 큰 반응만. 누르면 같은 패널이 열린다 — 별도 토글을 만들어
+            아이를 헷갈리게 하지 않는다. */}
+        {total > 0 && (
+          <button
+            type="button"
+            data-ux-role="control"
+            className="pc-chipsum"
+            aria-expanded={reactOpen}
+            aria-controls={reactPanelId}
+            onClick={() => setReactOpen((v) => !v)}
+          >
+            {REACTIONS.filter((r) => counts[r.id] > 0).map((r) => (
+              <span key={r.id} className="pc-chip">
+                <span aria-hidden>{r.icon}</span>
+                <span className="pc-chip-n">{counts[r.id]}</span>
+                <span className="pc-sr">{tPlain(r.key, viewerLang)}</span>
+              </span>
+            ))}
+          </button>
+        )}
       </div>
-      {legacy > 0 && (
-        <p data-ux-role="secondary" className="pc-note">{tFmt("cardLegacyLikes", viewerLang, { n: legacy })}</p>
+
+      {reactOpen && (
+        <div
+          id={reactPanelId}
+          ref={reactPanelRef}
+          className="pc-reactpanel"
+          role="group"
+          aria-label={t("cardReactions", viewerLang)}
+        >
+          {REACTIONS.map((r) => {
+            const on = mine === r.id;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                data-ux-role="control"
+                className={on ? "pc-react on" : "pc-react"}
+                aria-pressed={on}
+                aria-disabled={!myClientId}
+                onClick={() => pickReaction(r.id)}
+              >
+                <span aria-hidden className="pc-react-ico">{r.icon}</span>
+                <span className="pc-react-lb">{tPlain(r.key, viewerLang)}</span>
+                {/* 선택 표시는 색만으로 하지 않는다 — 체크와 테두리로도 알린다. */}
+                {on && <span aria-hidden className="pc-react-ck">✓</span>}
+                {counts[r.id] > 0 && <span className="pc-react-n">{counts[r.id]}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {reactError && (
+        <p data-ux-role="secondary" className="pc-note" role="status">{reactError}</p>
       )}
 
       {/* ── 답장 목록 ── */}
@@ -829,6 +913,52 @@ export const CARD_CSS = `
 .pc-label{ font-weight: 800; color: var(--ux-ink); }
 
 .pc-actions, .pc-reactions{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+
+/* ── 반응 (U06) ─────────────────────────────────────────────────────
+   기본은 '공감하기' 한 버튼 + 0보다 큰 반응의 요약 칩. 세부 5종은 눌러야
+   열린다 — 카드마다 5개를 상시 깔면 카드 50개 화면에서 조작이 폭발한다. */
+.pc-reactbar{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; align-items: center; }
+.pc-chipsum{
+  display: inline-flex; gap: var(--ux-space-2); align-items: center;
+  background: transparent; border: 2px solid transparent; cursor: pointer;
+  padding: var(--ux-space-1) var(--ux-space-2); border-radius: var(--ux-radius-pill);
+  font-family: inherit; color: var(--ux-ink-soft);
+}
+.pc-chipsum:hover{ background: var(--ux-surface-sunk); }
+.pc-chip{ display: inline-flex; gap: 2px; align-items: center; font-size: var(--ux-font-secondary); }
+.pc-chip-n{ font-weight: 700; color: var(--ux-ink); }
+/* 스크린리더에만 읽히는 반응 이름 — 아이콘만으로 뜻이 남지 않게 한다. */
+.pc-sr{
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* 좁은 칼럼(패들렛은 250px 안팎)에서 1열 5행이 되면 패널이 카드 밖으로 밀려
+   잘린다. min() 으로 최소 폭을 낮춰 최소 2열을 확보한다 (04 §5). */
+.pc-reactpanel{
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 86px), 1fr));
+  gap: var(--ux-space-2); margin-top: var(--ux-space-2);
+  background: var(--ux-surface-sunk); border-radius: var(--ux-radius-surface);
+  padding: var(--ux-space-2);
+  /* 태블릿 세로처럼 칼럼 하나가 화면 폭을 다 쓰면 버튼이 과하게 늘어난다. */
+  max-width: 560px;
+}
+.pc-react{
+  display: flex; align-items: center; gap: 4px; justify-content: center;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-ink-soft); font-family: inherit; font-weight: 700;
+  padding-left: var(--ux-space-2); padding-right: var(--ux-space-2);
+  min-width: 0;
+}
+/* 선택은 색만으로 알리지 않는다 — 굵은 테두리와 체크를 함께 쓴다. */
+.pc-react[aria-pressed="true"], .pc-react.on{
+  border: 3px solid var(--ux-selected-border); background: var(--ux-primary-fill);
+  color: var(--ux-primary-ink);
+}
+.pc-react-ico{ font-size: 1.15em; line-height: 1; }
+/* 긴 번역(예: "Cheering you on")이 2열 칸을 넘치지 않게 접는다.
+   아이콘만 남기지 않는다 — 아이콘 단독은 뜻이 모호하다. */
+.pc-react-lb{ min-width: 0; overflow-wrap: anywhere; word-break: keep-all; }
+.pc-react-n{ font-weight: 800; }
 /* 데스크톱: 버튼이 한 줄에 하나씩 쌓이면 카드가 세로로 한없이 길어진다.
    마우스를 쓰는 폭에서는 칩처럼 줄여 한 줄에 여러 개가 들어가게 한다.
    '큰 글씨' 를 고른 사용자에게는 적용하지 않는다. */
