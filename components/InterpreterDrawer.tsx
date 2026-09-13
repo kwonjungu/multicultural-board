@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { speakVia, stopAll as stopAllAudio } from "@/lib/audioBus";
-import BeeMascot from "./BeeMascot";
+import ScopedStyle from "./ui/child/ScopedStyle";
 
 type SideState = "idle" | "listening" | "translating" | "done" | "error";
 type SideValue = { original: string; translation: string };
@@ -35,6 +35,181 @@ async function speakText(text: string, lang: string) {
   });
 }
 
+/**
+ * 통역 화면 스타일.
+ *
+ * 예전 화면의 문제(실측·캡처로 확인):
+ *  - 크롬북 1366px 인데 오른쪽 560px 서랍에 갇히고 왼쪽 800px 은 빈 회색.
+ *    마주 보고 쓰는 도구인데 넓은 화면을 전혀 쓰지 않았다(04 §1 Q5).
+ *  - 다크 네이비 + 파랑/노랑 그라디언트 + 육각형 SVG 장식 — 앱의 크림·꿀빛
+ *    토큰과 무관해 이 화면만 겉돌았다.
+ *  - 44px 미만 조작 3개, 14px 미만 글자 7~9개, data-ux-role 0개.
+ *  - 390px 과 1366px 의 측정값이 완전히 동일 = 반응형 재배치가 없었다.
+ *
+ * 고친 방향: 색·크기를 전부 토큰으로 돌리고, 폭이 생기면 좌우로 나눈다.
+ * 마이크가 화면의 주인공이고, 번역문이 그다음이다.
+ */
+const ITP_CSS = `
+.itp-scrim{
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(41,37,31,.45);
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.itp-scrim.on{ opacity: 1; pointer-events: auto; }
+
+.itp-sheet{
+  position: fixed; inset: 0; z-index: 201;
+  display: flex; flex-direction: column;
+  background: var(--ux-bg);
+  transform: translateY(100%); transition: transform .28s cubic-bezier(.22,.61,.36,1);
+}
+.itp-sheet.on{ transform: none; }
+@media (min-width: 860px){
+  /* 넓은 화면에서는 전체를 덮지 않고 가운데 큰 판으로 — 교실에서 책상에
+     올려놓고 마주 보는 물건처럼. */
+  .itp-sheet{
+    inset: 3vh 4vw; border-radius: var(--ux-radius-panel);
+    border: 3px solid var(--ux-primary-border);
+    box-shadow: 0 24px 60px rgba(41,37,31,.3);
+    transform: translateY(8px) scale(.98); opacity: 0;
+  }
+  .itp-sheet.on{ transform: none; opacity: 1; }
+}
+
+.itp-head{
+  display: flex; align-items: center; gap: var(--ux-space-3);
+  padding: var(--ux-space-3) var(--ux-space-4);
+  border-bottom: 2px solid var(--ux-surface-sunk); flex-shrink: 0;
+}
+.itp-title{ margin: 0; flex: 1; text-align: center; color: var(--ux-ink); }
+.itp-close, .itp-reset{
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-ink-soft); font-family: inherit; font-weight: 800;
+}
+
+.itp-pair{
+  display: flex; align-items: center; justify-content: center; gap: var(--ux-space-3);
+  padding: var(--ux-space-2) var(--ux-space-4) var(--ux-space-3);
+  flex-wrap: wrap; flex-shrink: 0;
+}
+.itp-pair-me, .itp-pair-other{ display: inline-flex; align-items: center; gap: 6px; }
+.itp-pair-arrow{ color: var(--ux-ink-soft); font-weight: 900; }
+
+/* 마주 보기 무대 */
+.itp-stagewrap{ flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.itp-divider{
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  padding: var(--ux-space-2);
+  border-top: 2px dashed var(--ux-surface-sunk);
+  border-bottom: 2px dashed var(--ux-surface-sunk);
+  background: var(--ux-bg);
+}
+@media (min-width: 860px){
+  /* 폭이 생기면 좌우로. 글자를 뒤집을 필요가 없어진다. */
+  .itp-stagewrap{ flex-direction: row; }
+  /* 좌우 배치에서는 얇은 선만 남긴다. 세로로 세운 글자는 읽기 어렵다. */
+  .itp-divider{
+    border: none; border-left: 2px dashed var(--ux-surface-sunk);
+    padding: 0; width: 0;
+  }
+  .itp-divider > *{ display: none; }
+}
+
+.itp-side{
+  flex: 1; min-height: 0; min-width: 0;
+  display: flex; flex-direction: column; justify-content: space-between;
+  gap: var(--ux-space-3);
+  padding: var(--ux-space-4);
+  background: var(--ux-surface);
+}
+/* 두 사람을 색이 아니라 **자리와 라벨**로 나눈다. 은은한 바탕 차이만 준다. */
+.itp-side.other{ background: var(--ux-hint-mint); }
+/* 위아래로 쌓이는 좁은 화면에서만 친구 쪽을 뒤집는다. 좌우로 나란히 놓이면
+   뒤집을 이유가 없다 — 그리고 이 규칙을 미디어쿼리보다 **뒤에** 두면
+   같은 특이도라 나중 것이 이겨서 넓은 화면에서도 뒤집힌다(실제로 그랬다). */
+@media (max-width: 859px){
+  .itp-side.flip{ transform: rotate(180deg); }
+}
+
+.itp-top{ display: flex; align-items: center; gap: var(--ux-space-2); flex-shrink: 0; }
+.itp-flag{ font-size: 1.6em; line-height: 1; }
+.itp-who{ display: grid; min-width: 0; }
+.itp-lang{ color: var(--ux-ink); font-weight: 800; }
+.itp-pick{ margin-left: auto; }
+.itp-select{
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-ink-soft); font-family: inherit; font-weight: 700;
+  max-width: 46vw;
+}
+/* 스크린리더 전용 라벨 — 화면에서는 숨기되 이름은 남긴다. */
+.itp-sr{
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.itp-body{
+  flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center;
+}
+.itp-hint, .itp-error{ margin: 0; color: var(--ux-ink-soft); }
+.itp-error{ color: var(--ux-error); font-weight: 800; }
+
+.itp-result{ display: grid; gap: var(--ux-space-2); width: 100%; }
+/* 상대가 읽을 번역문이 주인공. 읽기 폭은 제한한다. */
+.itp-translation{
+  margin: 0 auto; max-width: 26ch; color: var(--ux-ink); font-weight: 700;
+}
+.itp-original{ margin: 0; color: var(--ux-ink-soft); }
+
+.itp-status{ display: grid; gap: var(--ux-space-2); justify-items: center; }
+.itp-status-text{ color: var(--ux-ink-soft); font-weight: 800; }
+.itp-wave{ display: inline-flex; align-items: center; gap: 5px; height: 36px; }
+.itp-wave i{
+  width: 6px; height: 100%; border-radius: 999px; background: var(--ux-primary-border);
+  animation: itpWave .8s ease-in-out infinite alternate;
+}
+.itp-dots{ display: inline-flex; gap: 8px; }
+.itp-dots i{
+  width: 10px; height: 10px; border-radius: 50%; background: var(--ux-primary-border);
+  animation: itpDot 1.1s infinite;
+}
+@keyframes itpWave { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
+@keyframes itpDot { 0%,80%,100% { transform: scale(.6); opacity: .5; } 40% { transform: scale(1); opacity: 1; } }
+
+.itp-actions{
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--ux-space-3); flex-shrink: 0; flex-wrap: wrap;
+}
+.itp-replay{
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-ink-soft); font-family: inherit; font-weight: 800;
+}
+/* 마이크가 이 화면의 주인공 — 가장 크고 가장 눈에 띈다. */
+.itp-mic{
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; min-width: 112px; min-height: 76px;
+  padding: var(--ux-space-2) var(--ux-space-6);
+  border-radius: var(--ux-radius-pill);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
+  border: 3px solid var(--ux-primary-border);
+  font-family: inherit; cursor: pointer;
+  box-shadow: 0 6px 16px rgba(137,83,0,.22);
+}
+.itp-mic-ico{ font-size: 1.8em; line-height: 1; }
+/* 녹음 중은 색만이 아니라 글자(멈추기)와 테두리로도 알린다. */
+.itp-mic.on{
+  background: var(--ux-error); color: #fff; border-color: var(--ux-error);
+  animation: itpRec 1.3s ease-in-out infinite;
+}
+@keyframes itpRec {
+  0%,100% { box-shadow: 0 6px 16px rgba(179,38,30,.35), 0 0 0 0 rgba(179,38,30,.4); }
+  50%     { box-shadow: 0 6px 16px rgba(179,38,30,.35), 0 0 0 12px rgba(179,38,30,0); }
+}
+.itp-mic[aria-disabled="true"]{ opacity: .6; cursor: wait; }
+`;
+
 interface SideProps {
   side: "me" | "other";
   lang: string;
@@ -53,171 +228,111 @@ function InterpreterSide({ side, lang, value, state, onStart, onStop, onReplay, 
   const info = LANGUAGES[lang] || LANGUAGES.ko;
   const isMe = side === "me";
 
-  const tint = isMe
-    ? { bg: "linear-gradient(160deg, #FEF3C7 0%, #FDE68A 100%)", pri: "#F59E0B", priDark: "#D97706", ink: "#B45309", border: "#FCD34D" }
-    : { bg: "linear-gradient(160deg, #DBEAFE 0%, #BFDBFE 100%)", pri: "#3B82F6", priDark: "#2563EB", ink: "#1E40AF", border: "#60A5FA" };
-
   const listening = state === "listening";
   const translating = state === "translating";
   const done = state === "done" && !!value;
   const err = state === "error";
 
   return (
-    <div style={{
-      flex: 1, background: tint.bg, position: "relative", overflow: "hidden",
-      display: "flex", flexDirection: "column", justifyContent: "space-between",
-      padding: "18px 16px", minHeight: 0,
-      transform: flipped ? "rotate(180deg)" : "none",
-    }}>
-      <svg data-ux-decor="background" style={{ position: "absolute", top: -10, right: -10, opacity: 0.18, pointerEvents: "none" }} width="140" height="140" viewBox="0 0 140 140" aria-hidden="true">
-        {[0,1,2].flatMap(i => [0,1,2].map(j => {
-          const x = i*44 + (j%2)*22 + 10; const y = j*38 + 10;
-          return <polygon key={`${i}-${j}`} points={`${x+16},${y} ${x+32},${y+9} ${x+32},${y+28} ${x+16},${y+37} ${x},${y+28} ${x},${y+9}`} fill="none" stroke={tint.pri} strokeWidth="1.5"/>;
-        }))}
-      </svg>
-
-      {/* Top: language indicator */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, zIndex: 2 }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 14, background: "#fff",
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
-          border: `2px solid ${tint.border}`, boxShadow: "0 3px 8px rgba(0,0,0,0.06)",
-        }}>{info.flag}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: tint.ink, letterSpacing: 0.5 }}>
-            {isMe ? "나 · 내 언어" : "친구 · 상대방 언어"}
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937" }}>{info.label}</div>
-        </div>
+    <div className={`itp-side ${isMe ? "me" : "other"}${flipped ? " flip" : ""}`} data-state={state}>
+      {/* 위: 누구 차례인지 + 언어 */}
+      <div className="itp-top">
+        <span aria-hidden className="itp-flag">{info.flag}</span>
+        <span className="itp-who">
+          <span data-ux-role="secondary" className="itp-role">{isMe ? "나" : "친구"}</span>
+          <span data-ux-role="label" className="itp-lang" lang={lang}>{info.label}</span>
+        </span>
         {onLangChange && (
-          <select
-            value={lang}
-            onChange={(e) => onLangChange(e.target.value)}
-            aria-label="언어 바꾸기"
-            style={{
-              background: "#fff", border: `2px solid ${tint.border}`, borderRadius: 10,
-              padding: "8px 10px", fontSize: 12, fontWeight: 800, color: tint.ink, cursor: "pointer",
-              fontFamily: "inherit", outline: "none",
-            }}
-          >
-            {availableLangs.map((k) => (
-              <option key={k} value={k}>{LANGUAGES[k]?.flag} {LANGUAGES[k]?.label}</option>
-            ))}
-          </select>
+          <span className="itp-pick">
+            {/* 지원 언어가 15개라 카드로 다 펴면 통역 화면을 덮는다. 네이티브
+                컨트롤을 쓰되 조작 크기와 이름은 토큰·라벨로 맞춘다. */}
+            <label className="itp-sr" htmlFor={`itp-lang-${side}`}>언어 바꾸기</label>
+            <select
+              id={`itp-lang-${side}`}
+              data-ux-role="control"
+              className="itp-select"
+              value={lang}
+              onChange={(e) => onLangChange(e.target.value)}
+            >
+              {availableLangs.map((k) => (
+                <option key={k} value={k}>{LANGUAGES[k]?.label}</option>
+              ))}
+            </select>
+          </span>
         )}
       </div>
 
-      {/* Middle: transcript */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 4px", zIndex: 2 }}>
+      {/* 가운데: 말한 내용 */}
+      <div className="itp-body">
         {listening ? (
-          <div style={{ textAlign: "center" }}>
-            <div data-ux-decor aria-hidden="true" style={{ display: "flex", gap: 4, justifyContent: "center", marginBottom: 10, height: 44, alignItems: "center" }}>
-              {Array.from({ length: 16 }).map((_, i) => (
-                <div key={i} style={{
-                  width: 4, borderRadius: 2, background: tint.pri, height: 12 + (i % 4) * 8,
-                  animation: `interpWave ${0.7 + (i % 4) * 0.1}s ease-in-out ${i * 0.05}s infinite alternate`,
-                }} />
+          <div className="itp-status">
+            <span aria-hidden className="itp-wave">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <i key={i} style={{ animationDelay: `${i * 0.09}s` }} />
               ))}
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: tint.ink }}>🎧 듣고 있어요...</div>
+            </span>
+            <span data-ux-role="body-emphasis" className="itp-status-text">듣고 있어요</span>
           </div>
         ) : translating ? (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              {[0, 1, 2].map((i) => (
-                <div key={i} style={{
-                  width: 10, height: 10, borderRadius: "50%", background: tint.pri,
-                  animation: `interpDot 1.1s infinite ${i * 0.15}s`,
-                }} />
-              ))}
-            </div>
-            <div style={{ marginTop: 10, fontSize: 15, fontWeight: 800, color: tint.ink }}>
-              🐝 꿀벌이 번역 중...
-            </div>
+          <div className="itp-status">
+            <span aria-hidden className="itp-dots">
+              {[0, 1, 2].map((i) => <i key={i} style={{ animationDelay: `${i * 0.16}s` }} />)}
+            </span>
+            <span data-ux-role="body-emphasis" className="itp-status-text">바꾸는 중</span>
           </div>
         ) : done && value ? (
-          <div style={{ width: "100%" }}>
-            <div style={{
-              background: "#fff", borderRadius: 18, padding: "14px 16px",
-              border: `2px solid ${tint.border}`,
-              boxShadow: "0 6px 16px rgba(0,0,0,0.08)",
-              fontSize: 19, fontWeight: 700, color: "#1F2937", lineHeight: 1.5,
-              textAlign: "center",
-            }}>
-              {value.translation}
-            </div>
-            <div style={{
-              marginTop: 8, padding: "6px 10px", textAlign: "center",
-              fontSize: 13, color: tint.ink, fontWeight: 600, fontStyle: "italic", opacity: 0.85,
-            }}>
-              &quot;{value.original}&quot;
-            </div>
+          <div className="itp-result">
+            {/* 상대가 읽을 번역문이 주인공 — 크게. */}
+            <p data-ux-role="learn-sentence" className="itp-translation">{value.translation}</p>
+            {/* 내가 말한 원문은 확인용 — 작게, 하지만 지우지 않는다. */}
+            <p data-ux-role="secondary" className="itp-original">{value.original}</p>
           </div>
         ) : err ? (
-          <div style={{ textAlign: "center", padding: "0 10px" }}>
-            <div style={{ fontSize: 36, marginBottom: 6 }}>😅</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#B91C1C", lineHeight: 1.55 }}>
-              {errorMsg || "다시 해볼까?"}
-            </div>
-          </div>
+          <p data-ux-role="body" className="itp-error" role="status">
+            {errorMsg || "다시 한 번 말해 볼까요?"}
+          </p>
         ) : (
-          <div style={{ textAlign: "center", opacity: 0.9, padding: "0 10px" }}>
-            {isMe && (
-              <img
-                src="/interpreter/empty.png"
-                alt=""
-                aria-hidden="true"
-                onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-                style={{ width: 110, height: 110, objectFit: "contain", margin: "0 auto 6px", display: "block",
-                  filter: "drop-shadow(0 4px 10px rgba(245,158,11,0.28))" }}
-              />
-            )}
-            <div style={{ fontSize: 14, fontWeight: 800, color: tint.ink, lineHeight: 1.65, whiteSpace: "pre-line" }}>
-              {isMe
-                ? `마이크를 누르고\n${info.label}로 말해봐!`
-                : `${info.flag} ${info.label}\n친구가 말할 차례예요`}
-            </div>
-          </div>
+          <p data-ux-role="body" className="itp-hint">
+            {isMe ? "누르고 말해 보세요" : "친구가 말할 차례예요"}
+          </p>
         )}
       </div>
 
-      {/* Bottom: mic + replay */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, zIndex: 2 }}>
+      {/* 아래: 마이크가 이 화면의 주인공이다 */}
+      <div className="itp-actions">
         {done && (
-          <button
-            onClick={onReplay}
-            aria-label="다시 듣기"
-            style={{
-              width: 52, height: 52, borderRadius: 16, border: `2px solid ${tint.border}`,
-              background: "#fff", color: tint.ink, fontSize: 22, cursor: "pointer",
-              boxShadow: "0 3px 10px rgba(0,0,0,0.08)",
-            }}
-          >🔊</button>
+          <button type="button" data-ux-role="control" className="itp-replay" onClick={onReplay}>
+            <span aria-hidden>🔊</span>
+            <span data-ux-role="label">다시 듣기</span>
+          </button>
         )}
         <button
+          type="button"
+          className={listening ? "itp-mic on" : "itp-mic"}
           onClick={listening ? onStop : onStart}
-          disabled={translating}
-          aria-label={listening ? "녹음 멈추기" : "말하기 시작"}
-          style={{
-            width: 84, height: 84, borderRadius: "50%", border: "none",
-            background: listening
-              ? "linear-gradient(135deg, #EF4444, #DC2626)"
-              : `linear-gradient(135deg, ${tint.pri}, ${tint.priDark})`,
-            color: "#fff", fontSize: 34, cursor: translating ? "wait" : "pointer",
-            boxShadow: `0 14px 32px ${tint.pri}66, inset 0 -4px 0 rgba(0,0,0,0.18)`,
-            animation: listening ? "interpRecPulse 1.2s infinite" : "none",
-            transition: "transform 0.12s",
-          }}
-          onMouseDown={(e) => !translating && ((e.currentTarget as HTMLButtonElement).style.transform = "scale(0.94)")}
-          onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = "scale(1)")}
+          aria-disabled={translating}
+          aria-label={listening ? "녹음 멈추기" : `${info.label}로 말하기`}
+          onClickCapture={(e) => { if (translating) e.preventDefault(); }}
         >
-          {listening ? "⏹" : "🎤"}
+          <span aria-hidden className="itp-mic-ico">{listening ? "■" : "🎤"}</span>
+          <span data-ux-role="label" className="itp-mic-label">{listening ? "멈추기" : "말하기"}</span>
         </button>
-        {done && <div style={{ width: 52 }} />}
       </div>
     </div>
   );
+}
+
+/**
+ * 개발용 fixture 주입구 (HARNESS §2 G0). 통역은 마이크 권한과 /api/stt·번역이
+ * 있어야 상태가 진행돼서, 없으면 '듣는 중·바꾸는 중·완료·오류' 화면을 아예
+ * 검수할 수 없다. 값이 있으면 녹음도 원격 호출도 하지 않고 그 상태로 그린다.
+ */
+export interface InterpreterFixture {
+  meState?: SideState;
+  otherState?: SideState;
+  meValue?: SideValue | null;
+  otherValue?: SideValue | null;
+  errMsg?: string;
 }
 
 interface Props {
@@ -225,16 +340,19 @@ interface Props {
   onClose: () => void;
   viewerLang: string;
   availableLangs: string[];
+  fixture?: InterpreterFixture;
 }
 
-export default function InterpreterDrawer({ open, onClose, viewerLang, availableLangs }: Props) {
+export default function InterpreterDrawer({ open, onClose, viewerLang, availableLangs, fixture }: Props) {
+  /** fixture 가 주입되면 마이크·네트워크 경계를 통째로 끈다. */
+  const offline = !!fixture;
   const defaultPartner = availableLangs.find((l) => l !== viewerLang) || "vi";
   const [partnerLang, setPartnerLang] = useState<string>(defaultPartner);
-  const [meState, setMeState] = useState<SideState>("idle");
-  const [otherState, setOtherState] = useState<SideState>("idle");
-  const [meValue, setMeValue] = useState<SideValue | null>(null);
-  const [otherValue, setOtherValue] = useState<SideValue | null>(null);
-  const [errMsg, setErrMsg] = useState<string>("");
+  const [meState, setMeState] = useState<SideState>(fixture?.meState ?? "idle");
+  const [otherState, setOtherState] = useState<SideState>(fixture?.otherState ?? "idle");
+  const [meValue, setMeValue] = useState<SideValue | null>(fixture?.meValue ?? null);
+  const [otherValue, setOtherValue] = useState<SideValue | null>(fixture?.otherValue ?? null);
+  const [errMsg, setErrMsg] = useState<string>(fixture?.errMsg ?? "");
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -249,7 +367,7 @@ export default function InterpreterDrawer({ open, onClose, viewerLang, available
     setErrMsg("");
   }
 
-  useEffect(() => { if (!open) reset(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open]);
+  useEffect(() => { if (!open && !offline) reset(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, offline]);
   useEffect(() => () => { cancelRecording(); stopAllAudio(); }, []);
 
   function cancelRecording() {
@@ -263,6 +381,8 @@ export default function InterpreterDrawer({ open, onClose, viewerLang, available
   }
 
   async function startRecording(side: "me" | "other") {
+    // fixture: 마이크를 켜지 않는다. 주입된 상태 그대로 둔다.
+    if (offline) return;
     if (meState === "listening" || otherState === "listening" || meState === "translating" || otherState === "translating") return;
     setErrMsg("");
     try {
@@ -357,94 +477,62 @@ export default function InterpreterDrawer({ open, onClose, viewerLang, available
 
   return (
     <>
+      <ScopedStyle css={ITP_CSS} />
       <div
+        className={open ? "itp-scrim on" : "itp-scrim"}
         onClick={onClose}
-        style={{
-          position: "fixed", inset: 0, background: "rgba(31,41,55,0.55)",
-          opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none",
-          transition: "opacity 0.25s", zIndex: 200,
-        }}
+        aria-hidden="true"
       />
       <div
+        data-ux-root
         role="dialog" aria-modal="true" aria-label="통역 도우미"
-        style={{
-          position: "fixed", top: 0, right: 0, bottom: 0,
-          width: "min(560px, 96vw)",
-          background: "#1F2937",
-          transform: open ? "translateX(0)" : "translateX(100%)",
-          transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          zIndex: 201, display: "flex", flexDirection: "column",
-          boxShadow: "-10px 0 40px rgba(0,0,0,0.35)",
-        }}
+        className={open ? "itp-sheet on" : "itp-sheet"}
       >
-        {/* Header */}
-        <div style={{
-          padding: "18px 14px 12px", display: "flex", alignItems: "center", gap: 10,
-          flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.08)",
-        }}>
-          <button
-            onClick={onClose}
-            aria-label="닫기"
-            style={{
-              width: 44, height: 44, borderRadius: 12, border: "none",
-              background: "rgba(255,255,255,0.12)", fontSize: 20, fontWeight: 900, color: "#fff", cursor: "pointer",
-            }}
-          >→</button>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 17, fontWeight: 900, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
-              🎙️ 통역 도우미
-              <span style={{
-                fontSize: 10, fontWeight: 900, background: "#F59E0B", color: "#fff",
-                padding: "3px 8px", borderRadius: 999, letterSpacing: 0.5,
-              }}>BETA</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#9CA3AF", fontWeight: 600, marginTop: 2 }}>
-              말하면 상대방 말로 바꿔줘요 · 대화는 저장되지 않아요
-            </div>
-          </div>
-          <button
-            onClick={reset}
-            aria-label="초기화"
-            style={{
-              background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 12,
-              padding: "10px 12px", fontSize: 14, fontWeight: 900, color: "#fff", cursor: "pointer",
-            }}
-          >↻</button>
+        {/* 머리: 닫기 · 제목 · 처음부터 */}
+        <div className="itp-head">
+          <button type="button" data-ux-role="control" className="itp-close" onClick={onClose}>
+            <span aria-hidden>✕</span>
+            <span data-ux-role="label">닫기</span>
+          </button>
+          <h2 data-ux-role="title" className="itp-title">통역</h2>
+          <button type="button" data-ux-role="control" className="itp-reset" onClick={reset}>
+            <span aria-hidden>↻</span>
+            <span data-ux-role="label">처음부터</span>
+          </button>
         </div>
 
-        {/* Lang pair selector */}
-        <div style={{
-          padding: "10px 14px 12px", borderBottom: "1px solid rgba(255,255,255,0.08)",
-          display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
-        }}>
-          <div style={{
-            flex: 1, background: "rgba(245,158,11,0.2)", border: "1.5px solid rgba(245,158,11,0.4)",
-            borderRadius: 12, padding: "9px 12px", display: "flex", alignItems: "center", gap: 8,
-          }}>
-            <span style={{ fontSize: 18 }}>{LANGUAGES[viewerLang]?.flag}</span>
-            <span style={{ fontSize: 13, fontWeight: 900, color: "#FEF3C7" }}>{LANGUAGES[viewerLang]?.label}</span>
-            <span style={{ fontSize: 10, fontWeight: 900, color: "#FCD34D", marginLeft: "auto", letterSpacing: 0.5 }}>나</span>
-          </div>
-          <div style={{ color: "#9CA3AF", fontSize: 18, fontWeight: 900 }}>⇅</div>
-          <select
-            value={partnerLang}
-            onChange={(e) => { setPartnerLang(e.target.value); reset(); }}
-            style={{
-              flex: 1, background: "rgba(59,130,246,0.2)", border: "1.5px solid rgba(59,130,246,0.4)",
-              borderRadius: 12, padding: "9px 12px", fontSize: 13, fontWeight: 900, color: "#DBEAFE",
-              fontFamily: "inherit", cursor: "pointer", outline: "none",
-            }}
-          >
-            {partnerOptions.map((k) => (
-              <option key={k} value={k} style={{ color: "#1F2937" }}>
-                {LANGUAGES[k]?.flag} {LANGUAGES[k]?.label} (친구)
-              </option>
-            ))}
-          </select>
+        {/* 두 사람의 언어 — 무엇이 무엇으로 바뀌는지 한 줄로 */}
+        <div className="itp-pair">
+          <span className="itp-pair-me">
+            <span aria-hidden>{LANGUAGES[viewerLang]?.flag}</span>
+            <span data-ux-role="label" lang={viewerLang}>{LANGUAGES[viewerLang]?.label}</span>
+          </span>
+          <span aria-hidden className="itp-pair-arrow">⇄</span>
+          <span className="itp-pair-other">
+            <label className="itp-sr" htmlFor="itp-partner">친구 언어 고르기</label>
+            <select
+              id="itp-partner"
+              data-ux-role="control"
+              className="itp-select"
+              value={partnerLang}
+              onChange={(e) => { setPartnerLang(e.target.value); reset(); }}
+            >
+              {partnerOptions.map((k) => (
+                <option key={k} value={k}>{LANGUAGES[k]?.label}</option>
+              ))}
+            </select>
+          </span>
         </div>
 
-        {/* Mirror layout — vertical (top side flipped) */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+        {/*
+          마주 보기 배치.
+          - 세로(태블릿 세로·폰): 위아래. 위쪽(친구)만 180° 돌려 마주 본 사람이
+            바로 읽게 한다.
+          - 가로(태블릿 가로·크롬북·노트북): **좌우로 나란히**. 넓은 화면에서
+            위아래로 쌓으면 각자 몫이 납작해지고, 글자를 뒤집을 필요도 없다.
+            07·04 §5 의 "폭이 생기면 옆으로" 와 같은 원칙이다.
+        */}
+        <div className="itp-stagewrap">
           <InterpreterSide
             side="other"
             lang={partnerLang}
@@ -459,15 +547,8 @@ export default function InterpreterDrawer({ open, onClose, viewerLang, available
             onLangChange={(l) => { setPartnerLang(l); reset(); }}
           />
 
-          {/* Divider */}
-          <div style={{
-            background: "#1F2937", height: 36, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#9CA3AF", fontSize: 11, fontWeight: 800, letterSpacing: 1, gap: 8,
-            borderTop: "1px dashed rgba(255,255,255,0.12)", borderBottom: "1px dashed rgba(255,255,255,0.12)",
-          }}>
-            <BeeMascot size={22} mood="happy" flying={false} />
-            서로 마주 보고 사용해요
+          <div className="itp-divider">
+            <span data-ux-role="secondary">마주 보고 번갈아 말해요</span>
           </div>
 
           <InterpreterSide
@@ -483,29 +564,7 @@ export default function InterpreterDrawer({ open, onClose, viewerLang, available
             availableLangs={[viewerLang]}
           />
         </div>
-
-        <div style={{
-          padding: "10px 14px 14px", flexShrink: 0,
-          textAlign: "center", fontSize: 11, color: "#6B7280", fontWeight: 700,
-        }}>
-          💡 파파고처럼 내 목소리를 친구 말로 바꿔 주는 도구예요
-        </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes interpWave {
-          from { transform: scaleY(0.4); }
-          to   { transform: scaleY(1.4); }
-        }
-        @keyframes interpDot {
-          0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
-          40%           { transform: scale(1);   opacity: 1;   }
-        }
-        @keyframes interpRecPulse {
-          0%, 100% { box-shadow: 0 14px 32px rgba(239,68,68,0.5), inset 0 -4px 0 rgba(0,0,0,0.18), 0 0 0 0 rgba(239,68,68,0.45); }
-          50%      { box-shadow: 0 14px 32px rgba(239,68,68,0.5), inset 0 -4px 0 rgba(0,0,0,0.18), 0 0 0 14px rgba(239,68,68,0);    }
-        }
-      `}</style>
     </>
   );
 }

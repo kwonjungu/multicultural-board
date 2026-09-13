@@ -15,6 +15,7 @@ import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { readChatStream } from "@/lib/chatStreamClient";
 import { raiseAlert } from "@/lib/storybook";
 import { t } from "@/lib/i18n";
+import { useOpenLayerCount } from "@/lib/backStack";
 import type { UserConfig } from "@/lib/types";
 import MicButton from "./MicButton";
 import ScopedStyle from "./ui/child/ScopedStyle";
@@ -107,6 +108,15 @@ export default function TutorChat({
   const lang = user.myLang;
   const storageKey = `tutorChat:${roomCode}:${myClientId}`;
   const [open, setOpen] = useState(false);
+  /**
+   * 꾸미기·통역 같은 창이 열려 있으면 꿀비 버튼을 비켜 준다.
+   *
+   * 이 버튼은 position:fixed; z-index:300 이라 모달·서랍 위에 그대로 떠 있었다.
+   * 아이 입장에서는 창을 열었는데 그 위로 다른 버튼이 툭 튀어나온 것으로 보인다
+   * (사용자 보고). 이미 열어 둔 대화 패널은 닫지 않는다 — 쓰던 것을 빼앗지
+   * 않고, 아직 안 연 버튼만 숨긴다.
+   */
+  const openLayers = useOpenLayerCount();
   const [collapsed, setCollapsed] = useState(false);
   const [messages, setMessages] = useState<TutorMsg[]>([]);
   const [draft, setDraft] = useState("");
@@ -290,8 +300,9 @@ export default function TutorChat({
     <div data-ux-root className="tc-root">
       <ScopedStyle css={TC_CSS} />
 
-      {/* 플로팅 버튼 — 아이콘 단독이 아니라 글자 라벨을 같이 둔다 */}
-      {!open && (
+      {/* 플로팅 버튼 — 아이콘 단독이 아니라 글자 라벨을 같이 둔다.
+          다른 창이 열려 있는 동안에는 그 위에 겹쳐 뜨지 않는다. */}
+      {!open && openLayers === 0 && (
         <button
           type="button"
           data-ux-role="control"

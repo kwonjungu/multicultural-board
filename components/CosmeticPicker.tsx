@@ -552,12 +552,12 @@ export default function CosmeticPicker({
                       key={pos}
                       onClick={() => setDraft((d) => ({ ...d, petPos: pos }))}
                       aria-pressed={on}
+                      data-ux-role="control"
                       style={{
-                        minHeight: 38, padding: "6px 16px", borderRadius: 10,
                         border: `2px solid ${on ? "#F59E0B" : "#E5E7EB"}`,
                         background: on ? "#FEF3C7" : "#fff",
                         color: on ? "#B45309" : "#9CA3AF",
-                        fontSize: 13, fontWeight: 900, cursor: "pointer",
+                        fontWeight: 900, cursor: "pointer",
                         fontFamily: "inherit",
                       }}
                     >{pos === "left" ? "◀ 왼쪽" : "오른쪽 ▶"}</button>
@@ -605,40 +605,43 @@ export default function CosmeticPicker({
           )}
         </div>
 
-        {/* Bottom actions */}
+        {/* Bottom actions — 보조(취소)는 왼쪽에 테두리 없이 낮은 강조,
+            주 동작(저장)은 오른쪽에 평소 강조 (04 §1). 크기는 control/action
+            역할 최소값 그대로 쓴다 — 인라인 min-height 로 다시 정하지 않는다. */}
         <div style={{
           flexShrink: 0, padding: "12px 14px 16px",
           borderTop: "1.5px solid #FDE68A",
           background: "#FFFBEB",
           display: "flex", gap: 10, alignItems: "center",
+          justifyContent: "space-between",
         }}>
           <button
+            data-ux-role="control"
             onClick={handleCancel}
             disabled={saving}
             style={{
-              flex: 1, minHeight: 54, borderRadius: 18,
-              background: "#fff", border: "2px solid #FDE68A",
-              color: "#92400E", fontWeight: 900, fontSize: 15,
+              background: "transparent", border: "2px solid transparent",
+              color: "#92400E", fontWeight: 700,
               cursor: saving ? "not-allowed" : "pointer",
-              transition: "all 0.12s",
               opacity: saving ? 0.6 : 1,
             }}
           >
             {t("cosmeticCancel", lang)}
           </button>
           <button
+            data-ux-role="action"
             onClick={handleSave}
             disabled={saving}
             style={{
-              flex: 2, minHeight: 54, borderRadius: 18,
+              flex: "1 1 auto", maxWidth: 260,
               background: saving
                 ? "#F3F4F6"
                 : "linear-gradient(135deg, #F59E0B, #D97706)",
               color: saving ? "#CBD5E1" : "#fff",
-              fontWeight: 900, fontSize: 17, border: "none",
+              fontWeight: 900, border: "none",
               cursor: saving ? "wait" : "pointer",
               boxShadow: saving ? "none" : "0 10px 24px rgba(245,158,11,0.4), inset 0 -3px 0 rgba(0,0,0,0.15)",
-              transition: "all 0.15s", letterSpacing: -0.2,
+              letterSpacing: -0.2,
             }}
           >
             {saving ? "⟳" : t("cosmeticSave", lang)}

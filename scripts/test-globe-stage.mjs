@@ -161,4 +161,65 @@ check('.gq-stage 가 position:relative 로 mount 의 absolute 앵커를 제공�
     '.gq-stage 의 min-height 바닥값이 없다 — 저높이/큰 글씨에서 stage 가 0 으로 짜부라질 수 있다');
 });
 
+/* ── 9. U11b(07 배치 계약): 나라 카드가 stage 를 상시 덮는 절대배치 오버레이가
+   아니라 stage 와 정상 흐름으로 나란한 패널이다 ─────────────────────────── */
+
+function extractBalancedBlock(text, startIndex) {
+  const braceIdx = text.indexOf('{', startIndex);
+  if (braceIdx === -1) return null;
+  let depth = 1, i = braceIdx + 1;
+  while (i < text.length && depth > 0) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') depth--;
+    i++;
+  }
+  return text.slice(braceIdx + 1, i - 1);
+}
+
+check('예전 .gq-cardlayer(하단 절대배치 시트)가 더 남아있지 않다 — panel 로 대체됐다', () => {
+  assert.ok(!/\.gq-cardlayer/.test(c),
+    '.gq-cardlayer 가 여전히 있다 — 나라 카드가 아직 stage 를 덮는 절대배치 오버레이일 수 있다');
+});
+
+check('GlobeShell 이 상시 정보는 panel(정상 흐름), 스쳐가는 토스트는 overlay(절대배치)로 분리한다', () => {
+  assert.match(c, /function\s+GlobeShell\s*\(\s*\{\s*topBar\s*,\s*children\s*,\s*overlay\s*,\s*panel\s*\}/,
+    'GlobeShell 이 panel prop 을 받지 않는다');
+  assert.match(c, /<div className="gq-stagewrap">/, '.gq-stagewrap 컨테이너가 없다');
+});
+
+check('ExploreMode 의 나라 카드가 overlay 가 아니라 panel 로 전달된다', () => {
+  assert.match(c, /panel=\{selected\s*&&/, 'ExploreMode 가 선택된 나라 카드를 panel 로 넘기지 않는다');
+  // 게임하기 모드의 정오답 토스트는 여전히 stage 공간을 뺏지 않는 절대배치 overlay 여야 한다.
+  assert.match(c, /overlay=\{flash\s*&&/, 'QuizMode 의 플래시 토스트가 overlay 경로에서 빠졌다 — 절대배치를 잃으면 안 된다');
+});
+
+check('.gq-panel 이 position:absolute 로 stage 위를 덮지 않는다(정상 흐름 배치)', () => {
+  const panelBlock = /\.gq-panel\{([^}]*)\}/.exec(c)?.[1] ?? '';
+  assert.ok(panelBlock.length > 0, '.gq-panel{...} 기본 규칙을 찾지 못했다');
+  assert.ok(!/position:\s*absolute/.test(panelBlock),
+    '.gq-panel 이 position:absolute 다 — stage(지구본) 위를 상시 덮는 옛 방식으로 되돌아갔다');
+});
+
+check('.gq-stagewrap 이 flex 컨테이너라 패널이 나타나면 stage 실측 크기가 실제로 바뀐다', () => {
+  const wrapBlock = /\.gq-stagewrap\{([^}]*)\}/.exec(c)?.[1] ?? '';
+  assert.match(wrapBlock, /display:\s*flex/,
+    '.gq-stagewrap 이 flex 가 아니다 — 패널이 나타나도 stage 폭/높이가 반응하지 않을 수 있다(ResizeObserver 가 관찰하는 .gq-stage 크기 자체가 안 바뀜)');
+});
+
+check('폭이 충분하면 컨테이너 쿼리로 stage 옆에 패널을 두고, 패널 폭을 제한한다(07: "정보 패널 폭은 제한")', () => {
+  const idx = c.indexOf('@container');
+  assert.ok(idx !== -1, '@container 규칙이 없다 — 07 이 요구하는, 실제 stage 공간 기준(뷰포트가 아니라) 폭 판단이 없다');
+  const wideBlock = extractBalancedBlock(c, idx) ?? '';
+  assert.match(wideBlock, /\.gq-stagewrap\{[^}]*flex-direction:\s*row/,
+    '넓을 때 .gq-stagewrap 을 가로(row)로 바꿔 stage 옆에 패널을 두는 규칙이 없다');
+  assert.match(wideBlock, /\.gq-panel\{[^}]*(?:width|max-width):\s*min\(\s*\d+px|\.gq-panel\{[^}]*max-width:\s*\d+px/,
+    '넓을 때 .gq-panel 폭이 제한되지 않는다 — "정보 패널 폭은 제한" 계약 위반(패널이 stage 를 밀어낼 수 있다)');
+});
+
+check('.gq-shell 이 container-type 을 선언해 뷰포트가 아니라 실제 자기 폭으로 배치를 판단한다', () => {
+  const shellBlock = /\.gq-shell\{([^}]*)\}/.exec(c)?.[1] ?? '';
+  assert.match(shellBlock, /container-type:\s*inline-size/,
+    '.gq-shell 에 container-type:inline-size 가 없다 — @container 규칙이 뷰포트가 아닌 셸 자신의 실제 폭을 기준으로 판단하지 못한다(나중에 GameRoom 이 셸을 더 좁게 배치해도 반응 못 함)');
+});
+
 console.log(`\n${count} checks passed`);

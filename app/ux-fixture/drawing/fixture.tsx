@@ -66,11 +66,12 @@ export default function DrawingFixture({ teacher = false }: { teacher?: boolean 
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFBEB", padding: 16 }}>
+    <div data-ux-root style={{ minHeight: "100svh", background: "#FFFBEB", padding: "var(--ux-space-4)" }}>
       <div
         data-testid="fixture-nav"
         data-fixture-chrome
-        style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 10 }}
+        data-ux-role="secondary"
+        style={{ marginBottom: 10 }}
       >
         role={teacher ? "teacher" : "student"} — {teacher ? "완성작(검토용)" : "그리다 만 상태(진행 중)"}
       </div>
