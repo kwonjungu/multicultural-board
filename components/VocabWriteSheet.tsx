@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { VocabWord } from "@/lib/vocabWords";
 
@@ -23,6 +24,17 @@ const PRACTICE_CELLS = 5;
  */
 export default function VocabWriteSheet({ words, onClose, studentName }: Props) {
   const handlePrint = () => window.print();
+
+  /**
+   * portal 대상은 마운트 뒤에만 있다. 서버 렌더 중에는 `document` 가 없어서
+   * 이 컴포넌트가 처음 그려지는 순간 `document is not defined` 로 500 이 난다.
+   * 지금까지는 버튼을 눌러야 열려서 SSR 을 타지 않았을 뿐이고, 열린 상태로
+   * 들어오는 경로(fixture 의 ?open=write, 앞으로 생길 딥링크)가 생기자마자
+   * 바로 터졌다. 마운트 전에는 아무것도 그리지 않는다.
+   */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
 
   // portal 로 body 직속 렌더 — 앱 화면(숨겨져도 높이를 차지) 뒤에 빈 페이지가
   // 딸려 인쇄되는 문제를 원천 차단. print CSS 의 body > * 선택자와 한 쌍.
@@ -101,25 +113,21 @@ export default function VocabWriteSheet({ words, onClose, studentName }: Props) 
             background: "#fff",
             color: PURPLE_DARK,
             border: "none",
-            borderRadius: 12,
-            padding: "10px 16px",
-            fontSize: 14,
             fontWeight: 900,
             cursor: "pointer",
             fontFamily: "inherit",
             boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
           }}
+          data-ux-role="control"
         >🖨 인쇄하기</button>
         <button
           onClick={onClose}
           aria-label="닫기"
+          data-ux-role="control"
           style={{
             background: "rgba(255,255,255,0.22)",
             color: "#fff",
             border: "none",
-            borderRadius: 12,
-            padding: "10px 14px",
-            fontSize: 14,
             fontWeight: 900,
             cursor: "pointer",
             fontFamily: "inherit",

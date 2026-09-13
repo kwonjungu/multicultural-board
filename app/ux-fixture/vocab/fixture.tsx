@@ -90,10 +90,14 @@ export default function VocabFixture({
   state = "progress",
   lang = "ko",
   teacher = false,
+  openView,
+  openWordId,
 }: {
   state?: VocabState;
   lang?: string;
   teacher?: boolean;
+  openView?: "detail" | "notebook" | "write" | "quiz" | "review";
+  openWordId?: string;
 }) {
   const [blocked, setBlocked] = useState<string[]>([]);
   const blockedRef = useRef<string[]>([]);
@@ -140,14 +144,16 @@ export default function VocabFixture({
       expressions: expressionsFor(state),
       cardTexts: cardTextsFor(state),
       stickersEarned: state === "rich" ? 4 : state === "progress" ? 1 : 0,
+      ...(openView ? { openView } : {}),
+      ...(openWordId ? { openWordId } : {}),
     }),
-    [state]
+    [state, openView, openWordId]
   );
 
   return (
     <>
       <VocabHub
-        key={`${state}-${lang}-${teacher}`}
+        key={`${state}-${lang}-${teacher}-${openView ?? ""}-${openWordId ?? ""}`}
         user={user}
         roomCode="9999"
         onBack={() => { /* fixture: 돌아갈 상위 화면이 없다 */ }}

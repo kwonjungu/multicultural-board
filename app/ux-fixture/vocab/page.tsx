@@ -9,6 +9,9 @@ import VocabFixture, { type VocabState } from "./fixture";
  *
  * 쿼리로 조합을 고른다:
  *   ?state=new|progress|rich   ?lang=ko|vi|en   ?role=student|teacher
+ *   ?open=detail|notebook|write|quiz|review   ?word=<단어 id>
+ *   open= 은 하위 학습 화면을 바로 열어 검수하기 위한 것이다 — 홈에서 여러 번
+ *   눌러야 도달해 캡처가 불안정하기 때문이다.
  *   new      = 첫 학생(진도 0) — 가짜 이어하기·가짜 달성률이 없어야 한다
  *   progress = 감정 단원 일부 진행
  *   rich     = 진도 + 표현 복습 대기 + 소통창 문장까지 있는 상태
@@ -26,11 +29,17 @@ export default function Page({
   const raw = pick("state");
   const state: VocabState =
     raw === "new" || raw === "progress" || raw === "rich" ? raw : "progress";
+  const rawView = pick("open");
+  const openView =
+    rawView === "detail" || rawView === "notebook" || rawView === "write"
+      || rawView === "quiz" || rawView === "review" ? rawView : undefined;
   return (
     <VocabFixture
       state={state}
       lang={pick("lang") || "ko"}
       teacher={pick("role") === "teacher"}
+      openView={openView}
+      openWordId={pick("word")}
     />
   );
 }

@@ -64,6 +64,18 @@ export interface VocabFixture {
   /** 소통창에서 긁어온 문장. 자동 스캔은 서버 대신 로컬 추출로만 돈다. */
   cardTexts?: string[];
   stickersEarned?: number;
+  /**
+   * 하위 학습 화면을 바로 열어 검수할 수 있게 하는 초기 상태.
+   * 이 화면들은 홈에서 여러 번 눌러야 도달해 캡처가 불안정하다.
+   *   detail   = 단어 상세(VocabCard)
+   *   notebook = 내 단어장
+   *   write    = 쓰기 학습지
+   *   quiz     = 문제 풀기(VocabTest)
+   *   review   = 표현 복습
+   */
+  openView?: "detail" | "notebook" | "write" | "quiz" | "review";
+  /** openView="detail" 일 때 열 단어. 없으면 첫 단어. */
+  openWordId?: string;
 }
 
 interface Props {
@@ -79,7 +91,11 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
   const lang = user.myLang;
   const [progress, setProgress] = useState<ProgressMap>(fixture?.progress ?? {});
   const [activeSub, setActiveSub] = useState<string | "all">("all");
-  const [openWord, setOpenWord] = useState<VocabWord | null>(null);
+  const [openWord, setOpenWord] = useState<VocabWord | null>(
+    fixture?.openView === "detail"
+      ? (VOCAB_WORDS.find((w) => w.id === fixture.openWordId) ?? VOCAB_WORDS[0])
+      : null,
+  );
 
   // 소통창 카드 텍스트 수집
   const [cardTexts, setCardTexts] = useState<string[]>(fixture?.cardTexts ?? []);
@@ -92,10 +108,16 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
   const [stickersEarned, setStickersEarned] = useState(fixture?.stickersEarned ?? 0);
 
   // 뷰 모드 (트리 / 그리드 / 단어장) — 듀오링고 스타일 트리가 기본
-  const [viewMode, setViewMode] = useState<"tree" | "grid" | "notebook">("tree");
+  const [viewMode, setViewMode] = useState<"tree" | "grid" | "notebook">(
+    fixture?.openView === "notebook" ? "notebook" : "tree",
+  );
 
   // 시험
-  const [quiz, setQuiz] = useState<QuizItem[] | null>(null);
+  const [quiz, setQuiz] = useState<QuizItem[] | null>(
+    fixture?.openView === "quiz"
+      ? buildDailyChallenge(fixture.progress ?? {}, [], 10)
+      : null,
+  );
   const [lessonContext, setLessonContext] = useState<{ id: string; title: string } | null>(null);
   // 레슨 시작 시트 — 단어 카드 공부(상황 카드) ↔ 시험 선택
   const [lessonSheet, setLessonSheet] = useState<{ lesson: Lesson; unit: Unit } | null>(null);
@@ -107,8 +129,8 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
   const [goalToast, setGoalToast] = useState<string | null>(null);
   const goalAdjustedRef = useRef(false);
   const [expressions, setExpressions] = useState<ExpressionEntry[]>(fixture?.expressions ?? []);
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [showWriteSheet, setShowWriteSheet] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(fixture?.openView === "review");
+  const [showWriteSheet, setShowWriteSheet] = useState(fixture?.openView === "write");
   const [showDictation, setShowDictation] = useState(false);
 
   useEffect(() => {
@@ -354,12 +376,16 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
         boxShadow: "0 8px 24px rgba(109, 40, 217, 0.12)",
         marginBottom: 18,
       }}>
+        {/* U07/U09: 태블릿 터치 기준을 만족해야 한다. 예전에는 64x32px 라
+            손가락으로 누르기 어려웠다. data-ux-role="control" 이 토큰의
+            최소 크기(터치 48px / 마우스 44px)를 걸어 준다. */}
         <button
           onClick={onBack}
           aria-label="뒤로"
+          data-ux-role="control"
           style={{
-            background: PURPLE_LIGHT, border: "none", borderRadius: 10,
-            padding: "8px 12px", fontSize: 14, fontWeight: 800, color: PURPLE_DARK,
+            background: PURPLE_LIGHT, border: "none",
+            fontWeight: 800, color: PURPLE_DARK,
             cursor: "pointer", fontFamily: "inherit",
           }}
         >{t("vocabBack", lang)}</button>
@@ -380,11 +406,11 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
         {isTeacher && (
           <button
             onClick={() => setTeacherView(true)}
+            data-ux-role="control"
             style={{
               background: "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")",
-              color: "#fff", border: "none", borderRadius: 14,
-              padding: "8px 14px", fontSize: 13, fontWeight: 900,
-              cursor: "pointer", fontFamily: "inherit",
+              color: "#fff", border: "none",
+              fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
               boxShadow: "0 4px 10px " + PURPLE + "55",
             }}
           >👨‍🏫 반 전체 보기</button>
@@ -398,15 +424,15 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             <button
               onClick={() => setReviewOpen(true)}
               aria-label="표현 복습"
+              data-ux-role="control"
               style={{
                 position: "relative",
                 background: dueCount > 0
                   ? "linear-gradient(135deg, #FB923C, #EA580C)"
                   : PURPLE_LIGHT,
                 color: dueCount > 0 ? "#fff" : PURPLE_DARK,
-                border: "none", borderRadius: 14,
-                padding: "8px 12px", fontSize: 13, fontWeight: 900,
-                cursor: "pointer", fontFamily: "inherit",
+                border: "none",
+                fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
                 boxShadow: dueCount > 0 ? "0 4px 12px rgba(234,88,12,0.45)" : "none",
               }}
             >
@@ -648,15 +674,16 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
           <button
             key={v.k}
             onClick={() => setViewMode(v.k)}
+            data-ux-role="control"
+            aria-pressed={viewMode === v.k}
             style={{
               flex: 1,
               background: viewMode === v.k
                 ? "linear-gradient(135deg, " + PURPLE + ", " + PURPLE_DARK + ")"
                 : "transparent",
               color: viewMode === v.k ? "#fff" : "#374151",
-              border: "none", borderRadius: 10,
-              padding: "10px", fontSize: 14, fontWeight: 900,
-              cursor: "pointer", fontFamily: "inherit",
+              border: "none",
+              fontWeight: 900, cursor: "pointer", fontFamily: "inherit",
               boxShadow: viewMode === v.k ? "0 6px 14px rgba(139, 92, 246, 0.3)" : "none",
             }}
           >{v.label}</button>

@@ -114,5 +114,43 @@ check('fixture 는 개발 전용이고 Firebase·원격 호출을 쓰지 않는�
   assert.match(code(fixture), /roomCode="9999"/, 'fixture 가 테스트 방 9999 를 쓰지 않는다');
 });
 
+/* ── 하위 학습 화면 (U07) ─────────────────────────────────────────── */
+
+check('하위 화면을 fixture 로 바로 열 수 있다', () => {
+  // 홈에서 여러 번 눌러야 도달하면 캡처가 불안정해 기기별 검수를 못 한다.
+  assert.match(hc, /openView\?: "detail" \| "notebook" \| "write" \| "quiz" \| "review"/,
+    '하위 화면 주입구가 없다');
+  assert.match(fixturePage, /rawView === "detail"/, '라우트가 open= 을 받지 않는다');
+});
+
+check('단어 화면의 조작이 토큰 최소 크기를 따른다', () => {
+  // 실측: 헤더 뒤로 64x32, 단어장 칩 29px 높이 등 태블릿 터치 기준 미달이었다.
+  // 크기를 인라인 px 로 다시 정하면 토큰의 터치/마우스 분기가 무력화된다.
+  const card = code(read('components/VocabCard.tsx'));
+  const notebook = code(read('components/VocabNotebook.tsx'));
+  const sheet = code(read('components/VocabWriteSheet.tsx'));
+
+  assert.ok((hc.match(/data-ux-role="control"/g) || []).length >= 4,
+    'VocabHub 의 조작에 control 역할이 충분히 붙지 않았다');
+  assert.match(notebook, /data-ux-role="control"/, '단어장 칩에 control 역할이 없다');
+  assert.match(card, /headerBtnStyle/, '상세 헤더 버튼 스타일이 사라졌다');
+  assert.match(card, /aria-label="닫기" data-ux-role="control"/, '상세 닫기 버튼이 작다');
+  assert.match(sheet, /data-ux-role="control"/, '쓰기 학습지 버튼에 control 역할이 없다');
+  // control 역할을 붙여 놓고 padding/fontSize 로 다시 눌러 버리면 소용없다.
+  assert.ok(!/headerBtnStyle: React\.CSSProperties = \{[^}]*padding:/.test(card),
+    '상세 헤더 버튼이 인라인 padding 으로 크기를 다시 정한다');
+});
+
+check('portal 을 쓰는 화면이 서버 렌더에서 터지지 않는다', () => {
+  // 열린 채로 들어오는 경로(fixture ?open=write, 딥링크)에서 실제로 500 이 났다.
+  const sheet = read('components/VocabWriteSheet.tsx');
+  assert.match(sheet, /const \[mounted, setMounted\] = useState\(false\)/,
+    'portal 이 마운트 전에 document 를 만진다');
+  assert.match(sheet, /if \(!mounted\) return null;/, '마운트 가드가 없다');
+  const guardIdx = sheet.indexOf('if (!mounted) return null;');
+  assert.ok(guardIdx > 0 && guardIdx < sheet.indexOf('createPortal('),
+    '마운트 가드가 createPortal 뒤에 있다 — 순서가 뒤바뀌면 의미가 없다');
+});
+
 console.log(`\n${count} checks passed — 실제 열 수·페이지 높이·첫 화면 비율은
 scripts/audit/shot-baseline.mjs 가 브라우저에서 따로 잰다.`);
