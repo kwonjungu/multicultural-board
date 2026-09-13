@@ -607,55 +607,55 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
       ) : (
       <>
 
-      {/* Test CTA banner */}
+      {/* 오늘의 단어 시험 (U07)
+          예전 문제 셋:
+           1) <div> 에 onClick 이라 키보드로 갈 수 없었다.
+           2) 주황 그라디언트 + 강한 그림자로 단원 카드보다 강조가 셌다.
+           3) 배울 단어가 없을 때 '아직 시험 볼 수 없어요 / 먼저 카드를 열어…'
+              라는 **잠금 배너**가 첫 화면의 큰 자리를 차지했다. 아이에게 지금
+              할 수 없는 일을 먼저 알리는 자리다 — 0개 챌린지와 같은 문제다.
+          이제 볼 수 있을 때만 그리고, 챌린지 행과 같은 흰 카드 + 꿀빛 테두리를 쓴다. */}
       {(() => {
         const studied = Object.values(progress).filter((p) => (p.doneSentences?.length ?? 0) > 0).length;
-        const canTest = studied >= 1;
+        if (studied < 1) return null;
         return (
-          <div
+          <button
+            type="button"
             onClick={() => {
-              if (!canTest) return;
               const fallback = matched.map((m) => m.wordId);
               const q = buildMixedQuiz(progress, Math.min(5, Math.max(3, studied)), fallback);
               if (q.length > 0) setQuiz(q);
             }}
             style={{
-              maxWidth: 760, margin: "0 auto 14px",
-              background: canTest
-                ? "linear-gradient(135deg, #FDBA74, #F97316)"
-                : "#F3F4F6",
-              borderRadius: 20,
-              padding: "14px 18px",
-              display: "flex", alignItems: "center", gap: 14,
-              cursor: canTest ? "pointer" : "default",
-              boxShadow: canTest ? "0 10px 26px rgba(249, 115, 22, 0.35)" : "none",
-              border: canTest ? "none" : "2px dashed #D1D5DB",
+              maxWidth: 760, width: "100%", margin: "0 auto 14px",
+              background: "#fff",
+              border: "2px solid var(--ux-primary-border)",
+              borderRadius: 16, padding: "12px 16px",
+              display: "flex", alignItems: "center", gap: 12, textAlign: "left",
+              cursor: "pointer", fontFamily: "inherit",
+              boxShadow: "0 4px 12px rgba(137,83,0,0.12)",
               transition: "transform 0.15s",
             }}
-            onMouseDown={(e) => canTest && (e.currentTarget.style.transform = "scale(0.98)")}
+            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
             onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            <div style={{ fontSize: 40, flexShrink: 0 }}>{canTest ? "📝" : "🔒"}</div>
-            <div style={{ flex: 1, minWidth: 0, color: canTest ? "#fff" : "#6B7280" }}>
-              <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: -0.3 }}>
-                {canTest ? "오늘의 단어 시험" : "아직 시험 볼 수 없어요"}
+            <div aria-hidden style={{ fontSize: 30, flexShrink: 0 }}>📝</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div data-ux-role="label" style={{ fontWeight: 800, color: "var(--ux-ink)" }}>
+                오늘의 단어 시험
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2, opacity: 0.95 }}>
-                {canTest
-                  ? `배운 단어 ${studied}개 중에서 빈칸 채우기 · 말하기 or 입력`
-                  : "먼저 카드를 열어 예문을 하나라도 완료해 보세요"}
+              <div data-ux-role="secondary" style={{ marginTop: 2 }}>
+                배운 단어 {studied}개 중에서 빈칸 채우기
               </div>
             </div>
-            {canTest && (
-              <div style={{
-                background: "rgba(255,255,255,0.25)",
-                color: "#fff", fontSize: 14, fontWeight: 900,
-                padding: "8px 14px", borderRadius: 12,
-                flexShrink: 0,
-              }}>시작 →</div>
-            )}
-          </div>
+            <div style={{
+              background: "var(--ux-primary-fill)", color: "var(--ux-primary-ink)",
+              border: "2px solid var(--ux-primary-border)",
+              fontSize: "var(--ux-font-label)", fontWeight: 800,
+              padding: "8px 14px", borderRadius: 12, flexShrink: 0,
+            }}>시작 →</div>
+          </button>
         );
       })()}
 
