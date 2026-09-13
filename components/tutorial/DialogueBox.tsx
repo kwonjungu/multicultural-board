@@ -74,6 +74,7 @@ export default function DialogueBox({ lines, speakerName, onLineChange, onDone, 
   const [visibleChars, setVisibleChars] = useState(0);
   const [typing, setTyping] = useState(true);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
   const currentLine = lines[idx];
 
   const segments = useMemo(
@@ -143,10 +144,38 @@ export default function DialogueBox({ lines, speakerName, onLineChange, onDone, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typing, idx, lines]);
 
+  /**
+   * 이 상자는 position:fixed 로 화면 아래에 깔린다. 그대로 두면 그 아래에 있는
+   * 진짜 버튼(홈 허브의 '단어 배우기'·'나의 꿀벌' 타일 등)을 덮어 클릭을 삼킨다
+   * — 2026-09-13 에 실제로 신고된 증상이다. 상자가 떠 있는 동안 문서 루트에
+   * --tutorial-dialogue-h 를 심어, 화면들이 아래쪽 여백을 그만큼 확보해
+   * 가려진 버튼까지 스크롤로 닿을 수 있게 한다.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!currentLine) { root.style.removeProperty("--tutorial-dialogue-h"); return; }
+    const apply = () => {
+      const h = boxRef.current?.getBoundingClientRect().height ?? 146;
+      // 28px 은 bottom 오프셋, 16px 은 상자와 버튼 사이 숨 쉴 틈.
+      root.style.setProperty("--tutorial-dialogue-h", `${Math.round(h) + 28 + 16}px`);
+    };
+    apply();
+    const el = boxRef.current;
+    const ro = typeof ResizeObserver !== "undefined" && el ? new ResizeObserver(apply) : null;
+    if (ro && el) ro.observe(el);
+    window.addEventListener("resize", apply);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", apply);
+      root.style.removeProperty("--tutorial-dialogue-h");
+    };
+  }, [currentLine]);
+
   if (!currentLine) return null;
 
   return (
     <div
+      ref={boxRef}
       role="dialog"
       aria-label={`${speakerName} 대화`}
       onClick={advance}
