@@ -15,6 +15,7 @@ import { cleanupExpiredRecordings } from "@/lib/vocabRecordings";
 import { buildMixedQuiz, buildLessonQuiz, buildDailyChallenge, type QuizItem } from "@/lib/quizFormats";
 import { getUnits, wordsForLesson, type Unit, type Lesson } from "@/lib/lessons";
 import BeeMascot from "./BeeMascot";
+import ScopedStyle from "./ui/child/ScopedStyle";
 import {
   subscribeLearner, setDailyGoal, effectiveHearts, msUntilNextHeart, xpToNextLevel, levelFromXp,
   MAX_HEARTS, type LearnerState,
@@ -303,6 +304,13 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
 
   const masteredTotal = masteredCount(progress);
   const isTeacher = user.isTeacher ?? false;
+  /** 진도가 하나라도 있는가. 첫 학생에게 0 으로 채운 상태 배지를 보이지 않기 위한 판단(U07). */
+  const hasAnyProgress = useMemo(
+    () => Object.values(progress).some(
+      (p) => (p.doneSentences?.length ?? 0) > 0 || (p.listenCount ?? 0) > 0 || (p.testPassed ?? 0) > 0,
+    ),
+    [progress],
+  );
 
   // 뒤로 가기: 열려 있는 학습/시험 화면을 한 단계씩 닫는다 (단어공부에서 바로
   // 나가지 않음). 중첩(레슨시트 위 학습/시험)은 중앙 백스택이 안쪽부터 닫는다.
@@ -360,9 +368,13 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
           <div style={{ fontSize: 20, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
             📚 {t("hubSectionVocab", lang)}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: PURPLE_DARK, marginTop: 2 }}>
-            {tFmt("vocabProgress", lang, { done: masteredTotal, total: VOCAB_WORDS.length })}
-          </div>
+          {/* U07: 아직 아무것도 안 한 학생에게 '0/100 완료' 를 먼저 보여주지
+              않는다. 진도가 생기면 그때 나타난다. */}
+          {hasAnyProgress && (
+            <div data-ux-role="secondary" style={{ marginTop: 2 }}>
+              {tFmt("vocabProgress", lang, { done: masteredTotal, total: VOCAB_WORDS.length })}
+            </div>
+          )}
         </div>
 
         {isTeacher && (
@@ -425,81 +437,65 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
         </div>
       </div>
 
-      {/* HUD: 하트 / 스트릭 / XP */}
-      <LearnerHUD learner={learner} now={now} />
+      {/* HUD: 하트 / 스트릭 / XP.
+          U07: 진도가 하나도 없는 첫 학생에게는 그리지 않는다. 0/100·Lv.0 0/50·
+          오늘 0/20 XP·연속 0 처럼 0 으로 채운 배지가 학습보다 먼저 나오면
+          '내가 아무것도 안 한 화면' 이 첫인상이 된다. */}
+      {hasAnyProgress && <LearnerHUD learner={learner} now={now} />}
 
-      {/* 🔥 나의 단어 일일 챌린지 — 소통판 단어 + 약점 단어 듀오링고식 릴레이 */}
+      {/* 나의 단어 챌린지 — 소통판 단어 + 약점 단어 릴레이.
+          U07: 예전에는 낼 문제가 0개여도 화면에서 가장 강한 색(주황→핑크
+          그라디언트 + 무한 pulse + 반짝이는 '도전!' 리본)으로 항상 광고했다.
+          진도 0 인 학생에게 '소통판 단어 0개 + 약점 단어 0개' 를 권하고,
+          눌러도 아무 일이 없었다(q.length > 0 가드 때문에 조용히 무시).
+          이제 실제로 낼 문제가 있을 때만 그리고, 강조는 단원 카드보다 낮춘다. */}
       {(() => {
-        const boardCount = matched.length;
-        const studiedCount = Object.values(progress).filter(
-          (p) => (p.doneSentences?.length ?? 0) > 0,
-        ).length;
+        const boardIds = matched.map((m) => m.wordId);
+        // 이 챌린지는 정의상 '내' 단어다 — 소통판에서 걸린 단어 + 내가 틀린
+        // 단어. 둘 다 없으면 buildDailyChallenge 가 기본 단어로 채워 문제 수는
+        // 0 이 아니지만, 그건 '나의 챌린지' 가 아니라 아무 단어 묶음이다.
+        // 첫 학생에게 그걸 권하지 않는다. 출처가 생기면 그때 나타난다.
+        const hasOwnSource = boardIds.length > 0 || hasAnyProgress;
+        const items = hasOwnSource ? buildDailyChallenge(progress, boardIds, 10) : [];
+        if (items.length === 0) return null;
         const startDailyChallenge = () => {
-          const boardIds = matched.map((m) => m.wordId);
-          const q = buildDailyChallenge(progress, boardIds, 10);
-          if (q.length > 0) {
-            setLessonContext({ id: "daily-challenge", title: "🔥 나의 단어 일일 챌린지" });
-            setQuiz(q);
-          }
+          setLessonContext({ id: "daily-challenge", title: "나의 단어 챌린지" });
+          setQuiz(items);
         };
         return (
           <>
-          <style>{`
-            @keyframes dailyChallengePulse {
-              0%, 100% { box-shadow: 0 10px 26px rgba(219,39,119,0.35); }
-              50% { box-shadow: 0 12px 34px rgba(219,39,119,0.65), 0 0 0 4px rgba(249,115,22,0.30); }
-            }
-            @keyframes dailyChallengeSparkle {
-              0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
-              50% { transform: scale(1.18) rotate(8deg); opacity: 0.85; }
-            }
-          `}</style>
           <button
             onClick={startDailyChallenge}
             style={{
               position: "relative",
               maxWidth: 760, width: "100%", margin: "0 auto 14px",
-              display: "flex", alignItems: "center", gap: 14, textAlign: "left",
-              background: "linear-gradient(135deg, #F97316, #DB2777)",
-              border: "none", borderRadius: 20, padding: "14px 18px",
+              display: "flex", alignItems: "center", gap: 12, textAlign: "left",
+              background: "#fff",
+              border: "2px solid var(--ux-primary-border)",
+              borderRadius: 16, padding: "12px 16px",
               cursor: "pointer", fontFamily: "inherit",
-              animation: "dailyChallengePulse 2.2s ease-in-out infinite",
+              boxShadow: "0 4px 12px rgba(137,83,0,0.12)",
               transition: "transform 0.15s",
             }}
             onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
             onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            {/* NEW 반짝 뱃지 — 시선 유도 */}
-            <span style={{
-              position: "absolute", top: -8, right: 14,
-              background: "#FACC15", color: "#7C2D12",
-              fontSize: 11, fontWeight: 900, letterSpacing: 0.5,
-              padding: "3px 9px", borderRadius: 999,
-              boxShadow: "0 3px 8px rgba(0,0,0,0.25)",
-              animation: "dailyChallengeSparkle 1.4s ease-in-out infinite",
-            }}>✨ 도전!</span>
-            <div style={{ fontSize: 46, flexShrink: 0 }}>🔥</div>
-            <div style={{ flex: 1, minWidth: 0, color: "#fff" }}>
-              <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: -0.3 }}>
-                오늘의 일일 챌린지 도전하기!
+            <div aria-hidden style={{ fontSize: 30, flexShrink: 0 }}>🎧</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div data-ux-role="label" style={{ fontWeight: 800, color: "var(--ux-ink)" }}>
+                나의 단어 챌린지
               </div>
-              <div style={{
-                display: "inline-block", marginTop: 5,
-                background: "rgba(255,255,255,0.28)", borderRadius: 999,
-                padding: "3px 10px", fontSize: 12, fontWeight: 900,
-              }}>
-                ⚡ 추가 경험치 획득 가능
-              </div>
-              <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4, opacity: 0.95 }}>
-                🎧 듣고 찾기 · 소통판 단어 {boardCount}개 + 약점 단어(틀린 단어) {studiedCount}개
+              <div data-ux-role="secondary" style={{ marginTop: 2 }}>
+                듣고 찾기 {items.length}문제
               </div>
             </div>
             <div style={{
-              background: "rgba(255,255,255,0.28)", color: "#fff",
-              fontSize: 15, fontWeight: 900, padding: "10px 16px", borderRadius: 12,
-              flexShrink: 0,
-            }}>도전 →</div>
+              background: "var(--ux-primary-fill)", color: "var(--ux-primary-ink)",
+              border: "2px solid var(--ux-primary-border)",
+              fontSize: "var(--ux-font-label)", fontWeight: 800,
+              padding: "8px 14px", borderRadius: 12, flexShrink: 0,
+            }}>시작 →</div>
           </button>
 
           {/* 🖨 오프라인 학습지 — 2분화: 단어 쓰기(모두) / 받아쓰기 테마별(교사 전용) */}
@@ -1224,6 +1220,43 @@ function LearnerHUD({ learner, now }: { learner: LearnerState | null; now: numbe
   );
 }
 
+/**
+ * 레슨 트리 배치 (04 §5 "단어 홈").
+ *
+ * 예전에는 폭과 무관하게 컨테이너가 520px 로 고정이고 레슨이 세로 1열
+ * 지그재그였다. 크롬북 1366px 에서도 한 번에 레슨 1~2개만 보이고 문서 높이가
+ * 3500px 를 넘었다 — 폭이 545px 늘어도 콘텐츠는 늘지 않는 "세로로 늘린
+ * 휴대폰" 이었다.
+ *
+ * 지그재그는 순서를 따라가는 단서라 **좁은 화면에서만** 남기고, 폭이 생기면
+ * 격자로 편다. 태블릿 세로 3열 / 태블릿 가로·분할 4열 / 크롬북·노트북 4열.
+ */
+const SKILL_TREE_CSS = `
+.vh-tree{ max-width:520px; margin:0 auto; padding:0 4px 30px; }
+.vh-lessons{ display:grid; grid-template-columns:1fr; gap:18px; justify-items:center; }
+@media (max-width:639px){
+  .vh-lessons > *:nth-child(odd){ transform:translateX(-40px); }
+  .vh-lessons > *:nth-child(even){ transform:translateX(40px); }
+}
+/* auto-fit + 고정 트랙 + max-width 로 열 수를 정한다. repeat(N, 1fr) 로 하면
+   레슨이 1~2개뿐인 단원에서 노드가 첫 칸에 붙어 왼쪽으로 치우친다. */
+@media (min-width:640px){
+  .vh-tree{ max-width:720px; }
+  .vh-lessons{
+    grid-template-columns:repeat(auto-fit, 116px);
+    justify-content:center; gap:16px 24px;
+    max-width:calc(3 * 116px + 2 * 24px); margin:0 auto;
+  }
+}
+@media (min-width:960px){
+  .vh-tree{ max-width:920px; }
+  .vh-lessons{ max-width:calc(4 * 116px + 3 * 24px); }
+}
+@media (min-width:1200px){
+  .vh-tree{ max-width:1120px; }
+}
+`;
+
 function SkillTreeView({
   learner, onStartLesson,
 }: {
@@ -1232,7 +1265,8 @@ function SkillTreeView({
 }) {
   const units = getUnits();
   return (
-    <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 4px 30px" }}>
+    <div className="vh-tree">
+      <ScopedStyle css={SKILL_TREE_CSS} />
       {units.map((unit, ui) => {
         const completedStars = unit.lessons.reduce((acc, l) => acc + (learner?.lessons?.[l.id]?.stars ?? 0), 0);
         const maxStars = unit.lessons.length * 3;
@@ -1261,8 +1295,8 @@ function SkillTreeView({
               </div>
             </div>
 
-            {/* 레슨 노드 — 지그재그 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {/* 레슨 노드 — 좁은 화면은 지그재그, 넓어지면 격자 (SKILL_TREE_CSS) */}
+            <div className="vh-lessons">
               {unit.lessons.map((lesson, li) => {
                 const res = learner?.lessons?.[lesson.id];
                 const done = !!res;
@@ -1270,12 +1304,8 @@ function SkillTreeView({
                 // 이전 레슨이 done 이거나 첫 레슨이거나 단원 첫 노드 → unlocked
                 const prevLessonDone = li === 0 ? prevUnitDone : !!learner?.lessons?.[unit.lessons[li - 1].id];
                 const unlocked = prevLessonDone;
-                const offset = li % 2 === 0 ? -40 : 40;
                 return (
-                  <div key={lesson.id} style={{
-                    display: "flex", justifyContent: "center",
-                    transform: `translateX(${offset}px)`,
-                  }}>
+                  <div key={lesson.id} style={{ display: "flex", justifyContent: "center" }}>
                     <button
                       onClick={() => unlocked && onStartLesson(lesson, unit)}
                       disabled={!unlocked}
