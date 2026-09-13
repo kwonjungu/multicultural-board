@@ -12,7 +12,17 @@ import { chromium } from "playwright-core";
 import { mkdirSync, writeFileSync } from "node:fs";
 
 const BASE = process.argv[2] || "http://localhost:3111";
-const OUT = "reports/audit-20260913/baseline";
+/**
+ * 출력 폴더와 대상 화면을 밖에서 정할 수 있어야 before/after 를 같은 도구로
+ * 찍을 수 있다. before 는 baseline 커밋을 별도 worktree 로 띄운 다른 포트에서
+ * 찍는다 — 그래야 "예전 화면" 이 재현 가능한 증거가 된다.
+ *   AUDIT_OUT=reports/.../before-601a8f0 AUDIT_ONLY=board,entry \
+ *     node scripts/audit/shot-baseline.mjs http://localhost:3112
+ */
+const OUT = process.env.AUDIT_OUT || "reports/audit-20260913/baseline";
+const ONLY = process.env.AUDIT_ONLY
+  ? new Set(process.env.AUDIT_ONLY.split(",").map((s) => s.trim()).filter(Boolean))
+  : null;
 mkdirSync(OUT, { recursive: true });
 
 /**
@@ -42,6 +52,17 @@ const SCREENS = [
   { id: "game", url: `${BASE}/ux-fixture/game`, area: "친구와놀기" },
   { id: "quest", url: `${BASE}/ux-fixture/quest`, area: "칭찬" },
   { id: "character", url: `${BASE}/ux-fixture/character`, area: "칭찬" },
+  { id: "storybook-shelf", url: `${BASE}/ux-fixture/storybook?view=shelf`, area: "동화" },
+  { id: "storybook-read", url: `${BASE}/ux-fixture/storybook?view=read`, area: "동화" },
+  { id: "storybook-question", url: `${BASE}/ux-fixture/storybook?view=question`, area: "동화" },
+  { id: "game-lobby", url: `${BASE}/ux-fixture/game-lobby`, area: "친구와놀기" },
+  { id: "praise-reasons", url: `${BASE}/ux-fixture/praise?view=reasons`, area: "칭찬" },
+  { id: "praise-collection", url: `${BASE}/ux-fixture/praise?view=collection`, area: "칭찬" },
+  { id: "praise-village", url: `${BASE}/ux-fixture/praise?view=village`, area: "칭찬" },
+  { id: "praise-decorate", url: `${BASE}/ux-fixture/praise?view=decorate`, area: "칭찬" },
+  { id: "drawing", url: `${BASE}/ux-fixture/drawing?role=student`, area: "창작수업" },
+  { id: "whiteboard", url: `${BASE}/ux-fixture/whiteboard?role=student`, area: "창작수업" },
+  { id: "discussion", url: `${BASE}/ux-fixture/discussion?state=running`, area: "창작수업" },
   { id: "vocab-home-new", url: `${BASE}/ux-fixture/vocab?state=new`, area: "단어배우기" },
   { id: "vocab-home", url: `${BASE}/ux-fixture/vocab?state=progress`, area: "단어배우기" },
   { id: "vocab-home-rich", url: `${BASE}/ux-fixture/vocab?state=rich`, area: "단어배우기" },
@@ -55,6 +76,7 @@ const rows = [];
 const problems = [];
 
 for (const s of SCREENS) {
+  if (ONLY && !ONLY.has(s.id)) continue;
   for (const v of VIEWS) {
     const sizes = LARGE_OFF.has(v.id) ? ["basic"] : ["basic", "large"];
     for (const size of sizes) {

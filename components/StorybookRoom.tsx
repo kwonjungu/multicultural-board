@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ScopedStyle from "./ui/child/ScopedStyle";
 import type {
   UserConfig,
   Storybook,
@@ -2199,6 +2200,40 @@ function DuringPhase({
   );
 }
 
+/**
+ * 읽기 페이지 배치 (04 §5 동화).
+ *
+ * 예전에는 그림 패널이 `aspect-ratio: 4/3` + `min-height: 440px` 라 폭이
+ * 넓어질수록 세로로 함께 커졌다. 크롬북 1366×768 에서 그림이 화면 세로의
+ * 82% 를 먹고 본문 첫 줄이 접힘선 아래로 밀려 **글이 안 보였다**.
+ *
+ * - 세로 배치에서는 그림 높이에 상한을 둬 본문이 항상 함께 보이게 한다.
+ * - 가로가 넉넉하면(≥960px) 그림과 본문을 나란히 놓는다.
+ * - 본문 칸은 320px 아래로 좁아지지 않는다 (responsive-plan §3).
+ *
+ * 이 CSS 는 반드시 PageCard 와 함께 렌더돼야 한다. 화면 하단의
+ * `<style jsx global>` 블록은 QuestionCard 안에 있어서 읽기 화면에서는
+ * 렌더되지 않는다 — 거기 두면 조용히 적용되지 않는다.
+ */
+const PAGE_CARD_CSS = `
+.sb-page{ display:grid; grid-template-columns:1fr; }
+.sb-page__illus{ aspect-ratio:4/3; max-height:46svh; min-height:200px; }
+.sb-page__emoji{ font-size:clamp(64px, 18svh, 140px); }
+@media (min-width:960px){
+  .sb-page{ grid-template-columns:minmax(0,1.15fr) minmax(320px,1fr); }
+  .sb-page__illus{ max-height:none; height:100%; aspect-ratio:auto; min-height:320px; }
+  .sb-page__text{ display:flex; flex-direction:column; justify-content:center; }
+}
+/* 크롬북·노트북처럼 세로가 낮은 화면에서는 그림을 더 눌러 본문을 확보한다. */
+@media (max-height:820px){
+  .sb-page__illus{ max-height:40svh; }
+  .sb-page__emoji{ font-size:clamp(56px, 14svh, 110px); }
+}
+@media (min-width:960px) and (max-height:820px){
+  .sb-page__illus{ max-height:none; }
+}
+`;
+
 function PageCard({
   lang, page, total, autoReading,
 }: {
@@ -2208,7 +2243,10 @@ function PageCard({
   autoReading?: boolean;
 }) {
   return (
+    <>
+    <ScopedStyle css={PAGE_CARD_CSS} />
     <div
+      className="sb-page"
       style={{
         background: "#fff",
         borderRadius: 26,
@@ -2218,12 +2256,13 @@ function PageCard({
         overflow: "hidden",
       }}
     >
-      {/* Illustration panel — emoji + gradient (MVP) or AI image (future) */}
+      {/* Illustration panel — emoji + gradient (MVP) or AI image (future).
+          높이 상한과 가로 2단 배치는 .sb-page CSS 가 정한다. 여기서 세로
+          치수를 다시 박으면 본문이 접힘선 아래로 밀린다. */}
       <div
+        className="sb-page__illus"
         style={{
           background: page.illustration.bgGradient,
-          minHeight: 440,
-          aspectRatio: "4 / 3",
           display: "flex", alignItems: "center", justifyContent: "center",
           position: "relative",
         }}
@@ -2236,8 +2275,8 @@ function PageCard({
             style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           />
         ) : (
-          <div style={{
-            fontSize: 140, letterSpacing: "0.05em",
+          <div className="sb-page__emoji" style={{
+            letterSpacing: "0.05em",
             filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.15))",
             textAlign: "center",
           }}>
@@ -2263,8 +2302,11 @@ function PageCard({
       </div>
 
       {/* Text panel — bilingual for non-Korean students */}
-      <BilingualText map={page.text} lang={lang} size="page" />
+      <div className="sb-page__text">
+        <BilingualText map={page.text} lang={lang} size="page" />
+      </div>
     </div>
+    </>
   );
 }
 
