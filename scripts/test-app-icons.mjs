@@ -93,9 +93,11 @@ check('원본 PNG 를 public 에 두지 않는다 (파생본만 배포된다)', 
     assert.ok(!existsSync(p),
       `원본이 public 에 있다: ${p} — 코드가 참조하지 않는 무게다. 파생본만 남길 것`);
   }
-  // public 에 남아도 되는 것은 파생본뿐이다.
-  const stray = readdirSync(abs('public/ui-icons/v1'))
-    .filter((f) => !/-(64|128)\.png$/.test(f));
+  // 이 폴더에 남아도 되는 **파일**은 파생본뿐이다. 하위 폴더(animals 등)는
+  // 각자의 검사가 따로 있으므로(예: scripts/test-animal-assets.mjs) 세지 않는다.
+  const stray = readdirSync(abs('public/ui-icons/v1'), { withFileTypes: true })
+    .filter((e) => e.isFile() && !/-(64|128)\.png$/.test(e.name))
+    .map((e) => e.name);
   assert.deepEqual(stray, [], `파생본이 아닌 파일이 있다: ${stray.join(', ')}`);
 });
 

@@ -270,8 +270,8 @@ export default function DiscussionSession({
 
   if (!meta) {
     return (
-      <div style={overlayStyle}>
-        <div style={{ color: "#fff", fontSize: 14 }}>세션 로딩 중...</div>
+      <div data-ux-root style={overlayStyle}>
+        <div data-ux-role="body" style={{ color: "#fff" }}>세션 로딩 중...</div>
       </div>
     );
   }
@@ -279,7 +279,7 @@ export default function DiscussionSession({
   // ═════════════════════════════ CLOSED: tree view ═════════════════════════════
   if (isClosed) {
     return (
-      <div style={{
+      <div data-ux-root style={{
         position: "fixed", inset: 0, zIndex: 450,
         background: "#0F0C28",
         display: "flex", flexDirection: "column",
@@ -869,7 +869,10 @@ function ResponseCard({
       <ImageLightbox src={zoomSrc} alt={`${resp.authorName}의 그림`} onClose={() => setZoomSrc(null)} />
 
       {/* 반응 이모지 행 */}
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {/* 반응 버튼은 32x23px 라 태블릿에서 옆 것을 누르기 쉬웠다. control 토큰으로
+          최소 크기(터치 48px / 마우스 44px)를 걸고 간격도 오터치 방지 값으로 넓힌다.
+          크기를 인라인 padding/fontSize 로 다시 정하면 그 분기가 무력화된다. */}
+      <div style={{ display: "flex", gap: "var(--ux-space-2)", flexWrap: "wrap" }}>
         {REACTIONS.map((emoji) => {
           const count = reactionCounts[emoji] || 0;
           const mine = myReaction === emoji;
@@ -877,14 +880,15 @@ function ResponseCard({
             <button
               key={emoji}
               onClick={() => toggleReaction(emoji)}
+              data-ux-role="control"
+              aria-pressed={mine}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 3,
-                padding: "2px 7px", borderRadius: 999, cursor: "pointer",
-                fontSize: 12, lineHeight: 1.4,
-                background: mine ? "rgba(245,158,11,0.22)" : "rgba(255,255,255,0.65)",
-                border: mine ? "1px solid #F59E0B" : "1px solid rgba(0,0,0,0.08)",
+                borderRadius: 999, cursor: "pointer",
+                background: mine ? "var(--ux-primary-fill)" : "var(--ux-surface)",
+                border: mine ? "2px solid var(--ux-selected-border)" : "2px solid var(--ux-ink-soft)",
                 fontWeight: mine ? 800 : 600,
-                color: "#374151",
+                color: "var(--ux-ink)",
               }}
             >
               <span>{emoji}</span>
@@ -915,10 +919,10 @@ function ResponseCard({
       {!showComposer ? (
         <button
           onClick={() => setShowComposer(true)}
+          data-ux-role="control"
           style={{
             alignSelf: "flex-start", background: "transparent", border: "none",
-            color: "#6B7280", fontSize: 11, fontWeight: 800, cursor: "pointer",
-            padding: "1px 0",
+            color: "var(--ux-ink-soft)", fontWeight: 800, cursor: "pointer",
           }}
         >💬 답글</button>
       ) : (

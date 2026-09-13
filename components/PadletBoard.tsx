@@ -833,8 +833,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             {columns.map((col) => {
               const colCards = cardsOf(col.id);
               const icon = columnIconFor(col.title);
+              // 전체 보기에서 주제(줄)를 눈으로 가르려면 머리띠만으로는
+              // 부족하다 — 칼럼 바탕과 테두리에도 그 주제 색을 옅게 깐다.
+              // 글자·카드는 흰 종이 위에 그대로 두어 대비를 지킨다.
               return (
-                <section key={col.id} className="bd-col" data-ux-surface="panel">
+                <section
+                  key={col.id}
+                  className="bd-col"
+                  data-ux-surface="panel"
+                  style={{ ["--col-tint" as string]: col.color }}
+                >
                   <div className="bd-col-head" style={{ background: col.color }}>
                     {icon && <img src={icon} alt="" aria-hidden="true" className="bd-col-art" />}
                     <span data-ux-role="label" className="bd-col-title">{cleanTitle(col.title)}</span>
@@ -1375,8 +1383,21 @@ const BOARD_CSS = `
   /* 패들렛처럼 여러 주제가 한눈에 들어와야 한다. 1280px 에서 4개, 1920px 에서 6개. */
   width: clamp(240px, 19vw, 290px); flex-shrink: 0;
   display: flex; flex-direction: column; gap: var(--ux-space-2);
-  border: 2px solid var(--ux-primary-border); padding: var(--ux-space-2);
-  background: var(--ux-surface); box-sizing: border-box;
+  padding: var(--ux-space-2);
+  box-sizing: border-box;
+  /* 주제마다 다른 색을 아주 옅게(12%) 깔아 전체 보기에서 줄이 갈린다.
+     테두리는 같은 색을 진하게(55%) 써서 경계가 분명하다. 본문 카드는 흰
+     종이 그대로라 글자 대비는 영향을 받지 않는다.
+     color-mix 를 못 쓰는 브라우저를 위해 기존 값을 먼저 둔다. */
+  border: 2px solid var(--ux-primary-border);
+  background: var(--ux-surface);
+  border-color: color-mix(in srgb, var(--col-tint, var(--ux-primary-border)) 55%, var(--ux-primary-border));
+}
+/* 토큰의 [data-ux-surface] 규칙이 background 를 var(--ux-surface) 로 되돌린다
+   (특이도가 같아 나중 규칙이 이긴다). 클래스와 속성을 함께 걸어 이긴다.
+   (이 주석은 template literal 안이라 백틱을 쓰면 문자열이 끊긴다.) */
+.bd-col[data-ux-surface]{
+  background: color-mix(in srgb, var(--col-tint, var(--ux-surface)) 14%, var(--ux-surface));
 }
 .bd-col-head{
   /* 좁아진 컬럼에서 주제 이름이 잘리면 안 된다 — 두 줄로 내려온다. */

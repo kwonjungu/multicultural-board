@@ -49,33 +49,121 @@ import { type QuestEventType } from "@/lib/quests";
 import Toast from "./Toast";
 import { HONEY } from "@/lib/constants";
 import { t } from "@/lib/i18n";
+import ScopedStyle from "./ui/child/ScopedStyle";
 
 // 🗺 3D 마을 맵 — three.js(~600KB)가 들어 있어 반드시 dynamic + ssr:false.
 // 로드 전/WebGL 실패 시엔 아래 2D hex 맵이 그대로 폴백으로 남는다.
 const VillageMap3D = dynamic(() => import("./VillageMap3D"), { ssr: false });
 
 // ── Design tokens ──────────────────────────────────────────────
-const R = { card: 22, tile: 14, pill: 999 };
-const SH = {
-  card: "0 8px 24px rgba(180,83,9,0.12)",
-  popover: "0 20px 50px rgba(0,0,0,0.4)",
-  sheet: "0 -12px 40px rgba(0,0,0,0.25)",
-  cta: "0 6px 16px rgba(245,158,11,0.3)",
-};
-// HONEY.h400 = #FBBF24, HONEY.h500 = #F59E0B, HONEY.h100 = #FEF3C7
-const GR = {
-  cta: "linear-gradient(135deg, #FBBF24, #F59E0B)",
-  surface: "linear-gradient(160deg, #FEF3C7, #fff)",
-};
+// 카드·글자·버튼은 공통 토큰(--ux-*, data-ux-role)만 쓴다 — QuestBoard 와
+// 같은 화면 안에 나란히 있으므로 두 컴포넌트가 다른 디자인 시스템처럼
+// 보이면 안 된다(가드레일: 화면마다 다른 그라디언트·그림자 반복 금지).
+// R/HONEY 는 지도 육각 타일처럼 순수 그래픽(게임판)에만 남긴다 — 읽는
+// 글자·버튼·카드 틀에는 쓰지 않는다.
+const R = { pill: 999 };
 const OVERLAY = { background: "rgba(9,7,30,0.6)", backdropFilter: "blur(4px)" };
-const CLOSE_BTN: React.CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: R.tile,
-  position: "absolute",
-  top: 6,
-  right: 6,
-};
+
+const VILLAGE_CSS = `
+.bv-root{ display:flex; flex-direction:column; gap:var(--ux-space-4); }
+/* 넓은 화면: 지도/시설을 왼쪽에, 심부름/지갑을 오른쪽에 — 하지만 폭이
+   커질수록 왼쪽만 무한히 넓어지지 않게 전체를 1280px 로 잡고, 오른쪽
+   칸도 함께 넓혀 심부름 카드가 2열로 늘어날 여유를 준다(04 §1 Q5:
+   여백만 커지지 않게, 폭이 생기면 열을 늘린다). DOM 순서는 모바일 읽기
+   순서(심부름→지갑→시설→지도)를 유지하고, 데스크톱에서만 grid-area 로
+   재배치한다 — 같은 마크업 두 벌을 만들지 않는다.
+   ※ CSS 특이도가 같으면 나중 규칙이 이긴다 — 이 블록 뒤에 같은
+     선택자를 다시 쓰지 않는다(실제로 겪은 함정). */
+.bv-layout{ display:flex; flex-direction:column; gap:var(--ux-space-4); }
+@media (min-width: 900px){
+  .bv-layout{
+    display:grid; align-items:start; max-width:1280px; margin:0 auto; width:100%;
+    grid-template-columns: minmax(0,1fr) minmax(20rem, 34rem);
+    grid-template-areas: "facilities quest" "map quest" "map wallet";
+    gap: var(--ux-space-4);
+  }
+  .bv-area-facilities{ grid-area:facilities; }
+  .bv-area-map{ grid-area:map; }
+  .bv-area-quest{ grid-area:quest; }
+  .bv-area-wallet{ grid-area:wallet; }
+}
+/* 카드 틀 — QuestBoard 의 .qb-card-panel 과 완전히 같은 값. */
+.bv-panel{
+  background:var(--ux-surface); border-radius:var(--ux-radius-panel);
+  border:2px solid var(--ux-primary-border); padding:var(--ux-space-4);
+  box-shadow:0 4px 14px rgba(137,83,0,.10);
+}
+.bv-panel-head{ display:flex; align-items:center; gap:var(--ux-space-2); flex-wrap:wrap; }
+.bv-panel-title{ font-weight:900; }
+
+.bv-hex-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+/* 마을 공동 시설 배너 */
+.bv-fac-row{ display:flex; align-items:center; gap:var(--ux-space-3); flex-wrap:wrap; }
+.bv-fac-icons{ display:flex; gap:var(--ux-space-2); margin-left:auto; }
+.bv-fac-tile{
+  width:52px; min-height:56px; border-radius:var(--ux-radius-surface);
+  border:2px solid var(--ux-primary-border); background:var(--ux-surface);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+}
+.bv-fac-tile[data-on="no"]{ filter:grayscale(1); opacity:.55; border-color:var(--ux-surface-sunk); }
+.bv-progress-track{
+  margin-top:var(--ux-space-3); height:12px; background:var(--ux-surface-sunk);
+  border-radius:var(--ux-radius-pill); overflow:hidden; border:1px solid var(--ux-primary-border);
+}
+.bv-progress-fill{ height:100%; background:var(--ux-primary-fill); transition:width .5s ease; }
+
+/* 꿀 지갑 — 조작 줄은 좌우로 나눈다: 정보는 왼쪽, 상점 열기는 오른쪽. */
+.bv-wallet-row{ display:flex; align-items:center; gap:var(--ux-space-3); flex-wrap:wrap; justify-content:space-between; }
+.bv-honey-num{ font-weight:900; }
+
+/* 상점/꾸미기 아이템 타일 — 상태는 색이 아니라 토큰의 두 가지 테두리로만
+   구분한다(선택 = selected-border, 그 외 = primary-border). */
+.bv-item-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(6.5rem,1fr)); gap:var(--ux-space-2); }
+.bv-item-tile[data-ux-role="control"]{
+  min-height:92px; flex-direction:column; justify-content:center; text-align:center;
+  border:2px solid var(--ux-primary-border); background:var(--ux-surface);
+}
+.bv-item-tile[data-equipped="yes"]{ border-color:var(--ux-selected-border); background:var(--ux-surface-sunk); }
+.bv-item-tile[data-afford="no"]{ opacity:.55; }
+.bv-item-emoji{ font-size:28px; line-height:1.1; }
+
+/* 조작 한 줄 — 왼쪽 낮은 강조(정보/보조) · 오른쪽 평소 강조(주 동작). */
+.bv-actions{ display:flex; gap:var(--ux-space-2); flex-wrap:wrap; align-items:center; justify-content:space-between; }
+
+/* 집 팝오버 / 꾸미기 시트 — 팝업 하나는 화면 안에 하나뿐이라 강한 그림자를
+   써도 "화면마다 다른 그림자" 반복이 아니다(모달 표준 elevation). */
+.bv-popover-overlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:220; padding:var(--ux-space-4); }
+.bv-popover{
+  background:var(--ux-surface); border-radius:var(--ux-radius-panel);
+  padding:var(--ux-space-6) var(--ux-space-4) var(--ux-space-4);
+  max-width:380px; width:100%; max-height:88vh; overflow-y:auto;
+  border:3px solid var(--ux-primary-border); animation:bv-popover-in .3s ease-out;
+  text-align:center; position:relative;
+}
+.bv-close[data-ux-role="control"]{
+  position:absolute; top:var(--ux-space-1); right:var(--ux-space-1); padding:0;
+  background:var(--ux-surface-sunk); border:1.5px solid var(--ux-primary-border);
+}
+.bv-garden-box{
+  margin-top:var(--ux-space-3); padding:var(--ux-space-3);
+  background:var(--ux-hint-mint); border:2px solid var(--ux-success);
+  border-radius:var(--ux-radius-surface);
+}
+.bv-water-dots{ font-size:20px; letter-spacing:4px; margin-top:var(--ux-space-2); }
+.bv-sheet-overlay{ position:fixed; inset:0; display:flex; align-items:flex-end; justify-content:center; z-index:230; }
+.bv-sheet{
+  background:var(--ux-surface); border-radius:var(--ux-radius-panel) var(--ux-radius-panel) 0 0;
+  padding:var(--ux-space-4) var(--ux-space-4) var(--ux-space-6); width:100%; max-width:560px;
+  max-height:78vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  border-top:3px solid var(--ux-primary-border); animation:bv-sheet-in .3s ease-out;
+}
+.bv-yard-slots{ display:flex; gap:var(--ux-space-2); margin-bottom:var(--ux-space-2); }
+.bv-yard-slot[data-ux-role="control"]{
+  flex:1; flex-direction:column; border:2px solid var(--ux-primary-border); background:var(--ux-surface);
+}
+.bv-yard-slot[data-active="yes"]{ border-color:var(--ux-selected-border); background:var(--ux-surface-sunk); }
+`;
 // ───────────────────────────────────────────────────────────────
 
 const DEFAULT_COSMETICS: StudentCosmetics = { skin: "classic", hat: null, pet: null, trophy: null };
@@ -140,25 +228,17 @@ interface ItemTileProps {
 function ItemTile({ emoji, label, price, equipped, has, affordable, removable = false, busy, onClick }: ItemTileProps) {
   return (
     <button
+      type="button"
+      data-ux-role="control"
+      className="bv-item-tile"
+      data-equipped={equipped ? "yes" : "no"}
+      data-afford={affordable ? "yes" : "no"}
       onClick={onClick}
-      disabled={busy}
-      style={{
-        minHeight: 92,
-        padding: "10px 6px 8px",
-        borderRadius: R.tile,
-        border: `2px solid ${equipped ? HONEY.h500 : has ? HONEY.h300 : HONEY.h100}`,
-        background: equipped ? GR.surface : "#FFFDF6",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        textAlign: "center",
-        opacity: affordable ? 1 : 0.55,
-      }}
+      aria-disabled={busy || undefined}
     >
-      <div style={{ fontSize: 28, lineHeight: 1.1 }}>{emoji}</div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: HONEY.h700, marginTop: 4 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
+      <div className="bv-item-emoji" aria-hidden>{emoji}</div>
+      <div data-ux-role="label">{label}</div>
+      <div data-ux-role="secondary">
         {equipped
           ? removable ? "✅ 장착 중 (눌러서 해제)" : "✅ 장착 중"
           : has
@@ -187,16 +267,8 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   // 심부름 "물주기" 클릭 시 지도 카드로 스크롤하기 위한 ref
   const mapCardRef = useRef<HTMLDivElement>(null);
 
-  // ── 데스크톱 2열 레이아웃 (≥900px) ────────────────────────────
-  // SSR 프리렌더에서 window 접근 금지 — 초기 false, 마운트 후 판정 (BeeWorldMarble 패턴)
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 900px)");
-    const apply = () => setIsDesktop(mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
+  // 데스크톱 2열 재배치는 순수 CSS(.bv-layout, ≥900px)로 한다 — JS matchMedia
+  // 분기 + 블록 두 벌을 유지하지 않는다(DOM 순서는 항상 모바일 순서 그대로).
 
   useEffect(() => {
     if (offline) return;
@@ -432,29 +504,21 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   const gridW = HEX_W * HEX_COLS + HEX_W / 2;   // 홀수행 시프트 포함
   const gridH = (rows - 1) * HEX_ROW_STEP + HEX_H;
 
-  const cardStyle: React.CSSProperties = {
-    background: "#fff",
-    borderRadius: R.card,
-    padding: "16px 14px",
-    border: `2px solid ${HONEY.h200}`,
-    boxShadow: SH.card,
-  };
-
   // ── 마을 맵 카드 ────────────────────────────────────────────
   const mapCard = (
-    <div ref={mapCardRef} style={{ ...cardStyle, padding: "16px 10px" /* hex grid: reduce horizontal padding to fit 5-col hex layout */ }}>
-      <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h900, margin: "0 6px 4px" }}>
+    <div ref={mapCardRef} className="bv-panel" style={{ padding: "var(--ux-space-4) var(--ux-space-2)" /* hex grid: reduce horizontal padding to fit 5-col hex layout */ }}>
+      <h2 data-ux-role="body-emphasis" className="bv-panel-title" style={{ margin: "0 var(--ux-space-2) var(--ux-space-1)" }}>
         🗺 마을 지도
-      </div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: HONEY.h700, margin: "0 6px 10px" }}>
+      </h2>
+      <p data-ux-role="secondary" style={{ margin: "0 var(--ux-space-2) var(--ux-space-3)" }}>
         {map3d === "on"
           ? `한 손가락으로 돌리고, 두 손가락으로 이동·확대해요 · 집을 눌러 방문 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`
           : `친구 집을 눌러 하루 한 번 💧 물을 줘요 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`}
-      </div>
+      </p>
       {entries.length === 0 ? (
-        <div style={{ fontSize: 13, color: HONEY.h700, fontWeight: 600, textAlign: "center", padding: 20 }}>
+        <p data-ux-role="body" style={{ textAlign: "center", padding: "var(--ux-space-6) 0" }}>
           아직 마을에 집이 없어요 — 칭찬 스티커를 받으면 집이 생겨요!
-        </div>
+        </p>
       ) : (
         <>
         {/* 3D 맵 (기본) — 씬 준비 전엔 height 0 으로 감춰두고 2D 를 보여준다.
@@ -471,7 +535,7 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
           </div>
         )}
         {map3d !== "on" && (
-        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div className="bv-hex-wrap">
           <div style={{ position: "relative", width: gridW, height: gridH, margin: "0 auto" }}>
             {plots.map((plot, i) => {
               const r = Math.floor(i / HEX_COLS);
@@ -526,6 +590,8 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
               return (
                 <button
                   key={e.id}
+                  type="button"
+                  data-ux-role="control"
                   onClick={() => setFocus(e.id)}
                   aria-label={`${e.name}의 집`}
                   style={{
@@ -581,42 +647,25 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
 
   // ── 마을 공동 시설 배너 ─────────────────────────────────────
   const facilitiesBanner = (
-    <div style={cardStyle}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+    <div className="bv-panel">
+      <div className="bv-fac-row">
         <div style={{ flex: 1, minWidth: 180 }}>
-          <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h900 }}>
+          <h2 data-ux-role="body-emphasis" className="bv-panel-title" style={{ margin: 0 }}>
             🏛 마을 공동 시설
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
+          </h2>
+          <p data-ux-role="secondary" style={{ margin: "var(--ux-space-1) 0 0" }}>
             {nextFacility
               ? `${nextFacility.emoji} ${nextFacility.label}까지 ${nextFacility.at - classTotal}개 남았어요! · 우리 반 칭찬 ${classTotal}🐝`
               : "🎉 모든 시설이 완성됐어요! 마을 축제가 열렸어요!"}
-          </div>
+          </p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="bv-fac-icons">
           {VILLAGE_FACILITIES.map((f) => {
             const on = classTotal >= f.at;
             return (
-              <div
-                key={f.at}
-                title={`${f.label} (학급 ${f.at}개)`}
-                style={{
-                  width: 52,
-                  minHeight: 56,
-                  borderRadius: R.tile,
-                  border: `2px solid ${on ? HONEY.h400 : HONEY.h100}`,
-                  background: on ? GR.surface : "#F9FAFB",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 2,
-                  filter: on ? "none" : "grayscale(1)",
-                  opacity: on ? 1 : 0.55,
-                }}
-              >
-                <div style={{ fontSize: 22 }}>{f.emoji}</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700 }}>{f.at}</div>
+              <div key={f.at} className="bv-fac-tile" data-on={on ? "yes" : "no"} title={`${f.label} (학급 ${f.at}개)`}>
+                <div className="bv-item-emoji" style={{ fontSize: 22 }} aria-hidden>{f.emoji}</div>
+                <div data-ux-role="secondary">{f.at}</div>
               </div>
             );
           })}
@@ -624,23 +673,10 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
       </div>
       {/* 다음 시설 진행바 */}
       {nextFacility && (
-        <div
-          style={{
-            marginTop: 10,
-            height: 12,
-            background: HONEY.h50,
-            borderRadius: R.pill,
-            overflow: "hidden",
-            border: `1px solid ${HONEY.h200}`,
-          }}
-        >
+        <div className="bv-progress-track" role="progressbar" aria-valuenow={classTotal} aria-valuemin={0} aria-valuemax={nextFacility.at}>
           <div
-            style={{
-              width: `${Math.max(0, Math.min(100, (classTotal / nextFacility.at) * 100))}%`,
-              height: "100%",
-              background: `linear-gradient(90deg, ${HONEY.h300}, ${HONEY.h500})`,
-              transition: "width 0.5s ease",
-            }}
+            className="bv-progress-fill"
+            style={{ width: `${Math.max(0, Math.min(100, (classTotal / nextFacility.at) * 100))}%` }}
           />
         </div>
       )}
@@ -649,35 +685,28 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
 
   // ── 꿀 지갑 + 상점 패널 ────────────────────────────────────
   const walletPanel = !user.isTeacher ? (
-    <div style={cardStyle}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+    <div className="bv-panel">
+      <div className="bv-wallet-row">
         <div style={{ flex: 1, minWidth: 150 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: HONEY.h800 }}>내 꿀 주머니</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: HONEY.h800, letterSpacing: -0.3 }}>
+          <p data-ux-role="secondary" style={{ margin: 0 }}>내 꿀 주머니</p>
+          <p data-ux-role="body-emphasis" className="bv-honey-num" style={{ margin: 0 }}>
             🍯 {myHoney}
-          </div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2 }}>
+          </p>
+          <p data-ux-role="secondary" style={{ margin: "var(--ux-space-1) 0 0" }}>
             {myVillage.lastDew === today
               ? "🌅 오늘의 꿀 이슬을 주웠어요"
               : "🌅 마을에 오면 매일 꿀 이슬을 주워요"}
             {" · 칭찬 스티커 1개 = 🍯5"}
-          </div>
+          </p>
         </div>
         <button
+          type="button"
+          data-ux-role="action"
           onClick={() => setShopOpen((v) => !v)}
           style={{
-            minHeight: 52,
-            padding: "10px 20px",
-            background: shopOpen ? "#fff" : GR.cta,
-            color: shopOpen ? HONEY.h800 : "#fff",
-            border: `2px solid ${shopOpen ? HONEY.h300 : HONEY.h500}`,
-            borderRadius: R.tile,
-            fontSize: 13,
-            fontWeight: 900,
-            cursor: "pointer",
-            boxShadow: shopOpen ? "none" : SH.cta,
-            fontFamily: "inherit",
-            letterSpacing: -0.2,
+            background: shopOpen ? "transparent" : "var(--ux-primary-fill)",
+            color: shopOpen ? "var(--ux-ink)" : "var(--ux-primary-ink)",
+            border: shopOpen ? "2px solid transparent" : "2px solid var(--ux-primary-border)",
           }}
         >
           {shopOpen ? "상점 닫기 ✕" : "🛍 내 집 가꾸기"}
@@ -686,19 +715,13 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
 
       {/* 상점 패널 */}
       {shopOpen && (
-        <div style={{ marginTop: 14 }}>
+        <div style={{ marginTop: "var(--ux-space-4)" }}>
           {(["roof", "garden", "plate"] as VillageSlot[]).map((slot) => (
-            <div key={slot} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: HONEY.h800, marginBottom: 6 }}>
+            <div key={slot} style={{ marginBottom: "var(--ux-space-3)" }}>
+              <p data-ux-role="label" style={{ margin: "0 0 var(--ux-space-2)" }}>
                 {slot === "roof" ? "🏠" : slot === "garden" ? "🌱" : "🪧"} {SLOT_LABEL[slot]}
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
-                  gap: 8,
-                }}
-              >
+              </p>
+              <div className="bv-item-grid">
                 {VILLAGE_DECOS.filter((d) => d.slot === slot).map((deco) => {
                   const equipped = myVillage.house?.[deco.slot] === deco.id;
                   const owned = myVillage.owned?.[deco.id] === true;
@@ -721,9 +744,9 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
               </div>
             </div>
           ))}
-          <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700 }}>
+          <p data-ux-role="secondary" style={{ margin: 0 }}>
             한 번 산 데코는 계속 보유해요. 같은 칸의 다른 데코로 언제든 바꿀 수 있어요.
-          </div>
+          </p>
         </div>
       )}
     </div>
@@ -756,7 +779,8 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
   ) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div className="bv-root">
+      <ScopedStyle css={VILLAGE_CSS} />
       {/* 로컬 애니메이션 keyframes */}
       <style>{`
         @keyframes bv-popover-in {
@@ -775,29 +799,15 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
         onDismiss={() => setToast(null)}
       />
 
-      {/* ── 데스크톱: 2열 그리드 / 모바일: 세로 스택 ── */}
-      {isDesktop ? (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 280px", gap: 16, alignItems: "start" }}>
-          {/* 좌 메인 — 시설 배너 + 마을 맵 (핵심 기능) */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {facilitiesBanner}
-            {mapCard}
-          </div>
-          {/* 우 사이드바 — 퀘스트 + 꿀 지갑/상점 */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {questBoard}
-            {walletPanel}
-          </div>
-        </div>
-      ) : (
-        /* 모바일: 퀘스트 → 지갑 → 시설 → 맵 */
-        <>
-          {questBoard}
-          {walletPanel}
-          {facilitiesBanner}
-          {mapCard}
-        </>
-      )}
+      {/* 모바일: 퀘스트 → 지갑 → 시설 → 맵 순서로 쌓인다. ≥900px 에서는
+          같은 마크업을 .bv-layout 의 grid-template-areas 가 좌(시설·맵)
+          우(퀘스트·지갑) 2단으로 재배치한다 — 블록을 두 벌 만들지 않는다. */}
+      <div className="bv-layout">
+        {questBoard && <div className="bv-area-quest">{questBoard}</div>}
+        {walletPanel && <div className="bv-area-wallet">{walletPanel}</div>}
+        <div className="bv-area-facilities">{facilitiesBanner}</div>
+        <div className="bv-area-map">{mapCard}</div>
+      </div>
 
       {/* ── 집 상세 팝오버 (친구 집 방문 + 물주기 / 내 집이면 🛋 꾸미기) ── */}
       {focusEntry && (
@@ -878,51 +888,16 @@ function HousePopover({
 
   return (
     <div
+      className="bv-popover-overlay"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        ...OVERLAY,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 220,
-        padding: 20,
-      }}
+      style={OVERLAY}
       role="dialog"
       aria-modal="true"
     >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: R.card,
-          padding: "22px 20px 18px",
-          maxWidth: 380,
-          width: "100%",
-          maxHeight: "88vh",
-          overflowY: "auto",
-          boxShadow: SH.popover,
-          border: `3px solid ${HONEY.h300}`,
-          animation: "bv-popover-in 0.3s ease-out",
-          textAlign: "center",
-          position: "relative",
-        }}
-      >
-        <button
-          onClick={onClose}
-          aria-label="close"
-          style={{
-            ...CLOSE_BTN,
-            background: HONEY.h50,
-            border: `1.5px solid ${HONEY.h200}`,
-            fontSize: 14,
-            fontWeight: 900,
-            color: HONEY.h800,
-            cursor: "pointer",
-          }}
-        >✕</button>
+      <div className="bv-popover">
+        <button type="button" data-ux-role="control" className="bv-close" onClick={onClose} aria-label="close">✕</button>
 
-        <div style={{ fontSize: 26 }}>{styleDeco?.emoji ?? roofDeco?.emoji ?? "🏠"}</div>
+        <div className="bv-item-emoji" style={{ fontSize: 26 }} aria-hidden>{styleDeco?.emoji ?? roofDeco?.emoji ?? "🏠"}</div>
 
         {/* 벌 — 150px+ 팝오버: 코스메틱 풀 렌더 (held/acc 포함) */}
         <div style={{ position: "relative", width: 150, height: 150, margin: "2px auto 0" }}>
@@ -943,84 +918,64 @@ function HousePopover({
           )}
         </div>
 
-        <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h900, marginTop: 8 }}>
+        <p data-ux-role="body-emphasis" style={{ fontWeight: 900, marginTop: "var(--ux-space-2)" }}>
           {entry.name}{isSelf ? " (나)" : ""}의 집
-        </div>
+        </p>
 
-        {/* 정원 게이지 */}
-        <div
-          style={{
-            marginTop: 12,
-            padding: "12px 14px",
-            background: "linear-gradient(160deg, #F0FDF4, #fff)",
-            border: "2px solid #BBF7D0",
-            borderRadius: R.tile,
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 800, color: "#166534" }}>
-            {gardenDeco ? `${gardenDeco.emoji} ${gardenDeco.label}` : "🌱 정원"} · Lv.{gardenLevel}
-          </div>
-          <div style={{ fontSize: 20, letterSpacing: 4, marginTop: 6 }}>
+        {/* 정원 게이지 — 새싹 단계(레벨 0)는 "Lv.0" 대신 말로 알린다
+            (0 으로 채운 배지를 그대로 보여주지 않는다). */}
+        <div className="bv-garden-box">
+          <p data-ux-role="label" style={{ margin: 0 }}>
+            {gardenDeco ? `${gardenDeco.emoji} ${gardenDeco.label}` : "🌱 정원"}
+            {gardenLevel > 0 ? ` · Lv.${gardenLevel}` : " · 새싹"}
+          </p>
+          <div className="bv-water-dots" aria-hidden>
             {Array.from({ length: WATER_PER_LEVEL }).map((_, i) => (
               <span key={i} style={{ opacity: i < gardenWater ? 1 : 0.22 }}>💧</span>
             ))}
           </div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#15803D", marginTop: 4 }}>
+          <p data-ux-role="secondary" style={{ margin: "var(--ux-space-1) 0 0" }}>
             물 {gardenWater}/{WATER_PER_LEVEL} — {WATER_PER_LEVEL}번 받으면 정원이 한 단계 자라요
-          </div>
+          </p>
         </div>
 
         {/* 물주기 버튼 / 내 집이면 꾸미기 */}
         {isSelf ? (
           <>
-            <div style={{ marginTop: 12, fontSize: 12, fontWeight: 700, color: HONEY.h700 }}>
+            <p data-ux-role="secondary" style={{ marginTop: "var(--ux-space-3)" }}>
               친구들이 물을 주면 내 정원이 자라요 🌷
-            </div>
+            </p>
             <button
+              type="button"
+              data-ux-role="action"
               onClick={onDecorate}
-              style={{
-                marginTop: 12,
-                minHeight: 52,
-                width: "100%",
-                padding: "10px 24px",
-                background: GR.cta,
-                color: "#fff",
-                border: "none",
-                borderRadius: R.tile,
-                fontSize: 13,
-                fontWeight: 900,
-                cursor: "pointer",
-                boxShadow: SH.cta,
-                fontFamily: "inherit",
-              }}
+              style={{ marginTop: "var(--ux-space-3)", width: "100%" }}
             >
               🛋 꾸미기 — 집·문패·울타리·마당
             </button>
           </>
         ) : isTeacher ? null : (
           <button
-            onClick={onWater}
-            disabled={!canWater || busy}
+            type="button"
+            data-ux-role="action"
+            onClick={() => canWater && !busy && onWater()}
+            aria-disabled={!canWater || busy || undefined}
+            aria-describedby={wateredToday ? "bv-water-hint" : undefined}
             style={{
-              marginTop: 14,
-              minHeight: 52,
+              marginTop: "var(--ux-space-4)",
               width: "100%",
-              padding: "10px 24px",
-              background: canWater && !busy
-                ? "linear-gradient(135deg, #38BDF8, #0284C7)"
-                : "#F3F4F6",
-              color: canWater && !busy ? "#fff" : "#9CA3AF",
-              border: "none",
-              borderRadius: R.tile,
-              fontSize: 13,
-              fontWeight: 900,
-              cursor: canWater && !busy ? "pointer" : "default",
-              boxShadow: canWater && !busy ? "0 6px 16px rgba(2,132,199,0.3)" : "none",
-              fontFamily: "inherit",
+              background: canWater && !busy ? "var(--ux-primary-fill)" : "var(--ux-surface-sunk)",
+              color: canWater && !busy ? "var(--ux-primary-ink)" : "var(--ux-ink-soft)",
+              border: `2px solid ${canWater && !busy ? "var(--ux-primary-border)" : "transparent"}`,
             }}
           >
             {wateredToday ? "오늘은 이미 물을 줬어요 ✅" : "💧 물주기 (하루 1번)"}
           </button>
+        )}
+        {!isSelf && !isTeacher && wateredToday && (
+          <span id="bv-water-hint" data-ux-role="secondary" style={{ display: "block", marginTop: "var(--ux-space-1)" }}>
+            내일 다시 와서 물을 줄 수 있어요
+          </span>
         )}
       </div>
     </div>
@@ -1070,17 +1025,11 @@ function DecorateSheet({
 
   function section(title: string, slot: VillageDecoV2["slot"]) {
     return (
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: HONEY.h800, marginBottom: 6 }}>
+      <div style={{ marginBottom: "var(--ux-space-3)" }}>
+        <p data-ux-role="label" style={{ margin: "0 0 var(--ux-space-2)" }}>
           {title}
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
-            gap: 8,
-          }}
-        >
+        </p>
+        <div className="bv-item-grid">
           {VILLAGE_DECOS_V2.filter((d) => d.slot === slot).map((deco) => {
             const equipped = isEquipped(deco);
             const has = owned[deco.id] === true;
@@ -1108,54 +1057,21 @@ function DecorateSheet({
 
   return (
     <div
+      className="bv-sheet-overlay"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        ...OVERLAY,
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        zIndex: 230,
-      }}
+      style={OVERLAY}
       role="dialog"
       aria-modal="true"
     >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: `${R.card}px ${R.card}px 0 0`,
-          padding: "16px 16px 22px",
-          width: "100%",
-          maxWidth: 560,
-          maxHeight: "78vh",
-          overflowY: "auto",
-          WebkitOverflowScrolling: "touch",
-          boxShadow: SH.sheet,
-          borderTop: `3px solid ${HONEY.h300}`,
-          animation: "bv-sheet-in 0.3s ease-out",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+      <div className="bv-sheet">
+        <div className="bv-actions" style={{ marginBottom: "var(--ux-space-3)" }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 900, color: HONEY.h900 }}>🛋 내 집 꾸미기</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: HONEY.h700, marginTop: 2 }}>
+            <p data-ux-role="body-emphasis" style={{ fontWeight: 900, margin: 0 }}>🛋 내 집 꾸미기</p>
+            <p data-ux-role="secondary" style={{ margin: "var(--ux-space-1) 0 0" }}>
               내 꿀 🍯 {honey} · 한 번 산 아이템은 계속 보유해요
-            </div>
+            </p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="close"
-            style={{
-              ...CLOSE_BTN,
-              background: HONEY.h50,
-              border: `1.5px solid ${HONEY.h200}`,
-              fontSize: 14,
-              fontWeight: 900,
-              color: HONEY.h800,
-              cursor: "pointer",
-            }}
-          >✕</button>
+          <button type="button" data-ux-role="control" className="bv-close" style={{ position: "static" }} onClick={onClose} aria-label="close">✕</button>
         </div>
 
         {section("🏠 집 스타일", "style")}
@@ -1163,43 +1079,33 @@ function DecorateSheet({
         {section("🚧 울타리", "fence")}
 
         {/* 마당 — 슬롯 3칸 (좌/우/앞) 선택 후 아이템 장착 */}
-        <div style={{ marginBottom: 4 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: HONEY.h800, marginBottom: 6 }}>
+        <div style={{ marginBottom: "var(--ux-space-1)" }}>
+          <p data-ux-role="label" style={{ margin: "0 0 var(--ux-space-2)" }}>
             🌳 마당 (3칸)
-          </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          </p>
+          <div className="bv-yard-slots">
             {(["왼쪽", "오른쪽", "앞"] as const).map((label, i) => {
               const cur = decoV2ById(house.yard[i]);
               const active = yardIndex === i;
               return (
                 <button
                   key={i}
+                  type="button"
+                  data-ux-role="control"
+                  className="bv-yard-slot"
+                  data-active={active ? "yes" : "no"}
+                  aria-pressed={active}
                   onClick={() => setYardIndex(i)}
-                  style={{
-                    flex: 1,
-                    minHeight: 62,
-                    borderRadius: R.tile,
-                    border: `2px solid ${active ? HONEY.h500 : HONEY.h200}`,
-                    background: active ? GR.surface : "#FFFDF6",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                  }}
                 >
-                  <div style={{ fontSize: 20 }}>{cur?.emoji ?? "➕"}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700 }}>
+                  <div className="bv-item-emoji" style={{ fontSize: 20 }} aria-hidden>{cur?.emoji ?? "➕"}</div>
+                  <span data-ux-role="secondary">
                     {label} {cur ? `· ${cur.label}` : "· 비어 있음"}
-                  </div>
+                  </span>
                 </button>
               );
             })}
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
-              gap: 8,
-            }}
-          >
+          <div className="bv-item-grid">
             {VILLAGE_DECOS_V2.filter((d) => d.slot === "yard").map((deco) => {
               const equipped = isEquipped(deco);
               const has = owned[deco.id] === true;
@@ -1222,9 +1128,9 @@ function DecorateSheet({
           </div>
         </div>
 
-        <div style={{ fontSize: 11, fontWeight: 700, color: HONEY.h700, marginTop: 10 }}>
+        <p data-ux-role="secondary" style={{ marginTop: "var(--ux-space-3)" }}>
           예전에 산 지붕·정원 아이템은 새 마을에서도 그대로 쓸 수 있어요 (무료 전환).
-        </div>
+        </p>
       </div>
     </div>
   );

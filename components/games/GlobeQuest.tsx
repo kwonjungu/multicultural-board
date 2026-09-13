@@ -375,16 +375,28 @@ function ModeCard({ emoji, title, sub, onClick }: {
 }
 
 // ── 공통 셸: 어두운 우주 배경 + 상단 바 + 캔버스 ──
-function GlobeShell({ topBar, children, overlay }: {
+// U11b(07 배치 계약): 지구본을 고르면 뜨는 정보는 이제 stage 를 항상 덮는
+// 절대배치 오버레이가 아니라 `panel` 로 받아 .gq-stagewrap 안에서 stage 와
+// 정상 흐름으로 나란히 배치한다 — 넓으면 옆(행), 좁으면 아래(열). 이렇게 하면
+// 패널이 열릴 때 .gq-stage 자체의 실제 크기(폭 또는 높이)가 줄어들고, 그 변화는
+// GlobeCanvas 의 ResizeObserver(같은 .gq-stage 를 관찰)가 그대로 잡아 카메라를
+// 다시 fit 한다 — 별도 배선 없이 기존 관찰 대상만으로 해결된다.
+// `overlay` 는 여전히 필요하다 — 게임하기 모드의 정오답 토스트(.gq-flashlayer)처럼
+// 화면 위를 스치듯 지나가는 알림은 stage 공간을 뺏지 않는 절대배치가 맞다.
+function GlobeShell({ topBar, children, overlay, panel }: {
   topBar: React.ReactNode;
   children: React.ReactNode; // GlobeCanvas
-  overlay?: React.ReactNode;
+  overlay?: React.ReactNode; // 스쳐 지나가는 토스트 — 여전히 절대배치, stage 크기에 영향 없음
+  panel?: React.ReactNode; // 상시 정보 패널 — 폭에 따라 stage 옆/아래로 정상 흐름 배치
 }) {
   return (
     <div data-ux-root className="gq-shell">
       <ScopedStyle css={GQ_CSS} />
       <div className="gq-topbar">{topBar}</div>
-      <div className="gq-stage">{children}</div>
+      <div className="gq-stagewrap">
+        <div className="gq-stage">{children}</div>
+        {panel}
+      </div>
       {overlay}
     </div>
   );
@@ -421,8 +433,8 @@ function ExploreMode({ viewerLang, onBack }: { viewerLang: string; onBack: () =>
           </div>
         </div>
       }
-      overlay={selected && (
-        <div className="gq-cardlayer">
+      panel={selected && (
+        <div className="gq-panel">
           <div className="gq-card">
             <img className="gq-landmark" src={selected.landmark} alt="" aria-hidden="true" />
             <div className="gq-cardbody">
@@ -639,11 +651,16 @@ const GQ_CSS = `
    .gq-shell 은 auto(내용 기준) 높이가 되어 .gq-stage 의 flex:1 이 분배할 여유
    공간이 전혀 생기지 않고, .gq-stage 는 min-height 값 그대로만 받는다 —
    지구본이 화면의 주인공이 아니라 남는 틈에 들어가는 문제의 실측 원인 중 하나. */
+/* U11b(07 배치 계약 — 가로/크롬북/노트북은 옆 정보 패널): container-type:inline-size
+   로 .gq-shell 자신의 실제 폭을 컨테이너 쿼리 기준으로 삼는다. 뷰포트 폭이 아니라
+   이 셸이 실제로 받은 폭으로 판단해야 나중에 다른 작업자가 GameRoom 레이아웃을
+   바꿔 셸이 뷰포트보다 좁아져도(예: 사이드바 추가) 옳게 반응한다. */
 .gq-shell{
   position: relative; display: flex; flex-direction: column;
   width: 100%; height: 100%; min-height: 0; box-sizing: border-box;
   background: radial-gradient(circle at 50% 40%, #1e1b4b 0%, #0d0b26 70%);
   color: #fff;
+  container-type: inline-size;
 }
 .gq-topbar{ padding: var(--ux-space-3); flex-shrink: 0; }
 .gq-topinner{ display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap; }
@@ -660,8 +677,41 @@ const GQ_CSS = `
    짜부라지지 않게 하는 바닥값이다 — 정상 상황의 실제 크기는 위 .gq-shell 의
    height:100% 를 통해 flex:1 이 분배하는 남는 공간이 결정한다.
    position:relative 는 GlobeCanvas 의 absolute+inset:0 mount 앵커. */
+/* U11b: .gq-stage 는 이제 .gq-stagewrap 의 자식이다(예전엔 .gq-shell 의 직계
+   자식). .gq-stagewrap 이 기본(좁은 화면 = 태블릿 세로/폭 부족)은 세로로 쌓아
+   stage 위·패널 아래를 만들고, 폭이 충분하면(아래 @container) 가로로 바꿔
+   stage 옆에 패널을 둔다 — 07 "가로는 옆 패널, 세로는 위·아래" 배치 계약.
+   패널이 뜨면 이 컨테이너 안에서 stage 의 실제 폭 또는 높이가 줄어들고, 그 변화는
+   GlobeCanvas 의 ResizeObserver(.gq-stage 를 그대로 관찰)가 바로 감지해 카메라를
+   다시 fit 한다 — 여기서 새 배선을 추가하지 않는다. */
+.gq-stagewrap{
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--ux-space-3);
+}
+/* 지구본은 넓은 화면에서 더 크게 본다 — 판을 키우는 쪽이 아이에게 유리하다.
+   min-height 는 이제 "목표 크기"가 아니라 저높이/큰 글씨에서도 stage 가 0 으로
+   짜부라지지 않게 하는 바닥값이다 — 정상 상황의 실제 크기는 .gq-shell 의
+   height:100% 를 통해 flex:1 이 분배하는 남는 공간이 결정한다.
+   position:relative 는 GlobeCanvas 의 absolute+inset:0 mount 앵커. */
 .gq-stage{ position: relative; flex: 1; min-height: clamp(320px, 58svh, 680px); }
 .gq-loading{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #C7D2FE; font-weight: 800; }
+
+/* 패널이 stage 위에 상시 덮이지 않게 정상 흐름(아래)에 둔다 — 콘텐츠가 stage
+   min-height 바닥값과 합쳐 화면보다 커지면, 이 셸은 스스로 자르지 않고
+   바깥(GameRoom 스테이지)의 overflow:auto 가 그대로 스크롤을 허용한다. */
+.gq-panel{ flex-shrink: 0; display: flex; justify-content: center; container-type: inline-size; }
+
+/* 폭이 충분(≈크롬북/노트북/가로 태블릿)하면 stage 옆에 패널 — 07 "가로/크롬북/
+   노트북은 큰 stage + 옆 정보 패널". 800px 처럼 애매하게 좁은 분할화면은 이
+   문턱 아래라 계속 아래 배치를 쓴다("최소 stage 공간이 부족하면 아래로"). */
+@container (min-width: 960px){
+  .gq-stagewrap{ flex-direction: row; align-items: stretch; }
+  .gq-stage{ min-width: 0; }
+  .gq-panel{
+    width: min(360px, 34cqi); max-width: 360px; min-height: 0;
+    overflow-y: auto; align-items: flex-start;
+  }
+}
 
 .gq-quizbar{
   flex: 1; min-width: 0;
@@ -676,11 +726,6 @@ const GQ_CSS = `
 .gq-quizstat{ display: flex; gap: var(--ux-space-3); align-items: baseline; flex-wrap: wrap; }
 .gq-quizstat [data-ux-role="label"]{ color: var(--ux-primary-ink); font-weight: 900; }
 
-.gq-cardlayer{
-  position: absolute; left: 0; right: 0; bottom: 0;
-  display: flex; justify-content: center;
-  padding: 0 var(--ux-space-3) var(--ux-space-4);
-}
 .gq-card{
   width: min(560px, 100%);
   background: var(--ux-surface); color: var(--ux-ink);
@@ -688,6 +733,14 @@ const GQ_CSS = `
   box-shadow: 0 18px 44px rgba(0,0,0,.5);
   padding: var(--ux-space-4);
   display: flex; gap: var(--ux-space-4); align-items: flex-start; flex-wrap: wrap;
+}
+/* .gq-card 는 자신을 담은 .gq-panel(컨테이너 쿼리)의 실제 폭을 본다 — 옆 패널
+   모드(≤360px)에서는 이미지+글 가로 배치가 비좁아 세로로 쌓는다. 아래 배치
+   모드에서는 .gq-panel 폭이 곧 stage 전체 폭이라 이 문턱에 걸리지 않고 기존
+   가로 배치를 유지한다. */
+@container (max-width: 400px){
+  .gq-card{ flex-direction: column; align-items: center; text-align: center; }
+  .gq-nameline, .gq-hellorow{ justify-content: center; }
 }
 .gq-landmark{ width: 84px; height: 84px; object-fit: contain; flex-shrink: 0; }
 .gq-cardbody{ flex: 1; min-width: 0; display: grid; gap: var(--ux-space-2); }

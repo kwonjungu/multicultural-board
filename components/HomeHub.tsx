@@ -28,7 +28,12 @@ interface ActivityMeta {
   descKey: string;
   mascot: string;
   tint: string;
-  /** 칭찬 표시는 육각형으로 — 벌집은 브랜드 장식과 칭찬에만 남긴다. */
+  /**
+   * 한때 '나의 꿀벌'(칭찬) 타일만 육각형으로 그렸다. 다섯 타일 중 하나만
+   * 모양이 달라 그 타일만 튀어 보인다는 지적을 받아 원으로 되돌렸다
+   * (사용자, 2026-09-13). 벌집 육각형은 브랜드 장식(.hub-hex)에만 남긴다.
+   * 필드는 남겨 두되 아무도 쓰지 않는다 — 다시 켜려면 여기부터 보면 된다.
+   */
   hex?: boolean;
 }
 
@@ -40,7 +45,7 @@ const ACTIVITIES: ActivityMeta[] = [
   { id: "board", titleKey: "hubActBoard", descKey: "hubSectionBoardDesc", mascot: "/mascot/bee-cheer.png", tint: "var(--ux-hint-apricot)" },
   { id: "storybook", titleKey: "hubActStorybook", descKey: "hubSectionStorybookDesc", mascot: "/mascot/bee-welcome.png", tint: "var(--ux-hint-lavender)" },
   { id: "vocab", titleKey: "hubActVocab", descKey: "hubSectionVocabDesc", mascot: "/mascot/bee-book.png", tint: "var(--ux-hint-mint)" },
-  { id: "dashboard", titleKey: "hubActBee", descKey: "hubSectionStickersDesc", mascot: "/mascot/bee-student.png", tint: "var(--ux-primary-fill)", hex: true },
+  { id: "dashboard", titleKey: "hubActBee", descKey: "hubSectionStickersDesc", mascot: "/mascot/bee-student.png", tint: "var(--ux-primary-fill)" },
   { id: "games", titleKey: "hubActGames", descKey: "hubSectionGamesDesc", mascot: "/mascot/bee-celebrate.png", tint: "var(--ux-surface-sunk)" },
 ];
 
@@ -429,6 +434,27 @@ const HUB_CSS = `
   padding: var(--ux-space-4);
   box-shadow: 0 8px 24px rgba(137,83,0,.12);
   display: grid; gap: var(--ux-space-4);
+}
+/* 넓은 화면에서는 인사와 설정을 한 줄에 좌·우로 놓는다.
+   예전에는 카드가 1080px 인데 내용이 전부 왼쪽 280px 에 몰려 있고 오른쪽
+   800px 이 빈 흰 여백이었다. 바로 아래 제목·활동 별은 가운데 정렬이라
+   헤더만 왼쪽에 붙어 보였다. 세로도 200px 을 먹어 첫 화면을 눌렀다.
+   좁은 화면은 기존처럼 위아래로 쌓는다. */
+@media (min-width: 860px){
+  .hub-head{
+    grid-template-columns: auto minmax(0, max-content);
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--ux-space-6);
+  }
+  /* 가로 배치에서는 위쪽 점선 구분이 어색하다 — 세로 구분으로 바꾼다. */
+  .hub-head .hub-settings{
+    border-top: none; padding-top: 0;
+    border-left: 2px dashed var(--ux-surface-sunk);
+    padding-left: var(--ux-space-6);
+    justify-items: end;
+  }
+  .hub-head .hub-settings-row{ justify-content: flex-end; }
 }
 .hub-who{ display: flex; align-items: center; gap: var(--ux-space-3); min-width: 0; }
 .hub-who-bee{ width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }

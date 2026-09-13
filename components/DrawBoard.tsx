@@ -8,6 +8,8 @@
 import {
   forwardRef, useEffect, useImperativeHandle, useRef, useState,
 } from "react";
+import ScopedStyle from "./ui/child/ScopedStyle";
+import { CHILD_UX } from "@/lib/childUx/tokens";
 
 export type ToolId = "pen" | "highlighter" | "line" | "rect" | "ellipse" | "arrow" | "text" | "eraser";
 
@@ -25,6 +27,95 @@ const SHAPE_TOOLS: ToolId[] = ["line", "rect", "ellipse", "arrow"];
 const COLORS = ["#1a1a1a", "#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#e91e63", "#ffffff"];
 const SIZES = [3, 8, 16];
 const UNDO_LIMIT = 8;
+/** 가로(landscape) 화면에서 도구를 세로 rail 로 돌리는 폭 하한. 이보다 좁게
+ *  주어진 컨테이너(예: 토론 화면의 460px 그림 응답칸)에서는 rail 이 캔버스를
+ *  더 좁게 만들 뿐이라 그대로 쌓아 둔다. */
+const RAIL_MIN_WIDTH = 560;
+
+/**
+ * 도구 줄 CSS — U-DRAW01 (04 §5).
+ *
+ * 이전에는 도구 두 줄(펜 8종 + 색·굵기·되돌리기)이 인라인 px 로 캔버스 위에
+ * 항상 쌓여, 1366x768 가로 화면에서 137px(뷰포트 세로의 18%)를 먹고 캔버스
+ * 아래가 실제로 잘렸다(before-creative 실측). 캔버스가 우선이라는 원칙에
+ * 따라 고친다:
+ *  - 가로로 넓고 짧은 화면(=태블릿/크롬북 가로, orientation:landscape)에서는
+ *    도구를 캔버스 옆 세로 rail 로 돌려 세로 공간을 캔버스에 돌려준다.
+ *    세로로 긴 화면(태블릿 세로)에서는 세로 공간이 넉넉하므로 기존처럼
+ *    캔버스 위에 짧게 쌓는다 — rail 로 바꾸면 캔버스 폭만 줄어든다.
+ *  - 도구 버튼은 아이콘+글자 라벨을 항상 같이 보여준다 — 툴팁 없이도 뜻을
+ *    알 수 있어야 한다(04 §5).
+ *  - 조작 영역 크기는 인라인 px 가 아니라 [data-ux-role="control"] 토큰이
+ *    정한다. 크기를 지키되 굵은 테두리를 항상 두르지는 않는다(선택된
+ *    도구만 강조).
+ */
+const DB_CSS = `
+.db-root{ display:flex; flex-direction:column; gap: var(--ux-space-3); }
+.db-body{ display:flex; flex-direction:column; gap: var(--ux-space-3); min-width:0; }
+.db-toolbar{ display:flex; flex-direction:column; gap: var(--ux-space-2); flex-shrink:0; }
+.db-tools{ display:flex; flex-wrap:wrap; gap: var(--ux-space-2); }
+.db-tool{
+  display:inline-flex; align-items:center; justify-content:center; gap:4px;
+  background: var(--ux-surface); color: var(--ux-ink-soft); font-family:inherit; font-weight:800;
+  border: 2px solid transparent;
+}
+.db-tool[data-ux-role="control"]{ padding: var(--ux-space-2) var(--ux-space-3); }
+/* 선택 강조색은 accent prop(인라인 style) 이 정한다 — 화면마다 다른 accent
+   계약(그림책 파랑 등)을 지키기 위해서다. 여기서는 미선택 기본값만 둔다. */
+.db-tool-ico{ font-size: 1.2em; line-height:1; }
+.db-tool-lb{ white-space:nowrap; }
+
+.db-swatchrow{ display:flex; flex-wrap:wrap; gap: var(--ux-space-2); align-items:center; }
+.db-divider{ width:2px; align-self:stretch; background: var(--ux-primary-border); opacity:.3; border-radius:2px; }
+.db-swatch{
+  display:inline-flex; align-items:center; justify-content:center;
+  background: var(--ux-surface); border: 2px solid transparent; padding:0;
+}
+.db-swatch[data-ux-role="control"]{ width: var(--ux-control-min); padding:0; }
+.db-swatch[aria-pressed="true"]{ border-color: var(--ux-selected-border); background: var(--ux-hint-apricot); }
+.db-swatch-dot{ width:22px; height:22px; border-radius:50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); flex-shrink:0; }
+.db-size-dot{ border-radius:50%; background: var(--ux-ink); flex-shrink:0; }
+
+.db-history{ display:flex; gap: var(--ux-space-2); justify-content: space-between; align-items:center; }
+.db-btn{
+  background: transparent; border: 2px solid transparent; color: var(--ux-ink-soft);
+  font-family:inherit; font-weight:800; display:inline-flex; align-items:center; gap:6px;
+}
+.db-btn[data-ux-role="control"]{ padding: var(--ux-space-2) var(--ux-space-3); }
+.db-btn:hover, .db-btn:focus-visible{ background: var(--ux-surface-sunk); color: var(--ux-ink); }
+.db-btn:disabled{ opacity:.5; cursor:default; }
+.db-btn.danger{ color: var(--ux-error); }
+.db-btn.danger:hover, .db-btn.danger:focus-visible{ background: #FEF2F2; }
+
+.db-canvaswrap{ position:relative; min-width:0; flex:1; }
+.db-canvas{
+  width:100%; display:block; border-radius: var(--ux-radius-surface);
+  border: 2px solid var(--ux-primary-border); background:#fff; touch-action:none;
+}
+.db-text-input{
+  position:absolute; min-width:120px; padding:2px 6px; border-radius:6px; outline:none;
+  border: 2px dashed var(--ux-selected-border); background: rgba(255,255,255,.95);
+  font-family:inherit; font-weight:700;
+}
+.db-hint{ margin-top:2px; }
+
+/* 가로로 넓고 짧은 화면에서만 rail 로 — 세로로 긴 화면은 그대로 쌓는다. */
+[data-db-layout="rail"] .db-body{ flex-direction: row; align-items: stretch; }
+[data-db-layout="rail"] .db-toolbar{
+  flex-direction: column; width: 116px; overflow-y: auto;
+  padding-right: var(--ux-space-1);
+}
+[data-db-layout="rail"] .db-tools{ flex-direction: column; }
+[data-db-layout="rail"] .db-tool{ flex-direction: column; width: 100%; gap:2px; }
+[data-db-layout="rail"] .db-swatchrow{ flex-direction: column; align-items: stretch; }
+[data-db-layout="rail"] .db-divider{ width: auto; height:2px; margin: 2px 0; }
+[data-db-layout="rail"] .db-history{ flex-direction: column; align-items: stretch; }
+/* rail 로도 폭이 남으면 3:2 캔버스가 세로로 화면을 넘칠 수 있다(예: 1366x768).
+   세로 예산을 넘지 않게 높이로도 한 번 더 잡아 준다 — 캔버스가 잘리는 것보다
+   살짝 작아지는 편이 낫다. */
+[data-db-layout="rail"] .db-canvaswrap{ max-height: calc(100svh - var(--ux-space-8)); }
+[data-db-layout="rail"] .db-canvas{ width: auto; height: 100%; max-width: 100%; }
+`;
 
 interface Pt { x: number; y: number }
 interface TextEntry { cssX: number; cssY: number; cx: number; cy: number; fontCss: number; value: string }
@@ -50,7 +141,8 @@ export interface DrawBoardFixture {
 export interface DrawBoardProps {
   width?: number;
   height?: number;
-  /** 강조색(선택 도구 하이라이트). 기본 청록. */
+  /** 강조색(선택 도구 하이라이트). 기본은 공통 디자인 토큰의 선택 강조색 —
+   *  그림책처럼 자기 accent 를 넘기는 화면은 그 색을 그대로 쓴다. */
   accent?: string;
   /** 변화 디바운스 후 최신 dataURL 콜백 — 라이브 스트리밍용. */
   onChange?: (dataUrl: string) => void;
@@ -60,15 +152,44 @@ export interface DrawBoardProps {
 }
 
 const DrawBoard = forwardRef<DrawBoardHandle, DrawBoardProps>(function DrawBoard(
-  { width = 720, height = 480, accent = "#14B8A6", onChange, debounceMs = 600, fixture },
+  // 기본 accent 는 공통 디자인 토큰의 선택 강조색 — 화이트보드·토론처럼 accent 를
+  // 따로 넘기지 않는 화면은 자동으로 공통 규칙을 따른다. 그림책처럼 자기 accent 를
+  // 넘기는 화면(StorybookRoom·PostModal)의 계약은 그대로 유지된다 — 건드리지 않는다.
+  { width = 720, height = 480, accent = CHILD_UX.palette["selected-border"], onChange, debounceMs = 600, fixture },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<ToolId>("pen");
   const [color, setColor] = useState("#1a1a1a");
   const [size, setSize] = useState(8);
   const [canUndo, setCanUndo] = useState(false);
   const [textEntry, setTextEntry] = useState<TextEntry | null>(null);
+
+  // 도구 rail 전환: 실제로 주어진 폭(부모가 정함 — 그리기 엔진 자신의 콘텐츠가
+  // 아니다)과 화면 방향(가로/세로)을 함께 본다. 폭만 보면 세로로 긴 태블릿도
+  // rail 이 되어 버리고, 방향만 보면 토론 화면의 좁은 460px 그림칸까지 rail
+  // 이 되어 캔버스가 더 좁아진다.
+  const [railWidth, setRailWidth] = useState(0);
+  const [landscape, setLandscape] = useState(false);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      if (box) setRailWidth(box.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    const mq = window.matchMedia("(orientation: landscape)");
+    const update = () => setLandscape(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const railLayout = landscape && railWidth >= RAIL_MIN_WIDTH;
 
   const drawingRef = useRef(false);
   const startRef = useRef<Pt | null>(null);
@@ -284,122 +405,122 @@ const DrawBoard = forwardRef<DrawBoardHandle, DrawBoardProps>(function DrawBoard
   }
 
   return (
-    <div>
-      {/* 도구 선택 */}
-      <div style={{ display: "flex", gap: 5, marginBottom: 8, flexWrap: "wrap" }}>
-        {TOOLS.map((tl) => (
-          <button
-            key={tl.id}
-            type="button"
-            onClick={() => setTool(tl.id)}
-            aria-pressed={tool === tl.id}
-            title={tl.label}
-            style={{
-              minWidth: 44, height: 40, padding: "0 8px", borderRadius: 10,
-              border: `2px solid ${tool === tl.id ? accent : "#e5e5e5"}`,
-              background: tool === tl.id ? `${accent}22` : "#fff",
-              color: tool === tl.id ? accent : "#374151",
-              fontSize: 13, fontWeight: 800, cursor: "pointer",
-              display: "inline-flex", alignItems: "center", gap: 4,
-            }}
-          >
-            <span style={{ fontSize: 16 }}>{tl.icon}</span>{tl.label}
-          </button>
-        ))}
-      </div>
+    <div ref={rootRef} className="db-root" data-db-layout={railLayout ? "rail" : "stack"}>
+      <ScopedStyle css={DB_CSS} />
+      <div className="db-body">
+        <div className="db-toolbar" role="toolbar" aria-label="그리기 도구">
+          {/* 도구 선택 — 아이콘+글자를 항상 같이 보여줘 툴팁 없이도 뜻이 남는다. */}
+          <div className="db-tools">
+            {TOOLS.map((tl) => (
+              <button
+                key={tl.id}
+                type="button"
+                data-ux-role="control"
+                className="db-tool"
+                onClick={() => setTool(tl.id)}
+                aria-pressed={tool === tl.id}
+                title={tl.label}
+                // 선택 강조색은 accent prop 을 따른다 — 그림책·게시판처럼 자기
+                // 색을 넘기는 화면의 기존 계약(파랑/칼럼색 강조)을 지킨다.
+                style={tool === tl.id ? { borderColor: accent, background: `${accent}22`, color: accent } : undefined}
+              >
+                <span aria-hidden className="db-tool-ico">{tl.icon}</span>
+                <span className="db-tool-lb">{tl.label}</span>
+              </button>
+            ))}
+          </div>
 
-      {/* 색·굵기·되돌리기·전체지우기 */}
-      <div style={{ display: "flex", gap: 5, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {COLORS.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => setColor(c)}
-            aria-label={`색상 ${c}`}
-            style={{
-              width: 28, height: 28, borderRadius: "50%",
-              border: color === c ? "3px solid #1F2937" : "2px solid transparent",
-              background: c, cursor: "pointer", flexShrink: 0,
-              boxShadow: c === "#ffffff" ? "inset 0 0 0 1px #ddd" : "none",
-            }}
-          />
-        ))}
-        <div style={{ width: 1, height: 22, background: "#e5e5e5", margin: "0 2px" }} />
-        {SIZES.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSize(s)}
-            aria-label={`굵기 ${s}`}
-            style={{
-              width: 28, height: 28, borderRadius: "50%",
-              border: size === s ? "2px solid #1F2937" : "2px solid transparent",
-              background: "#fff", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-          >
-            <div style={{ width: s, height: s, borderRadius: "50%", background: "#333" }} />
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={undo}
-          disabled={!canUndo}
-          style={{
-            marginLeft: "auto", padding: "6px 12px", borderRadius: 10, fontSize: 12, fontWeight: 800,
-            border: "2px solid #e5e5e5", background: canUndo ? "#fff" : "#F3F4F6",
-            color: canUndo ? "#374151" : "#9CA3AF", cursor: canUndo ? "pointer" : "default",
-          }}
-        >↩︎ 되돌리기</button>
-        <button
-          type="button"
-          onClick={clearAll}
-          style={{
-            padding: "6px 12px", borderRadius: 10, fontSize: 12, fontWeight: 800,
-            border: "2px solid #FECACA", background: "#fff", color: "#B91C1C", cursor: "pointer",
-          }}
-        >🗑 전체 지우기</button>
-      </div>
+          {/* 색·굵기 */}
+          <div className="db-swatchrow">
+            {COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                data-ux-role="control"
+                className="db-swatch"
+                onClick={() => setColor(c)}
+                aria-pressed={color === c}
+                aria-label={`색상 ${c}`}
+              >
+                <span
+                  aria-hidden
+                  className="db-swatch-dot"
+                  style={{ background: c }}
+                />
+              </button>
+            ))}
+            <div className="db-divider" />
+            {SIZES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                data-ux-role="control"
+                className="db-swatch"
+                onClick={() => setSize(s)}
+                aria-pressed={size === s}
+                aria-label={`굵기 ${s}`}
+              >
+                <span aria-hidden className="db-size-dot" style={{ width: s, height: s }} />
+              </button>
+            ))}
+          </div>
 
-      {/* 캔버스 (글자 입력창은 이 래퍼 기준 절대배치) */}
-      <div style={{ position: "relative" }}>
-        <canvas
-          ref={canvasRef}
-          width={width}
-          height={height}
-          style={{
-            width: "100%", display: "block", borderRadius: 12, border: "2px solid #e5e5e5",
-            cursor: tool === "eraser" ? "cell" : tool === "text" ? "text" : "crosshair",
-            touchAction: "none", background: "#fff",
-          }}
-          onMouseDown={onDown}
-          onMouseMove={onMove}
-          onMouseUp={onUp}
-          onMouseLeave={onUp}
-          onTouchStart={onDown}
-          onTouchMove={onMove}
-          onTouchEnd={onUp}
-        />
-        {textEntry && (
-          <input
-            autoFocus
-            value={textEntry.value}
-            onChange={(e) => setTextEntry({ ...textEntry, value: e.target.value })}
-            onKeyDown={(e) => { if (e.key === "Enter") commitText(); if (e.key === "Escape") setTextEntry(null); }}
-            onBlur={commitText}
-            placeholder="글자 입력 후 Enter"
+          {/* 되돌리기(보조·낮은 강조) · 전체 지우기(오른쪽) */}
+          <div className="db-history">
+            <button
+              type="button"
+              data-ux-role="control"
+              className="db-btn"
+              onClick={undo}
+              disabled={!canUndo}
+            >↩︎ 되돌리기</button>
+            <button
+              type="button"
+              data-ux-role="control"
+              className="db-btn danger"
+              onClick={clearAll}
+            >🗑 전체 지우기</button>
+          </div>
+        </div>
+
+        {/* 캔버스 (글자 입력창은 이 래퍼 기준 절대배치) */}
+        <div className="db-canvaswrap">
+          <canvas
+            ref={canvasRef}
+            width={width}
+            height={height}
+            className="db-canvas"
             style={{
-              position: "absolute",
-              left: textEntry.cssX, top: textEntry.cssY,
-              minWidth: 120, padding: "2px 6px",
-              fontSize: Math.max(14, textEntry.fontCss), fontWeight: 700, color,
-              border: `2px dashed ${accent}`, borderRadius: 6, outline: "none",
-              background: "rgba(255,255,255,0.95)", fontFamily: "inherit",
+              cursor: tool === "eraser" ? "cell" : tool === "text" ? "text" : "crosshair",
             }}
+            onMouseDown={onDown}
+            onMouseMove={onMove}
+            onMouseUp={onUp}
+            onMouseLeave={onUp}
+            onTouchStart={onDown}
+            onTouchMove={onMove}
+            onTouchEnd={onUp}
           />
-        )}
+          {textEntry && (
+            <input
+              autoFocus
+              value={textEntry.value}
+              onChange={(e) => setTextEntry({ ...textEntry, value: e.target.value })}
+              onKeyDown={(e) => { if (e.key === "Enter") commitText(); if (e.key === "Escape") setTextEntry(null); }}
+              onBlur={commitText}
+              placeholder="글자 입력 후 Enter"
+              className="db-text-input"
+              style={{
+                left: textEntry.cssX, top: textEntry.cssY,
+                // 캔버스에 실제로 찍힐 글자 크기를 그대로 보여줘야 하는 값이라
+                // 역할 토큰이 아니라 붓 굵기에서 계산한다(commitText 와 같은 공식).
+                fontSize: Math.max(14, textEntry.fontCss), color,
+              }}
+            />
+          )}
+        </div>
       </div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", marginTop: 6 }}>
+      <div data-ux-role="secondary" className="db-hint">
         {tool === "text" ? "캔버스를 눌러 글자 위치를 정하고 입력하세요."
           : SHAPE_TOOLS.includes(tool) ? "끌어서 도형을 그려요. 놓으면 그려집니다."
           : "자유롭게 그려보세요."}

@@ -474,11 +474,22 @@ export default function PadletCard({
     >
       {/* ── 1. 누가 썼는지 ── */}
       <header className="pc-who">
-        {/* U05 — 작성자의 내 동물. 교사는 동물을 고르지 않으므로 종전 표시를 유지한다.
-            해석 순서는 검증된 learnerId → 프로필 → 글에 저장된 스냅샷 → 결정적 폴백.
-            이름으로 프로필을 찾지 않는다(동명이인 병합 금지). */}
+        {/* U05 — 작성자의 내 동물. 해석 순서는 검증된 learnerId → 프로필 →
+            글에 저장된 스냅샷 → 결정적 폴백. 이름으로 프로필을 찾지 않는다
+            (동명이인 병합 금지).
+
+            교사는 동물을 고르지 않는다. OS 이모지(🧑‍🏫)는 기기마다 그림이
+            달라 이 앱의 톤과 맞지 않았다 — 같은 세트의 꿀벌 마스코트를 쓴다
+            (03 에셋가이드: OS 유니코드 이모지를 핵심 아이콘으로 쓰지 않기).
+            원 안에서 그림이 작아 보이던 것도 함께 키웠다. */}
+        {/* 바탕색은 주제(칼럼) 색을 그대로 쓴다 — 색이 다른 것은 의도다.
+            통일하는 것은 **모양**이다: 모든 아바타가 같은 크기의 정원에
+            같은 테두리를 갖는다(.pc-avatar). */}
         <span aria-hidden className="pc-avatar" style={{ background: colColor }}>
-          {card.isTeacher ? "🧑‍🏫" : <AnimalArt id={authorAnimal} size={30} />}
+          {card.isTeacher
+            ? <img src="/mascot/bee-teacher.png" alt="" aria-hidden="true" width={40} height={40}
+                   className="pc-avatar-art" style={{ width: 40, height: 40 }} />
+            : <AnimalArt id={authorAnimal} size={40} className="pc-avatar-art" />}
         </span>
         <span className="pc-who-text">
           <span data-ux-role="label" className="pc-name"><bdi>{card.authorName}</bdi></span>
@@ -706,20 +717,26 @@ export default function PadletCard({
         </div>
       )}
 
-      {/* ── 5. 듣기 · 답장 ── */}
+      {/* ── 5. 조작 한 줄: 왼쪽 읽기 보조 · 오른쪽 대화 ──
+             읽기 보조(듣기)와 대화 동작(답장·공감)은 성격이 다르다. 같은 무게로
+             나란히 쌓으면 카드가 버튼 더미가 된다. */}
       <div className="pc-actions">
-        <ListenButton
-          id="mine"
-          text={translating || translateFailed ? card.originalText : readingText}
-          lang={translating || translateFailed ? card.authorLang : viewerLang}
-        />
-        <button
-          type="button"
-          data-ux-role="control"
-          className="pc-btn"
-          aria-expanded={commentsOpen}
-          onClick={() => setCommentsOpen((v) => !v)}
-        >{tPlain("cardReply", viewerLang)}{commentCount > 0 ? ` ${commentCount}` : ""}</button>
+        <div className="pc-act-read">
+          <ListenButton
+            id="mine"
+            text={translating || translateFailed ? card.originalText : readingText}
+            lang={translating || translateFailed ? card.authorLang : viewerLang}
+          />
+        </div>
+        <div className="pc-act-talk">
+          <button
+            type="button"
+            data-ux-role="control"
+            className="pc-btn"
+            aria-expanded={commentsOpen}
+            onClick={() => setCommentsOpen((v) => !v)}
+          >{tPlain("cardReply", viewerLang)}{commentCount > 0 ? ` ${commentCount}` : ""}</button>
+        </div>
       </div>
 
       {/* ── 반응 (U06): 기본은 '공감하기' 한 버튼. 누르면 세부 5종 패널이 열린다.
@@ -887,10 +904,20 @@ export const CARD_CSS = `
 .pc-card.pending{ border-style: dashed; }
 .pc-who{ display: flex; align-items: center; gap: var(--ux-space-3); flex-wrap: wrap; }
 .pc-avatar{
-  width: 44px; height: 44px; border-radius: var(--ux-radius-pill); flex-shrink: 0;
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--ux-primary-ink); font-weight: 900;
+  overflow: hidden;
+  /* 모양은 통일한다 — 같은 지름의 정원 + 같은 테두리. 바탕색만 주제별로 다르다. */
+  border: 2px solid var(--ux-primary-border);
+  box-sizing: border-box;
 }
+/* 원 대비 그림을 크게. 예전에는 44px 원에 30px 그림이라(68%) 동물이 작아
+   보였다. 40px(91%)로 키우고 살짝 아래로 내려 얼굴이 원 가운데 오게 한다 —
+   이 그림들은 머리가 위쪽에 있어 정중앙에 놓으면 아래가 비어 보인다.
+   크기는 여기서 정하지 않는다: AnimalArt 가 size prop 을 인라인 style 로
+   넣어서 클래스보다 우선한다. 여기서 %로 다시 쓰면 조용히 무시된다. */
+.pc-avatar-art{ object-fit: contain; display: block; transform: translateY(4%); }
 .pc-who-text{ display: grid; gap: 2px; min-width: 0; flex: 1; }
 .pc-name{ font-weight: 900; color: var(--ux-ink); overflow-wrap: anywhere; }
 .pc-meta{ overflow-wrap: anywhere; }
@@ -933,12 +960,44 @@ export const CARD_CSS = `
 .pc-note{ margin: 0; word-break: keep-all; overflow-wrap: anywhere; }
 .pc-label{ font-weight: 800; color: var(--ux-ink); }
 
-.pc-actions, .pc-reactions{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+/* 카드 아래 조작 줄.
+   예전에는 버튼 5개(원문 보기·듣기·답장·공감·요약)가 전부 같은 굵은 갈색
+   테두리로 **3줄에 걸쳐 왼쪽에 쌓여** 본문(2줄)보다 큰 덩어리가 됐다.
+   전부 왼쪽에 몰려 오른쪽이 비는 것도 좌편향으로 보였다(사용자 지적).
+
+   고친 규칙:
+    - 한 줄로 두고 좌우로 나눈다. 읽기 보조(듣기·원문)는 왼쪽에서 **낮은 강조**,
+      대화 동작(답장·공감)은 오른쪽에서 평소 강조.
+    - 굵은 갈색 테두리를 모든 버튼에 두르지 않는다. 보조는 테두리 없이 두고
+      hover/focus 에서만 바탕을 준다 — 조작 영역 크기는 그대로 지킨다. */
+.pc-actions{
+  display: flex; gap: var(--ux-space-2); flex-wrap: wrap;
+  align-items: center; justify-content: space-between;
+}
+.pc-act-read, .pc-act-talk{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; align-items: center; }
+.pc-act-talk{ margin-left: auto; }
+/* 보조 조작 — 크기는 유지하고 시각 무게만 낮춘다. */
+.pc-actions .pc-act-read .pc-btn{
+  border-color: transparent; background: transparent; font-weight: 700;
+  color: var(--ux-ink-soft);
+}
+.pc-actions .pc-act-read .pc-btn:hover,
+.pc-actions .pc-act-read .pc-btn:focus-visible{
+  background: var(--ux-surface-sunk); color: var(--ux-ink);
+}
+.pc-reactions{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
 
 /* ── 반응 (U06) ─────────────────────────────────────────────────────
    기본은 '공감하기' 한 버튼 + 0보다 큰 반응의 요약 칩. 세부 5종은 눌러야
    열린다 — 카드마다 5개를 상시 깔면 카드 50개 화면에서 조작이 폭발한다. */
-.pc-reactbar{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; align-items: center; }
+/* 공감 줄도 조작 줄과 같은 축에 맞춘다 — 왼쪽에 요약, 오른쪽에 공감하기.
+   전부 왼쪽에 몰리면 카드 오른쪽이 계속 비어 좌편향으로 보인다. */
+.pc-reactbar{
+  display: flex; gap: var(--ux-space-2); flex-wrap: wrap; align-items: center;
+  justify-content: space-between;
+}
+.pc-reactbar > .pc-btn{ order: 2; margin-left: auto; }
+.pc-reactbar > .pc-chipsum{ order: 1; }
 .pc-chipsum{
   display: inline-flex; gap: var(--ux-space-2); align-items: center;
   background: transparent; border: 2px solid transparent; cursor: pointer;

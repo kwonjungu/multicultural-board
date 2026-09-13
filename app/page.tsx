@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LANGUAGES } from "@/lib/constants";
 import BeeBanner from "@/components/BeeBanner";
@@ -100,6 +100,63 @@ export default function Home() {
     setJoinState({ kind: "idle" });
     setJoinCode((c) => next(c));
   }
+
+  /**
+   * 키보드로도 교실 번호를 넣는다.
+   *
+   * 화면 키패드는 태블릿 터치 기준으로 만든 것이고, 크롬북·노트북에서는
+   * 숫자를 그냥 치는 것이 훨씬 빠르다. 04 §4 가 "크롬북은 트랙패드·키보드" 를
+   * 핵심 입력으로 꼽은 이유다.
+   *
+   * 가로채면 안 되는 경우를 먼저 빠져나간다:
+   *  - 다른 입력칸(교실 만들기 명렬표, 교사 PIN 등)에 포커스가 있을 때
+   *  - 한글·일본어·중국어 조합 중일 때(IME) — 조합 중 Enter 는 확정용이다
+   *  - Ctrl/Cmd/Alt 조합 — 브라우저 단축키를 빼앗지 않는다
+   *  - 들어가기 화면이 아닐 때(교실 만들기·문서 번역 탭)
+   */
+  useEffect(() => {
+    if (view !== "join" || tab !== "join") return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.isComposing) return;
+      const el = e.target as HTMLElement | null;
+      if (el) {
+        const tag = el.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable) return;
+      }
+
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        editCode((c) => (c.length >= 4 ? c : c + e.key));
+        return;
+      }
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        editCode((c) => c.slice(0, -1));
+        return;
+      }
+      if (e.key === "Delete" || e.key === "Escape") {
+        e.preventDefault();
+        editCode(() => "");
+        return;
+      }
+      if (e.key === "Enter") {
+        // 네 자리가 다 찼을 때만. 아니면 아무 일도 하지 않는다(오동작 방지).
+        if (joinCode.replace(/\D/g, "").length !== 4) return;
+        // 버튼에 포커스가 있으면 그 버튼의 기본 동작에 맡긴다 — 두 번 실행 금지.
+        if (el && el.tagName === "BUTTON") return;
+        e.preventDefault();
+        void handleJoin();
+      }
+    };
+
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // handleJoin 은 매 렌더 새로 만들어지므로 의존성에 넣지 않는다 — 최신
+    // joinCode 는 위에서 직접 읽는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, tab, joinCode]);
 
   function parsedRoster(): string[] {
     return createRosterText
@@ -321,6 +378,11 @@ export default function Home() {
                 <img src="/mascot/bee-welcome.png" alt="" aria-hidden="true" className="root-hero-bee" />
                 <h1 data-ux-role="title" className="root-title">우리 교실에 들어가요</h1>
                 <p data-ux-role="body" className="root-sub">교실 번호 네 자리를 눌러 주세요</p>
+                {/* 크롬북·노트북에서는 그냥 치는 게 빠르다. 키보드가 없는
+                    태블릿에서는 이 줄이 방해되지 않도록 보조 크기로 둔다. */}
+                <p data-ux-role="secondary" className="root-kbdhint">
+                  키보드로 숫자를 눌러도 돼요 · <kbd>⌫</kbd> 지우기 · <kbd>Enter</kbd> 들어가기
+                </p>
               </div>
 
               {/* 네 자리 표시 — 지금 어디를 누르는지 보이게 한다 */}
@@ -646,6 +708,16 @@ const ROOT_CSS = `
 .root-title{ margin: 0; color: var(--ux-ink); font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
 .root-title.small{ flex: 1; min-width: 0; text-align: left; }
 .root-sub{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }
+/* 키보드 안내 — 터치만 쓰는 태블릿에서는 화면을 차지하지 않게 작게 둔다.
+   포인터가 굵은(터치) 기기에서는 아예 감춘다: 키보드가 없는데 키보드
+   안내를 읽히면 혼란만 준다. */
+.root-kbdhint{ margin: var(--ux-space-2) 0 0; color: var(--ux-ink-soft); word-break: keep-all; }
+.root-kbdhint kbd{
+  font: inherit; font-weight: 800;
+  background: var(--ux-surface-sunk); border: 1.5px solid var(--ux-primary-border);
+  border-radius: 6px; padding: 0 6px;
+}
+@media (pointer: coarse){ .root-kbdhint{ display: none; } }
 
 /* 네 자리 표시 */
 .root-digits{ display: flex; gap: var(--ux-space-3); justify-content: center; }

@@ -258,7 +258,7 @@ export default function PraiseHive({
         }}
       />
 
-      <div style={{ maxWidth: 760, margin: "0 auto", position: "relative", zIndex: 1 }}>
+      <div className="ph-wrap" style={{ position: "relative", zIndex: 1 }}>
         {/* Header */}
         <div
           data-tutorial-id="praise-header"
@@ -457,6 +457,47 @@ export default function PraiseHive({
           />
         )}
       </div>
+      {/* 공통 규칙(04 §1): 조작 줄은 좌우로 나누고, 보조는 테두리 없이 낮은
+          강조로 — 크기는 data-ux-role 최소값 그대로(인라인 px 로 다시 정하지
+          않는다). 넓은 화면에서는 여백만 커지지 않게 나의 꿀벌집을 2영역으로
+          나눈다. 화면 전체에서 한 번만 선언한다(탭이 바뀌어도 계속 유효). */}
+      <style jsx global>{`
+        .ph-actions{
+          margin-top: 16px;
+          display: flex; gap: var(--ux-space-3);
+          align-items: center; justify-content: space-between;
+          flex-wrap: wrap;
+        }
+        .ph-btn-primary, .ph-btn-secondary{
+          font-family: inherit; font-weight: 900; letter-spacing: -0.2px;
+          border-radius: 16px; box-sizing: border-box;
+        }
+        .ph-btn-primary{
+          background: #FFD35C; color: #38280D; border: 2px solid #895300;
+        }
+        /* 보조 동작 — 테두리 없이, 크기(48/56·터치·마우스 분기)는 그대로. */
+        .ph-btn-secondary{
+          background: transparent; color: var(--ux-ink-soft);
+          border: 2px solid transparent; font-weight: 700;
+        }
+        .ph-btn-secondary:hover, .ph-btn-secondary:focus-visible{
+          background: var(--ux-surface-sunk); color: var(--ux-ink);
+        }
+        /* 나의 꿀벌집 — 좁은 화면은 세로 한 단, 넓은 화면(≥900px)은 캐릭터
+           카드(왼쪽)와 받은 칭찬·도감(오른쪽) 2영역으로 나눠 폭을 쓴다. */
+        .ph-mine-grid{ display: flex; flex-direction: column; gap: 14px; }
+        @media (min-width: 900px){
+          .ph-mine-grid{
+            display: grid;
+            grid-template-columns: minmax(320px, 420px) 1fr;
+            align-items: start;
+          }
+        }
+        /* 전체 폭 — 좁은 화면은 기존 760px, 태블릿 가로 이상은 04 §1 컨테이너
+           규칙(1120~1280px)만큼 넓혀 여백만 커지지 않게 한다. */
+        .ph-wrap{ max-width: 760px; margin: 0 auto; }
+        @media (min-width: 900px){ .ph-wrap{ max-width: 1120px; } }
+      `}</style>
     </div>
   );
 }
@@ -557,6 +598,9 @@ function MyHiveTab({
   const extra = count > HEX_COUNT ? count - HEX_COUNT : 0;
 
   return (
+    // 넓은 화면(≥900px)에서 캐릭터 카드(왼쪽)와 받은 칭찬·도감(오른쪽)
+    // 2영역으로 나눈다 — 04 §1: 폭이 생기면 여백이 아니라 열을 늘린다.
+    <div className="ph-mine-grid">
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Hero character card — README §7.1: 위에 칭찬 이유, 가운데 내 꿀벌,
           아래에 ‘꾸미기’·‘칭찬 모아보기’. 스티커 수는 보조 정보다. */}
@@ -730,57 +774,31 @@ function MyHiveTab({
             : t("phMaxStage", lang)}
         </div>
 
-        {/* 두 가지 행동 — 꾸미기 / 칭찬 모아보기 (README §7.1) */}
-        <div
-          style={{
-            marginTop: 16,
-            display: "flex",
-            gap: 12,
-            justifyContent: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <button
-            data-ux-role="action"
-            onClick={onOpenCosmetics}
-            style={{
-              minHeight: 64,
-              minWidth: 56,
-              padding: "10px 22px",
-              background: "#FFD35C",
-              color: "#38280D",
-              border: "2px solid #895300",
-              borderRadius: 16,
-              fontSize: "var(--ux-font-label)",
-              fontWeight: 900,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            {t("phCustomize", lang)}
-          </button>
+        {/* 두 가지 행동 — 꾸미기 / 칭찬 모아보기 (README §7.1).
+            보조(칭찬 모아보기)는 왼쪽에 테두리 없이 낮은 강조로, 주 동작
+            (꾸미기)은 오른쪽에 평소 강조로 — 04 §1 확정 규칙. 크기는
+            data-ux-role 의 control/action 최소값을 그대로 쓴다(인라인
+            min-height 로 다시 정하지 않는다 — 큰 글씨·마우스 분기가 죽는다). */}
+        <div className="ph-actions">
           <button
             data-ux-role="control"
+            className="ph-btn-secondary"
             onClick={() => hiveRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            style={{
-              minHeight: 64,
-              minWidth: 56,
-              padding: "10px 22px",
-              background: "#fff",
-              color: "#29251F",
-              border: "2px solid #895300",
-              borderRadius: 16,
-              fontSize: "var(--ux-font-label)",
-              fontWeight: 900,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
           >
             {t("phRecentPraise", lang)}
           </button>
+          <button
+            data-ux-role="action"
+            className="ph-btn-primary"
+            onClick={onOpenCosmetics}
+          >
+            {t("phCustomize", lang)}
+          </button>
         </div>
       </div>
+    </div>
 
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Recent praise feed — latest 3 received stickers, big cards */}
       {count > 0 && <RecentPraiseFeed lang={lang} list={list} />}
 
@@ -974,15 +992,17 @@ function MyHiveTab({
           </div>
         )}
       </div>
+    </div>
 
-      {/* Sticker detail popover (tap a hex cell) */}
-      {selectedSticker && (
-        <StickerDetailPopover
-          sticker={selectedSticker}
-          lang={lang}
-          onClose={() => setSelectedSticker(null)}
-        />
-      )}
+    {/* Sticker detail popover (tap a hex cell) — position:fixed 오버레이라
+        2영역 밖에 둬도 화면 배치에는 영향이 없다. */}
+    {selectedSticker && (
+      <StickerDetailPopover
+        sticker={selectedSticker}
+        lang={lang}
+        onClose={() => setSelectedSticker(null)}
+      />
+    )}
     </div>
   );
 }
@@ -1108,8 +1128,11 @@ function RaceTab({
           </div>
         ) : (
           <div style={{
+            // auto-fit(안 auto-fill) — 학생이 적을 때 빈 열이 오른쪽에 그대로
+            // 남아 카드가 왼쪽으로 쏠려 보이던 문제(좌편향 실측 08-collection).
+            // auto-fit 은 빈 트랙을 접어 있는 카드가 한 줄을 고르게 채운다.
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
             gap: 10,
           }}>
             {galleryOrder.map((e) => {
@@ -1930,17 +1953,15 @@ function ManageTab({
                   {r.count}
                 </div>
                 <button
+                  data-ux-role="control"
                   onClick={() => onOpenGive(r.name, r.name)}
                   style={{
-                    minHeight: 36,
-                    padding: "6px 12px",
+                    // 크기·글자는 control 역할 토큰 그대로 — 36px 고정은
+                    // 44px 미만 조작이라 실측에서 걸린다(교사 지급 버튼).
                     background: `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`,
                     color: "#fff",
                     border: "none",
-                    borderRadius: 10,
-                    fontSize: 12,
                     fontWeight: 900,
-                    cursor: "pointer",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -2248,17 +2269,16 @@ function PraiseGuide({ lang }: { lang: string }) {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        data-ux-role="control"
         style={{
           width: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 10,
-          padding: "6px 0",
           background: "transparent",
           border: "none",
           cursor: "pointer",
-          fontSize: 15,
           fontWeight: 900,
           color: HONEY.h800,
           letterSpacing: -0.2,
@@ -2747,13 +2767,14 @@ function GalleryPopover({
             <button
               onClick={handleComment}
               disabled={!draft.trim() || busy}
+              data-ux-role="control"
               style={{
-                minWidth: 56, borderRadius: 10, border: "none",
+                border: "none",
                 background: draft.trim() && !busy
                   ? `linear-gradient(135deg, ${HONEY.h400}, ${HONEY.h500})`
                   : "#F3F4F6",
                 color: draft.trim() && !busy ? "#fff" : "#9CA3AF",
-                fontSize: 13, fontWeight: 900,
+                fontWeight: 900,
                 cursor: draft.trim() && !busy ? "pointer" : "default",
                 fontFamily: "inherit",
               }}
