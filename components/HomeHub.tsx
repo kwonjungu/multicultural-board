@@ -413,10 +413,9 @@ const HUB_CSS = `
 .hub-root{
   position: relative;
   min-height: 100svh;
-  /* 튜토리얼 대화상자(fixed, 화면 아래)가 떠 있는 동안 그만큼 아래 여백을
-     더 준다. 없으면 별 배치의 아래쪽 타일이 상자에 가려 눌리지 않는다. */
-  padding: var(--ux-space-4) var(--ux-space-4)
-           calc(var(--ux-space-12) + var(--tutorial-dialogue-h, 0px));
+  /* 튜토리얼 대화상자용 아래 여백은 body 에서 전역으로 준다(app/layout.tsx).
+     여기서 또 주면 두 번 잡혀 빈 공간만 늘어난다. */
+  padding: var(--ux-space-4) var(--ux-space-4) var(--ux-space-12);
   background: var(--ux-bg);
   display: flex; justify-content: center;
 }

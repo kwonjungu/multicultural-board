@@ -25,6 +25,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body style={{
         margin: 0, padding: 0,
+        /* 튜토리얼 대화상자는 position:fixed 로 화면 아래를 차지한다. 그대로
+           두면 그 아래 깔린 진짜 버튼(카드의 듣기·답장, 홈 타일 등)을 덮어
+           끝까지 스크롤해도 누를 수 없다 — 실제로 신고된 증상이다.
+           **인라인 style 이라 스타일시트로는 못 덮는다**(padding:0 이 이긴다).
+           그래서 여기에 둔다. padding 뒤에 와야 롱핸드가 이긴다.
+           --tutorial-dialogue-h 는 DialogueBox 가 떠 있는 동안에만 있으므로
+           평소 레이아웃은 그대로다. */
+        paddingBottom: "var(--tutorial-dialogue-h, 0px)",
         fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         lineHeight: 1.6,
         letterSpacing: "0.02em",
@@ -57,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
           *, *::before, *::after { box-sizing: border-box; }
           body { color: var(--ink); }
+
           button, input, textarea, select { font-family: inherit; }
           *:focus-visible { outline: 3px solid var(--ux-focus); outline-offset: 2px; border-radius: 4px; }
 
