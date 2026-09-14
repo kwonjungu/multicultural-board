@@ -32,6 +32,8 @@ import BeeCafe from "./games/BeeCafe";
 
 // three.js(~600KB)가 들어 있어 지구본을 열 때만 로드
 const GlobeQuest = dynamic(() => import("./games/GlobeQuest"), { ssr: false });
+// 지도 polygon 번들(0.73MB)을 받아야 하므로 이 놀이를 열 때만 로드한다.
+const WorldMapQuiz = dynamic(() => import("./games/WorldMapQuiz"), { ssr: false });
 
 type GameMeta = {
   id: string;
@@ -106,6 +108,9 @@ const GAMES: GameMeta[] = [
   { id: "puzzle",    icon: "🧩", iconImg: "/game-icons/puzzle.png",   name: "문화 퍼즐",          sub: "조각 맞추기",       color: "#F472B6", bg: "#FCE7F3", cmp: CulturePuzzle },
   // 나머지 게임 — 기존 상대 순서 유지
   { id: "country",   icon: "🌏", iconImg: "/game-icons/country.png",  name: "이 나라는 어디?",   sub: "국기 맞추기",       color: "#F59E0B", bg: "#FEF3C7", playBg: WORLD_BG, cmp: CountryGuess },
+  // 위 '이 나라는 어디?' 와 짝. 저쪽은 국기로 이름을 맞히고, 이쪽은 이름으로
+  // 지도에서 위치를 찾는다. 정답 판정은 Natural Earth polygon(public domain).
+  { id: "worldmap",  icon: "🗺️", iconImg: "/game-icons/worldmap.png", name: "지도에서 나라 찾기", sub: "세계지도에서 위치 찾기", color: "#0E7490", bg: "#CFFAFE", playBg: WORLD_BG, cmp: WorldMapQuiz },
   { id: "emotion",   icon: "💗", iconImg: "/game-icons/emotion.png",  name: "이 마음은?",         sub: "감정 알아채기",     color: "#FB7185", bg: "#FFE4E6", cmp: EmotionQuiz },
   { id: "memory",    icon: "🎴", iconImg: "/game-icons/memory.png",   name: "기억 카드",          sub: "짝 맞추기",         color: "#A78BFA", bg: "#EDE9FE", cmp: WordMemory },
   { id: "greeting",  icon: "👋", iconImg: "/game-icons/greeting.png", name: "인사말 배우기",      sub: "들은 인사 찾기",    color: "#10B981", bg: "#D1FAE5", playBg: WORLD_BG, cmp: GreetingRelay },
