@@ -100,18 +100,45 @@ export default function YutSticks({
 /* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
 const YS_CSS = `
 .ys-root{ display: grid; justify-items: center; gap: var(--ux-space-3); width: 100%; }
-.ys-sticks{ display: flex; gap: var(--ux-space-3); }
+/* 접촉 그림자를 놓을 바닥. 윷가락이 떠오르면 그림자가 옅어지고 퍼진다 —
+   06 §6 이 말한 '접촉 그림자'다. 가락마다가 아니라 바닥 하나로 두어
+   그리기 비용을 늘리지 않는다. */
+.ys-sticks{ display: flex; gap: var(--ux-space-3); position: relative; }
+.ys-sticks::after{
+  content: ""; position: absolute; left: 6%; right: 6%; bottom: -10px; height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(41,37,31,.34), rgba(41,37,31,0));
+  transition: opacity var(--ux-motion-press) var(--ux-motion-ease),
+              transform var(--ux-motion-press) var(--ux-motion-ease);
+}
+.ys-sticks:has(.ys-stick[data-spinning])::after{ opacity: .45; transform: scaleX(1.12); }
 .ys-stick{
   width: 26px; height: 84px; border-radius: 13px;
-  background: linear-gradient(180deg, #6B3410, #4A2409);
+  /* 통나무를 반으로 쪼갠 것이라 **가로**로 둥글어야 한다. 세로 그라데이션만
+     있으면 납작한 알약으로 보인다. 가로 결(둥근 단면) 위에 세로 결을 옅게 얹는다. */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.18)),
+    linear-gradient(90deg, #3E1D07 0%, #6B3410 26%, #8A4A18 44%, #6B3410 68%, #351805 100%);
   border: 2px solid #4A2409;
   box-shadow: 0 3px 8px rgba(41,37,31,.2);
   transition: transform var(--ux-motion-press) var(--ux-motion-ease), background var(--ux-motion-press) var(--ux-motion-ease);
   display: flex; align-items: center; justify-content: center;
   font-size: var(--ux-font-secondary); font-weight: 900; color: #FFF3D0;
 }
-.ys-stick[data-up]{ background: linear-gradient(180deg, #FFE6A3, #C79B4E); color: #4A2409; }
-.ys-stick[data-spinning]{ box-shadow: 0 8px 18px rgba(41,37,31,.3); }
+/* 엎어진 면은 톱으로 자른 **평평한 단면**이다. 그래서 둥근 가로 결을 빼고
+   거의 고른 면으로 두되, 가장자리에만 얇은 테를 남겨 두께를 보인다. */
+.ys-stick[data-up]{
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.13) 0%, rgba(0,0,0,0) 14%, rgba(0,0,0,0) 86%, rgba(0,0,0,.13) 100%),
+    linear-gradient(180deg, #FFEFC4, #E6C077);
+  color: #4A2409;
+  box-shadow: inset 0 -2px 0 rgba(74,36,9,.22), 0 3px 8px rgba(41,37,31,.2);
+}
+.ys-stick[data-spinning]{ box-shadow: 0 14px 20px -6px rgba(41,37,31,.28); }
+@media (prefers-reduced-motion: reduce){
+  .ys-stick{ transition: none; }
+  .ys-sticks::after{ transition: none; }
+}
 .ys-resultslot{ min-height: var(--ux-space-8); display: flex; align-items: center; }
 .ys-result{ margin: 0; font-weight: 900; animation: ysPop .35s ease; }
 .ys-again{ margin-left: var(--ux-space-2); color: var(--ux-primary-ink); }

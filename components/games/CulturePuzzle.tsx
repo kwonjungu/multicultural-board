@@ -245,6 +245,13 @@ const CP_CSS = `
 
 .cp-frame{
   position: relative; width: 100%;
+  /* 판을 화면 높이로도 묶는다. 폭만 보고 키우면 1366x768 에서 판이 651px 가 돼
+     아래 120px 이 잘렸다(1024 는 69px). 조각을 바꾸려면 **그림 전체**를 동시에
+     봐야 하는 놀이인데 아랫줄이 접히면 아이가 스크롤해 가며 맞춰야 했다.
+     비율은 주제마다 인라인으로 달리 오므로 높이를 직접 자르지 않고(자르면 그림이
+     찌그러진다) 폭 상한으로 묶는다 — 비율은 그대로 유지된다. */
+  max-width: min(100%, 60svh);
+  margin-inline: auto;
   border-radius: var(--ux-radius-surface); overflow: hidden;
   background: var(--ux-surface-sunk);
   box-shadow: 0 8px 24px rgba(41,37,31,.12);
@@ -263,8 +270,27 @@ const CP_CSS = `
   background-color: var(--ux-surface-sunk);
   background-repeat: no-repeat;
   outline: none; font-family: inherit;
+  /* 06 §6 "조각의 높이·집기·맞춤 피드백". 조각은 판 위에 **얹혀 있는 것**이라
+     아래로 얇은 그림자를 깐다. 3D 가 아니라 그림자 두 겹이다 — canvas 도
+     WebGL 도 쓰지 않으므로 입력 지연이 늘지 않는다. */
+  box-shadow: 0 2px 0 rgba(120,53,15,.20), 0 3px 5px -1px rgba(120,53,15,.18);
+  transition: transform .14s var(--ux-motion-ease), box-shadow .14s var(--ux-motion-ease);
 }
-.cp-cell[data-picked]{ box-shadow: inset 0 0 0 4px var(--ux-selected-border); }
+/* 고른 조각은 **집어 든다** — 살짝 떠오르고 그림자가 멀어진다. */
+.cp-cell[data-picked]{
+  box-shadow: inset 0 0 0 4px var(--ux-selected-border),
+              0 10px 18px -4px rgba(120,53,15,.38);
+  transform: translateY(-4px) scale(1.03);
+  z-index: 2;
+}
+/* 다 맞추면 한 장의 그림이어야 한다. 틈(gap:0)과 함께 높이도 없앤다. */
+.cp-grid[data-solved] .cp-cell[data-ux-role="control"]{
+  transform: none; box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce){
+  .cp-cell[data-ux-role="control"]{ transition: none; }
+  .cp-cell[data-picked]{ transform: none; }
+}
 
 .cp-side{ display: grid; gap: var(--ux-space-3); align-content: start; }
 .cp-guide{ margin: 0; padding: var(--ux-space-4); background: var(--ux-surface); border-radius: var(--ux-radius-surface); border: 2px solid var(--ux-primary-border); }

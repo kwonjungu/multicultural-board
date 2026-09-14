@@ -124,10 +124,20 @@ export default function YutBoard({
                   from={`0 ${n.x} ${n.y}`} to={`360 ${n.x} ${n.y}`} dur="6s" repeatCount="indefinite" />
               </circle>
             )}
+            {/* 06 §6 '입체 말·접촉 그림자'.
+                예전에는 말에 **팀 색 후광**(drop-shadow 팀색)을 걸었다. 후광은
+                사방으로 퍼지므로 말이 판에 놓인 게 아니라 떠 있는 것으로 보였다.
+                대신 바닥에 눌린 타원 그림자를 깔고, 그 위에 팀 색 받침을 둔다.
+                팀 구분은 받침이 맡으므로 후광 없이도 두 팀이 갈린다. */}
+            <ellipse cx={n.x} cy={n.y + 30} rx={30} ry={9} fill="rgba(41,37,31,.26)" />
+            <ellipse
+              cx={n.x} cy={n.y + 26} rx={26} ry={8}
+              fill={TEAM_COLOR[g.team]} stroke="#fff" strokeWidth={2.5}
+            />
             <image
               href={TEAM_IMG[g.team]}
               x={n.x - 38} y={n.y - 44} width={76} height={76}
-              style={{ filter: `drop-shadow(0 4px 8px ${TEAM_COLOR[g.team]}88)` }}
+              style={{ filter: "drop-shadow(0 3px 4px rgba(41,37,31,.34))" }}
             />
             {g.ids.length > 1 && (
               <g>
@@ -182,7 +192,11 @@ function HomeTray({
                   from={`0 ${px} ${py}`} to={`360 ${px} ${py}`} dur="6s" repeatCount="indefinite" />
               </circle>
             )}
+            {/* 대기 말에는 받침을 두지 않는다. 꿀벌 몸이 받침을 거의 다 덮어
+                보이지도 않으면서, 좁은 대기칸에 색 타원 넉 장이 더해져 지저분해진다.
+                여기서는 팀이 이미 상자 색·라벨로 드러나므로 그림자만 준다. */}
             <image href={TEAM_IMG[team]} x={px - 27} y={py - 30} width={54} height={54}
+              style={{ filter: "drop-shadow(0 2px 3px rgba(41,37,31,.3))" }}
               opacity={isMov ? 1 : 0.75} />
           </g>
         );

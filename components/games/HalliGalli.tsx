@@ -346,12 +346,17 @@ export default function HalliGalli({ langA, langB }: { langA: string; langB: str
 
         {/* Center table — two face-up cards */}
         <div className="hg-table">
+          {/* key 가 파일 높이다. 카드가 한 장 올라올 때마다 key 가 바뀌어
+              리마운트되고, .hg-card 의 넘김 애니메이션이 다시 재생된다.
+              같은 과일·같은 개수가 연달아 나와도 높이는 늘 달라 놓치지 않는다. */}
           <CenterCard
+            key={`b-${piles[1]?.length ?? 0}`}
             card={topB}
             flipped
             highlight={!!(topB && winningFruit && topB.fruit === winningFruit)}
           />
           <CenterCard
+            key={`a-${piles[0]?.length ?? 0}`}
             card={topA}
             highlight={!!(topA && winningFruit && topA.fruit === winningFruit)}
           />
@@ -629,11 +634,22 @@ const HG_CSS = `
   white-space: nowrap;
 }
 .hg-flip[aria-disabled="true"]{ opacity: .55; cursor: default; }
+/* 종은 **눌려야** 한다. 06 §6 이 말한 '종 눌림'이다.
+   아래로 4px 짜리 단단한 턱을 두고, :active 에 그 턱만큼 내려앉힌다.
+   CSS :active 라 자바스크립트가 개입하지 않는다 — 누른 그 프레임에 바로
+   반응하므로 §7 의 '입력 피드백 100ms' 를 늦출 여지가 없다. */
 .hg-bell[data-ux-role="control"]{
   background: var(--ux-primary-fill); color: var(--ux-primary-ink);
   border: 2px solid var(--ux-primary-border); font-family: inherit; font-weight: 900;
   white-space: nowrap;
+  box-shadow: 0 4px 0 var(--ux-primary-border), 0 6px 10px -2px rgba(41,37,31,.28);
+  transition: transform .06s linear, box-shadow .06s linear;
 }
+.hg-bell[data-ux-role="control"]:active:not([aria-disabled="true"]){
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--ux-primary-border), 0 1px 3px rgba(41,37,31,.3);
+}
+.hg-flip:active:not([aria-disabled="true"]){ transform: translateY(2px); }
 
 .hg-panels{ display: grid; gap: var(--ux-space-3); grid-template-columns: 1fr; }
 @media (min-width: 640px){ .hg-panels{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -653,19 +669,61 @@ const HG_CSS = `
   background: var(--ux-surface);
   border: 4px solid var(--ux-primary-border);
   border-radius: var(--ux-radius-surface);
-  box-shadow: 0 10px 22px rgba(41,37,31,.12);
+  /* 06 §6 "두께가 느껴지는 카드". 테두리 색은 과일마다 인라인으로 바뀌므로
+     두께는 그림자로만 만든다 — 아래로 겹친 두 층이 '쌓인 카드 더미' 로 읽힌다.
+     테두리를 건드리지 않으니 과일 색 규칙은 그대로다. */
+  box-shadow: 0 3px 0 rgba(41,37,31,.16), 0 7px 0 rgba(41,37,31,.08),
+              0 12px 22px -4px rgba(41,37,31,.18);
   padding: var(--ux-space-3); position: relative; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center;
+  /* 짧은 넘김. 호출부가 카드가 바뀔 때마다 key 를 갈아 끼워 다시 재생된다. */
+  animation: hgFlipIn .18s var(--ux-motion-ease) both;
 }
 .hg-card[data-compact]{ width: 100%; }
 .hg-card:not([data-compact]){ width: min(92%, 420px); }
-.hg-card[data-flipped]{ transform: rotate(180deg); }
-.hg-cardempty{ border-style: dashed; border-color: var(--ux-ink-soft); }
-/* 합이 5인 '기회' 상태는 긍정적 초록. 빨강은 오답/경고용이라 여기선 쓰지 않는다. */
-.hg-card[data-highlight]{ animation: hgGlow .6s ease-in-out infinite alternate; }
+/* 맞은편 자리는 카드를 180도 돌려 놓는다. 그런데 box-shadow 도 같이 돌기 때문에
+   위에서 준 '아래로 쌓인 두께'가 **위로** 올라가 빛이 아래에서 오는 꼴이 된다.
+   그래서 이 자리만 그림자 방향을 미리 뒤집어 둔다 — 돌고 나면 제자리다. */
+.hg-card[data-flipped]{
+  transform: rotate(180deg); animation-name: hgFlipInB;
+  box-shadow: 0 -3px 0 rgba(41,37,31,.16), 0 -7px 0 rgba(41,37,31,.08),
+              0 -12px 22px -4px rgba(41,37,31,.18);
+}
+/* 빈 자리는 카드가 아니라 '카드가 놓일 곳'이다. 두께도 넘김도 주지 않는다 —
+   점선 테두리에 카드 더미 그림자가 붙으면 있지도 않은 카드가 있는 것처럼 보인다. */
+/* 바로 위 .hg-card[data-flipped] 와 특이도를 맞추려고 클래스를 겹쳐 쓴다.
+   (0,2,0) 동률이고 뒤에 오므로 이 규칙이 이긴다 — 뒤집힌 빈 자리도 잠잠하다. */
+.hg-card.hg-cardempty{
+  border-style: dashed; border-color: var(--ux-ink-soft);
+  box-shadow: none; animation: none;
+}
+/* 넘김은 180ms 다. 종을 치려고 보는 화면이라 이보다 길면 판단을 가린다. */
+@keyframes hgFlipIn{
+  from{ transform: rotateX(74deg) scale(.95); opacity: .45; }
+  to  { transform: none; opacity: 1; }
+}
+@keyframes hgFlipInB{
+  from{ transform: rotate(180deg) rotateX(74deg) scale(.95); opacity: .45; }
+  to  { transform: rotate(180deg); opacity: 1; }
+}
+/* 합이 5인 '기회' 상태는 긍정적 초록. 빨강은 오답/경고용이라 여기선 쓰지 않는다.
+   animation 단축 속성이라 넘김까지 같이 적어 두지 않으면 넘김이 사라진다. */
+.hg-card[data-highlight]{
+  animation: hgFlipIn .18s var(--ux-motion-ease) both,
+             hgGlow .6s ease-in-out infinite alternate;
+}
+.hg-card[data-highlight][data-flipped]{
+  animation: hgFlipInB .18s var(--ux-motion-ease) both,
+             hgGlow .6s ease-in-out infinite alternate;
+}
 @keyframes hgGlow{
-  from{ box-shadow: 0 0 0 4px rgba(20,107,73,.25), 0 12px 28px rgba(41,37,31,.18); }
-  to  { box-shadow: 0 0 0 10px rgba(20,107,73,.5), 0 12px 32px rgba(41,37,31,.25); }
+  from{ box-shadow: 0 0 0 4px rgba(20,107,73,.25), 0 3px 0 rgba(41,37,31,.16), 0 12px 28px rgba(41,37,31,.18); }
+  to  { box-shadow: 0 0 0 10px rgba(20,107,73,.5), 0 3px 0 rgba(41,37,31,.16), 0 12px 32px rgba(41,37,31,.25); }
+}
+@media (prefers-reduced-motion: reduce){
+  .hg-card, .hg-card[data-flipped],
+  .hg-card[data-highlight], .hg-card[data-highlight][data-flipped]{ animation: none; }
+  .hg-bell[data-ux-role="control"]{ transition: none; }
 }
 .hg-fruits{ display: grid; gap: var(--ux-space-2); width: 100%; height: 100%; place-items: center; align-content: center; }
 .hg-fruit{ width: clamp(1.75rem, 9vw, 3.5rem); height: clamp(1.75rem, 9vw, 3.5rem); object-fit: contain; }
