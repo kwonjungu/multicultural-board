@@ -263,13 +263,19 @@ export function Board({
             alignItems: "center",
             justifyContent: "center",
             padding: "4%",
-            background: "rgba(255,255,255,0.55)",
+            /* 예전에는 흰색 55% 였다. 보드도 카드도 크림색이라 흰 막을 씌우면
+               둘의 밝기가 비슷해져 카드가 위에 있는 것으로 읽히지 않았다
+               (캡처로 확인: 보드가 바래 보이기만 하고 카드는 안 떴다).
+               어두운 막으로 바꾸면 크림색 카드가 그대로 떠오른다. */
+            background: "rgba(41,37,31,0.45)",
             backdropFilter: "blur(2px)",
             zIndex: 10,
             boxSizing: "border-box",
           }}
-          role="dialog"
-          aria-modal="true"
+          /* role="dialog" 를 여기 두지 않는다 — 안의 QuizCard·ChanceCard 가 이미
+             자기 자신을 dialog 로 밝히고 있어서, 두면 대화상자가 겹쳐 선언된다.
+             이 층이 하는 일은 뒤를 가리는 것뿐이므로 표현용으로 남긴다. */
+          aria-hidden={false}
         >
           {overlay}
         </div>

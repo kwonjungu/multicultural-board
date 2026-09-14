@@ -70,19 +70,29 @@ export function LogTicker({ log, variant = "footer" }: LogTickerProps) {
 
 /* 글자 크기는 전부 토큰. 여기에 px 글자 크기를 다시 쓰지 말 것. */
 const LOG_CSS = `
+/* 예전에는 거의 검은 상자(rgba(41,37,31,.92))에 크림색 글씨였다. 옆에 나란히
+   선 '더보기'·'처음부터' 는 크림 표면에 갈색 테두리라, 이 상자만 새까매서
+   화면에서 혼자 튀었다(캡처로 확인). 같은 표면 토큰으로 맞춘다. */
 .mb-logmini{
-  background: rgba(41,37,31,.92); color: #F7F3EC;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
   border-radius: 8px; padding: var(--ux-space-1) var(--ux-space-2);
   font-size: var(--ux-font-secondary); font-weight: 700; line-height: var(--ux-lh-tight);
   width: 100%; max-height: 34%; overflow: hidden;
   display: flex; flex-direction: column; box-sizing: border-box;
 }
 .mb-logmini > div{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mb-logbar{ display: flex; gap: var(--ux-space-2); align-items: stretch; width: 100%; }
+/* 로그와 버튼 두 개가 한 줄에 들어가려다 로그가 62px 로 눌려, 한 줄짜리 글이
+   네 줄로 쪼개지고 잘렸다(캡처로 확인). 좁으면 로그가 제 줄을 갖도록 접는다. */
+.mb-logbar{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); align-items: stretch; width: 100%; }
+/* 펼친 로그도 같은 이유로 표면 토큰에 맞춘다. */
 .mb-logbody{
-  background: var(--ux-ink); color: #F7F3EC;
+  background: var(--ux-surface); color: var(--ux-ink);
+  border: 2px solid var(--ux-primary-border);
   border-radius: var(--ux-radius-surface); padding: var(--ux-space-2) var(--ux-space-3);
-  flex: 1; min-width: 0; box-sizing: border-box;
+  /* 140px 아래로는 줄지 않는다 — 그보다 좁으면 글이 글자 단위로 쪼개진다.
+     들어갈 자리가 없으면 위 flex-wrap 이 로그를 제 줄로 내려 준다. */
+  flex: 1 1 180px; min-width: 140px; box-sizing: border-box;
   max-height: 76px; overflow: hidden;
   display: grid; gap: var(--ux-space-1); align-content: start;
 }

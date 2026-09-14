@@ -35,6 +35,15 @@ export interface PieceLayerProps {
 const SPREAD = 2.9;
 function offsetFor(i: number, total: number): { dx: number; dy: number } {
   if (total <= 1) return { dx: 0, dy: 0 };
+  /**
+   * 둘일 때는 **좌우로만** 비킨다.
+   *
+   * 예전에는 둘도 2×2 자리표를 썼다. 그런데 둘이면 언제나 첫 줄(row 0)만 차서
+   * dy 가 둘 다 -2.9 — 두 말이 나란히 **위로** 밀려 칸 위쪽 테두리를 넘어갔다.
+   * 마블은 2인 대전이 가장 흔하므로 이게 평소 모습이었다. 좌우로만 비키면
+   * 세로 중심은 칸 한가운데에 남는다.
+   */
+  if (total === 2) return { dx: (i === 0 ? -1 : 1) * SPREAD, dy: 0 };
   if (total <= 4) {
     const col = i % 2;
     const row = Math.floor(i / 2);
@@ -75,6 +84,8 @@ export function PieceLayer({ state }: PieceLayerProps) {
             key={pid}
             id={pid}
             skin={p.skin}
+            tile={p.pos}
+            stack={here.length}
             left={c.left + dx}
             top={c.top + dy}
             moving={movingWho === pid}
@@ -87,10 +98,14 @@ export function PieceLayer({ state }: PieceLayerProps) {
 }
 
 function Piece({
-  id, skin, left, top, moving, reduceMotion,
+  id, skin, tile, stack, left, top, moving, reduceMotion,
 }: {
   id: PlayerId;
   skin?: string;
+  /** 지금 선 칸 번호. 화면에는 안 쓰고 data-* 로만 나간다(검수용). */
+  tile: number;
+  /** 이 칸에 같이 선 말 수. 2 이상이면 겹친 말 상태다. */
+  stack: number;
   left: number;
   top: number;
   moving: boolean;
@@ -146,7 +161,10 @@ function Piece({
   };
 
   return (
-    <span style={wrap}>
+    /* data-* 는 검수 스크립트가 '어느 말이 어느 칸에 몇 개로 서 있는지'를
+       내부 state 를 훔쳐보지 않고 알아내는 유일한 길이다(06 §8 "실제 존재하는
+       상태를 inventory 에서 확인"). 화면에는 아무 영향이 없다. */
+    <span style={wrap} data-mb-piece={id} data-mb-tile={tile} data-mb-stack={stack}>
       <span aria-hidden="true" style={shadow} />
       <span style={body}>
         {skin && !failed ? (
