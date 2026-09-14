@@ -1308,7 +1308,7 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
       {/* ── 감정 카드 데크 모달 ── */}
       {emotionOpen && (
         <div className="bd-modal-back" onClick={(e) => { if (e.target === e.currentTarget) setEmotionOpen(false); }}>
-          <div className="bd-modal narrow" data-ux-surface="panel" role="dialog" aria-modal="true" aria-label="내 감정 표현하기">
+          <div className="bd-modal emotion" data-ux-surface="panel" role="dialog" aria-modal="true" aria-label="내 감정 표현하기">
             <div className="bd-modal-head">
               <h2 data-ux-role="body-emphasis" className="bd-modal-title">내 감정 표현하기</h2>
               <button type="button" data-ux-role="control" className="bd-btn" onClick={() => setEmotionOpen(false)}>닫기</button>
@@ -1596,6 +1596,12 @@ const BOARD_CSS = `
   box-shadow: 0 18px 48px rgba(41,37,31,.35);
 }
 .bd-modal.narrow{ max-width: 460px; justify-items: center; text-align: center; }
+/* 감정 덱은 .narrow 를 쓰면 안 된다. 거기 걸린 justify-items:center 때문에
+   격자가 내용 폭까지 쪼그라들어, 460px 모달 안에서 실제 폭이 253px 밖에 안
+   됐다 — 어느 화면에서든 2열 고정이라 감정 20장이 10줄(974px)로 늘어졌다.
+   폭을 그대로 쓰게 두고 조금 넓힌다. */
+.bd-modal.emotion{ max-width: 560px; }
+.bd-modal.emotion > *{ width: 100%; }
 .bd-modal-head{ display: flex; align-items: center; gap: var(--ux-space-3); width: 100%; }
 .bd-modal-title{ margin: 0; flex: 1; min-width: 0; font-weight: 900; color: var(--ux-ink); word-break: keep-all; }
 .bd-modal-body{ display: grid; gap: var(--ux-space-3); }

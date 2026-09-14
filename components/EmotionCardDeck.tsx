@@ -12,7 +12,7 @@ interface Props {
 }
 
 /**
- * 감정 카드 12장.
+ * 감정 카드 20장.
  *
  * 예전에는 카드마다 자기 색(`hue`)으로 배경을 칠하고 이모지를 얹었다. 열두 장이
  * 노랑·파랑·빨강·분홍·보라·초록으로 제각각이라 화면이 알록달록해지고, 정작
@@ -27,6 +27,10 @@ interface Props {
  *
  * 라벨은 그대로 15개 언어를 쓴다 — 꿀벌 무드 목록은 한국어·영어만 있어서,
  * 여기서 무드로 갈아타면 다국어 라벨을 잃는다. 그림만 빌려 온다.
+ *
+ * 2026-09: 12장 → 20장. 꿀벌 그림 20종에 감정을 1:1로 다 붙인 결과다.
+ * 늘어난 것은 개수뿐이고 색·면·그림 규칙은 위 그대로다. 개수 때문에 바꾼 것은
+ * 격자 최소 트랙 하나(104 → 96px)뿐 — 아래 주석 참고.
  */
 export default function EmotionCardDeck({ lang, onPick, quick = false, busy = false }: Props) {
   const [pending, setPending] = useState<EmotionId | null>(null);
@@ -45,7 +49,11 @@ export default function EmotionCardDeck({ lang, onPick, quick = false, busy = fa
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))",
+          // 104 → 96. 카드가 12장에서 20장으로 늘면서 390px 폭이 2열 10줄(974px)이
+          // 돼 덱 하나가 화면보다 길어졌다. 96 이면 390px 가 3열(680px), 820px 가
+          // 7열(287px)로 떨어진다. 1366px 는 7열 그대로 — 넓은 화면은 건드리지 않는다.
+          // 이보다 더 줄이면(92) 1366px 가 8열로 갈라져 넓은 화면 배치가 바뀐다.
+          gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))",
           gap: "var(--ux-space-2)",
         }}
       >
@@ -102,6 +110,11 @@ export default function EmotionCardDeck({ lang, onPick, quick = false, busy = fa
                   lineHeight: "var(--ux-lh-tight)",
                   textAlign: "center",
                   wordBreak: "keep-all",
+                  // keep-all 은 낱말 안에서 못 자른다. 카드가 96px 트랙으로 좁아지자
+                  // 띄어쓰기 없는 긴 낱말(fil "Nagpapasalamat")이 카드 밖으로 4px
+                  // 삐져나가 overflow:hidden 에 잘렸다. anywhere 는 **들어가지 않을
+                  // 때만** 끼어들므로 짧은 한국어 라벨은 그대로 한 줄이다.
+                  overflowWrap: "anywhere",
                 }}
               >
                 {label}

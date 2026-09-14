@@ -9,7 +9,10 @@ import type { LangMap } from "./gameData";
 
 export type EmotionId =
   | "joy" | "sad" | "angry" | "surprised" | "scared" | "calm"
-  | "tired" | "proud" | "unfair" | "curious" | "shy" | "grateful";
+  | "tired" | "proud" | "unfair" | "curious" | "shy" | "grateful"
+  // ── 확장 8 (2026-09) — 꿀벌 그림이 이미 있는데 감정 카드가 없던 무드 ──
+  | "worried" | "excited" | "lonely" | "bored"
+  | "letdown" | "loved" | "hopeful" | "peaceful";
 
 export interface ExpressEmotion {
   id: EmotionId;
@@ -18,7 +21,11 @@ export interface ExpressEmotion {
   label: LangMap;
 }
 
-// 12감정 — 황의순 교사 요청: 기본 6 + 확장 6.
+// 20감정 — 기본 6 + 확장 6 (황의순 교사 요청) + 확장 8 (꿀벌 그림 전량 사용).
+//
+// 개수의 상한은 **꿀벌 그림(lib/beeMoods, 20종)** 이 정한다. 감정 카드는 그림을
+// 그쪽에서 빌려 오므로, 그림이 없는 감정을 만들면 카드에 얼굴이 비어 버린다.
+// 20종을 1:1로 다 쓰면 여기가 20개가 되고, 그 이상은 새 꿀벌 그림이 먼저 필요하다.
 export const EXPRESS_EMOTIONS: ExpressEmotion[] = [
   { id: "joy", emoji: "😄", hue: "#FBBF24", label: {
     ko: "기쁨", en: "Joy", vi: "Vui", zh: "开心", ja: "うれしい", th: "ดีใจ",
@@ -80,6 +87,57 @@ export const EXPRESS_EMOTIONS: ExpressEmotion[] = [
     ko: "감사", en: "Grateful", vi: "Biết ơn", zh: "感谢", ja: "ありがたい", th: "ขอบคุณ",
     id: "Bersyukur", hi: "आभारी", ru: "Благодарность", ar: "ممتن", fil: "Nagpapasalamat",
     km: "អរគុណ", mn: "Талархах", uz: "Minnatdor", my: "ကျေးဇူးတင်",
+  }},
+
+  // ────────────────────────────────────────────────────────────────────
+  // 확장 8 (2026-09)
+  //
+  // ⚠️ 아래 8종의 ko 이외 14개 언어 라벨은 **기계 번역이다. 검토가 필요하다.**
+  //    앱 자체 번역 API(/api/translate)를 쓰려 했으나 이 환경에 GROQ_API_KEY 가
+  //    없어 500 을 돌려주었다(.env.local 부재). 그래서 모델이 직접 채워 넣었고,
+  //    사람 검수를 거치지 않았다. 특히 km(크메르)·my(버마)·mn(몽골)·uz(우즈베크)는
+  //    화면에서 길이가 튀거나 뜻이 어긋날 수 있다.
+  //    위 12종(검수 완료분)과 달리 이 8종은 **선생님 확인 전 임시값**으로 다뤄라.
+  // ────────────────────────────────────────────────────────────────────
+  { id: "worried", emoji: "😟", hue: "#818CF8", label: {
+    ko: "걱정", en: "Worried", vi: "Lo lắng", zh: "担心", ja: "しんぱい", th: "กังวล",
+    id: "Khawatir", hi: "चिंता", ru: "Тревога", ar: "قلق", fil: "Nag-aalala",
+    km: "បារម្ភ", mn: "Санаа зовох", uz: "Xavotir", my: "စိုးရိမ်",
+  }},
+  { id: "excited", emoji: "🤩", hue: "#FACC15", label: {
+    ko: "신남", en: "Excited", vi: "Hào hứng", zh: "兴奋", ja: "わくわく", th: "ตื่นเต้น",
+    id: "Semangat", hi: "उत्साह", ru: "Восторг", ar: "متحمس", fil: "Sabik",
+    km: "រំភើប", mn: "Догдлох", uz: "Hayajon", my: "စိတ်လှုပ်ရှား",
+  }},
+  { id: "lonely", emoji: "🥺", hue: "#38BDF8", label: {
+    ko: "외로움", en: "Lonely", vi: "Cô đơn", zh: "孤单", ja: "さびしい", th: "เหงา",
+    id: "Kesepian", hi: "अकेलापन", ru: "Одиноко", ar: "وحيد", fil: "Nag-iisa",
+    km: "ឯកា", mn: "Ганцаардах", uz: "Yolgʻizlik", my: "အထီးကျန်",
+  }},
+  { id: "bored", emoji: "😑", hue: "#A8A29E", label: {
+    ko: "지루함", en: "Bored", vi: "Chán", zh: "无聊", ja: "たいくつ", th: "เบื่อ",
+    id: "Bosan", hi: "ऊब", ru: "Скука", ar: "ملل", fil: "Nababagot",
+    km: "អផ្សុក", mn: "Уйдах", uz: "Zerikish", my: "ငြီးငွေ့",
+  }},
+  { id: "letdown", emoji: "😞", hue: "#64748B", label: {
+    ko: "실망", en: "Let down", vi: "Thất vọng", zh: "失望", ja: "がっかり", th: "ผิดหวัง",
+    id: "Kecewa", hi: "निराशा", ru: "Огорчение", ar: "خيبة أمل", fil: "Bigo",
+    km: "ខកចិត្ត", mn: "Урам хугарах", uz: "Umidsizlik", my: "စိတ်ပျက်",
+  }},
+  { id: "loved", emoji: "💖", hue: "#F9A8D4", label: {
+    ko: "사랑받음", en: "Loved", vi: "Được yêu", zh: "被爱", ja: "あいされる", th: "ถูกรัก",
+    id: "Disayangi", hi: "प्यार मिला", ru: "Любимый", ar: "محبوب", fil: "Minamahal",
+    km: "ត្រូវបានស្រឡាញ់", mn: "Хайрлуулах", uz: "Sevilgan", my: "ချစ်ခံရ",
+  }},
+  { id: "hopeful", emoji: "✨", hue: "#2DD4BF", label: {
+    ko: "기대", en: "Hopeful", vi: "Mong chờ", zh: "期待", ja: "たのしみ", th: "ตั้งตารอ",
+    id: "Berharap", hi: "आशा", ru: "Надежда", ar: "متفائل", fil: "Umaasa",
+    km: "សង្ឃឹម", mn: "Найдах", uz: "Umid", my: "မျှော်လင့်",
+  }},
+  { id: "peaceful", emoji: "🍃", hue: "#86EFAC", label: {
+    ko: "안심", en: "Peaceful", vi: "Yên tâm", zh: "安心", ja: "あんしん", th: "โล่งใจ",
+    id: "Lega", hi: "निश्चिंत", ru: "Облегчение", ar: "اطمئنان", fil: "Panatag",
+    km: "ស្ងប់ចិត្ត", mn: "Санаа амрах", uz: "Xotirjam", my: "စိတ်အေး",
   }},
 ];
 
@@ -223,6 +281,10 @@ export async function awardEmotionStickerOncePerDay(params: {
  * 감정 카드는 15개 언어 라벨을 갖고 있고 꿀벌 무드는 한국어·영어만 있다.
  * 그래서 목록을 합치지 않고 **그림만** 빌려 온다. 여기를 바꾸면 화면의
  * 그림이 바뀌므로, 뜻이 가장 가까운 것으로만 짝지을 것.
+ *
+ * 확장 8을 더해 이제 꿀벌 무드 20종을 **하나도 남김없이 1:1로** 쓴다.
+ * 이 표에 같은 무드가 두 번 나오면 카드 두 장이 같은 얼굴이 된다 — 금지.
+ * 감정을 더 늘리려면 lib/beeMoods.ts 에 새 무드와 그림이 먼저 있어야 한다.
  */
 export const EMOTION_MOOD: Record<EmotionId, string> = {
   joy: "happy",
@@ -237,4 +299,13 @@ export const EMOTION_MOOD: Record<EmotionId, string> = {
   curious: "curious",
   shy: "shy",
   grateful: "thankful",
+  // ── 확장 8 ──
+  worried: "worried",
+  excited: "excited",
+  lonely: "lonely",
+  bored: "bored",
+  letdown: "let-down",
+  loved: "loved",
+  hopeful: "hopeful",
+  peaceful: "peaceful",
 };
