@@ -22,11 +22,14 @@ export default function GlobeFixture({
   mode: initialModeProp,
   chrome,
   country,
+  auditPins,
 }: {
   mode: Mode;
   chrome: "game" | "bare";
   /** 미리 고를 나라의 ISO 코드(예: "KR"). 정보 패널이 열린 상태를 재려고 쓴다. */
   country?: string;
+  /** 게임하기 모드의 핀 조준점을 노출한다(?pins=audit). 감사 스크립트 전용. */
+  auditPins?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>(initialModeProp);
   const [blocked, setBlocked] = useState<string[]>([]);
@@ -57,6 +60,7 @@ export default function GlobeFixture({
       langB="vi"
       initialMode={mode === "menu" ? undefined : mode}
       initialCountryCode={country}
+      auditPins={auditPins}
     />
   );
 

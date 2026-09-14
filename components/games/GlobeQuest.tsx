@@ -91,12 +91,28 @@ function fitDistanceForFraction(R: number, f: number, w: number, h: number, tanH
   return R * Math.sqrt(1 + C * C) / C;
 }
 
-function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
+function GlobeCanvas({ onPick, auditPins }: {
+  onPick: (c: GlobeCountry) => void;
+  /**
+   * fixture 전용 — 핀(THREE.Sprite)의 **현재 화면 좌표**를 window 에 노출한다.
+   * 값을 주지 않으면(실제 게임룸) 아무것도 달지 않는다.
+   *
+   * 왜 필요한가: 퀴즈의 유일한 입력이 3D 핀 레이캐스트라, 감사 스크립트가
+   * "지금 그 나라를 누르려면 화면 어디를 눌러야 하는가"를 컴포넌트 밖에서
+   * 알 방법이 없었다. 좌표를 찍어 맞을 때까지 누르면 오답이 기록되어 점수가
+   * 매번 달라진다(= 재현 불가). 여기서 노출하는 것은 **조준점뿐**이고,
+   * 정답 판정·점수·시간은 전부 제품 코드가 그대로 정한다 — 누르는 것도
+   * 감사 스크립트가 실제 pointerdown/up 으로 누른다.
+   */
+  auditPins?: boolean;
+}) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   // onPick 이 바뀌어도 씬을 다시 만들지 않도록 ref 로 우회
   const onPickRef = useRef(onPick);
   useEffect(() => { onPickRef.current = onPick; });
+  // 마운트 시점의 값으로 고정한다(fixture 가 정적으로 넘긴다).
+  const auditPinsRef = useRef(auditPins);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -266,6 +282,72 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
 
+    // ── fixture 전용 조준점 노출 (auditPins 를 넘긴 fixture 에서만) ──────────
+    // 각 핀의 화면 좌표와, **그 점을 실제로 눌렀을 때 레이캐스트가 잡는 나라**를
+    // 같이 돌려준다(가려졌거나 지구 뒤로 넘어간 핀은 hit 이 달라진다).
+    // 판정 로직은 건드리지 않는다 — 여기서 나가는 것은 좌표뿐이다.
+    if (auditPinsRef.current) {
+      const probeRay = new THREE.Raycaster();
+      const probeNdc = new THREE.Vector2();
+      const camRight = new THREE.Vector3();
+      const camUp = new THREE.Vector3();
+      const tmp = new THREE.Vector3();
+      (window as unknown as Record<string, unknown>).__globeAuditPins = (code?: string) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const sprites = pinGroup.children.filter((o): o is THREE.Sprite => (o as THREE.Sprite).isSprite);
+        const sx = (v: THREE.Vector3) => rect.left + ((v.x + 1) / 2) * rect.width;
+        const sy = (v: THREE.Vector3) => rect.top + ((1 - v.y) / 2) * rect.height;
+        /** 화면 한 점을 눌렀을 때 제품 레이캐스트가 잡을 나라 (제품과 같은 식). */
+        const hitAt = (px: number, py: number) => {
+          probeNdc.set(((px - rect.left) / rect.width) * 2 - 1, -((py - rect.top) / rect.height) * 2 + 1);
+          probeRay.setFromCamera(probeNdc, camera);
+          const h = probeRay.intersectObjects(sprites, false)[0];
+          return h ? (h.object.userData.country as GlobeCountry).code : null;
+        };
+        if (!code) {
+          return sprites.map((s) => {
+            const v = s.position.clone().project(camera);
+            const x = sx(v), y = sy(v);
+            return { code: (s.userData.country as GlobeCountry).code, x, y, hit: hitAt(x, y) };
+          });
+        }
+        // 한 나라의 조준점을 찾는다. 핀 스프라이트는 서로 겹치므로(동아시아가
+        // 특히 심하다) 중심이 이웃 핀에 가려질 수 있다. 스프라이트의 화면
+        // 넓이 안을 격자로 훑어, **눌렀을 때 그 나라가 잡히는** 점 중에서
+        // 상하좌우 이웃까지 같은 나라가 잡히는(= 가장자리가 아닌) 점을 고른다.
+        const target = sprites.find((s) => (s.userData.country as GlobeCountry).code === code);
+        if (!target) return null;
+        camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+        camUp.setFromMatrixColumn(camera.matrixWorld, 1);
+        const pc = tmp.copy(target.position).project(camera).clone();
+        const pr = tmp.copy(target.position).addScaledVector(camRight, target.scale.x / 2).project(camera).clone();
+        const pu = tmp.copy(target.position).addScaledVector(camUp, target.scale.y / 2).project(camera).clone();
+        const cx = sx(pc), cy = sy(pc);
+        const hx = Math.max(4, Math.abs(sx(pr) - cx));
+        const hy = Math.max(4, Math.abs(sy(pu) - cy));
+        const N = 6;
+        let best: { x: number; y: number; score: number; d: number } | null = null;
+        for (let i = -N; i <= N; i++) {
+          for (let j = -N; j <= N; j++) {
+            const x = cx + (i / N) * hx * 0.9;
+            const y = cy + (j / N) * hy * 0.9;
+            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+            if (hitAt(x, y) !== code) continue;
+            const el = document.elementFromPoint(x, y);
+            if (el !== renderer.domElement) continue;
+            const pad = Math.max(6, Math.min(hx, hy) / 4);
+            let score = 0;
+            for (const [dx, dy] of [[pad, 0], [-pad, 0], [0, pad], [0, -pad]]) {
+              if (hitAt(x + dx, y + dy) === code) score++;
+            }
+            const d = Math.hypot(x - cx, y - cy);
+            if (!best || score > best.score || (score === best.score && d < best.d)) best = { x, y, score, d };
+          }
+        }
+        return best ? { code, x: best.x, y: best.y, clearance: best.score } : { code, blocked: true };
+      };
+    }
+
     let raf = 0;
     const animate = () => {
       raf = requestAnimationFrame(animate);
@@ -283,6 +365,9 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
       controls.removeEventListener("start", onStart);
       controls.removeEventListener("end", onEnd);
+      if (auditPinsRef.current) {
+        delete (window as unknown as Record<string, unknown>).__globeAuditPins;
+      }
       controls.dispose();
       globe.geometry.dispose();
       (globe.material as THREE.Material).dispose();
@@ -314,7 +399,7 @@ function GlobeCanvas({ onPick }: { onPick: (c: GlobeCountry) => void }) {
 
 type Mode = "menu" | "explore" | "quiz";
 
-export default function GlobeQuest({ langA, langB, initialMode, initialCountryCode }: {
+export default function GlobeQuest({ langA, langB, initialMode, initialCountryCode, auditPins }: {
   langA: string; langB: string;
   /** fixture 전용 — 메뉴를 거치지 않고 특정 모드로 바로 연다. 실제 게임룸은 넘기지 않는다. */
   initialMode?: Mode;
@@ -325,6 +410,8 @@ export default function GlobeQuest({ langA, langB, initialMode, initialCountryCo
    * 경로가 아니다. 실제 게임룸은 이 prop 을 넘기지 않는다.
    */
   initialCountryCode?: string;
+  /** fixture 전용 — 게임하기 모드의 핀 조준점을 노출한다(GlobeCanvas 의 auditPins 참고). */
+  auditPins?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode ?? "menu");
 
@@ -371,7 +458,7 @@ export default function GlobeQuest({ langA, langB, initialMode, initialCountryCo
       />
     );
   }
-  return <QuizMode viewerLang={langA} friendLang={langB} onBack={() => setMode("menu")} />;
+  return <QuizMode viewerLang={langA} friendLang={langB} onBack={() => setMode("menu")} auditPins={auditPins} />;
 }
 
 function ModeCard({ emoji, title, sub, onClick }: {
@@ -513,8 +600,10 @@ function ExploreMode({ viewerLang, onBack, initialCountryCode }: {
 // ⚡ 게임하기 — 빠르게 그 나라 찾기
 // ============================================================
 
-function QuizMode({ viewerLang, friendLang, onBack }: {
+function QuizMode({ viewerLang, friendLang, onBack, auditPins }: {
   viewerLang: string; friendLang: string; onBack: () => void;
+  /** fixture 전용 (GlobeCanvas 의 같은 이름 prop 참고). */
+  auditPins?: boolean;
 }) {
   /**
    * 첫 렌더는 **비워 둔다.** 여기서 pickN 을 부르면 서버와 클라이언트가 서로
@@ -670,7 +759,7 @@ function QuizMode({ viewerLang, friendLang, onBack }: {
         </div>
       )}
     >
-      <GlobeCanvas onPick={handlePick} />
+      <GlobeCanvas onPick={handlePick} auditPins={auditPins} />
     </GlobeShell>
   );
 }

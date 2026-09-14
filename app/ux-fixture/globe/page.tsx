@@ -30,5 +30,9 @@ export default function Page({
   const chrome = pick("chrome") === "bare" ? "bare" : "game";
   // ?country=KR — 공부하기 모드를 정보 패널이 열린 상태로 연다(2열 배치 실측용).
   const country = (pick("country") ?? "").toUpperCase().slice(0, 2) || undefined;
-  return <GlobeFixture mode={mode} chrome={chrome} country={country} />;
+  // ?pins=audit — 게임하기 모드의 핀 조준점을 window.__globeAuditPins 로 노출한다.
+  // 감사 스크립트가 "그 나라를 누르려면 화면 어디인가"만 알기 위한 것이고,
+  // 정답 판정·점수·시간은 제품 코드가 그대로 정한다. 실제 게임룸은 쓰지 않는다.
+  const auditPins = pick("pins") === "audit";
+  return <GlobeFixture mode={mode} chrome={chrome} country={country} auditPins={auditPins} />;
 }

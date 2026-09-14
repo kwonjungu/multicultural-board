@@ -12,6 +12,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { SCREENS, BY_ID } from "./screens.mjs";
 
 const HARNESS = "C:/Users/권준구/Desktop/꿀벌소통창_Opus_실행설계_20260913/harness";
@@ -23,6 +24,25 @@ const okFile = (p) => {
   if (!p || typeof p !== "string" || !p.trim()) return false;
   try { const s = fs.statSync(path.resolve(HARNESS, p)); return s.isFile() && s.size > 0; } catch { return false; }
 };
+
+/**
+ * 그 칸을 실제로 찍은 커밋과 시각을 **증거 파일에서 읽어온다**.
+ *
+ * 저장소는 감사 도중에도 계속 앞으로 간다(4dca8c5 → 2993ef6 사이 13커밋).
+ * 모든 칸에 "지금 HEAD" 를 적으면 1차 라운드에 찍은 캡처까지 최신 커밋에서
+ * 찍은 것처럼 보인다 — 그건 거짓이다. capture.mjs 가 칸마다 남기는
+ * interaction 마크다운에 그때의 HEAD 와 시각이 이미 적혀 있으므로 그걸 읽는다.
+ */
+function provenanceOf(check) {
+  const out = { head: null, at: null };
+  if (!okFile(check.interactionEvidence)) return out;
+  try {
+    const md = fs.readFileSync(path.resolve(HARNESS, check.interactionEvidence), "utf8");
+    out.head = (md.match(/multicultural-board HEAD ([0-9a-f]{7,40}|\(unknown\))/) || [])[1] || null;
+    out.at = (md.match(/측정 시각: ([0-9T:.\-Z]+)/) || [])[1] || null;
+  } catch { /* 증거를 못 읽으면 표기하지 않는다 */ }
+  return out;
+}
 
 const cap = JSON.parse(fs.readFileSync(CAPTURE, "utf8"));
 const state = JSON.parse(fs.readFileSync(STATE, "utf8").replace(/^\uFEFF/, ""));
@@ -110,14 +130,25 @@ for (const target of state.screens) {
     const m = c.measured || {};
     const beforeNote = rec.beforeKind === "flow"
       ? "before 는 601a8f0 당시 실제 진입 흐름(홈 허브)이다 — 이 화면은 이번 라운드에 새로 생긴 fixture 라 같은 라우트의 이전 캡처가 존재하지 않는다."
-      : "before 는 601a8f0 의 같은 fixture 라우트를 같은 뷰포트·같은 글자 크기로 찍은 것이다.";
+      : rec.beforeUrl && rec.beforeUrl !== rec.url
+        ? `before 는 601a8f0 의 ${rec.beforeUrl} — 그 시점 같은 게임의 진입 경로다. after 쪽 fixture 라우트(${rec.url})는 무작위를 시드로 고정하려고 이번 라운드에 새로 만든 것이라 601a8f0 에는 없다.`
+        : "before 는 601a8f0 의 같은 fixture 라우트를 같은 뷰포트·같은 글자 크기로 찍은 것이다.";
+    const prov = provenanceOf(c);
+    const provNote = prov.head
+      ? `이 칸은 ${prov.at ?? "시각 미상"} 에 HEAD ${prov.head} 에서 찍었다.`
+      : "";
+    const motionNote = rec.motion === "no-preference"
+      ? "움직임 줄이기를 끈 상태(prefers-reduced-motion=no-preference / childUx.motion=full)로 쟀다 — 연출이 있는 쪽이 감사 대상인 화면이다."
+      : "";
     row.review = [
       `${c.device} ${m.viewport ? `${m.viewport.w}x${m.viewport.h}` : ""} 글자 ${c.textSize}:`,
       `문서 ${m.docScroll ? `${m.docScroll.w}x${m.docScroll.h}` : "-"}, 가로 넘침 ${m.overflowX ?? "-"}px,`,
       `첫 화면 조작 ${m.foldControlCount ?? "-"}개, 최소 조작 ${m.minTapInFold ?? "-"}px,`,
       `본문 글자 중앙값 ${m.bodyFontMedian ?? "-"}px, data-ux-text=${m.uxText ?? "-"}.`,
       (c.interactLog || []).join(" / ") + ".",
+      motionNote,
       beforeNote,
+      provNote,
       clean ? "" : `미해결: ${c.issues.join(" · ")}`,
     ].filter(Boolean).join(" ");
 
@@ -130,11 +161,28 @@ for (const target of state.screens) {
   }
 }
 
+// 캡처가 실제로 어느 커밋들에서 났는지 증거에서 모은다 — 손으로 박지 않는다.
+const heads = new Map();
+for (const rec of cap) {
+  for (const c of rec.checks) {
+    const h = provenanceOf(c).head;
+    if (h) heads.set(h, (heads.get(h) || 0) + 1);
+  }
+}
+const headList = [...heads.entries()].sort((a, b) => b[1] - a[1]).map(([h, n]) => `${h}(${n}칸)`).join(", ");
+let nowHead = "(unknown)";
+try { nowHead = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim(); } catch { /* git 없이도 돈다 */ }
+
 state.repository = {
   path: "C:/Users/권준구/multicultural-board",
-  head: "4dca8c5",
+  head: nowHead,
   branch: "main",
-  note: "2026-09-14 품질 하네스 감사. after=3300(이 저장소 HEAD 4dca8c5), before=3402(git worktree C:/Users/권준구/mb-before-601a8f0, 601a8f0). 증거는 이 저장소 reports/audit-20260914/ 아래 절대경로.",
+  note:
+    `2026-09-14 품질 하네스 감사. after=3300(이 저장소 작업 트리), before=3402(git worktree C:/Users/권준구/mb-before-601a8f0, 601a8f0). ` +
+    `증거는 이 저장소 reports/audit-20260914/ 아래 절대경로. ` +
+    `주의 — 저장소가 감사 도중에도 계속 앞으로 갔다. 칸별로 실제 캡처된 커밋이 다르며 분포는 ${headList || "(증거에서 읽지 못함)"} 이다. ` +
+    `각 칸의 review 와 interactionEvidence 에 그 칸을 찍은 커밋과 시각이 적혀 있다. ` +
+    `head 필드의 ${nowHead} 는 "기록 시점의 HEAD" 일 뿐 모든 칸의 캡처 커밋이 아니다.`,
 };
 
 console.log(report.join("\n") || "(pending 없음)");

@@ -58,10 +58,15 @@ type Key = keyof typeof GAMES;
 export default function GameFixture() {
   const [key, setKey] = useState<Key>("taboo");
   const [exited, setExited] = useState(0);
+  // ?pins=audit — 지구본 게임하기 모드의 핀 조준점만 노출한다(감사 스크립트 전용).
+  // 다른 게임에는 아무 영향이 없고, 실제 게임룸은 이 경로를 쓰지 않는다.
+  const [auditPins, setAuditPins] = useState(false);
 
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("game");
+    const sp = new URLSearchParams(window.location.search);
+    const q = sp.get("game");
     if (q && q in GAMES) setKey(q as Key);
+    if (sp.get("pins") === "audit") setAuditPins(true);
   }, []);
 
   const Active = GAMES[key].cmp;
@@ -94,7 +99,11 @@ export default function GameFixture() {
           fixture 에는 셸이 없으므로 여기서 직접 준다 — 그래야 측정 스크립트가
           비활성 버튼이 아닌 진짜 버튼의 크기·히트를 잰다. */}
       <GameShellProvider onExit={() => setExited((n) => n + 1)}>
-        <Active langA="ko" langB="vi" />
+        {key === "globe" && auditPins ? (
+          <GlobeQuest langA="ko" langB="vi" auditPins />
+        ) : (
+          <Active langA="ko" langB="vi" />
+        )}
       </GameShellProvider>
       {exited > 0 && (
         <p data-fixture-chrome style={{ padding: 8, margin: 0, background: "#111", color: "#9CA3AF", font: "12px monospace" }}>
