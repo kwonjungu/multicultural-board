@@ -221,11 +221,23 @@ function ensureRegistered() {
   registerForeignStop(cancelSpeak);
 }
 
-export async function speak(text: string, langShort: string): Promise<void> {
-  if (typeof window === "undefined" || !text.trim()) return;
+/**
+ * 읽어 주기의 결과.
+ *   "server"  — 서버 음성(/api/tts)으로 재생이 시작됐다
+ *   "browser" — 브라우저 음성으로 재생이 시작됐다
+ *   "muted"   — 앱에서 소리를 꺼 둔 상태라 일부러 안 냈다
+ *   "failed"  — 둘 다 실패했다(네트워크·자동재생 차단·목소리 없음)
+ *   "empty"   — 읽을 글이 없다
+ * 부르는 쪽이 이 값을 보고 **화면에 이유를 말할 수 있다.** 예전에는 어떤
+ * 경로로 실패하든 아무 말도 없어서, 아이도 우리도 원인을 알 수 없었다.
+ */
+export type SpeakResult = "server" | "browser" | "muted" | "failed" | "empty";
+
+export async function speak(text: string, langShort: string): Promise<SpeakResult> {
+  if (typeof window === "undefined" || !text.trim()) return "empty";
   // 소리를 끈 아이에게는 아무 소리도 나면 안 된다. 화면 안내는 그대로 두고
   // 재생만 건너뛴다(호출부는 await 로 '다 읽었다' 를 기다리므로 즉시 resolve).
-  if (!isSoundOn()) return;
+  if (!isSoundOn()) return "muted";
   ensureRegistered();
 
   // 이전 재생 정지 — 이 파일 것과 버스 것 양쪽 모두.
@@ -246,7 +258,7 @@ export async function speak(text: string, langShort: string): Promise<void> {
    */
   try {
     await playServerTts(text, langShort);
-    return;
+    return "server";
   } catch {
     // 네트워크·서버 실패 → 아래 브라우저 음성으로 이어간다.
   }
@@ -297,7 +309,7 @@ export async function speak(text: string, langShort: string): Promise<void> {
           }, 5000);
           synth.speak(u);
         });
-        if (spoke) return;
+        if (spoke) return "browser";
         // 브라우저가 조용했다 — 아래 서버 TTS 로 이어진다.
       }
     }
@@ -307,11 +319,18 @@ export async function speak(text: string, langShort: string): Promise<void> {
   // 여기까지 왔다면 서버도 브라우저 목소리 선택도 실패한 것이다.
   // 마지막으로 기본 목소리에 맡긴다 — 엉뚱한 발음이라도 침묵보다 낫다.
   const synth2 = window.speechSynthesis;
-  if (synth2) {
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = BCP47[langShort] || "en-US";
+  if (!synth2) return "failed";
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = BCP47[langShort] || "en-US";
+  // 이 마지막 시도도 조용히 실패할 수 있다. start 가 오면 성공으로 본다.
+  return await new Promise<SpeakResult>((resolve) => {
+    let settled = false;
+    const done = (r: SpeakResult) => { if (!settled) { settled = true; resolve(r); } };
+    u.addEventListener("start", () => done("browser"), { once: true });
+    u.addEventListener("error", () => done("failed"), { once: true });
+    window.setTimeout(() => done("failed"), 1500);
     synth2.speak(u);
-  }
+  });
 }
 
 export function cancelSpeak() {

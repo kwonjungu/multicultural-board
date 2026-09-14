@@ -773,7 +773,12 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                     aria-pressed={active}
                     onClick={() => setActiveColId(col.id)}
                   >
-                    {icon && <img src={icon} alt="" aria-hidden="true" className="bd-topic-art" />}
+                    {/* 열 머리와 같은 이유로 자리를 늘 잡는다 — 아이콘 없는 열
+                       (사용자가 만든 "새 칸")만 이름이 36px 왼쪽으로 밀려
+                       세로로 늘어선 주제 이름이 들쭉날쭉해진다. */}
+                    {icon
+                      ? <img src={icon} alt="" aria-hidden="true" className="bd-topic-art" />
+                      : <span aria-hidden="true" className="bd-topic-art bd-topic-art-empty" />}
                     <span className="bd-topic-text">
                       <span data-ux-role="label" className="bd-topic-name">{cleanTitle(col.title)}</span>
                       <span data-ux-role="secondary" className="bd-topic-count">
@@ -848,8 +853,17 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                   style={{ ["--col-tint" as string]: col.color }}
                 >
                   <div className="bd-col-head" style={{ background: col.color }}>
-                    {icon && <img src={icon} alt="" aria-hidden="true" className="bd-col-art" />}
-                    <span data-ux-role="label" className="bd-col-title">{cleanTitle(col.title)}</span>
+                    {/* 그림 자리는 **아이콘이 없어도 늘 잡아 둔다**.
+                       lib/assets.ts 의 columnIconFor 는 제목이 이모지로 시작할
+                       때만 아이콘을 준다. 기본 3열은 "🙋 자기소개 …" 라 아이콘이
+                       붙지만, addColumnQuick 이 만드는 "새 칸" 은 이모지가 없어
+                       null 이다. 머리가 세로 배치라 그 열만 36px+gap 만큼 짧아져
+                       옆 열과 어긋났다(사용자 지적: "사용자가 추가한 열에서
+                       레이아웃 이슈"). 빈 자리는 보이지 않지만 높이는 맡는다. */}
+                    {icon
+                      ? <img src={icon} alt="" aria-hidden="true" className="bd-col-art" />
+                      : <span aria-hidden="true" className="bd-col-art bd-col-art-empty" />}
+                    <span data-ux-role="label" className="bd-col-title" title={cleanTitle(col.title)}>{cleanTitle(col.title)}</span>
                     <span data-ux-role="secondary" className="bd-col-count">
                       {tFmt("boardStoryCount", lang, { n: colCards.length })}
                     </span>
@@ -1350,7 +1364,8 @@ const BOARD_CSS = `
 }
 .bd-topic.on{ border: 3px solid var(--ux-selected-border); background: var(--ux-surface-sunk); }
 .bd-topic{ padding: var(--ux-space-2) var(--ux-space-3); }
-.bd-topic-art{ width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+.bd-topic-art{ display: block; width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+.bd-topic-art-empty{ background: none; }
 .bd-topic-text{ display: grid; gap: 2px; min-width: 0; flex: 1; }
 .bd-topic-name{ font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
 .bd-check{ width: 1.5em; text-align: center; font-weight: 900; color: var(--ux-selected-border); flex-shrink: 0; }
@@ -1431,8 +1446,14 @@ const BOARD_CSS = `
 /* 전체 보기에서는 제목을 크게 반복하지 않는다 — 바로 위 전환 버튼이 이미 말한다. */
 .bd-main-full .bd-ask{ font-size: var(--ux-font-label); color: var(--ux-ink-soft); }
 .bd-col{
-  /* 패들렛처럼 여러 주제가 한눈에 들어와야 한다. 1280px 에서 4개, 1920px 에서 6개. */
-  width: clamp(240px, 19vw, 290px); flex-shrink: 0;
+  /* 패들렛처럼 여러 주제가 한눈에 들어와야 한다.
+     예전 값 clamp(240px, 19vw, 290px) 는 1280px 에서 실측 243px 이라 카드
+     안쪽이 185px 밖에 안 됐다 — 조작 버튼 넷(48px 원 x4 + 간격 8 x3 = 216px)이
+     들어가지 못해 서로 겹쳤다(실측: 1280·1024 에서 겹침 1건). 사용자도 같은
+     것을 봤다: "열 폭을 더 키우고 반응형 조절되도록".
+     최소 300px = 216(버튼 넷) + 32(카드 안쪽 여백) + 10(카드 테두리) + 16(칸
+     여백) + 여유. vw 로 따라 늘고 360px 에서 멈춘다(읽기 폭 42ch 안쪽). */
+  width: clamp(300px, 22vw, 360px); flex-shrink: 0;
   display: flex; flex-direction: column; gap: var(--ux-space-2);
   padding: var(--ux-space-2);
   box-sizing: border-box;
@@ -1450,6 +1471,10 @@ const BOARD_CSS = `
 .bd-col[data-ux-surface]{
   background: color-mix(in srgb, var(--col-tint, var(--ux-surface)) 14%, var(--ux-surface));
 }
+/* '큰 글씨' 를 고른 아이는 --ux-control-min 이 48px 이 아니라 56px 이다.
+   버튼 넷이 4x56 + 8x3 = 248px 을 먹으므로 칸도 그만큼 넓어야 한 행이 유지된다.
+   크게 보려고 고른 설정을 레이아웃이 되돌리면 안 된다(tokens.ts 의 원칙). */
+:root[data-ux-text="large"] .bd-col{ width: clamp(340px, 25vw, 420px); }
 /* 주제 머리 — 가운데 정렬.
    예전에는 그림이 왼쪽, 개수가 오른쪽 끝(margin-left:auto)에 붙어 한 칸 안에서
    좌우로 벌어져 보였다. 칼럼이 여러 개 늘어서면 그 어긋남이 더 눈에 띈다
@@ -1459,9 +1484,27 @@ const BOARD_CSS = `
   gap: var(--ux-space-1);
   border-radius: var(--ux-radius-surface); padding: var(--ux-space-2) var(--ux-space-3);
 }
-.bd-col-art{ width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; background: var(--ux-surface); border-radius: var(--ux-radius-surface); }
-/* 좁아진 컬럼에서 주제 이름이 잘리면 안 된다 — 두 줄로 내려온다. */
-.bd-col-title{ width: 100%; min-width: 0; font-weight: 900; color: var(--ux-ink); white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+.bd-col-art{ display: block; width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; background: var(--ux-surface); border-radius: var(--ux-radius-surface); }
+/* 아이콘 없는 열(사용자가 만든 "새 칸")의 빈 자리 — 높이만 맡고 보이지 않는다. */
+.bd-col-art-empty{ background: none; }
+/* 주제 이름은 **두 줄 자리를 늘 잡는다**.
+   예전 주석은 "잘리면 안 된다 — 두 줄로 내려온다" 였는데, 실제로는 한 줄짜리
+   이름과 두 줄짜리 이름의 머리 높이가 18.9px 어긋났고(실측), 아주 긴 이름은
+   세 줄까지 내려가 열마다 제각각이 됐다. 계약의 의도는 "이름을 읽을 수 있게"
+   이지 "몇 줄이든 다 편다" 가 아니다 — 그래서 **두 줄로 고정**한다:
+    - min-height 로 한 줄 이름도 두 줄 자리를 차지해 옆 열과 높이가 같다.
+    - 두 줄을 넘기면 말줄임으로 접는다. 글자는 DOM 에 그대로 남아 스크린리더가
+      끝까지 읽고, 마우스에는 title 로 전체가 뜬다.
+    - line-height 를 여기서 못박아 min-height 계산과 실제 줄 높이가 정확히
+      맞는다(토큰 값과 같은 --ux-lh-tight 를 쓴다). */
+.bd-col-title{
+  width: 100%; min-width: 0; font-weight: 900; color: var(--ux-ink);
+  white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+  line-height: var(--ux-lh-tight);
+  min-height: calc(2 * var(--ux-lh-tight) * 1em);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .bd-col-count{ color: var(--ux-ink); }
 /* 추가·관리 버튼도 같은 축에 가운데로. */
 .bd-col-tools{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; justify-content: center; }

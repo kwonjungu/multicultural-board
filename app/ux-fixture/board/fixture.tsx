@@ -137,6 +137,17 @@ function buildCards(): CardData[] {
     }));
   }
 
+  /* 주제 4: 사용자가 '새 주제 추가' 로 만든 칸. 제목에 이모지가 없어
+     columnIconFor 가 null 을 돌려주고 .bd-col-art 가 렌더되지 않는다 —
+     아이콘 있는 칸과 머리 높이가 어긋나는지 여기서 잡는다. 카드가 하나는
+     있어야 머리 아래 줄들의 y 도 비교할 수 있다. */
+  cards.push(textCard({
+    id: "fx-d1", colId: "fx-col-4", authorName: "학생 44",
+    originalText: KO_SENTENCES[3],
+    translations: { ko: KO_SENTENCES[3], vi: VI_SENTENCES[3] },
+    timestamp: FIXED_NOW - 300_000,
+  }));
+
   // 주제 3: 카드 0개 (빈 주제 안내를 본다)
   return cards;
 }
@@ -154,10 +165,35 @@ const LEARNERS = {
 };
 
 const FIXTURE: BoardFixture = {
+  /**
+   * 기본 3열 + **사용자가 추가한 열** 3개.
+   *
+   * 왜 늘렸나: 기본 열 제목은 전부 이모지로 시작해 lib/assets.ts 의
+   * columnIconFor 가 아이콘을 돌려준다. 반면 PadletBoard 의 addColumnQuick 은
+   * createColumn("새 칸", …) 이라 이모지가 없어 아이콘이 null 이고
+   * .bd-col-art 가 아예 렌더되지 않는다. 기본 3열만 두면 그 상태가 검수에서
+   * 통째로 빠진다 — 사용자가 본 어긋남이 정확히 거기서 났다.
+   *
+   * 네 가지 경우를 한 화면에 깐다:
+   *  - fx-col-4: 이모지 없는 짧은 제목 (실제 '새 칸' 그대로)
+   *  - fx-col-5: 이모지 없는 아주 긴 제목 → 두 줄 이상으로 감긴다
+   *  - fx-col-6: 이모지 있는 긴 제목 → 아이콘 + 여러 줄
+   */
   columns: [
     { id: "fx-col-1", title: "🙋 자기소개 / Introduce", color: "#F59E0B", order: 0 },
     { id: "fx-col-2", title: "💬 오늘의 이야기 / Today", color: "#FF6584", order: 1 },
     { id: "fx-col-3", title: "🌟 칭찬해요 / Praise", color: "#43C59E", order: 2 },
+    { id: "fx-col-4", title: "새 칸", color: "#7C6CF5", order: 3 },
+    {
+      id: "fx-col-5",
+      title: "우리 반 친구들이 방학 동안 겪은 아주 특별한 이야기를 하나씩 모아 봐요",
+      color: "#0EA5E9", order: 4,
+    },
+    {
+      id: "fx-col-6",
+      title: "🎨 함께 그리고 만드는 우리 반 미술 이야기 / Art time together",
+      color: "#F97316", order: 5,
+    },
   ],
   cards: buildCards(),
   /**

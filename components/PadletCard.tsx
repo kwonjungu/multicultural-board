@@ -96,6 +96,8 @@ export default function PadletCard({
 
   // 듣기 — 재생 중인 것은 카드 전체에서 하나뿐이다 (AUDIO-01).
   const [speaking, setSpeaking] = useState<string | null>(null);
+  /** 소리가 안 났을 때 그 이유. 조용한 실패를 없애기 위한 것이다. */
+  const [speakNote, setSpeakNote] = useState<string | null>(null);
   const playToken = useRef(0);
   /** 언마운트 정리에서 "지금 이 카드가 읽고 있었나" 를 보기 위한 거울. */
   const speakingRef = useRef<string | null>(null);
@@ -307,8 +309,15 @@ export default function PadletCard({
     if (speaking === id) { setSpeaking(null); return; }
     const token = ++playToken.current;
     setSpeaking(id);
+    setSpeakNote(null);
     try {
-      await speak(text, lang);
+      const r = await speak(text, lang);
+      // 실패를 조용히 넘기지 않는다 — 왜 소리가 안 나는지 화면이 말해야
+      // 아이도 선생님도 다음에 무엇을 할지 안다.
+      if (r === "muted") setSpeakNote("소리가 꺼져 있어요. 설정에서 소리를 켜 주세요.");
+      else if (r === "failed") setSpeakNote("소리를 낼 수 없어요. 기기 소리와 탭 음소거를 확인해 주세요.");
+    } catch {
+      setSpeakNote("소리를 낼 수 없어요. 기기 소리와 탭 음소거를 확인해 주세요.");
     } finally {
       if (playToken.current === token) setSpeaking(null);
     }
@@ -881,6 +890,9 @@ export default function PadletCard({
           )}
         </div>
       )}
+      {speakNote && (
+        <p data-ux-role="secondary" className="pc-note" role="status">🔇 {speakNote}</p>
+      )}
       {reactError && (
         <p data-ux-role="secondary" className="pc-note" role="status">{reactError}</p>
       )}
@@ -998,6 +1010,37 @@ export const CARD_CSS = `
 .pc-meta{ overflow-wrap: anywhere; }
 .pc-owner-tools{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
 
+/* ── 카드 안 글은 절대 글자 중간에서 잘리지 않는다 ────────────────────
+   실측한 원인(추측 아님): 위의 .pc-name{overflow-wrap:anywhere} 는 **적용되지
+   않고 있었다**. 전역 토큰 [data-ux-role]{overflow-wrap:break-word;
+   word-break:keep-all} 이 특이도가 (0,1,0) 로 클래스 하나와 같은데, 토큰
+   style 태그가 카드 CSS 보다 **뒤에** 주입돼 순서로 이긴다.
+   (probe: .pc-name 의 computed overflow-wrap = break-word)
+
+   break-word 는 정말 넘칠 때만 끊고 **min-content 폭은 가장 긴 토막을 지킨다**.
+   그래서 공백 없는 45자 이름("응우옌티민카이…")이 .pc-who-text 그리드 트랙의
+   최소 폭을 261px 로 밀었고, 205px 짜리 트랙을 넘쳐 카드(244px)가 333px 까지
+   벌어졌다 — 사용자가 본 "오른쪽 끝에서 글자 중간에 잘림" 이 이것이다.
+   아래 번역문이 멀쩡했던 이유는 그쪽에는 공백이 있어 어절로 끊겼기 때문이다.
+
+   전역 토큰은 건드리지 않는다 — tokens.ts 의 주석대로 anywhere 를 전역에
+   되돌리면 동물 선택 카드의 "토끼" 가 12px 폭으로 짜부라진다. 대신 **카드
+   안에서만** 특이도를 (0,2,0) 으로 올려 anywhere 를 되살린다. 카드 안 글은
+   전부 문장·이름이라 한 글자 폭으로 짜부라질 flex 라벨이 없다. */
+.pc-card .pc-name,
+.pc-card .pc-meta,
+.pc-card .pc-body,
+.pc-card .pc-note,
+.pc-card .pc-state.warn,
+.pc-card .pc-comment-who,
+.pc-card .pc-read-tag,
+.pc-card .pc-label{ overflow-wrap: anywhere; }
+/* 그리드/플렉스 자식의 자동 최소 폭(min-content)이 카드를 벌리지 못하게 한다.
+   위의 anywhere 로 min-content 자체가 작아지지만, 이미지·버튼처럼 줄일 수 없는
+   자식이 섞여도 카드가 넘치지 않도록 상자 쪽에서도 한 번 더 막는다. */
+.pc-card .pc-who, .pc-card .pc-read, .pc-card .pc-sub,
+.pc-card .pc-alt, .pc-card .pc-comment{ min-width: 0; }
+
 .pc-img-btn{ padding: 0; border: none; background: none; cursor: zoom-in; width: 100%; }
 .pc-img{ width: 100%; height: auto; display: block; border-radius: var(--ux-radius-surface); }
 .pc-video{ position: relative; width: 100%; padding-bottom: 56.25%; height: 0; border-radius: var(--ux-radius-surface); overflow: hidden; }
@@ -1059,22 +1102,69 @@ export const CARD_CSS = `
    (한 줄로 합치면서 실제로 그렇게 됐다). 넘치는 대신 라벨이 접히게 둔다. */
 .pc-act-read{ flex: 0 1 auto; }
 .pc-act-talk{ margin-left: auto; flex: 0 0 auto; }
-/* 보조 조작 — 크기는 유지하고 시각 무게만 낮춘다. */
-.pc-actions .pc-act-read .pc-btn{
-  border-color: transparent; background: transparent; font-weight: 700;
-  color: var(--ux-ink-soft);
+
+/* 네 버튼은 **같은 알약/원**이다.
+   예전에는 왼쪽 둘만 border-color:transparent; background:transparent 라
+   "두개는 원 속, 두개는 없" 어 보였다(사용자 지적: "다 원 안에 넣어").
+   무게 차이는 테두리 유무가 아니라 **채움**으로만 남긴다:
+     - 읽기 보조(번역·듣기) = 비운 원 (카드와 같은 흰 바탕)
+     - 대화(답장·공감)      = 채운 원 (--ux-surface-sunk)
+   테두리 색·두께·모서리·크기는 넷이 똑같다. */
+/* 아래 규칙은 **카드 본체의 조작 줄에만** 건다(.pc-card > .pc-actions).
+   답장 목록 안(.pc-comment .pc-actions)에도 같은 클래스가 쓰여서, 자손
+   선택자로 걸면 교사용 '승인'·'삭제' 버튼까지 원이 되고 danger 의 빨간
+   테두리가 특이도 싸움에서 밀려 사라진다. */
+.pc-card > .pc-actions .pc-btn{
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  white-space: nowrap; min-width: 0;
+  /* 크기는 토큰(--ux-control-min: 터치 48 / 마우스 44)에 맡긴다. 인라인으로
+     px 을 박지 않는다 — 여기서는 '토큰 값 이하로 내려가지 않게' 만 못박는다. */
+  /* 높이는 토큰 값 **그대로** 못박고 위아래 여백을 0 으로 둔다.
+     왜: 스피커는 <img>(AppIcon size=22 를 인라인 style 로 박는다)이고 나머지
+     셋은 이모지 글자다. 콘텐츠가 높이를 정하게 두면 같은 줄에서 50px 과 54px
+     로 갈렸다(실측). 높이를 토큰이 정하면 안에 무엇이 들어와도 넷이 같다 —
+     손가락 최소 크기(터치 48 / 마우스 44)는 그 토큰이 지킨다. */
+  height: var(--ux-control-min);
+  min-height: var(--ux-control-min);
+  padding-top: 0; padding-bottom: 0;
+  border: 2px solid var(--ux-primary-border);
+  border-radius: var(--ux-radius-pill);
+  color: var(--ux-ink);
+  position: relative;
 }
-.pc-actions .pc-act-read .pc-btn:hover,
-.pc-actions .pc-act-read .pc-btn:focus-visible{
-  background: var(--ux-surface-sunk); color: var(--ux-ink);
+.pc-card > .pc-actions .pc-act-read .pc-btn{ background: var(--ux-surface); font-weight: 700; }
+.pc-card > .pc-actions .pc-act-talk .pc-btn{ background: var(--ux-surface-sunk); }
+.pc-card > .pc-actions .pc-act-read .pc-btn:hover,
+.pc-card > .pc-actions .pc-act-read .pc-btn:focus-visible{ background: var(--ux-surface-sunk); }
+.pc-card > .pc-actions .pc-act-talk .pc-btn:hover,
+.pc-card > .pc-actions .pc-act-talk .pc-btn:focus-visible{ background: var(--ux-primary-fill); color: var(--ux-primary-ink); }
+/* 눌린 상태·공감 선택은 위 '채움' 규칙보다 뒤에, 더 높은 특이도로 둔다.
+   아래쪽 .pc-btn[aria-pressed="true"] / .pc-heart.on 은 (0,2,0) 이라 위
+   (0,4,0) 규칙에 밀린다 — 그대로 두면 하트를 골라도 노란 채움이 안 뜬다.
+   테두리 3px 은 색 말고도 선택을 알리는 신호라 유지한다(box-sizing:
+   border-box 라 바깥 크기는 넷이 그대로 같다). */
+.pc-card > .pc-actions .pc-act-read .pc-btn[aria-pressed="true"],
+.pc-card > .pc-actions .pc-act-talk .pc-btn[aria-pressed="true"],
+.pc-card > .pc-actions .pc-act-read .pc-btn.on,
+.pc-card > .pc-actions .pc-act-talk .pc-btn.on{
+  border: 3px solid var(--ux-selected-border); background: var(--ux-surface-sunk);
+}
+.pc-card > .pc-actions .pc-act-talk .pc-heart.on{
+  border: 3px solid var(--ux-selected-border);
+  background: var(--ux-primary-fill); color: var(--ux-primary-ink);
 }
 
-/* 버튼 속 아이콘 · 라벨 · 숫자 */
-.pc-actions .pc-btn{
-  display: inline-flex; align-items: center; gap: 6px;
-  white-space: nowrap; min-width: 0;
+/* 버튼 속 아이콘 · 라벨 · 숫자.
+   아이콘 상자를 **고정 크기**로 만든다. 이모지(🌐·💌·🤍)는 글자라 글꼴이
+   높이를 정하고 스피커·무드는 <img> 라 제 픽셀이 높이를 정한다 — 그래서
+   같은 줄의 버튼 높이가 48.3px 과 50px 로 갈렸다(실측). 상자가 고정이면
+   안에 무엇이 들어와도 버튼 높이가 같다. */
+.pc-btn-ico{
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; flex: 0 0 auto;
+  font-size: 1.15em; line-height: 1;
 }
-.pc-btn-ico{ font-size: 1.15em; line-height: 1; flex: 0 0 auto; }
+.pc-btn-ico > *{ display: block; max-width: 100%; max-height: 100%; }
 .pc-btn-lb{ min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .pc-btn-n{
   font-weight: 800; flex: 0 0 auto;
@@ -1087,25 +1177,51 @@ export const CARD_CSS = `
   background: var(--ux-primary-fill); color: var(--ux-primary-ink);
 }
 
-/* 좁은 칼럼: 글자 라벨을 접고 아이콘 + 숫자만 남긴다. 줄은 절대 늘리지 않는다.
-   패들렛 칼럼은 250px 안팎이다 — 그 폭에서는 라벨이 들어가므로 남기고,
-   "큰 글씨" 를 고른 아이는 글자가 커서 더 일찍 접어야 한다. */
-@container (max-width: 260px){
-  .pc-actions .pc-btn-lb{
+/* 좁은 칼럼: 글자 라벨을 접고 아이콘(+숫자)만 남긴다. 줄은 절대 늘리지 않는다.
+
+   문턱을 260px → 480px 로 올린 근거(전부 실측):
+    - 라벨을 다 펴면 네 버튼이 97.5 + 107.2 + 105.8 + 122.7 = 433px, 간격 24px
+      까지 **457px** 이 필요하다(베트남어 라벨 기준).
+    - 390px 휴대폰의 카드 안쪽은 316px 이다. 옛 문턱 260px 을 넘으니 라벨이
+      펴졌는데 457px 이 316px 에 들어갈 리 없어, 읽기 쪽 버튼이 36px 로
+      짓눌리다 답장 버튼과 **겹쳤다**(실측: 390 에서 겹침 1건, .pc-act-read
+      71<80). 문턱이 화면이 아니라 '라벨이 실제로 들어가는 폭' 이어야 했다.
+    - 480px 이면 휴대폰(316px)과 칼럼 보기(카드 안쪽 242~303px)는 접히고,
+      단일 주제 보기(820 세로, 카드 안쪽 620px)는 펴진 채로 남는다.
+    - '큰 글씨' 도 같은 문턱을 쓴다. 칼럼 폭을 큰 글씨에서 340~420px 로 함께
+      키웠기 때문에(PadletBoard) 카드 안쪽이 282~362px 로 480 아래에 머문다 —
+      따로 400px 문턱을 둘 이유가 없어졌다. */
+@container (max-width: 480px){
+  .pc-card > .pc-actions .pc-btn-lb{
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
-}
-/* "큰 글씨" 를 고른 아이는 같은 폭에 글자가 더 크다 — 더 일찍 접는다. */
-@container (max-width: 400px){
-  :root[data-ux-text="large"] .pc-actions .pc-btn-lb{
-    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  /* 라벨이 접히면 남는 건 아이콘뿐이다 — 이때 네 버튼은 **지름이 같은 정원**
+     이어야 한다. 지름은 토큰이 정한다(--ux-control-min: 터치 48 / 마우스 44).
+     숫자를 원 안에 두면 그 버튼만 넓어져 넷이 어긋난다(실측: 번역 28px,
+     답장 48.5px, 하트 63.2px). 그래서 숫자는 원 위에 배지로 얹는다. */
+  .pc-card > .pc-actions .pc-btn{
+    width: var(--ux-control-min); height: var(--ux-control-min);
+    min-width: var(--ux-control-min);
+    padding-left: 0; padding-right: 0; gap: 0;
+  }
+  /* 배지는 **가로로는 원 밖으로 나가지 않는다** (right: 0 = 안쪽 상자 오른쪽
+     끝). -4px 로 내밀었더니 원의 scrollWidth 가 clientWidth 를 4px 넘겨
+     '카드 안 잘림 0개' 계약을 깼다(실측: 40<44). 위로만 6px 띄워 아이콘과
+     겹치는 면을 줄이고, 카드 색 테두리로 원과 분리해 읽는다. */
+  .pc-card > .pc-actions .pc-btn-n{
+    position: absolute; top: -6px; right: 0;
+    min-width: 20px; height: 20px; box-sizing: border-box; padding: 0 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: var(--ux-font-secondary); line-height: 1;
+    background: var(--ux-selected-border); color: var(--ux-surface);
+    border: 2px solid var(--ux-surface); border-radius: var(--ux-radius-pill);
   }
 }
-@container (max-width: 230px){
-  .pc-act-read .pc-btn-lb, .pc-act-read .pc-btn{ min-width: 0; }
-  .pc-actions{ gap: var(--ux-space-1); }
+/* 그래도 더 좁아지면 간격만 줄인다. 원 지름은 손가락 최소 크기라 줄이지
+   않는다 — 예전에 여기서 min-width 를 0 으로 풀어 버튼이 짓눌렸다. */
+@container (max-width: 240px){
+  .pc-card > .pc-actions{ gap: var(--ux-space-1); }
 }
 .pc-reactions{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
 
