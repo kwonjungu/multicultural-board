@@ -110,7 +110,9 @@ export default function VocabCard({
       aria-modal="true"
       style={{
         position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(15, 10, 40, 0.72)",
+        /* 남보라 장막(15,10,40)은 화면의 3분의 2를 보랏빛으로 덮어 이 화면만
+           앱에서 떠 보이게 했다. 코코아 잉크(--ux-ink 계열)로 맞춘다. */
+        background: "rgba(41, 37, 31, 0.72)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
         fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         animation: "fadeIn 0.2s ease",

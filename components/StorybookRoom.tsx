@@ -1436,20 +1436,33 @@ function FriendAnswers({
       </div>
 
       {/* ── ✍ 새 생각 남기기 — 수업과 동일한 4모드(그림·글자·말·감정) ── */}
+      {/* 이 버튼만 파란 그라디언트라 꿀색 화면에서 혼자 튀었다(사용자 지적).
+          토큰 색으로 맞추고, 무엇을 하는 자리인지 그림으로도 알린다.
+          주석은 삼항 분기 **밖**에 둔다 — 분기 안에 주석과 엘리먼트를 나란히
+          두면 자식이 둘이 되어 JSX 가 깨진다(이번에 실제로 깨뜨렸다). */}
       {!composerOpen ? (
         <button
+          data-ux-role="action"
           onClick={() => { setComposerOpen(true); setAnswerWarn(null); }}
           style={{
-            width: "100%", minHeight: 46, marginBottom: 10,
-            background: "linear-gradient(135deg, #3B82F6, #2563EB)",
-            color: "#fff", fontSize: 14, fontWeight: 900,
-            border: "none", borderRadius: 14, cursor: "pointer",
-            boxShadow: "0 5px 14px rgba(59,130,246,0.3)", fontFamily: "inherit",
+            width: "100%", marginBottom: 10,
+            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+            background: "var(--ux-primary-fill)", color: "var(--ux-primary-ink)",
+            fontWeight: 800,
+            border: "2px solid var(--ux-primary-border)", borderRadius: 14, cursor: "pointer",
+            boxShadow: "0 5px 14px rgba(137,83,0,.18)", fontFamily: "inherit",
           }}
-        >✍ {myAnswer ? "내 생각 다시 쓰기" : "새 생각 남기기"}</button>
+        >
+          <img
+            src="/ui-icons/v1/scene/bee-idea-128.png"
+            alt="" aria-hidden="true"
+            style={{ width: 30, height: 30, objectFit: "contain", flexShrink: 0 }}
+          />
+          {myAnswer ? "내 생각 다시 쓰기" : "새 생각 남기기"}
+        </button>
       ) : (
         <div style={{
-          background: "#F8FAFF", border: "2px solid #DBEAFE", borderRadius: 14,
+          background: "var(--ux-surface-sunk)", border: "2px solid var(--ux-primary-border)", borderRadius: 14,
           padding: "12px 12px 14px", marginBottom: 12,
         }}>
           {/* 모드 탭 — 수업(QuestionCard)과 동일 구성 */}
@@ -1463,7 +1476,7 @@ function FriendAnswers({
               <button key={tab.id} onClick={() => setMode(tab.id)} style={{
                 flex: 1, padding: "8px 4px", borderRadius: 10,
                 background: mode === tab.id ? "#fff" : "transparent",
-                border: mode === tab.id ? "2px solid #3B82F6" : "2px solid transparent",
+                border: mode === tab.id ? "2px solid var(--ux-selected-border)" : "2px solid transparent",
                 fontSize: 12.5, fontWeight: 800, color: mode === tab.id ? "#1E40AF" : "#9CA3AF",
                 cursor: "pointer", fontFamily: "inherit",
               }}>{tab.icon} {tab.label}</button>
@@ -1511,7 +1524,7 @@ function FriendAnswers({
 
           {mode === "draw" && (
             <div>
-              <DrawBoard key={`free-${question.id}`} ref={freeDrawRef} width={720} height={400} accent="#3B82F6" />
+              <DrawBoard key={`free-${question.id}`} ref={freeDrawRef} width={720} height={400} accent="#F59E0B" />
               <input
                 value={answerDraft}
                 onChange={(e) => setAnswerDraft(e.target.value)}
@@ -1560,7 +1573,7 @@ function FriendAnswers({
                   flex: 2, minHeight: 44,
                   background: submitting || (mode !== "draw" && !answerDraft.trim())
                     ? "#E5E7EB"
-                    : "linear-gradient(135deg, #3B82F6, #2563EB)",
+                    : "var(--ux-primary-fill)",
                   color: submitting || (mode !== "draw" && !answerDraft.trim()) ? "#9CA3AF" : "#fff",
                   fontSize: 14, fontWeight: 900, border: "none", borderRadius: 12,
                   cursor: submitting ? "wait" : "pointer", fontFamily: "inherit",

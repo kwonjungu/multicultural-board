@@ -216,3 +216,25 @@ export async function awardEmotionStickerOncePerDay(params: {
     return false;
   }
 }
+
+/**
+ * 감정 카드 → 꿀벌 감정 그림(lib/beeMoods) 짝짓기.
+ *
+ * 감정 카드는 15개 언어 라벨을 갖고 있고 꿀벌 무드는 한국어·영어만 있다.
+ * 그래서 목록을 합치지 않고 **그림만** 빌려 온다. 여기를 바꾸면 화면의
+ * 그림이 바뀌므로, 뜻이 가장 가까운 것으로만 짝지을 것.
+ */
+export const EMOTION_MOOD: Record<EmotionId, string> = {
+  joy: "happy",
+  sad: "sad",
+  angry: "angry",
+  surprised: "surprised",
+  scared: "nervous",
+  calm: "calm",
+  tired: "tired",
+  proud: "proud",
+  unfair: "frustrated",
+  curious: "curious",
+  shy: "shy",
+  grateful: "thankful",
+};

@@ -42,6 +42,12 @@ export const SCENE_BEES = [
       "Keep all four the same size and the same character design so none looks more important",
   },
   {
+    id: "bee-idea",
+    what: "동화책 '새 생각 남기기' 버튼",
+    pose: "floating happily and writing on a small note card held in one hand with a fat pencil in the other, " +
+      "eyes bright with an idea, one small simple lightbulb-free sparkle above the head, leaning slightly forward",
+  },
+  {
     id: "bee-writing",
     what: "쓰기 학습지 화면",
     pose: "sitting at a small desk seen from the front, holding a fat pencil in one hand and writing " +

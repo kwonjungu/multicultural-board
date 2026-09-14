@@ -5,9 +5,34 @@ import { VOCAB_WORDS, VocabWord } from "@/lib/vocabWords";
 import { ProgressMap, wordDoneCount } from "@/lib/vocabProgress";
 import { t, tFmt } from "@/lib/i18n";
 
-const PURPLE = "#8B5CF6";
-const PURPLE_DARK = "#6D28D9";
-const PURPLE_LIGHT = "#F5F3FF";
+/**
+ * 단어장 — U07 정리에서 이 파일만 빠져 하드코딩이 남아 있었다(사용자 지적:
+ * "단어장 레이아웃이 되게 다르고"). VocabCard·VocabHub 가 이미 쓰는 규칙을
+ * 그대로 가져온다. 세 화면이 따로 놀지 않게 하는 것이 목적이다.
+ *
+ *  - 보라(--c-vocab)는 "단어 배우기" 의 정체성 색이지만 면을 통째로 칠하지
+ *    않는다. 예전에는 완주/학습중 줄이 통째로 금색·보라 그라디언트였다.
+ *    이제 면은 공통 표면 토큰 하나로 통일하고, 상태 구분은 **왼쪽 가는 띠
+ *    하나**로만 남긴다(EmotionCardDeck 과 같은 결).
+ *  - 하드코딩 px 글자 크기(11/12/13/14/15) → var(--ux-font-*) 계단.
+ *    11px 는 태블릿에서 아이가 못 읽는다.
+ *  - 굵기 900 → 800, 800 → 700.
+ */
+const ACCENT = "var(--c-vocab)";
+const PURPLE = ACCENT;                           /* 옛 이름 유지 — 호출부가 많다 */
+const PURPLE_DARK = "var(--ux-ink)";             /* 글자는 잉크색 */
+const PURPLE_LIGHT = "var(--ux-surface-sunk)";   /* 살짝 가라앉은 면 */
+const INK_SOFT = "var(--ux-ink-soft)";
+const BORDER = "var(--ux-primary-border)";
+
+/** `${ACCENT}33` 같은 hex 알파 이어붙이기는 var() 에서 깨진다. */
+const accentAlpha = (pct: number) => `color-mix(in srgb, ${ACCENT} ${pct}%, transparent)`;
+
+/** 완주는 꿀색, 학습 중은 정체성 보라 — 띠 한 줄에만 쓴다. */
+const TONE_STRIP: Record<"gold" | "purple", string> = {
+  gold: "var(--ux-primary-fill)",
+  purple: ACCENT,
+};
 
 interface Props {
   progress: ProgressMap;
@@ -43,54 +68,64 @@ export default function VocabNotebook({ progress, stickersEarned, onOpenWord, la
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
       {/* 학습 현황 바 */}
       <div style={{
-        background: "#fff", borderRadius: 18,
-        border: "2px solid " + PURPLE + "33",
-        padding: "16px", marginBottom: 14,
-        boxShadow: "0 6px 16px rgba(139, 92, 246, 0.12)",
+        background: "var(--ux-surface)", borderRadius: "var(--ux-radius-surface)",
+        border: `2px solid ${BORDER}`,
+        padding: "var(--ux-space-4)", marginBottom: "var(--ux-space-3)",
+        boxShadow: "0 6px 16px rgba(137,83,0,.12)",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div style={{ fontSize: 14, fontWeight: 900, color: "#1F2937" }}>
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          gap: "var(--ux-space-3)", marginBottom: "var(--ux-space-2)",
+        }}>
+          <div style={{ fontSize: "var(--ux-font-label)", fontWeight: 800, color: PURPLE_DARK }}>
             {tFmt("vocabProgress", lang, { done: doneCount, total })}
           </div>
+          {/* 스티커 수 — 예전에는 금색 그라디언트 알약이었다. 면은 가라앉은
+              표면 하나로 두고 테두리로만 구분한다. */}
           <div style={{
-            background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
-            color: "#78350F", fontSize: 12, fontWeight: 900,
-            padding: "4px 10px", borderRadius: 999,
+            background: PURPLE_LIGHT, border: `1.5px solid ${BORDER}`,
+            color: "var(--ux-primary-ink)",
+            fontSize: "var(--ux-font-secondary)", fontWeight: 700,
+            padding: "4px 10px", borderRadius: "var(--ux-radius-pill)",
+            whiteSpace: "nowrap",
           }}>{tFmt("vocabStickersEarned", lang, { n: stickersEarned })}</div>
         </div>
         <div style={{
-          width: "100%", height: 14, borderRadius: 999,
+          width: "100%", height: 14, borderRadius: "var(--ux-radius-pill)",
           background: PURPLE_LIGHT, overflow: "hidden",
-          border: "1px solid " + PURPLE + "33",
+          border: `1px solid ${accentAlpha(20)}`,
         }}>
           <div style={{
             width: `${pct}%`, height: "100%",
-            background: "linear-gradient(90deg, " + PURPLE + ", " + PURPLE_DARK + ")",
-            transition: "width 0.4s ease",
+            background: ACCENT,
+            transition: "width var(--ux-motion-state) var(--ux-motion-ease)",
           }} />
         </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textAlign: "right", marginTop: 4 }}>
+        <div style={{
+          fontSize: "var(--ux-font-secondary)", fontWeight: 700,
+          color: INK_SOFT, textAlign: "right", marginTop: 4,
+        }}>
           {pct}%
         </div>
       </div>
 
       {/* Mastered */}
       {mastered.length > 0 && (
-        <Section title={t("vocabSectionMastered", lang)} tone="gold">
+        <Section title={t("vocabSectionMastered", lang)}>
           {mastered.map((w) => <NotebookRow key={w.id} w={w} progress={progress} onOpen={onOpenWord} tone="gold" />)}
         </Section>
       )}
 
       {/* In progress */}
       {inProgress.length > 0 && (
-        <Section title={t("vocabSectionInProgress", lang)} tone="purple">
+        <Section title={t("vocabSectionInProgress", lang)}>
           {inProgress.map((w) => <NotebookRow key={w.id} w={w} progress={progress} onOpen={onOpenWord} tone="purple" />)}
         </Section>
       )}
 
       {/* Unstudied — 간단 칩 */}
       {unstudied.length > 0 && (
-        <Section title={`${t("vocabSectionUnstudied", lang)} (${unstudied.length})`} tone="gray">
+        <Section title={`${t("vocabSectionUnstudied", lang)} (${unstudied.length})`}>
           {/* U07/U09: 아직 안 배운 단어 칩이 95개쯤 깔린다. 예전에는 높이 29px 라
               태블릿에서 손가락으로 옆 칩을 누르기 쉬웠다. control 토큰으로
               최소 크기(터치 48px / 마우스 44px)를 걸고, 오터치 방지 간격도 준다. */}
@@ -103,10 +138,10 @@ export default function VocabNotebook({ progress, stickersEarned, onOpenWord, la
                 onClick={() => onOpenWord(w)}
                 data-ux-role="control"
                 style={{
-                  background: "#fff",
-                  border: "1.5px solid #E5E7EB",
-                  borderRadius: 999,
-                  fontWeight: 800, color: "#4B5563",
+                  background: "var(--ux-surface)",
+                  border: `1.5px solid ${BORDER}`,
+                  borderRadius: "var(--ux-radius-pill)",
+                  fontWeight: 700, color: PURPLE_DARK,
                   cursor: "pointer", fontFamily: "inherit",
                 }}
               >{w.ko}</button>
@@ -118,15 +153,19 @@ export default function VocabNotebook({ progress, stickersEarned, onOpenWord, la
   );
 }
 
-function Section({ title, tone, children }: { title: string; tone: "gold" | "purple" | "gray"; children: React.ReactNode }) {
-  const color = tone === "gold" ? "#B45309" : tone === "purple" ? PURPLE_DARK : "#6B7280";
+/**
+ * 구역 제목. 예전에는 구역마다 제목 색이 달랐다(금/보라/회색). 제목이 셋 다
+ * 다른 색이면 무엇이 중요한지 알 수 없어 색은 잉크 하나로 통일하고, 구역은
+ * 줄의 왼쪽 띠로 구분한다.
+ */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: "var(--ux-space-4)" }}>
       <div style={{
-        fontSize: 13, fontWeight: 900, color,
-        letterSpacing: -0.2, padding: "0 4px 8px",
+        fontSize: "var(--ux-font-label)", fontWeight: 800, color: INK_SOFT,
+        letterSpacing: -0.2, padding: "0 4px var(--ux-space-2)",
       }}>{title}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--ux-space-2)" }}>
         {children}
       </div>
     </div>
@@ -143,37 +182,47 @@ function NotebookRow({
   const p = progress[w.id];
   const listenCount = p?.listenCount ?? 0;
   const dateStr = p?.lastStudied ? formatDate(p.lastStudied) : "";
+  const strip = TONE_STRIP[tone];
   return (
     <button
       onClick={() => onOpen(w)}
+      data-ux-role="control"
       style={{
-        background: tone === "gold"
-          ? "linear-gradient(145deg, #FEF3C7, #FDE68A)"
-          : "linear-gradient(145deg, #fff, " + PURPLE_LIGHT + ")",
-        border: tone === "gold" ? "2px solid #F59E0B" : "2px solid " + PURPLE + "66",
-        borderRadius: 14,
-        padding: "10px 14px",
-        display: "flex", alignItems: "center", gap: 12,
-        cursor: "pointer", fontFamily: "inherit",
-        boxShadow: tone === "gold"
-          ? "0 4px 10px rgba(245, 158, 11, 0.2)"
-          : "0 4px 10px rgba(139, 92, 246, 0.15)",
+        position: "relative", overflow: "hidden",
+        background: "var(--ux-surface)",
+        border: `2px solid ${BORDER}`,
+        borderRadius: "var(--ux-radius-surface)",
+        padding: "var(--ux-space-2) var(--ux-space-4) var(--ux-space-2) var(--ux-space-6)",
+        display: "flex", alignItems: "center", gap: "var(--ux-space-3)",
+        cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+        boxShadow: "0 4px 10px rgba(137,83,0,.10)",
       }}
     >
+      {/* 완주/학습중 구분은 이 가는 띠 하나로만. 면을 칠하지 않는다. */}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute", left: 0, top: 0, bottom: 0, width: 6,
+          background: strip,
+        }}
+      />
       <img
         src={`/vocab-images/icons/${w.id}.png`}
         alt=""
         aria-hidden="true"
         style={{
           width: "var(--ux-control-min)", height: "var(--ux-control-min)", objectFit: "contain",
-          background: "rgba(255,255,255,0.6)",
+          background: PURPLE_LIGHT,
           borderRadius: 10, padding: 3, flexShrink: 0,
         }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
       />
       <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-        <div style={{ fontSize: 15, fontWeight: 900, color: "#1F2937" }}>{w.ko}</div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginTop: 2 }}>
+        <div style={{ fontSize: "var(--ux-font-body)", fontWeight: 800, color: PURPLE_DARK }}>{w.ko}</div>
+        <div style={{
+          fontSize: "var(--ux-font-secondary)", fontWeight: 700,
+          color: INK_SOFT, marginTop: 2,
+        }}>
           {w.subcategory} · 👂 {listenCount} · 예문 {done}/3 {dateStr && `· ${dateStr}`}
         </div>
       </div>
@@ -181,7 +230,8 @@ function NotebookRow({
         {[0, 1, 2].map((i) => (
           <span key={i} style={{
             width: 8, height: 8, borderRadius: "50%",
-            background: i < done ? (tone === "gold" ? "#F59E0B" : PURPLE) : "#E5E7EB",
+            background: i < done ? strip : "var(--ux-surface-sunk)",
+            border: i < done ? "none" : `1px solid ${BORDER}`,
           }} />
         ))}
       </div>

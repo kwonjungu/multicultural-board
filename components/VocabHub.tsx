@@ -16,6 +16,7 @@ import { buildMixedQuiz, buildLessonQuiz, buildDailyChallenge, type QuizItem } f
 import { getUnits, wordsForLesson, type Unit, type Lesson } from "@/lib/lessons";
 import BeeMascot from "./BeeMascot";
 import ScopedStyle from "./ui/child/ScopedStyle";
+import MoodArt from "./ui/child/MoodArt";
 import {
   subscribeLearner, setDailyGoal, effectiveHearts, msUntilNextHeart, xpToNextLevel, levelFromXp,
   MAX_HEARTS, type LearnerState,
@@ -360,7 +361,8 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
     return (
       <div style={{
         minHeight: "100vh",
-        background: "linear-gradient(180deg, #FAF5FF 0%, #EDE9FE 50%, #DDD6FE 100%)",
+        /* 학생 화면과 같은 꿀색 바닥. 선생님 화면만 라벤더면 같은 앱으로 안 보인다. */
+        background: "linear-gradient(180deg, var(--ux-bg) 0%, var(--ux-surface-sunk) 100%)",
         fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         padding: "16px 14px 40px",
       }}>
@@ -372,8 +374,12 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
   return (
     <div style={{
       minHeight: "100vh",
-      // 🐝 꽃밭 풍경 배경 (흰 반투명 오버레이로 단어카드 가독성 유지)
-      background: "linear-gradient(rgba(250,245,255,0.85), rgba(237,233,254,0.85)), url('/landing/board-meadow.webp') center / cover no-repeat",
+      /* 🐝 꽃밭 풍경 배경.
+         예전 오버레이는 라벤더(#FAF5FF→#EDE9FE)라 화면 바닥 전체가 보라였다.
+         앱은 꿀색(크림·허니옐로우·코코아)인데 이 화면만 보랏빛으로 떠 보인
+         가장 큰 원인이다(사용자 지적: "톤 맞춰"). 전자 도서관(SBL_CSS)과 같이
+         크림 막을 덮는다 — 배경이 예뻐도 글을 못 읽으면 소용이 없다. */
+      background: "linear-gradient(rgba(255,249,237,0.82), rgba(253,243,224,0.88)), url('/landing/board-meadow.webp') center / cover no-repeat",
       backgroundAttachment: "fixed",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       padding: "16px 14px 40px",
@@ -385,7 +391,7 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
         display: "flex", alignItems: "center", gap: 12,
         background: "#fff", borderRadius: 20, padding: "12px 16px",
         border: "2px solid " + accentAlpha(20),
-        boxShadow: "0 8px 24px rgba(109, 40, 217, 0.12)",
+        boxShadow: "0 8px 24px rgba(137,83,0,.14)",
         marginBottom: 18,
       }}>
         {/* U07/U09: 태블릿 터치 기준을 만족해야 한다. 예전에는 64x32px 라
@@ -693,10 +699,12 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
               background: viewMode === v.k
                 ? "var(--ux-primary-fill)"
                 : "transparent",
-              color: viewMode === v.k ? "#fff" : "#374151",
+              /* 꿀색 알약(#FFD35C) 위의 흰 글자는 대비가 1.6:1 이라 안 보였다.
+                 칠한 면에는 짝이 되는 잉크(--ux-primary-ink)를 쓴다. */
+              color: viewMode === v.k ? "var(--ux-primary-ink)" : "var(--ux-ink)",
               border: "none",
               fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
-              boxShadow: viewMode === v.k ? "0 6px 14px rgba(139, 92, 246, 0.3)" : "none",
+              boxShadow: viewMode === v.k ? "0 6px 14px rgba(137,83,0,.28)" : "none",
             }}
           >{v.label}</button>
         ))}
@@ -922,7 +930,8 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
           onClick={() => setLessonSheet(null)}
           style={{
             position: "fixed", inset: 0, zIndex: 600,
-            background: "rgba(15,10,40,0.55)", backdropFilter: "blur(4px)",
+            /* 남보라 장막이 아니라 코코아 잉크 장막 — 뒤 화면이 보라로 물들지 않는다. */
+            background: "rgba(41,37,31,0.55)", backdropFilter: "blur(4px)",
             display: "flex", alignItems: "center", justifyContent: "center", padding: 18,
           }}
         >
@@ -930,9 +939,11 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "min(420px, 100%)",
-              background: "#fff", borderRadius: 24,
-              border: `4px solid ${lessonSheet.unit.color}`,
-              boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
+              background: "var(--ux-surface)", borderRadius: "var(--ux-radius-panel)",
+              /* 예전에는 단원 색(초록/주황/하늘)이 그대로 시트 테두리였다.
+                 어느 단원에서 열든 같은 시트로 보이게 꿀색 테두리로 통일한다. */
+              border: "4px solid var(--ux-primary-border)",
+              boxShadow: "0 20px 50px rgba(41,37,31,0.4)",
               padding: "20px 18px", textAlign: "center",
             }}
           >
@@ -967,11 +978,15 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                   const words = wordsForLesson(lessonSheet.lesson.id);
                   if (words.length > 0) { setStudyQueue(words); setStudyIdx(0); }
                 }}
+                /* 첫째 할 일 = 칠한 꿀색 면. 흰 글자는 꿀색 위에서 안 보여
+                   짝 잉크(--ux-primary-ink)를 쓴다. */
                 style={{
-                  background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
-                  color: "#fff", border: "none", borderRadius: 16,
+                  background: "var(--ux-primary-fill)",
+                  color: "var(--ux-primary-ink)",
+                  border: "2px solid var(--ux-selected-border)", borderRadius: 16,
                   padding: "14px", fontSize: "var(--ux-font-body)", fontWeight: 800, cursor: "pointer",
-                  boxShadow: "0 6px 16px rgba(245,158,11,0.4)",
+                  fontFamily: "inherit",
+                  boxShadow: "0 6px 16px rgba(137,83,0,.30)",
                 }}
               >📖 단어 카드 공부 (그림·상황 카드)</button>
               <button
@@ -986,18 +1001,23 @@ export default function VocabHub({ user, roomCode, onBack, fixture }: Props) {
                     setLessonSheet(null);
                   }
                 }}
+                /* 둘째 할 일. 두 버튼을 다 칠하면 무엇을 먼저 할지 알 수 없다.
+                   면은 비우고 정체성 보라는 테두리 한 줄로만 남긴다. */
                 style={{
-                  background: `linear-gradient(135deg, ${PURPLE}, ${PURPLE_DARK})`,
-                  color: "#fff", border: "none", borderRadius: 16,
+                  background: "var(--ux-surface)",
+                  color: INK_STRONG,
+                  border: `2px solid ${PURPLE}`, borderRadius: 16,
                   padding: "14px", fontSize: "var(--ux-font-body)", fontWeight: 800, cursor: "pointer",
-                  boxShadow: `0 6px 16px ${PURPLE}55`,
+                  fontFamily: "inherit",
+                  boxShadow: "0 4px 12px rgba(137,83,0,.14)",
                 }}
               >⚡ 시험 보기 (XP 도전!)</button>
               <button
                 onClick={() => setLessonSheet(null)}
                 style={{
-                  background: "#F3F4F6", color: INK_SOFT, border: "none",
+                  background: "var(--ux-surface-sunk)", color: INK_SOFT, border: "none",
                   borderRadius: 14, padding: "10px", fontSize: "var(--ux-font-secondary)", fontWeight: 700, cursor: "pointer",
+                  fontFamily: "inherit",
                 }}
               >닫기</button>
             </div>
@@ -1275,6 +1295,94 @@ function LearnerHUD({ learner, now }: { learner: LearnerState | null; now: numbe
  */
 const SKILL_TREE_CSS = `
 .vh-tree{ max-width:520px; margin:0 auto; padding:0 4px 30px; }
+
+/* ── 꿀벌 큐레이터 ────────────────────────────────────────────
+   단원 목록 맨 위에서 "지금 무엇을 하면 되는지" 를 한 줄로 말해 주는 자리.
+   예전에는 색색 막대가 일곱 개 쌓여 있을 뿐 안내가 없었다. */
+.vh-curator{
+  display:flex; align-items:center; gap:var(--ux-space-3);
+  background:var(--ux-surface);
+  border:3px solid var(--ux-primary-border);
+  border-radius:var(--ux-radius-surface);
+  padding:var(--ux-space-3) var(--ux-space-4);
+  margin-bottom:var(--ux-space-5);
+  box-shadow:0 8px 20px rgba(137,83,0,.14);
+}
+.vh-curator-bee{ width:64px; height:64px; object-fit:contain; flex:0 0 auto; }
+.vh-curator-text{ min-width:0; }
+.vh-curator-say{
+  margin:0; color:var(--ux-ink); font-weight:700;
+  font-size:var(--ux-font-body); line-height:var(--ux-lh-tight);
+  word-break:keep-all; overflow-wrap:anywhere;
+}
+/* <b> 기본값은 'bolder' 라 800짜리 부모 안에서 900으로 계산된다. 계단은
+   400/700/800 세 칸만 쓰기로 했으므로 값을 못박는다. */
+.vh-curator-say b{ font-weight:800; }
+/* 안내 문장은 아이가 실제로 읽고 무엇을 할지 정하는 줄이라 '상태' 크기
+   (secondary=13.5px)가 아니라 라벨 크기로 올린다. */
+.vh-curator-sub{
+  margin:4px 0 0; color:var(--ux-ink-soft); font-weight:700;
+  font-size:var(--ux-font-label); line-height:var(--ux-lh-tight);
+  word-break:keep-all;
+}
+
+/* ── 단원 머리 ────────────────────────────────────────────────
+   예전에는 단원마다 자기 색(초록/주황/하늘)으로 면을 통째로 칠해 화면이
+   신호등이 됐다(사용자 지적: "UI가 구려 톤 맞춰"). 면은 전부 같은 표면
+   토큰으로 두고, 단원 구분은 **꿀벌 얼굴·진행도·테두리**가 맡는다. */
+.vh-unit{ margin-bottom:var(--ux-space-6); }
+.vh-unithead{
+  display:flex; align-items:center; gap:var(--ux-space-3);
+  background:var(--ux-surface);
+  border:2px solid var(--ux-primary-border);
+  border-radius:var(--ux-radius-surface);
+  padding:var(--ux-space-3) var(--ux-space-4);
+  margin-bottom:var(--ux-space-4);
+  box-shadow:0 4px 12px rgba(137,83,0,.10);
+}
+/* 지금 배울 단원만 테두리를 굵히고 살짝 띄운다 — 색을 더 쓰지 않고 구분한다. */
+.vh-unithead.current{
+  border-width:4px; border-color:var(--ux-selected-border);
+  box-shadow:0 10px 24px rgba(137,83,0,.20);
+}
+/* 아직 못 여는 단원은 점선. 회색으로 죽이지 않고 "닫혀 있음" 만 알린다. */
+.vh-unithead.locked{ border-style:dashed; background:var(--ux-surface-sunk); }
+.vh-unitbee{ width:48px; height:48px; object-fit:contain; flex:0 0 auto; }
+.vh-unitbody{ flex:1; min-width:0; }
+.vh-unitkicker{
+  display:flex; align-items:center; gap:6px;
+  color:var(--ux-ink-soft); font-weight:700;
+  font-size:var(--ux-font-secondary); line-height:var(--ux-lh-tight);
+}
+.vh-unittitle{
+  color:var(--ux-ink); font-weight:800;
+  font-size:var(--ux-font-body); line-height:var(--ux-lh-tight);
+  word-break:keep-all; overflow-wrap:anywhere;
+}
+/* 진행도 막대 — 단원을 구분하는 진짜 정보. 색이 아니라 이게 다르다. */
+.vh-unitmeter{
+  margin-top:6px; height:10px; border-radius:var(--ux-radius-pill);
+  background:var(--ux-surface-sunk);
+  border:1px solid var(--ux-primary-border);
+  overflow:hidden;
+}
+.vh-unitmeter > i{
+  display:block; height:100%; background:var(--ux-primary-fill);
+  transition:width var(--ux-motion-state) var(--ux-motion-ease);
+}
+.vh-unitstat{
+  margin-top:4px; color:var(--ux-ink-soft); font-weight:700;
+  font-size:var(--ux-font-secondary); line-height:var(--ux-lh-tight);
+}
+/* "여기부터" 표지 — 큐레이터 꿀벌이 현재 단원을 가리킨다. */
+.vh-unitnow{
+  display:inline-flex; align-items:center; gap:4px;
+  background:var(--ux-primary-fill); color:var(--ux-primary-ink);
+  border-radius:var(--ux-radius-pill); padding:2px 10px;
+  font-weight:800; font-size:var(--ux-font-secondary);
+  line-height:var(--ux-lh-tight); white-space:nowrap;
+}
+
 .vh-lessons{ display:grid; grid-template-columns:1fr; gap:18px; justify-items:center; }
 @media (max-width:639px){
   .vh-lessons > *:nth-child(odd){ transform:translateX(-40px); }
@@ -1297,7 +1405,60 @@ const SKILL_TREE_CSS = `
 @media (min-width:1200px){
   .vh-tree{ max-width:1120px; }
 }
+
+/* ── 레슨 노드 ────────────────────────────────────────────────
+   예전에는 노드마다 단원 색으로 radial-gradient 를 깔아 스무 개가 색색이었다.
+   상태는 셋뿐이다: 다 함 / 지금 할 수 있음 / 아직 못 엶. 셋을 꿀색 한 계열의
+   **채우기·테두리**로 구분한다. */
+.vh-node{
+  width:92px; height:92px; border-radius:50%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-family:inherit; position:relative;
+  border:4px solid var(--ux-primary-border);
+  background:var(--ux-surface); color:var(--ux-ink);
+  transition:transform var(--ux-motion-press) var(--ux-motion-ease);
+}
+.vh-node.done{
+  background:var(--ux-primary-fill); color:var(--ux-primary-ink);
+  border-color:var(--ux-selected-border);
+  box-shadow:0 8px 16px rgba(137,83,0,.28), inset 0 -4px 0 rgba(56,40,13,.12);
+}
+.vh-node.open{
+  background:var(--ux-surface);
+  box-shadow:0 8px 16px rgba(137,83,0,.18), inset 0 -4px 0 rgba(137,83,0,.10);
+  cursor:pointer;
+}
+.vh-node.done{ cursor:pointer; }
+.vh-node.locked{
+  background:var(--ux-surface-sunk); color:var(--ux-ink-soft);
+  border-style:dashed; cursor:not-allowed; box-shadow:none;
+}
+.vh-nodenum{ font-size:var(--ux-font-title); line-height:1; font-weight:800; }
+.vh-nodelabel{ font-size:var(--ux-font-secondary); font-weight:700; margin-top:2px; }
+.vh-nodestars{
+  position:absolute; bottom:-14px; left:50%; transform:translateX(-50%);
+  display:flex; gap:1px;
+}
+.vh-nodestars > span{ font-size:var(--ux-font-label); }
 `;
+
+/**
+ * 단원마다 짝이 되는 꿀벌 얼굴(lib/beeMoods 20종 중에서).
+ *
+ * 단원을 구분하던 일이 색에서 **얼굴**로 옮겨 왔다. 아이는 소통창·감정 카드·
+ * 동화책에서 이미 같은 꿀벌들을 만나므로 새로 배울 그림이 아니다.
+ * 여기 있는 id 는 전부 public/ui-icons/v1/moods/<id>-128.png 로 실재한다.
+ * 모르는 단원 id 가 오면 MoodArt 가 이모지로 내려가므로 렌더는 멈추지 않는다.
+ */
+const UNIT_BEE: Record<string, string> = {
+  greetings: "happy",       // 인사와 만남
+  emotions: "loved",        // 내 마음과 감정
+  pointers: "curious",      // 이것과 저것
+  school: "proud",          // 학교 생활
+  verbs: "excited",         // 매일 하는 일
+  adjectives: "surprised",  // 어떤 모양일까
+  expressions: "hopeful",   // 내 생각 말하기
+};
 
 function SkillTreeView({
   learner, onStartLesson,
@@ -1306,32 +1467,75 @@ function SkillTreeView({
   onStartLesson: (lesson: Lesson, unit: Unit) => void;
 }) {
   const units = getUnits();
+  /* 단원 잠금은 순서대로다 — 앞 단원을 다 해야 다음이 열린다. 그래서 "아직 다
+     못 한 첫 단원" 이 곧 지금 배울 단원이고, 큐레이터 꿀벌이 가리키는 곳이다. */
+  const unitDone = units.map((u) => u.lessons.every((l) => !!learner?.lessons?.[l.id]));
+  const currentIdx = unitDone.findIndex((d) => !d);
+  const currentUnit = currentIdx >= 0 ? units[currentIdx] : null;
+  const nextLesson = currentUnit
+    ? currentUnit.lessons.find((l) => !learner?.lessons?.[l.id]) ?? null
+    : null;
+
   return (
     <div className="vh-tree">
       <ScopedStyle css={SKILL_TREE_CSS} />
+
+      {/* 꿀벌 큐레이터 — 일곱 단원을 그냥 늘어놓지 않고, 오늘 어디를 하면
+          되는지 먼저 말해 준다. 그림은 scripts/gen-scene-bees.mjs 가 만든
+          실제 파일이다. */}
+      <div className="vh-curator">
+        <img
+          className="vh-curator-bee"
+          src="/ui-icons/v1/scene/bee-writing-256.png"
+          alt=""
+          aria-hidden="true"
+        />
+        <div className="vh-curator-text">
+          {currentUnit && nextLesson ? (
+            <p className="vh-curator-say">
+              오늘은 <b>{currentUnit.title}</b>의 레슨 {nextLesson.index}을 해 볼까?
+            </p>
+          ) : (
+            <p className="vh-curator-say">일곱 단원을 모두 마쳤어! 정말 대단해 🎉</p>
+          )}
+          <p className="vh-curator-sub">
+            꿀벌이 단원 {units.length}개를 순서대로 골라 두었어. 위에서부터 하나씩 열려.
+          </p>
+        </div>
+      </div>
+
       {units.map((unit, ui) => {
         const completedStars = unit.lessons.reduce((acc, l) => acc + (learner?.lessons?.[l.id]?.stars ?? 0), 0);
         const maxStars = unit.lessons.length * 3;
         const completedLessons = unit.lessons.filter((l) => learner?.lessons?.[l.id]).length;
         // 다음 미해결 레슨이 unlocked. 이전 단원의 마지막 레슨이 done 이어야 다음 단원 unlock
-        const prevUnitDone = ui === 0 ? true : units[ui - 1].lessons.every((l) => learner?.lessons?.[l.id]);
+        const prevUnitDone = ui === 0 ? true : unitDone[ui - 1];
+        const isCurrent = ui === currentIdx;
+        const pct = Math.round((completedLessons / Math.max(1, unit.lessons.length)) * 100);
+        const headClass = "vh-unithead"
+          + (isCurrent ? " current" : "")
+          + (prevUnitDone ? "" : " locked");
         return (
-          <div key={unit.id} style={{
-            marginBottom: 24, position: "relative",
-            opacity: prevUnitDone ? 1 : 0.55,
+          <div key={unit.id} className="vh-unit" style={{
+            position: "relative",
+            /* 잠긴 단원도 글자는 읽혀야 한다. 예전 0.55 는 대비를 반토막 냈다. */
+            opacity: prevUnitDone ? 1 : 0.8,
           }}>
-            {/* 단원 헤더 배너 */}
-            <div style={{
-              background: `linear-gradient(135deg, ${unit.color}, ${unit.color}dd)`,
-              color: "#fff", borderRadius: 18, padding: "14px 18px",
-              display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
-              boxShadow: `0 8px 20px ${unit.color}55`,
-            }}>
-              <div style={{ fontSize: "var(--ux-font-learn-word)" }}>{unit.emoji}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, opacity: 0.9 }}>단원 {ui + 1}</div>
-                <div style={{ fontSize: "var(--ux-font-body)", fontWeight: 800, letterSpacing: -0.3 }}>{unit.title}</div>
-                <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 700, opacity: 0.9, marginTop: 2 }}>
+            {/* 단원 머리 — 색이 아니라 꿀벌 얼굴·진행도·테두리로 구분한다. */}
+            <div className={headClass}>
+              <MoodArt id={UNIT_BEE[unit.id] ?? "calm"} size={48} className="vh-unitbee" />
+              <div className="vh-unitbody">
+                <div className="vh-unitkicker">
+                  <span aria-hidden="true">{unit.emoji}</span>
+                  <span>단원 {ui + 1}</span>
+                  {isCurrent && <span className="vh-unitnow">🐝 여기부터</span>}
+                  {!prevUnitDone && <span>🔒 잠김</span>}
+                </div>
+                <div className="vh-unittitle">{unit.title}</div>
+                <div className="vh-unitmeter" role="presentation">
+                  <i style={{ width: `${pct}%` }} />
+                </div>
+                <div className="vh-unitstat">
                   {completedLessons} / {unit.lessons.length} 레슨 · ⭐ {completedStars}/{maxStars}
                 </div>
               </div>
@@ -1346,51 +1550,33 @@ function SkillTreeView({
                 // 이전 레슨이 done 이거나 첫 레슨이거나 단원 첫 노드 → unlocked
                 const prevLessonDone = li === 0 ? prevUnitDone : !!learner?.lessons?.[unit.lessons[li - 1].id];
                 const unlocked = prevLessonDone;
+                const state = !unlocked ? "locked" : done ? "done" : "open";
                 return (
                   <div key={lesson.id} style={{ display: "flex", justifyContent: "center" }}>
                     <button
                       onClick={() => unlocked && onStartLesson(lesson, unit)}
                       disabled={!unlocked}
                       title={lesson.title}
-                      style={{
-                        width: 92, height: 92, borderRadius: "50%",
-                        border: done ? `4px solid ${unit.color}` : unlocked ? `4px solid ${unit.color}88` : "4px solid #D1D5DB",
-                        background: !unlocked
-                          ? "#F3F4F6"
-                          : done
-                            ? `radial-gradient(circle at 35% 30%, ${unit.color}ee, ${unit.color}88)`
-                            : `radial-gradient(circle at 35% 30%, #fff, ${unit.color}33)`,
-                        color: done ? "#fff" : unlocked ? unit.color : "#9CA3AF",
-                        cursor: unlocked ? "pointer" : "not-allowed",
-                        fontFamily: "inherit",
-                        boxShadow: unlocked ? `0 8px 16px ${unit.color}44, inset 0 -4px 0 rgba(0,0,0,0.12)` : "none",
-                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                        transition: "transform 0.12s",
-                        position: "relative",
-                      }}
+                      className={`vh-node ${state}`}
                       onMouseDown={(e) => { if (unlocked) e.currentTarget.style.transform = "scale(0.94)"; }}
                       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                       onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                     >
-                      <div style={{ fontSize: "var(--ux-font-title)", lineHeight: 1 }}>
+                      <span className="vh-nodenum">
                         {!unlocked ? "🔒" : done ? "✓" : lesson.index}
-                      </div>
-                      <div style={{ fontSize: "var(--ux-font-secondary)", fontWeight: 800, marginTop: 2 }}>레슨 {lesson.index}</div>
+                      </span>
+                      <span className="vh-nodelabel">레슨 {lesson.index}</span>
 
                       {/* 별 표시 */}
                       {unlocked && (
-                        <div style={{
-                          position: "absolute", bottom: -14, left: "50%", transform: "translateX(-50%)",
-                          display: "flex", gap: 1,
-                        }}>
+                        <span className="vh-nodestars">
                           {[1, 2, 3].map((s) => (
                             <span key={s} style={{
-                              fontSize: "var(--ux-font-label)",
-                              opacity: s <= stars ? 1 : 0.25,
-                              filter: s <= stars ? "drop-shadow(0 2px 3px rgba(245,158,11,0.5))" : "none",
+                              opacity: s <= stars ? 1 : 0.3,
+                              filter: s <= stars ? "drop-shadow(0 2px 3px rgba(137,83,0,.45))" : "none",
                             }}>⭐</span>
                           ))}
-                        </div>
+                        </span>
                       )}
                     </button>
                   </div>
@@ -1415,22 +1601,23 @@ function CatChip({
         background: active
           ? "var(--ux-primary-fill)"
           : "#fff",
-        color: active ? "#fff" : "#374151",
-        border: active ? "none" : "2px solid #E5E7EB",
+        /* 칠한 꿀색 면 위에는 짝 잉크. 흰 글자는 대비가 안 나온다. */
+        color: active ? "var(--ux-primary-ink)" : "var(--ux-ink)",
+        border: active ? "none" : "2px solid var(--ux-primary-border)",
         borderRadius: 999,
         padding: "8px 14px",
         fontSize: "var(--ux-font-secondary)", fontWeight: 700,
         cursor: "pointer", fontFamily: "inherit",
         display: "flex", alignItems: "center", gap: 6,
-        boxShadow: active ? "0 6px 14px rgba(139, 92, 246, 0.35)" : "none",
+        boxShadow: active ? "0 6px 14px rgba(137,83,0,.28)" : "none",
         whiteSpace: "nowrap",
       }}
     >
       <span>{icon}</span>
       <span>{label}</span>
       <span style={{
-        background: active ? "rgba(255,255,255,0.25)" : "#F3F4F6",
-        color: active ? "#fff" : "#6B7280",
+        background: active ? "rgba(56,40,13,0.14)" : "var(--ux-surface-sunk)",
+        color: active ? "var(--ux-primary-ink)" : "var(--ux-ink-soft)",
         borderRadius: 999, padding: "1px 7px", fontSize: "var(--ux-font-secondary)", fontWeight: 800,
       }}>{count}</span>
     </button>

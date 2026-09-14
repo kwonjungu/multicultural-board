@@ -101,13 +101,23 @@ const DB_CSS = `
 
 /* 가로로 넓고 짧은 화면에서만 rail 로 — 세로로 긴 화면은 그대로 쌓는다. */
 [data-db-layout="rail"] .db-body{ flex-direction: row; align-items: stretch; }
+/* rail 을 **한 줄로 세우면 캔버스보다 훨씬 길어진다.** 실측 116x1208px 로
+   캔버스(736px)보다 472px 더 길었고, 그만큼 화면이 세로로 늘어졌다
+   (사용자 지적: "이거 반응형으로 이상하네"). 도구는 2열, 색은 3열로 접어
+   rail 높이를 캔버스 안에 들어오게 한다. */
 [data-db-layout="rail"] .db-toolbar{
-  flex-direction: column; width: 116px; overflow-y: auto;
+  flex-direction: column; width: 152px; overflow-y: auto;
   padding-right: var(--ux-space-1);
 }
-[data-db-layout="rail"] .db-tools{ flex-direction: column; }
+[data-db-layout="rail"] .db-tools{
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 [data-db-layout="rail"] .db-tool{ flex-direction: column; width: 100%; gap:2px; }
-[data-db-layout="rail"] .db-swatchrow{ flex-direction: column; align-items: stretch; }
+[data-db-layout="rail"] .db-swatchrow{
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center; justify-items: center;
+}
+[data-db-layout="rail"] .db-swatchrow .db-divider{ grid-column: 1 / -1; width: 100%; }
 [data-db-layout="rail"] .db-divider{ width: auto; height:2px; margin: 2px 0; }
 [data-db-layout="rail"] .db-history{ flex-direction: column; align-items: stretch; }
 /* rail 로도 폭이 남으면 3:2 캔버스가 세로로 화면을 넘칠 수 있다(예: 1366x768).

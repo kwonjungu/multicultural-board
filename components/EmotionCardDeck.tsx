@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { EXPRESS_EMOTIONS, type EmotionId } from "@/lib/emotions";
+import { EXPRESS_EMOTIONS, EMOTION_MOOD, type EmotionId } from "@/lib/emotions";
+import MoodArt from "./ui/child/MoodArt";
 
 interface Props {
   lang: string;
@@ -10,6 +11,23 @@ interface Props {
   busy?: boolean;
 }
 
+/**
+ * 감정 카드 12장.
+ *
+ * 예전에는 카드마다 자기 색(`hue`)으로 배경을 칠하고 이모지를 얹었다. 열두 장이
+ * 노랑·파랑·빨강·분홍·보라·초록으로 제각각이라 화면이 알록달록해지고, 정작
+ * 무엇을 고르는지보다 색이 먼저 눈에 들어왔다(사용자 지적: "레이아웃 개선하고
+ * 깔끔하게").
+ *
+ * 바꾼 규칙:
+ *  - 면은 전부 같은 표면 토큰. 감정별 색은 **왼쪽 가는 띠 하나**로만 남긴다.
+ *  - 이모지 대신 **꿀벌 감정 그림**(lib/beeMoods)을 쓴다. 소통창 공감·동화책
+ *    반응이 이미 같은 꿀벌을 쓰므로 아이가 같은 얼굴을 여러 화면에서 만난다.
+ *  - 열 수는 폭이 정한다(auto-fit). 3열 고정이면 좁은 화면에서 글자가 찌그러진다.
+ *
+ * 라벨은 그대로 15개 언어를 쓴다 — 꿀벌 무드 목록은 한국어·영어만 있어서,
+ * 여기서 무드로 갈아타면 다국어 라벨을 잃는다. 그림만 빌려 온다.
+ */
 export default function EmotionCardDeck({ lang, onPick, quick = false, busy = false }: Props) {
   const [pending, setPending] = useState<EmotionId | null>(null);
 
@@ -27,73 +45,78 @@ export default function EmotionCardDeck({ lang, onPick, quick = false, busy = fa
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          gap: 10,
+          gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))",
+          gap: "var(--ux-space-2)",
         }}
       >
         {EXPRESS_EMOTIONS.map((e) => {
           const label = e.label[lang] ?? e.label.en ?? e.label.ko ?? e.id;
           const isPending = pending === e.id;
+          const disabled = busy || pending !== null;
           return (
             <button
               key={e.id}
+              data-ux-role="control"
               onClick={() => handlePick(e.id, quick ? 2 : 2)}
-              disabled={busy || pending !== null}
+              disabled={disabled}
               aria-label={label}
               style={{
                 position: "relative",
-                padding: "12px 6px 10px",
+                overflow: "hidden",
+                padding: "var(--ux-space-3) var(--ux-space-2)",
                 borderRadius: 16,
-                border: "2px solid rgba(0,0,0,0.06)",
-                background: `linear-gradient(135deg, ${e.hue}22, ${e.hue}44)`,
-                cursor: busy || pending !== null ? "not-allowed" : "pointer",
+                border: isPending
+                  ? "3px solid var(--ux-selected-border)"
+                  : "2px solid var(--ux-primary-border)",
+                background: "var(--ux-surface)",
+                cursor: disabled ? "not-allowed" : "pointer",
                 opacity: busy && !isPending ? 0.55 : 1,
-                transition: "transform 0.12s, box-shadow 0.12s",
+                transition: "transform .12s, box-shadow .12s",
                 boxShadow: isPending
-                  ? `0 0 0 3px ${e.hue}, 0 6px 16px ${e.hue}55`
-                  : "0 2px 6px rgba(0,0,0,0.06)",
+                  ? "0 6px 16px rgba(137,83,0,.24)"
+                  : "0 2px 6px rgba(137,83,0,.10)",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 4,
-                minHeight: 84,
+                fontFamily: "inherit",
               }}
-              onMouseDown={(ev) => {
-                if (!busy && pending === null) ev.currentTarget.style.transform = "scale(0.94)";
-              }}
+              onMouseDown={(ev) => { if (!disabled) ev.currentTarget.style.transform = "scale(0.96)"; }}
               onMouseUp={(ev) => (ev.currentTarget.style.transform = "scale(1)")}
               onMouseLeave={(ev) => (ev.currentTarget.style.transform = "scale(1)")}
             >
-              <div style={{ fontSize: 32, lineHeight: 1 }} aria-hidden>
-                {e.emoji}
-              </div>
-              <div
+              {/* 감정별 색은 이 가는 띠 하나로만. 면을 칠하지 않는다. */}
+              <span
+                aria-hidden
                 style={{
-                  fontSize: 12,
-                  fontWeight: 900,
-                  color: "#1F2937",
-                  lineHeight: 1.2,
+                  position: "absolute", left: 0, top: 0, bottom: 0, width: 5,
+                  background: e.hue,
+                }}
+              />
+              <MoodArt id={EMOTION_MOOD[e.id]} size={40} />
+              <span
+                data-ux-role="secondary"
+                style={{
+                  fontWeight: 800,
+                  color: "var(--ux-ink)",
+                  lineHeight: "var(--ux-lh-tight)",
                   textAlign: "center",
-                  letterSpacing: -0.2,
+                  wordBreak: "keep-all",
                 }}
               >
                 {label}
-              </div>
+              </span>
             </button>
           );
         })}
       </div>
       {!quick && (
-        <div
-          style={{
-            marginTop: 10,
-            fontSize: 11,
-            color: "#6B7280",
-            textAlign: "center",
-          }}
+        <p
+          data-ux-role="secondary"
+          style={{ marginTop: "var(--ux-space-2)", color: "var(--ux-ink-soft)", textAlign: "center" }}
         >
           카드를 눌러 지금 내 감정을 친구에게 보여주세요
-        </div>
+        </p>
       )}
     </div>
   );

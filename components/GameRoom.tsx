@@ -348,8 +348,21 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
     <div style={{
       position: "fixed", inset: 0, zIndex: 460,
       display: "flex", flexDirection: "column",
-      // 🐝 협곡 꽃밭 풍경 배경을 흰 반투명(80%) 오버레이 아래 은은하게 (카드 가독성 유지)
-      background: "linear-gradient(rgba(255,251,235,0.80), rgba(252,239,176,0.80)), url('/landing/game-canyon.webp') center / cover no-repeat",
+      // 🐝 이 방 전용 배경 — '꿀벌 놀이터'(교실 한켠의 놀이 공간).
+      //    scripts/gen-backgrounds.mjs 로 뽑는다. 다른 화면과 돌려 쓰던 협곡
+      //    풍경에서 바꿨다 — 여기는 '놀이터'라는 것이 그림으로 먼저 보여야 한다.
+      //
+      //    크림 막의 진하기를 위아래로 다르게 준다. 그림 자체는 이미 밝지만,
+      //    맨 위 헤더 글자(🎮 제목·설명)는 카드 안이 아니라 배경 위에 바로
+      //    얹히므로, 가랜드·꿀벌이 지나가는 윗띠만 두껍게 덮어 대비를 지키고,
+      //    카드가 놓이는 가운데부터는 얇게 덮어 놀이터가 비쳐 보이게 한다.
+      background:
+        "linear-gradient(to bottom," +
+        " rgba(255,251,235,0.88) 0px," +
+        " rgba(255,251,235,0.86) 104px," +
+        " rgba(255,251,235,0.50) 248px," +
+        " rgba(253,230,138,0.44) 100%)," +
+        " url('/backgrounds/bee-playground.jpg') center / cover no-repeat",
       fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
       overflow: "hidden",
     }}>
