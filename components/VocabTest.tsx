@@ -51,7 +51,7 @@ interface Props {
   studentName: string;
   // Duolingo 스타일 — 레슨 컨텍스트
   lessonId?: string;
-  lessonTitle?: string;
+  lessonTitle?: string;
   /**
    * 검수용 화면(fixture)에서 켠다. 켜지면 XP·하트·퀘스트·레슨 결과를 하나도
    * 쓰지 않는다. 화면 흐름은 그대로 두고 저장만 건너뛴다.
@@ -95,9 +95,14 @@ export default function VocabTest({
   const finalizedRef = useRef(false);
 
   useEffect(() => {
+    // offline(=fixture)에서는 구독하지 않는다. 이 파일은 쓰기(logAttempt·awardXp)는
+    // 이미 offline 으로 막고 있었는데 **읽기 구독만 빠져** 있었다. 그래서 fixture
+    // 에서 FIREBASE FATAL ERROR 가 나고 화면이 죽었다 — vocab-quiz 와 그 다음의
+    // vocab-result 20칸이 이 한 줄 때문에 감사 불가로 남아 있었다.
+    if (offline) return;
     const unsub = subscribeLearner(roomCode, clientId, setLearner);
     return unsub;
-  }, [roomCode, clientId]);
+  }, [roomCode, clientId, offline]);
 
   const currentQ = queue[qIdx];
   const total = questions.length;
