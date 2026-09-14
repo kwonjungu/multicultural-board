@@ -289,9 +289,22 @@ const SETUP_CSS = `
 .ms-count[data-active]{ background: var(--ux-primary-fill); color: var(--ux-primary-ink); border-width: 3px; border-color: var(--ux-selected-border); }
 
 /* 넓은 화면에서는 설정 카드를 여러 열로 — 세로로 끝없이 늘어나지 않게. */
-.ms-cards{ display: grid; gap: var(--ux-space-3); grid-template-columns: 1fr; }
-@media (min-width: 640px){ .ms-cards{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1100px){ .ms-cards{ grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* 사람 수만큼만 칸을 만든다.
+   예전에는 1100px 이상에서 **항상 4열**이라 2인으로 할 때도 칸이 네 개 생겼다.
+   카드가 1/4 폭으로 좁아져 스킨·모자·펫 줄이 잘렸고(아래 .ms-chips 참고),
+   오른쪽 두 칸이 비어 화면이 왼쪽으로 쏠려 보였다. auto-fit 으로 사람 수에
+   맞추고, 카드가 지나치게 넓어지지 않게 상한을 두고 가운데로 모은다. */
+.ms-cards{
+  display: grid; gap: var(--ux-space-3);
+  /* auto-fit 의 최소값에 퍼센트(min(100%, …))를 쓰면 반복 횟수를 정할 수 없어
+     브라우저가 1열로 떨어뜨린다 — 실제로 1366px 에서도 카드가 세로로 쌓였다.
+     px 로 못 박고, 아주 좁은 화면만 아래에서 따로 1열로 만든다.
+     auto-fit 의 반복 횟수는 **최대값**으로 계산된다. 상한을 340px 로 두면
+     340×2 + 12(gap) = 692 라 688px 짜리 판에서 4px 이 모자라 1열로 떨어졌다.
+     상한을 낮춰 두 장이 확실히 들어가게 한다. */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 320px));
+  justify-content: center;
+}
 
 .ms-card{
   background: var(--ux-surface); border: 3px solid var(--ux-primary-border);
@@ -316,7 +329,11 @@ const SETUP_CSS = `
 }
 .ms-row{ display: grid; gap: var(--ux-space-1); min-width: 0; }
 .ms-rowlabel{ font-weight: 800; color: var(--ux-primary-ink); }
-.ms-chips{ display: flex; gap: var(--ux-space-2); overflow-x: auto; padding-bottom: var(--ux-space-1); }
+@media (max-width: 420px){ .ms-cards{ grid-template-columns: 1fr; } }
+/* 고를 것들은 **감싸 내려간다**. 가로 스크롤로 두면 좁은 카드에서 뒤쪽
+   항목이 잘린 채 숨는데, 1~2학년은 그 안에 더 있다는 것을 알아채지 못한다
+   (실제로 133px 칸에 304px 이 들어가 반쯤 잘려 보였다). */
+.ms-chips{ display: flex; flex-wrap: wrap; gap: var(--ux-space-2); }
 .ms-chip[data-ux-role="control"]{
   width: var(--ux-control-min); height: var(--ux-control-min);
   flex-shrink: 0; padding: var(--ux-space-1);

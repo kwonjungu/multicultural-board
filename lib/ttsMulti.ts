@@ -110,10 +110,10 @@ async function ensureVoicesReady(): Promise<void> {
   });
 }
 
-// Languages where Web Speech API rarely has a usable voice. For these we
-// skip the browser and go straight to the server /api/tts (Google Translate
-// proxy), which covers all 15 supported languages.
-const WEBSPEECH_UNRELIABLE = new Set(["fil", "km", "mn", "uz", "my"]);
+// 예전에는 '브라우저 음성이 미덥지 않은 언어' 만 서버로 보냈다. 지금은 모든
+// 언어가 서버 음성을 먼저 쓰므로(제스처 창 안에서 재생을 시작하기 위해) 이
+// 목록은 필요 없어졌다. 기록만 남긴다: fil·km·mn·uz·my 는 Web Speech 에
+// 쓸 만한 목소리가 거의 없다.
 
 // Tracks the current HTML5 audio element so cancelSpeak() can stop it.
 let currentAudio: HTMLAudioElement | null = null;
@@ -231,14 +231,27 @@ export async function speak(text: string, langShort: string): Promise<void> {
   // 이전 재생 정지 — 이 파일 것과 버스 것 양쪽 모두.
   cancelSpeak();
   stopAll();
-  // 여기서 기다리지 않는다. 기다리면 클릭에서 이어지는 '사용자 제스처 창' 을
-  // 벗어나 브라우저가 재생을 막는다. cancel 직후 speak 을 삼키는 Chrome 버그는
-  // 아래 감시견이 서버 경로로 넘겨 받는다.
+  /**
+   * **서버 음성을 먼저 쓴다.**
+   *
+   * 예전에는 브라우저 음성(Web Speech)을 먼저 시도하고, 조용히 실패하면
+   * 1.5초 뒤 감시견이 서버 음성으로 넘겼다. 그런데 그 1.5초 사이에 클릭에서
+   * 이어지는 '사용자 제스처 창' 이 닫혀, 정작 서버 음성의 play() 가 브라우저
+   * 자동재생 정책에 막혔다 — 아이 입장에서는 눌러도 **아무 소리도 안 났다**
+   * (실제로 반복 신고된 증상이다).
+   *
+   * 서버 경로(/api/tts)는 클릭 직후 바로 play() 를 부르므로 제스처 창 안에서
+   * 시작되고, 15개 언어를 모두 같은 품질로 덮는다. 브라우저 음성은 그 다음
+   * 차례로 남긴다 — 네트워크가 끊긴 교실에서도 소리가 나야 하기 때문이다.
+   */
+  try {
+    await playServerTts(text, langShort);
+    return;
+  } catch {
+    // 네트워크·서버 실패 → 아래 브라우저 음성으로 이어간다.
+  }
 
-  // For reliably-unsupported languages, skip browser entirely.
-  const goServerFirst = WEBSPEECH_UNRELIABLE.has(langShort);
-
-  if (!goServerFirst) {
+  {
     const synth = window.speechSynthesis;
     if (synth) {
       await ensureVoicesReady();
@@ -291,17 +304,13 @@ export async function speak(text: string, langShort: string): Promise<void> {
     // else: no voice found → fall through to server TTS
   }
 
-  try {
-    await playServerTts(text, langShort);
-  } catch (err) {
-    console.warn("server TTS failed, trying browser default", err);
-    // Final fallback: browser with default voice (may read in English)
-    const synth = window.speechSynthesis;
-    if (synth) {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = BCP47[langShort] || "en-US";
-      synth.speak(u);
-    }
+  // 여기까지 왔다면 서버도 브라우저 목소리 선택도 실패한 것이다.
+  // 마지막으로 기본 목소리에 맡긴다 — 엉뚱한 발음이라도 침묵보다 낫다.
+  const synth2 = window.speechSynthesis;
+  if (synth2) {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = BCP47[langShort] || "en-US";
+    synth2.speak(u);
   }
 }
 

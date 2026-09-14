@@ -34,6 +34,14 @@ export const SCENE_BEES = [
       "looking down at it with a delighted open smile, one leg bouncing, a couple of tiny sparkles above",
   },
   {
+    id: "bee-team",
+    what: "친구랑 놀기(게임 로비) 머리 그림",
+    pose: "FOUR of the same honeybee characters sitting close together in a circle seen from the front, " +
+      "all four leaning in over ONE shared board game laid flat between them, hands reaching to the board, " +
+      "looking at each other and smiling, clearly cooperating on the same thing rather than competing. " +
+      "Keep all four the same size and the same character design so none looks more important",
+  },
+  {
     id: "bee-writing",
     what: "쓰기 학습지 화면",
     pose: "sitting at a small desk seen from the front, holding a fat pencil in one hand and writing " +

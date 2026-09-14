@@ -521,13 +521,16 @@ function TeacherSetup({
       style={{
         minHeight: "100vh",
         // 🐝 협곡 풍경 배경 (그림책 일러스트 보호 위해 흰 오버레이 88%로 은은하게)
-        background: "linear-gradient(rgba(255,251,235,0.88), rgba(253,230,138,0.88)), url('/landing/game-canyon.webp') center / cover no-repeat",
+        background: "linear-gradient(rgba(255,251,235,.62), rgba(253,230,138,.66)), url('/backgrounds/bee-library.jpg') center / cover no-repeat",
         backgroundAttachment: "fixed",
         fontFamily: "'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif",
         padding: "20px 16px 40px",
       }}
     >
-      <div style={{ maxWidth: 620, margin: "0 auto" }}>
+      {/* 학생 화면과 같은 도서관 스타일을 쓴다 — 주입을 빠뜨리면 클래스가
+          하나도 먹지 않아 카드가 그냥 세로로 쌓인다(실제로 그랬다). */}
+      <ScopedStyle css={SBL_CSS} />
+      <div className="sbl-shell" style={{ maxWidth: 1180 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           {/* 크기를 인라인으로 박으면 control 토큰의 최소 크기(터치 48px /
               마우스 44px)가 무력화된다 — 실제로 44x44 로 고정돼 터치 계약에
@@ -542,12 +545,17 @@ function TeacherSetup({
               fontWeight: 800, color: "#92400E", cursor: "pointer",
             }}
           >←</button>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#1F2937", letterSpacing: -0.3 }}>
-            {t("sbChooseBook", lang)}
-          </h1>
+          {/* 학생 화면과 같은 사서 꿀벌 — 같은 방이라는 것이 한눈에 보인다. */}
+          <img src="/ui-icons/v1/library/bee-librarian-256.png" alt="" aria-hidden="true" className="sbl-librarian" />
+          <div style={{ minWidth: 0 }}>
+            <h1 data-ux-role="title" className="sbl-title">{t("sbChooseBook", lang)}</h1>
+            <p data-ux-role="secondary" className="sbl-sub">선생님 화면 · 책을 고르면 수업이 시작돼요</p>
+          </div>
         </div>
 
-        {/* Create new — hero button */}
+        {/* 선생님 도구 — 책 목록과 섞이지 않게 따로 묶는다. */}
+        <section className="sbl-tools" aria-label="선생님 도구">
+          <p data-ux-role="secondary" className="sbl-toolshead">🧰 수업 준비</p>
         <button
           onClick={() => setCreating(true)}
           disabled={busy}
@@ -603,6 +611,8 @@ function TeacherSetup({
           </span>
         </button>
 
+        </section>
+
         {loadingList ? (
           <div style={{ textAlign: "center", padding: 30, color: "#92400E", fontWeight: 700 }}>
             📚 그림책 목록 불러오는 중…
@@ -612,7 +622,7 @@ function TeacherSetup({
             {t("sbNoBookYet", lang)}
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="sbl-shelf teacher">
             {allBooks.map((b) => (
               <div
                 key={b.id}
@@ -626,53 +636,17 @@ function TeacherSetup({
                 role="button"
                 tabIndex={0}
                 aria-label={`${b.titleKo} 시작`}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "88px 1fr auto",
-                  alignItems: "center",
-                  gap: 14,
-                  padding: "12px 14px",
-                  background: b.source === "generated"
-                    ? "linear-gradient(135deg, #FAF5FF, #EDE9FE)"
-                    : "linear-gradient(135deg, #FEF3C7, #FDE68A)",
-                  border: `3px solid ${b.source === "generated" ? "#8B5CF655" : "#F59E0B55"}`,
-                  borderRadius: 18,
-                  boxShadow: "0 6px 20px rgba(180,83,9,0.15)",
-                  cursor: busy ? "wait" : "pointer",
-                  transition: "transform 0.12s",
-                  opacity: busy ? 0.75 : 1,
-                }}
+                className="sbl-book"
+                style={{ cursor: busy ? "wait" : "pointer", opacity: busy ? 0.75 : 1 }}
                 onMouseDown={(e) => { if (!busy) e.currentTarget.style.transform = "scale(0.98)"; }}
                 onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
               >
-                {b.coverImageUrl ? (
-                  <div style={{
-                    width: 88, height: 88,
-                    borderRadius: 12, overflow: "hidden",
-                    boxShadow: "0 4px 10px rgba(180,83,9,0.25)",
-                    background: "#fff",
-                    border: "2px solid #fff",
-                  }}>
-                    <img
-                      src={b.coverImageUrl}
-                      alt=""
-                      aria-hidden="true"
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                  </div>
-                ) : (
-                  <div style={{
-                    width: 88, height: 88,
-                    borderRadius: 12,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    background: "rgba(255,255,255,0.6)",
-                    fontSize: 44,
-                    filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.1))",
-                  }}>
-                    {b.coverEmoji}
-                  </div>
-                )}
+                <span className="sbl-cover">
+                  {b.coverImageUrl
+                    ? <img src={b.coverImageUrl} alt="" aria-hidden="true" />
+                    : <span aria-hidden className="sbl-coveremoji">{b.coverEmoji}</span>}
+                </span>
                 <div style={{ minWidth: 0 }}>
                   <div style={{
                     fontSize: 16, fontWeight: 900, color: "#1F2937", letterSpacing: -0.2,
@@ -1029,6 +1003,22 @@ const SBL_CSS = `
   word-break: keep-all; overflow-wrap: anywhere;
 }
 .sbl-quiz{ color: var(--ux-ink-soft); }
+
+/* ── 선생님 화면 ──────────────────────────────────────────────
+   같은 도서관이지만 할 일이 다르다. 수업 준비 도구를 따로 묶고, 책 카드는
+   토글·내보내기까지 들어가야 하므로 학생 카드보다 넓게 잡는다. */
+.sbl-tools{
+  display: grid; gap: var(--ux-space-2);
+  margin-bottom: var(--ux-space-5);
+  padding: var(--ux-space-3);
+  background: var(--ux-surface);
+  border: 3px dashed var(--ux-primary-border);
+  border-radius: var(--ux-radius-surface);
+}
+.sbl-toolshead{ margin: 0; color: var(--ux-ink-soft); font-weight: 800; }
+.sbl-shelf.teacher{ grid-template-columns: repeat(auto-fit, minmax(230px, 300px)); }
+.sbl-shelf.teacher .sbl-book{ justify-items: stretch; text-align: left; }
+.sbl-shelf.teacher .sbl-cover{ aspect-ratio: 16 / 10; }
 
 /* 폰에서는 두 권씩 — 한 권씩 크게 깔면 스크롤만 길어진다. */
 @media (max-width: 520px){

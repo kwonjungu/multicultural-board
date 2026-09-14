@@ -75,7 +75,9 @@ check('게임 카드가 중첩 버튼이 아니다', () => {
   const buttons = gridBlock.match(/<button/g) || [];
   // GAMES.map 안에서 카드 버튼 자신 하나만 있어야 한다 — PLAY 는 <span> 장식이어야 한다.
   assert.equal(buttons.length, 1, `게임 카드 안에 버튼이 ${buttons.length}개 있다 — 중첩 버튼 의심`);
-  assert.match(gridBlock, /className="gr-card-play"/, 'PLAY 장식 표시가 없다');
+  // 예전에는 여기서 PLAY(▶) 장식 span 이 있는지까지 봤다. 그 장식은 세로 칩
+  // 카드로 바뀌며 없앴다 — 카드에는 준 에셋 그림만 둔다는 지시에 따른 것이다.
+  // 이 검사의 계약('카드 안에 버튼이 하나뿐')은 바로 위에서 그대로 본다.
   assert.ok(!/<button[^>]*>\s*PLAY/.test(gridBlock), 'PLAY 가 여전히 별도 버튼이다');
 });
 
@@ -93,7 +95,9 @@ check('.gr-card 는 게임과 무관하게 하나의 토큰 스타일만 쓴다 
   assert.ok(cssStart > 0, 'LOBBY_CSS 를 찾지 못했다');
   const css = src.slice(cssStart, src.indexOf('`;', src.indexOf('.gr-card{', cssStart)));
   assert.match(css, /\.gr-card\{[^}]*background:\s*var\(--ux-surface\)/, '.gr-card 배경이 --ux-surface 토큰이 아니다');
-  assert.match(css, /\.gr-card\{[^}]*border:\s*2px solid var\(--ux-primary-border\)/, '.gr-card 테두리가 --ux-primary-border 토큰이 아니다');
+  // 계약은 "테두리 색이 토큰" 이다 — 게임마다 다른 색을 쓰지 않는 것. 두께는
+  // 디자인이 정할 몫이라 고정하지 않는다(세로 칩 카드로 바뀌며 3px 가 됐다).
+  assert.match(css, /\.gr-card\{[^}]*border:\s*\d+(?:\.\d+)?px solid var\(--ux-primary-border\)/, '.gr-card 테두리가 --ux-primary-border 토큰이 아니다');
 });
 
 check('조작에 data-ux-role 이 붙어 있다', () => {
@@ -128,8 +132,13 @@ check('로비 조작이 인라인 padding/fontSize 로 크기를 다시 정하�
 check('그리드 열 수는 폭으로만 정한다 (04 §5 경계값)', () => {
   const cssStart = src.indexOf('const LOBBY_CSS');
   const css = src.slice(cssStart);
-  assert.match(css, /@media \(min-width: 640px\)\{\s*\.gr-grid\{ grid-template-columns: repeat\(3, 1fr\); \}/, '640px 경계의 3열 규칙이 없다');
-  assert.match(css, /@media \(min-width: 1200px\)\{\s*\.gr-grid\{ grid-template-columns: repeat\(4, 1fr\); \}/, '1200px 경계의 4열 규칙이 없다');
+  // 계약은 "열 수를 폭이 정한다" 이다 — 화면 종류나 게임 수로 고정하지 않는 것.
+  // 경계값을 미디어 쿼리로 적든 auto-fit 으로 적든 그 계약은 지켜진다. 지금은
+  // 도서관 서가와 같은 auto-fit 을 쓴다(칸을 늘리지 않고 무리를 가운데로 모은다).
+  const byWidth =
+    /\.gr-grid\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\([^)]*\)\)/.test(css) ||
+    /@media \(min-width: \d+px\)\{\s*\.gr-grid\{ grid-template-columns: repeat\(\d+, 1fr\); \}/.test(css);
+  assert.ok(byWidth, '그리드 열 수가 폭으로 정해지지 않는다(auto-fit 도 미디어 쿼리도 없다)');
 });
 
 check('로비가 ScopedStyle 로 CSS 를 주입하고 인라인 grid 스타일에 의존하지 않는다', () => {

@@ -124,7 +124,11 @@ const GAMES: GameMeta[] = [
 ];
 
 /** Graceful <img> that falls back to an emoji span when the PNG is missing. */
-function GameIcon({ icon, iconImg, size }: { icon: string; iconImg?: string; size: number }) {
+function GameIcon({ icon, iconImg, size, fill }: {
+  icon: string; iconImg?: string; size: number;
+  /** 액자를 꽉 채운다. 로비 칩처럼 그림이 주인공인 자리에서 쓴다. */
+  fill?: boolean;
+}) {
   const [failed, setFailed] = useState(false);
   if (!iconImg || failed) {
     return <div style={{ fontSize: size, lineHeight: 1 }}>{icon}</div>;
@@ -135,7 +139,9 @@ function GameIcon({ icon, iconImg, size }: { icon: string; iconImg?: string; siz
       alt=""
       aria-hidden="true"
       onError={() => setFailed(true)}
-      style={{ width: size + 10, height: size + 10, objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.15))" }}
+      style={fill
+        ? { width: "100%", height: "100%", objectFit: "contain" }
+        : { width: size + 10, height: size + 10, objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.15))" }}
     />
   );
 }
@@ -215,31 +221,67 @@ const LOBBY_CSS = `
 
 /* 그리드 열 수는 폭으로만 정한다 (04 §5 / tokens.json responsive.containers):
    ~639px 2열 · 640~1199px 3열 · 1200px+ 4열. */
-.gr-grid{ display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--ux-space-3); }
-@media (min-width: 640px){ .gr-grid{ grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1200px){ .gr-grid{ grid-template-columns: repeat(4, 1fr); } }
+/* 게임 칩이 꽂힌 선반. 도서관 서가와 같은 규칙 — 칸을 늘리지 말고 무리를
+   가운데로 모은다. 그래야 게임이 적을 때 왼쪽으로 쏠리지 않는다. */
+.gr-grid{
+  display: grid; gap: var(--ux-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(148px, 190px));
+  justify-content: center;
+}
 
-/* 카드 = 하나의 버튼. 색은 게임과 무관하게 전부 같은 토큰 —
-   구분은 아이콘·라벨의 몫이지 배경색의 몫이 아니다. */
+/* 카드 = 세로 게임 칩 하나.
+   색은 게임과 무관하게 전부 같은 토큰 — 구분은 그림과 이름의 몫이지
+   배경색의 몫이 아니다. 칩 느낌은 위쪽 홈과 아래쪽 두께로만 낸다. */
 .gr-card{
-  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
-  background: var(--ux-surface); border: 2px solid var(--ux-primary-border);
-  border-radius: var(--ux-radius-surface); text-align: left; font-family: inherit;
-  position: relative; box-shadow: 0 4px 12px rgba(137,83,0,.10);
-  transition: border-color var(--ux-motion-state) var(--ux-motion-ease), transform var(--ux-motion-press) var(--ux-motion-ease);
+  display: flex; flex-direction: column; align-items: center; gap: var(--ux-space-1);
+  background: var(--ux-surface); border: 3px solid var(--ux-primary-border);
+  border-radius: 18px; text-align: center; font-family: inherit;
+  position: relative;
+  /* 아래쪽 두께 — 선반에 꽂힌 칩처럼 보이게. */
+  border-bottom-width: 9px;
+  box-shadow: 0 6px 16px rgba(137,83,0,.16);
+  transition: border-color var(--ux-motion-state) var(--ux-motion-ease), transform var(--ux-motion-press) var(--ux-motion-ease), box-shadow var(--ux-motion-state) var(--ux-motion-ease);
 }
-.gr-card[data-ux-role="control"]{ min-height: 128px; padding: var(--ux-space-3) var(--ux-space-4); }
-.gr-card:hover, .gr-card:focus-visible{ border-color: var(--ux-selected-border); }
-.gr-card:active{ transform: scale(0.97); }
-.gr-card-icon{
-  width: 48px; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  background: var(--ux-hint-apricot); border-radius: var(--ux-radius-surface);
+.gr-card[data-ux-role="control"]{
+  min-height: 208px;
+  padding: var(--ux-space-4) var(--ux-space-2) var(--ux-space-3);
 }
-.gr-card-title{ color: var(--ux-ink); font-weight: 900; }
+.gr-card:hover, .gr-card:focus-visible{
+  border-color: var(--ux-selected-border);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(137,83,0,.22);
+}
+.gr-card:active{ transform: translateY(0) scale(0.98); }
+
+/* 칩 위쪽 홈 — 카트리지 라벨 띠. 순전히 장식이라 스크린리더에서 감춘다. */
+.gr-card-notch{
+  position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+  width: 34%; height: 6px; border-radius: 999px;
+  background: var(--ux-primary-border); opacity: .45;
+}
+
+/* 액자 — 게임 그림이 크게 들어가는 자리. 카드의 주인공이다. */
+.gr-card-frame{
+  width: 100%; aspect-ratio: 1 / 1; margin-top: 6px;
+  display: flex; align-items: center; justify-content: center;
+  /* 게임 그림 PNG 중에는 흰 배경이 있는 것이 많다. 액자 바탕을 살구색으로
+     두면 그 흰 네모가 액자 안에 또 하나의 네모로 도드라진다. 바탕을 표면색으로
+     맞추고 그림이 액자를 꽉 채우게 한다. */
+  background: var(--ux-surface);
+  border: 2px solid var(--ux-primary-border);
+  border-radius: 14px; overflow: hidden;
+  padding: 4px;
+  box-shadow: inset 0 2px 6px rgba(137,83,0,.12);
+}
+.gr-card-title{ color: var(--ux-ink); font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
 .gr-card-title-alt{ display: block; color: var(--ux-ink-soft); font-weight: 700; }
-.gr-card-sub{ color: var(--ux-ink-soft); }
-/* PLAY 표시는 장식으로만 내린다 — 카드 전체가 이미 버튼이라 중첩 버튼을 만들지 않는다. */
-.gr-card-play{ position: absolute; top: var(--ux-space-2); right: var(--ux-space-2); color: var(--ux-primary-border); opacity: .55; }
+.gr-card-sub{ color: var(--ux-ink-soft); word-break: keep-all; }
+
+/* 아주 좁은 폰에서는 두 칸으로 고정 — 한 칸씩 크게 깔면 스크롤만 길어진다. */
+@media (max-width: 400px){
+  .gr-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gr-card[data-ux-role="control"]{ min-height: 184px; }
+}
 `;
 
 const DEFAULT_LANG_CODES = ["ko","en","vi","zh","fil","ja","th","id"];
@@ -334,9 +376,10 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
                 {gt(GR.subtitle, viewerLang)}
               </div>
             </div>
-            {/* 게임기를 든 꿀벌 — 머리 영역과 게임 목록을 눈으로 갈라 준다. */}
+            {/* 하나를 놓고 함께 노는 꿀벌 넷 — 이 방이 '같이 하는 곳' 이라는
+                것을 그림 하나로 말한다(혼자 게임기를 든 그림에서 바꿨다). */}
             <img
-              src="/ui-icons/v1/scene/bee-gamer-256.png"
+              src="/ui-icons/v1/scene/bee-team-256.png"
               alt=""
               aria-hidden="true"
               className="gr-bee"
@@ -425,8 +468,11 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
                   className="gr-card"
                   onClick={() => setGameId(g.id)}
                 >
-                  <span aria-hidden className="gr-card-icon">
-                    <GameIcon icon={g.icon} iconImg={g.iconImg} size={32} />
+                  {/* 칩 위쪽 홈 — 실제 카트리지의 라벨 띠 자리. 장식이다. */}
+                  <span aria-hidden className="gr-card-notch" />
+                  {/* 액자 — 이 안의 그림이 카드의 주인공이다. */}
+                  <span aria-hidden className="gr-card-frame">
+                    <GameIcon icon={g.icon} iconImg={g.iconImg} size={72} fill />
                   </span>
                   <span data-ux-role="label" className="gr-card-title">
                     <GameText map={{ ko: g.name }} lang={viewerLang} />
@@ -437,7 +483,6 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
                   <span data-ux-role="secondary" className="gr-card-sub">
                     <GameText map={{ ko: g.sub }} lang={viewerLang} />
                   </span>
-                  <span aria-hidden className="gr-card-play">▶</span>
                 </button>
               ))}
             </div>
