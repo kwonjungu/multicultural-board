@@ -205,13 +205,16 @@ export default function ExpressionReview({
         display: "flex", alignItems: "center", justifyContent: "space-between",
         gap: 8, paddingBottom: 10, borderBottom: `2px solid ${PURPLE_LIGHT}`,
       }}>
+        {/* 36x33 이라 아이 손가락으로 옆 것을 누르기 쉬웠다(터치 계약 48px 미달).
+            padding·minWidth·fontSize 로 크기를 정하지 않고 control 토큰에 맡긴다. */}
         <button
           onClick={onClose}
           aria-label="닫기"
+          data-ux-role="control"
           style={{
             background: PURPLE_LIGHT, border: "none", borderRadius: 10,
-            padding: "6px 10px", fontSize: 16, fontWeight: 900, color: PURPLE_DARK,
-            cursor: "pointer", fontFamily: "inherit", minWidth: 36,
+            fontWeight: 800, color: PURPLE_DARK,
+            cursor: "pointer", fontFamily: "inherit",
           }}
         >✕</button>
         <div style={{ fontSize: 13, fontWeight: 900, color: "#6B7280" }}>
@@ -259,12 +262,15 @@ export default function ExpressionReview({
         <div style={{ fontSize: 22, fontWeight: 900, color: "#1F2937", lineHeight: 1.4 }}>
           {current.text}
         </div>
+        {/* 93x41 로 세로가 계약(48px)에 못 미쳤다. 높이는 토큰이 정한다. */}
         <button
           onClick={() => speakKo(current.text)}
           aria-label="듣기"
+          data-ux-role="control"
           style={{
             background: PURPLE_LIGHT, border: `2px solid ${PURPLE}55`, borderRadius: 999,
-            padding: "8px 18px", fontSize: 16, fontWeight: 900, color: PURPLE_DARK,
+            paddingInline: 18,
+            fontWeight: 800, color: PURPLE_DARK,
             cursor: "pointer", fontFamily: "inherit",
           }}
         >🔊 듣기</button>
