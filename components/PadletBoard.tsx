@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ref, onValue, off, set, remove, update } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES } from "@/lib/constants";
@@ -97,6 +97,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   // Management modal state
   const [showManage, setShowManage] = useState(false);
   const [editTitle, setEditTitle] = useState<Record<string, string>>({});
+  /** 방금 이름을 저장한 주제. 잠깐 '저장했어요' 를 보여 주기 위한 것이다. */
+  const [savedTitleAt, setSavedTitleAt] = useState<{ colId: string; at: number } | null>(null);
 
   // Room config state (live-updated)
   const [roomConfigState, setRoomConfigState] = useState<RoomConfig>(roomConfig);
@@ -303,11 +305,21 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const activeCards = activeCol ? cardsOf(activeCol.id) : [];
 
   // ── Column management ──
-  function saveColTitle(colId: string) {
-    const title = editTitle[colId]?.trim();
-    if (!title || offline) return;
+  /**
+   * 주제 이름 저장. 바뀐 게 없으면 쓰지 않는다(같은 값을 계속 덮어쓰면
+   * 다른 사람 화면이 불필요하게 다시 그려진다).
+   * 저장했으면 true — 부르는 쪽이 '저장했어요' 를 띄운다.
+   */
+  function saveColTitle(colId: string): boolean {
+    const draft = editTitle[colId];
+    if (draft === undefined || offline) return false;
+    const title = draft.trim();
+    const current = columns.find((c) => c.id === colId)?.title ?? "";
+    if (!title || title === current) return false;
     const db = getClientDb();
     set(ref(db, `rooms/${roomCode}/columns/${colId}/title`), title);
+    setSavedTitleAt({ colId, at: Date.now() });
+    return true;
   }
 
   function changeColColor(colId: string, color: string) {
@@ -622,10 +634,28 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
   /** 교사 전용 주제 관리 (이름·색·순서·삭제). 권한 검사는 그대로 두고 UI 만 숨긴다. */
   function ColumnAdmin({ col }: { col: FirebaseColumn }) {
+    /* 훅은 조건부 return 앞에 둔다 — 순서가 바뀌면 React 가 깨진다. */
+    const draft = editTitle[col.id];
+    const dirty = draft !== undefined && draft.trim() !== "" && draft.trim() !== col.title;
+    const justSaved = savedTitleAt?.colId === col.id && Date.now() - savedTitleAt.at < 4000;
+
+    /**
+     * 패널이 닫히거나 화면을 떠날 때 **고친 이름을 잃지 않는다.**
+     * '주제 관리' 를 다시 눌러 닫으면 입력칸이 사라지는데, 그때 blur 가
+     * 보장되지 않아 편집이 그대로 날아갔다.
+     */
+    const dirtyRef = useRef(false);
+    dirtyRef.current = dirty;
+    useEffect(() => {
+      return () => { if (dirtyRef.current) saveColTitle(col.id); };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [col.id]);
+
     if (!isTeacher) return null;
     return (
       <div className="bd-admin" data-ux-surface>
         <label data-ux-role="label" className="bd-admin-label" htmlFor={`bd-title-${col.id}`}>주제 이름</label>
+        <div className="bd-admin-titlerow">
         <input
           id={`bd-title-${col.id}`}
           className="bd-input"
@@ -638,6 +668,16 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
             saveColTitle(col.id);
           }}
         />
+        {/* 무엇을 눌러야 저장인지 보이게 둔다. 포커스 아웃·Enter 로도 저장되지만,
+            그건 화면에 드러나지 않아 "저장이 안 된다" 로 읽혔다. */}
+        <button
+          type="button"
+          data-ux-role="control"
+          className="bd-btn"
+          aria-disabled={!dirty}
+          onClick={(e) => { e.stopPropagation(); saveColTitle(col.id); }}
+        >{dirty ? "저장" : justSaved ? "저장했어요" : "저장됨"}</button>
+        </div>
         <label data-ux-role="label" className="bd-admin-label" htmlFor={`bd-color-${col.id}`}>주제 색</label>
         <select
           id={`bd-color-${col.id}`}
@@ -1511,6 +1551,11 @@ const BOARD_CSS = `
 
 /* 어디에 올릴까요 — 주제를 색과 이름으로 고른다. 아이가 글을 쓰기 전에
    어디로 가는지 알아야 한다. */
+/* 이름 입력칸과 저장 버튼을 한 줄로. 좁으면 버튼이 아래로 내려간다. */
+.bd-admin-titlerow{ display: flex; gap: var(--ux-space-2); align-items: center; flex-wrap: wrap; }
+.bd-admin-titlerow .bd-input{ flex: 1 1 140px; min-width: 0; }
+.bd-admin-titlerow .bd-btn[aria-disabled="true"]{ opacity: .55; }
+
 .bd-topicpick{ display: grid; gap: var(--ux-space-3); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .bd-topicpick-btn{
   display: grid; gap: 2px; justify-items: center; text-align: center;
