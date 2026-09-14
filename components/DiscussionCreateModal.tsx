@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ref, push, set } from "firebase/database";
+import { ref, push, set, update } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { compressToUnder1MB } from "@/lib/imageUtils";
 import { BRAND_GRADIENT } from "@/lib/constants";
@@ -56,9 +56,13 @@ export default function DiscussionCreateModal({
   async function translateToAll(text: string): Promise<Record<string, string>> {
     const targets = roomLangs.filter((l) => l !== teacherLang);
     if (targets.length === 0 || !text.trim()) return { [teacherLang]: text };
+    // 번역이 하염없이 걸리면 뒤따라 채우는 것조차 안 온다. 상한을 둔다.
+    const ctl = new AbortController();
+    const guard = window.setTimeout(() => ctl.abort(), 20000);
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
+        signal: ctl.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: text.trim(),
@@ -75,6 +79,8 @@ export default function DiscussionCreateModal({
       return data.translations || { [teacherLang]: text };
     } catch {
       return { [teacherLang]: text };
+    } finally {
+      window.clearTimeout(guard);
     }
   }
 
@@ -88,15 +94,21 @@ export default function DiscussionCreateModal({
       const newSessionRef = push(sessionsRef);
       const sessionId = newSessionRef.key!;
 
-      const [titleTranslations, bodyTextTranslations] = await Promise.all([
-        translateToAll(title.trim()),
-        bodyText.trim() ? translateToAll(bodyText.trim()) : Promise.resolve(undefined),
-      ]);
+      const titleText = title.trim();
+      const bodyTrimmed = bodyText.trim();
 
+      /**
+       * 먼저 만들고, 번역은 뒤따라 채운다.
+       *
+       * 예전에는 여기서 번역을 **기다렸다.** Gemini 왕복이 몇 초라 그동안
+       * 화면에 아무 일도 일어나지 않아 "시작이 안 된다" 로 보였다. 아이들이
+       * 곧바로 들어오는 것이 번역을 먼저 갖추는 것보다 중요하다 — 소통창
+       * 카드도 같은 순서로 동작한다(먼저 올리고 번역이 오면 갱신).
+       */
       const meta: Partial<SessionMeta> & { id: string } = {
         id: sessionId,
-        title: title.trim(),
-        titleTranslations,
+        title: titleText,
+        titleTranslations: { [teacherLang]: titleText },
         startedAt: Date.now(),
         status: "active",
         teacherClientId,
@@ -104,10 +116,7 @@ export default function DiscussionCreateModal({
         teacherName,
         targetLangs: roomLangs,
       };
-      if (bodyText.trim()) {
-        meta.bodyText = bodyText.trim();
-        if (bodyTextTranslations) meta.bodyTextTranslations = bodyTextTranslations;
-      }
+      if (bodyTrimmed) meta.bodyText = bodyTrimmed;
       if (imageUrl) meta.imageUrl = imageUrl;
       if (liveReveal) meta.liveReveal = true;
 
@@ -115,6 +124,23 @@ export default function DiscussionCreateModal({
       await set(ref(db, `rooms/${roomCode}/activeSession`), sessionId);
       onCreated?.(sessionId);
       onClose();
+
+      // 여기서부터는 화면을 붙잡지 않는다. 번역이 오면 그때 채운다.
+      void (async () => {
+        try {
+          const [titleTr, bodyTr] = await Promise.all([
+            translateToAll(titleText),
+            bodyTrimmed ? translateToAll(bodyTrimmed) : Promise.resolve(undefined),
+          ]);
+          const patch: Record<string, unknown> = {};
+          if (titleTr && Object.keys(titleTr).length > 1) patch.titleTranslations = titleTr;
+          if (bodyTr && Object.keys(bodyTr).length > 1) patch.bodyTextTranslations = bodyTr;
+          if (Object.keys(patch).length === 0) return;   // 번역이 원문뿐이면 쓰지 않는다
+          await update(ref(db, `rooms/${roomCode}/sessions/${sessionId}/meta`), patch);
+        } catch {
+          /* 번역이 못 와도 세션은 원문으로 그대로 굴러간다. */
+        }
+      })();
     } catch (err) {
       setError(err instanceof Error ? err.message : "세션 생성 실패");
       setCreating(false);
