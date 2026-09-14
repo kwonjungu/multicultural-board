@@ -1798,13 +1798,19 @@ function SessionHeader({
         marginBottom: 14,
       }}
     >
+      {/* 크기를 40px 로 인라인에 박아 두면 control 토큰의 최소 크기(터치 48px /
+          마우스 44px)가 무력화된다 — 감사에서 실제로 40x40 으로 측정돼 기기 5종의
+          기본 글씨 칸이 전부 터치 계약에 미달했다(큰 글씨는 legacy zoom 1.25 때문에
+          50px 로 보여 우연히 통과했을 뿐이다). 같은 파일의 다른 뒤로 버튼(540행)이
+          이미 쓰는 방식대로 크기는 토큰에 맡기고 생김새만 여기서 정한다. */}
       <button
         onClick={onBack}
         aria-label="back"
+        data-ux-role="control"
         style={{
-          width: 40, height: 40, borderRadius: 12,
+          borderRadius: 12,
           background: "#fff", border: "2px solid #FDE68A",
-          fontSize: 16, fontWeight: 900, color: "#92400E", cursor: "pointer",
+          fontWeight: 900, color: "#92400E", cursor: "pointer",
           flexShrink: 0,
         }}
       >←</button>

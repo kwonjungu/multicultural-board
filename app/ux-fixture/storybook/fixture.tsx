@@ -229,7 +229,11 @@ function DevSwitcher({
     <div
       data-fixture-chrome
       style={{
-        position: "fixed", top: 8, left: 8, zIndex: 9999,
+        /* 왼쪽 위에 두면 제품의 뒤로 버튼(읽기 화면의 유일한 조작)을 정확히 덮는다 —
+           감사 도구가 "손가락이 닿는 제품 버튼이 첫 화면에 없다" 고 적고, 실제로
+           탭도 타임아웃 났다. 검수 껍데기가 검수 대상을 가리면 안 되므로 오른쪽으로
+           옮긴다. 이 화면의 제품 조작은 전부 왼쪽에 있다(실측: 첫 화면 조작 1개). */
+        position: "fixed", top: 8, right: 8, zIndex: 9999,
         maxWidth: "70vw",
         background: "rgba(255,255,255,0.95)", padding: "6px 8px",
         borderRadius: 10, boxShadow: "0 2px 10px rgba(0,0,0,0.25)",

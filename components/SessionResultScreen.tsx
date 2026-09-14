@@ -59,6 +59,7 @@ export default function SessionResultScreen({
         <RewardSummary sessionXp={sessionXp} award={award} finalizing={finalizing} />
         <button
           onClick={onClose}
+          data-ux-role="action"
           style={primaryBtn}
         >쉬러 가기</button>
       </div>
@@ -74,7 +75,7 @@ export default function SessionResultScreen({
         <div style={{ fontSize: 18, fontWeight: 900, color: "#1F2937", marginBottom: 16 }}>
           문제가 없어요
         </div>
-        <button onClick={onClose} style={primaryBtn}>닫기</button>
+        <button onClick={onClose} data-ux-role="action" style={primaryBtn}>닫기</button>
       </div>
     );
   }
@@ -134,8 +135,12 @@ export default function SessionResultScreen({
       <RewardSummary sessionXp={sessionXp} award={award} finalizing={finalizing} />
 
       <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 18 }}>
-        <button onClick={onRetry} style={secondaryBtn}>↻ 다시 풀기</button>
-        <button onClick={onClose} style={primaryBtn}>완료</button>
+        {/* 실측(2026-09-14, 기기 5종 × 글자 2종): 기본 글씨에서 이 두 버튼이
+            103x42 · 70x42 라 아이 손가락 기준 48px(포인터 44px)에 못 미쳤다.
+            큰 글씨에서만 53px 로 넘겼다. 높이를 손으로 박지 않고 action 토큰에
+            맡긴다 — 기본 56px / 큰 글씨 64px / 마우스 48px. */}
+        <button onClick={onRetry} data-ux-role="action" style={secondaryBtn}>↻ 다시 풀기</button>
+        <button onClick={onClose} data-ux-role="action" style={primaryBtn}>완료</button>
       </div>
 
       <style>{`

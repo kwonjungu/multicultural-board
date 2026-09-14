@@ -12,6 +12,9 @@ import VocabFixture, { type VocabState } from "./fixture";
  *   ?open=detail|notebook|write|quiz|review   ?word=<단어 id>
  *   open= 은 하위 학습 화면을 바로 열어 검수하기 위한 것이다 — 홈에서 여러 번
  *   눌러야 도달해 캡처가 불안정하기 때문이다.
+ *   ?seed=<정수>  open=quiz 의 문제 10개·보기 순서를 고정하는 시드. 기본 1.
+ *                 (quiz 는 buildDailyChallenge → shuffle → Math.random 을 타서
+ *                  시드를 안 고정하면 새로 고칠 때마다 다른 화면이 된다.)
  *   new      = 첫 학생(진도 0) — 가짜 이어하기·가짜 달성률이 없어야 한다
  *   progress = 감정 단원 일부 진행
  *   rich     = 진도 + 표현 복습 대기 + 소통창 문장까지 있는 상태
@@ -33,6 +36,8 @@ export default function Page({
   const openView =
     rawView === "detail" || rawView === "notebook" || rawView === "write"
       || rawView === "quiz" || rawView === "review" ? rawView : undefined;
+  const rawSeed = Number.parseInt(pick("seed") ?? "1", 10);
+  const seed = Number.isFinite(rawSeed) ? Math.abs(rawSeed) % 2147483647 : 1;
   return (
     <VocabFixture
       state={state}
@@ -40,6 +45,7 @@ export default function Page({
       teacher={pick("role") === "teacher"}
       openView={openView}
       openWordId={pick("word")}
+      seed={seed}
     />
   );
 }

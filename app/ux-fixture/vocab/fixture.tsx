@@ -21,6 +21,18 @@ import type { UserConfig } from "@/lib/types";
 const T0 = Date.parse("2026-09-11T00:00:00Z");
 const DAY = 86400_000;
 
+/** mulberry32 — 32bit 시드 하나로 재현되는 난수열(마블 fixture 와 같은 방식). */
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return function next() {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export type VocabState = "new" | "progress" | "rich";
 
 function progressFor(state: VocabState): ProgressMap {
@@ -92,19 +104,66 @@ export default function VocabFixture({
   teacher = false,
   openView,
   openWordId,
+  seed = 1,
 }: {
   state?: VocabState;
   lang?: string;
   teacher?: boolean;
   openView?: "detail" | "notebook" | "write" | "quiz" | "review";
   openWordId?: string;
+  seed?: number;
 }) {
   const [blocked, setBlocked] = useState<string[]>([]);
   const blockedRef = useRef<string[]>([]);
 
+  /**
+   * 시험(VocabTest)만 난수를 고정하고 마운트 뒤에 그린다.
+   *
+   * 왜 필요한가: VocabHub 는 openView="quiz" 일 때 첫 렌더의 useState 초기값으로
+   * buildDailyChallenge() 를 부른다. 그 안의 shuffle() 이 Math.random 을 쓰므로
+   * (lib/quizFormats.ts:75-82, 340) 서버 렌더와 클라이언트 렌더가 서로 다른 보기
+   * 순서를 만들어 하이드레이션이 어긋났다 — 실제로 콘솔에
+   * `Text content did not match. Server: "놀라다" Client: "슬프다"` 가 떴다.
+   * 같은 이유로 문제 10개가 새로 고칠 때마다 달라져 "같은 입력 = 같은 화면" 이
+   * 성립하지 않았다.
+   *
+   * 그래서 마블 fixture(app/ux-fixture/marble/fixture.tsx)와 같은 방법을 쓴다:
+   * 서버 HTML 에는 VocabHub 를 아예 넣지 않고, 클라이언트에서 Math.random 을
+   * 시드로 바꾼 뒤에 그린다. 서버 HTML 이 없으니 어긋날 것도 없다.
+   * 다른 화면(detail/write/notebook/review/홈)은 이 경로를 타지 않으므로
+   * 종전과 똑같이 서버에서 렌더된다.
+   */
+  const needsSeed = openView === "quiz";
+  const [mounted, setMounted] = useState(!needsSeed);
+
   // 네트워크 차단: fixture 는 어떤 원격 호출도 하지 않는다. /api/* 는 canned
   // 응답으로 막고, 새는 경로가 있으면 화면에 드러낸다.
   useEffect(() => {
+    const realRandom = Math.random;
+    if (needsSeed) {
+      const next = mulberry32(seed || 1);
+      Math.random = next;
+    }
+
+    // 듣고 찾기 문항은 들어오자마자 speakKorean() 으로 문장을 읽는다
+    // (VocabTest.tsx:712-717). speakKorean 은 ko 목소리가 없으면
+    // `new Audio('/api/tts?...')` 로 서버 TTS 를 부르는데(VocabTest.tsx:36-42)
+    // 그 경로는 window.fetch 를 타지 않아 아래 차단망을 그대로 빠져나간다 —
+    // 실측에서 fixture 가 GET /api/tts 로 나가는 것을 확인했다.
+    // 실제 태블릿/크롬북에는 한국어 목소리가 있으므로, 여기서는 그 상태를
+    // 만들어 준다: 목소리 목록만 채워 제품이 제 경로(브라우저 TTS)를 타게 한다.
+    const synth = window.speechSynthesis;
+    const realGetVoices = synth?.getVoices?.bind(synth);
+    if (synth && realGetVoices) {
+      const koVoice = { name: "fixture ko", lang: "ko-KR", default: true, localService: true, voiceURI: "fixture-ko" };
+      synth.getVoices = () => {
+        const live = realGetVoices();
+        return live.some((v) => v.lang?.startsWith("ko"))
+          ? live
+          : ([...live, koVoice] as SpeechSynthesisVoice[]);
+      };
+    }
+
     const real = window.fetch.bind(window);
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -129,8 +188,14 @@ export default function VocabFixture({
       }
       return real(input as RequestInfo, init);
     }) as typeof window.fetch;
-    return () => { window.fetch = real; };
-  }, []);
+
+    setMounted(true);
+    return () => {
+      window.fetch = real;
+      Math.random = realRandom;
+      if (synth && realGetVoices) synth.getVoices = realGetVoices;
+    };
+  }, [needsSeed, seed]);
 
   const user: UserConfig = useMemo(
     () => ({ myLang: lang, myName: "학생 A", isTeacher: teacher, teacherLangs: [] }),
@@ -152,13 +217,15 @@ export default function VocabFixture({
 
   return (
     <>
-      <VocabHub
-        key={`${state}-${lang}-${teacher}-${openView ?? ""}-${openWordId ?? ""}`}
-        user={user}
-        roomCode="9999"
-        onBack={() => { /* fixture: 돌아갈 상위 화면이 없다 */ }}
-        fixture={fixture}
-      />
+      {mounted && (
+        <VocabHub
+          key={`${state}-${lang}-${teacher}-${openView ?? ""}-${openWordId ?? ""}-${needsSeed ? seed : ""}`}
+          user={user}
+          roomCode="9999"
+          onBack={() => { /* fixture: 돌아갈 상위 화면이 없다 */ }}
+          fixture={fixture}
+        />
+      )}
       {blocked.length > 0 && (
         <pre
           data-fixture-leak
