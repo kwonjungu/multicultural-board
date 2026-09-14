@@ -12,6 +12,7 @@ import { prefetchGameTexts } from "@/lib/gameI18n";
 import ScopedStyle from "../../ui/child/ScopedStyle";
 import GameHeader, { GameStat } from "../../ui/game/GameHeader";
 import { renderActionPanels } from "./ActionPanel";
+import { useReduceMotion } from "./useReduceMotion";
 import { Board } from "./Board";
 import { CharacterSetup } from "./CharacterSetup";
 import { LogTicker } from "./LogTicker";
@@ -24,22 +25,6 @@ const TILE_COUNT = 30;
 const ROLL_MS = 700;
 /** 06 §5 — 긴 이동도 총 연출 2초 이내. 여유를 두고 1.5초를 예산으로 쓴다. */
 const MOVE_BUDGET_MS = 1500;
-
-/**
- * 움직임 줄이기 설정. 기기 설정이 바뀌면 그 자리에서 따른다.
- * 06 §5: "흔들림·점프·카메라 이동을 생략하고 결과/도착 상태를 바로 보여준다".
- */
-function useReduceMotion(): boolean {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const apply = () => setReduce(mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
-  return reduce;
-}
 
 export default function BeeWorldMarble({
   langA,

@@ -4,6 +4,7 @@ import { CSSProperties, ReactNode, useMemo } from "react";
 import { TILES } from "@/lib/marbleData";
 import type { GameState, PlayerId } from "@/lib/marbleReducer";
 import { Tile } from "./Tile";
+import { PieceLayer } from "./PieceLayer";
 
 export interface BoardProps {
   state: GameState;
@@ -116,6 +117,15 @@ function slotFor(idx: number): Slot {
   return { left: 0, top: 0, width: CORNER_PCT, height: CORNER_PCT };
 }
 
+/**
+ * 칸의 **중심** 좌표(보드 폭 대비 %). 말 레이어가 이 값으로 말을 놓는다.
+ * 슬롯 계산을 두 곳에 복사하면 판과 말이 어긋나므로 여기 하나만 둔다.
+ */
+export function slotCenter(idx: number): { left: number; top: number } {
+  const s = slotFor(idx);
+  return { left: s.left + s.width / 2, top: s.top + s.height / 2 };
+}
+
 export function Board({
   state,
   viewerLang,
@@ -123,18 +133,7 @@ export function Board({
   center,
   overlay,
 }: BoardProps) {
-  // Precompute per-tile occupants & owners for cheap lookups.
-  const occupants = useMemo(() => {
-    const map = new Map<number, PlayerId[]>();
-    for (const pid of state.playerIds) {
-      const p = state.players[pid];
-      if (p.bankrupt) continue;
-      const list = map.get(p.pos) ?? [];
-      list.push(pid);
-      map.set(p.pos, list);
-    }
-    return map;
-  }, [state.players, state.playerIds]);
+  // 소유자만 미리 모은다. 말의 자리는 PieceLayer 가 직접 계산한다.
 
   const owners = useMemo(() => {
     const map = new Map<number, PlayerId[]>();
@@ -237,15 +236,17 @@ export function Board({
             <Tile
               tile={tile}
               owners={owners.get(tile.idx) ?? []}
-              occupants={occupants.get(tile.idx) ?? []}
               viewerLang={viewerLang}
               friendLang={friendLang}
               highlight={highlighted === tile.idx}
-              skinOf={(id) => state.players[id]?.skin}
             />
           </div>
         );
       })}
+
+      {/* 말은 타일 안이 아니라 이 층에 그린다 — 칸 사이를 미끄러지고,
+          같은 칸의 말끼리 서로 비켜 앉는다. */}
+      <PieceLayer state={state} />
 
       {center && (
         <div style={centerWrap}>
