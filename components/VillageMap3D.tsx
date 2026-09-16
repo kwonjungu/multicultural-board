@@ -21,7 +21,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { decoV2ById } from "@/lib/village";
+import { decoV2ById, WATER_PER_LEVEL } from "@/lib/village";
 
 export interface VillagePlot3D {
   id: string;
@@ -34,6 +34,8 @@ export interface VillagePlot3D {
   plate: string;
   fence: string | null;
   yard: (string | null)[];
+  gardenLevel: number;
+  gardenWater: number;
 }
 
 interface Props {
@@ -55,6 +57,9 @@ const AZIMUTH_LIMIT = Math.PI / 6;       // 회전 ±30°
 const ZOOM_MIN = 0.7;
 const ZOOM_MAX = 2.0;
 const PAN_LIMIT = 46;
+/** 카메라가 바라보는 지점은 마을 안이어야 한다. 밖이면 onControlsChange 의
+ *  클램프가 매 프레임 같은 크기의 delta 를 되살려 rAF 가 멈추지 않는다. */
+const clampToVillage = (v: number) => Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, v));
 const GROUND_SIZE = 130;
 const GROUND_COLOR = 0x9fdd82;    // 연두 단색 폴백 (ground-meadow 부재 시)
 const SKY_COLOR = 0xbfe7fb;
@@ -68,6 +73,30 @@ function plotPosition(i: number): { x: number; z: number } {
   const r = 9 + 6 * Math.sqrt(i);
   const th = i * 2.39996322972865; // 황금각
   return { x: r * Math.cos(th), z: r * Math.sin(th) };
+}
+
+/**
+ * 씬의 한 갈래를 버린다.
+ *
+ * Sprite 의 geometry 만은 dispose 하지 않는다 — three 는 모든 Sprite 가
+ * 모듈 전역 객체 하나를 함께 쓴다(three/src/objects/Sprite.js 의 `let _geometry`,
+ * 생성자에서 처음 한 번만 만들고 이후 전부 그것을 가리킨다). 산책 벌 하나를
+ * 치우면서 그걸 버리면 아직 화면에 남아 있는 집·문패·울타리·마당 스프라이트의
+ * GPU 버퍼까지 같이 풀린다. 스프라이트는 material 만 버린다.
+ */
+function disposeSubtree(root: THREE.Object3D): void {
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh & { isSprite?: boolean; isInstancedMesh?: boolean };
+    // InstancedMesh 의 instanceMatrix/instanceColor 는 geometry 가 아니라 메시가
+    //들고 있고, 그 GPU 버퍼는 InstancedMesh.dispose() 가 쏘는 'dispose' 이벤트로만
+    // 풀린다(three 0.184.0 renderers/webgl/WebGLObjects.js 의 onInstancedMeshDispose).
+    // geometry.dispose() 로는 안 풀려서, 재빌드마다 집마다 두 개씩 새어 나간다.
+    if (mesh.isInstancedMesh) (mesh as unknown as THREE.InstancedMesh).dispose();
+    if (!mesh.isSprite) mesh.geometry?.dispose();
+    const material = (mesh as unknown as { material?: THREE.Material | THREE.Material[] }).material;
+    if (Array.isArray(material)) material.forEach((m) => m.dispose());
+    else material?.dispose();
+  });
 }
 
 function colorOf(id: string | null | undefined): number {
@@ -117,6 +146,15 @@ export default function VillageMap3D({
   const imgCacheRef = useRef<Map<string, ImgEntry>>(new Map());
   const plateTexCacheRef = useRef<Map<string, THREE.CanvasTexture>>(new Map());
   const aliveRef = useRef(false);
+  const plotsRef = useRef(plots);
+  plotsRef.current = plots;
+  const reducedMotionRef = useRef(false);
+  /** 산책 루프가 지금 이 프레임을 직접 그리는 중인가. controls.update() 가
+   *  부르는 onControlsChange 의 requestRender 와 겹치지 않게 하는 표시. */
+  const walkFrameRef = useRef(false);
+  const wakeWalkRef = useRef<() => void>(() => {});
+  const [destination, setDestination] = useState("");
+  const [helpOpen, setHelpOpen] = useState(false);
   // 재빌드 세대 — 늦게 도착한 텍스처 콜백이 옛 플롯을 만지지 않게
   const genRef = useRef(0);
 
@@ -134,7 +172,10 @@ export default function VillageMap3D({
     target: THREE.Vector3 | null;
     raf: number;
     highlight: THREE.Mesh | null;
-  }>({ active: false, sprite: null, pos: new THREE.Vector3(), target: null, raf: 0, highlight: null });
+    /** 산책을 시작한 시점의 내 집 인덱스. 명렬표가 바뀌어 자리가 옮겨지면
+     *  벌만 옛 자리에 남으므로, 그때는 산책을 정리하고 최신 목록에서 다시 시작한다. */
+    startedAt: number;
+  }>({ active: false, sprite: null, pos: new THREE.Vector3(), target: null, raf: 0, highlight: null, startedAt: -1 });
 
   const selfPlotIndex = plots.findIndex((p) => p.isSelf);
 
@@ -144,7 +185,10 @@ export default function VillageMap3D({
     cancelAnimationFrame(w.raf);
     const scene = sceneRef.current;
     if (scene) {
-      if (w.sprite) scene.remove(w.sprite);
+      if (w.sprite) {
+        scene.remove(w.sprite);
+        disposeSubtree(w.sprite);
+      }
       if (w.highlight) {
         scene.remove(w.highlight);
         w.highlight.geometry.dispose();
@@ -154,6 +198,9 @@ export default function VillageMap3D({
     w.sprite = null;
     w.highlight = null;
     w.target = null;
+    w.raf = 0;
+    walkFrameRef.current = false;
+    wakeWalkRef.current = () => {};
     const controls = controlsRef.current;
     if (controls) controls.enablePan = true;
     setWalking(false);
@@ -174,7 +221,8 @@ export default function VillageMap3D({
 
     // 시작 위치 = 내 집 앞
     const { x, z } = plotPosition(selfPlotIndex);
-    w.pos.set(x, 0, z + 3.2);
+    w.pos.set(clampToVillage(x), 0, clampToVillage(z + 3.2));
+    w.startedAt = selfPlotIndex;
     w.target = null;
 
     // 플레이어 스프라이트 (내 벌 후보 체인 재사용, 실패 시 노란 박스)
@@ -184,7 +232,7 @@ export default function VillageMap3D({
     w.sprite = holder;
     const bee = plots[selfPlotIndex].bee;
     const tryTex = (i: number) => {
-      if (!w.active) return;
+      if (!w.active || w.sprite !== holder) return;
       if (i >= bee.length) {
         const cube = new THREE.Mesh(
           new THREE.BoxGeometry(0.9, 0.9, 0.9),
@@ -192,15 +240,17 @@ export default function VillageMap3D({
         );
         cube.position.y = 1.2;
         holder.add(cube);
+        requestRenderRef.current();
         return;
       }
       getTexture(bee[i], (tex) => {
-        if (!w.active) return;
+        if (!w.active || w.sprite !== holder) return;
         if (!tex) return tryTex(i + 1);
         const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, alphaTest: 0.04 }));
         s.scale.set(2.4, 2.4, 1);
         s.position.y = 1.4;
         holder.add(s);
+        requestRenderRef.current();
       });
     };
     tryTex(0);
@@ -219,11 +269,14 @@ export default function VillageMap3D({
     const SPEED = 7; // 월드유닛/초
     let last = performance.now();
     const step = (now: number) => {
-      if (!w.active) return;
+      w.raf = 0;
+      if (!w.active || document.hidden) return;
+      walkFrameRef.current = true;
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       // 이동 보간
       if (w.target) {
+        if (reducedMotionRef.current) w.pos.copy(w.target);
         const to = w.target.clone().sub(w.pos);
         to.y = 0;
         const d = to.length();
@@ -234,12 +287,12 @@ export default function VillageMap3D({
         }
       }
       // bobbing — 이동 중엔 크게, 정지 시 잔잔히 부유
-      const bobA = w.target ? 0.22 : 0.08;
+      const bobA = w.target && !reducedMotionRef.current ? 0.22 : 0;
       holder.position.set(w.pos.x, Math.abs(Math.sin(now / 130)) * bobA, w.pos.z);
       // 근접 하이라이트 — 가장 가까운 플롯 (반경 5.5)
       let bestI = -1;
       let bestD = 5.5;
-      for (let i = 0; i < plots.length; i++) {
+      for (let i = 0; i < plotsRef.current.length; i++) {
         const p = plotPosition(i);
         const d = Math.hypot(p.x - w.pos.x, p.z - w.pos.z);
         if (d < bestD) { bestD = d; bestI = i; }
@@ -252,15 +305,49 @@ export default function VillageMap3D({
         hl.visible = false;
       }
       // 카메라 리지드 팔로우 — target 이동분을 camera 에도 더해 오프셋 보존
-      const follow = new THREE.Vector3(w.pos.x, 1, w.pos.z);
-      const delta = follow.clone().sub(controls.target).multiplyScalar(0.14);
+      const follow = new THREE.Vector3(clampToVillage(w.pos.x), 1, clampToVillage(w.pos.z));
+      const delta = follow.clone().sub(controls.target);
+      const settling = delta.lengthSq() > 0.0001;
+      delta.multiplyScalar(reducedMotionRef.current || !settling ? 1 : 0.14);
       controls.target.add(delta);
       camera.position.add(delta);
       controls.update();
       renderer.render(scene, camera);
+      walkFrameRef.current = false;
+      if (w.target || (settling && !reducedMotionRef.current)) w.raf = requestAnimationFrame(step);
+    };
+    wakeWalkRef.current = () => {
+      if (!w.active || w.raf || document.hidden) return;
+      last = performance.now();
       w.raf = requestAnimationFrame(step);
     };
-    w.raf = requestAnimationFrame(step);
+    wakeWalkRef.current();
+  }
+
+  function focusPlace(index: number | null) {
+    if (walkRef.current.active) stopWalk();
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+    const p = index === null ? { x: 0, z: 0 } : plotPosition(index);
+    // 클램프는 onControlsChange 가 카메라를 옮긴 뒤에 걸린다 — 먼저 잘라 두지
+    // 않으면 controls.target 과 camera 가 어긋난 채 남아 다음 조작에서 튄다.
+    const target = new THREE.Vector3(clampToVillage(p.x), 1, clampToVillage(p.z));
+    camera.position.add(target.clone().sub(controls.target));
+    controls.target.copy(target);
+    controls.update();
+    requestRenderRef.current();
+  }
+
+  function zoom(factor: number) {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+    const offset = camera.position.clone().sub(controls.target);
+    offset.setLength(THREE.MathUtils.clamp(offset.length() * factor, controls.minDistance, controls.maxDistance));
+    camera.position.copy(controls.target).add(offset);
+    controls.update();
+    requestRenderRef.current();
   }
 
   // ── 텍스처 로더 (캐시 + 실패 기억) ─────────────────────────
@@ -278,6 +365,7 @@ export default function VillageMap3D({
     new THREE.TextureLoader().load(
       url,
       (tex) => {
+        if (!aliveRef.current || cache.get(url) !== entry) { tex.dispose(); return; }
         tex.colorSpace = THREE.SRGBColorSpace;
         const waiters = entry.status === "loading" ? entry.waiters : [];
         cache.set(url, { status: "ok", tex });
@@ -285,6 +373,7 @@ export default function VillageMap3D({
       },
       undefined,
       () => {
+        if (!aliveRef.current || cache.get(url) !== entry) return;
         const waiters = entry.status === "loading" ? entry.waiters : [];
         cache.set(url, { status: "err" });
         waiters.forEach((w) => w(null));
@@ -306,11 +395,13 @@ export default function VillageMap3D({
     cache.set(url, entry);
     const img = new Image();
     img.onload = () => {
+      if (!aliveRef.current || cache.get(url) !== entry) return;
       const waiters = entry.status === "loading" ? entry.waiters : [];
       cache.set(url, { status: "ok", img });
       waiters.forEach((w) => w(img));
     };
     img.onerror = () => {
+      if (!aliveRef.current || cache.get(url) !== entry) return;
       const waiters = entry.status === "loading" ? entry.waiters : [];
       cache.set(url, { status: "err" });
       waiters.forEach((w) => w(null));
@@ -422,6 +513,7 @@ export default function VillageMap3D({
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true });
     } catch {
+      aliveRef.current = false;
       onFailRef.current(); // WebGL 컨텍스트 생성 실패 → 2D 폴백
       return;
     }
@@ -446,15 +538,32 @@ export default function VillageMap3D({
     let renderQueued = false;
     let disposed = false;
     const requestRender = () => {
-      if (renderQueued || disposed) return;
+      if (renderQueued || disposed || document.hidden) return;
       renderQueued = true;
       requestAnimationFrame(() => {
         renderQueued = false;
-        if (disposed) return;
+        if (disposed || document.hidden) return;
         renderer.render(scene, camera);
       });
     };
     requestRenderRef.current = requestRender;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onMotionChange = () => {
+      reducedMotionRef.current = motion.matches;
+      wakeWalkRef.current();
+    };
+    onMotionChange();
+    motion.addEventListener("change", onMotionChange);
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(walkRef.current.raf);
+        walkRef.current.raf = 0;
+      } else {
+        wakeWalkRef.current();
+        requestRender();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     // 컨텍스트 유실 → 2D 폴백
     const onContextLost = (e: Event) => {
@@ -504,6 +613,8 @@ export default function VillageMap3D({
 
     // 컨트롤 — 고정 아이소 앵글, 회전 ±30°, 줌 0.7~2.0×, 팬 (터치 우선)
     const controls = new OrbitControls(camera, renderer.domElement);
+    controls.touches.ONE = THREE.TOUCH.ROTATE;
+    controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
     controls.enableDamping = false; // damping 은 연속 rAF 필요 — invalidate 렌더와 상충
     controls.target.set(0, 1, 0);
     controls.minPolarAngle = CAM_POLAR;
@@ -520,6 +631,9 @@ export default function VillageMap3D({
       t.x = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, t.x));
       t.z = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, t.z));
       t.y = 1;
+      // 산책 루프가 이 프레임을 이미 그린다. 여기서 또 예약하면 한 프레임에
+      // render 가 두 번 돈다 — 실측으로 60Hz 화면에서 초당 122회였다.
+      if (walkFrameRef.current) return;
       requestRender();
     };
     controls.addEventListener("change", onControlsChange);
@@ -542,12 +656,19 @@ export default function VillageMap3D({
     // 탭 → raycast → 학생 팝오버 (8px 이내 이동만 클릭으로 인정)
     const ray = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
-    let downAt: { x: number; y: number } | null = null;
+    let downAt: { x: number; y: number; id: number } | null = null;
+    const pointers = new Set<number>();
     const onPointerDown = (e: PointerEvent) => {
-      downAt = { x: e.clientX, y: e.clientY };
+      pointers.add(e.pointerId);
+      downAt = pointers.size === 1 && e.button === 0 ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+    };
+    const onPointerCancel = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      downAt = null;
     };
     const onPointerUp = (e: PointerEvent) => {
-      if (!downAt) return;
+      pointers.delete(e.pointerId);
+      if (!downAt || downAt.id !== e.pointerId || pointers.size) { downAt = null; return; }
       const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
       downAt = null;
       if (moved > 8) return;
@@ -581,11 +702,13 @@ export default function VillageMap3D({
             0,
             Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, p.z)),
           );
+          wakeWalkRef.current();
         }
       }
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
+    renderer.domElement.addEventListener("pointercancel", onPointerCancel);
 
     sceneRef.current = scene;
     rendererRef.current = renderer;
@@ -602,20 +725,19 @@ export default function VillageMap3D({
       disposed = true;
       walkRef.current.active = false;
       cancelAnimationFrame(walkRef.current.raf);
+      walkRef.current.raf = 0;
+      wakeWalkRef.current = () => {};
+      document.removeEventListener("visibilitychange", onVisibility);
+      motion.removeEventListener("change", onMotionChange);
       observer.disconnect();
       renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
+      renderer.domElement.removeEventListener("pointercancel", onPointerCancel);
       controls.removeEventListener("change", onControlsChange);
       controls.dispose();
       // 씬 전체 dispose (geometry/material) — 텍스처 캐시는 별도 정리
-      scene.traverse((obj) => {
-        const mesh = obj as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const mat = (mesh as unknown as { material?: THREE.Material | THREE.Material[] }).material;
-        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-        else if (mat) mat.dispose();
-      });
+      disposeSubtree(scene);
       texCacheRef.current.forEach((e) => {
         if (e.status === "ok") e.tex.dispose();
       });
@@ -642,19 +764,18 @@ export default function VillageMap3D({
   useEffect(() => {
     const group = plotsGroupRef.current;
     if (!group || !sceneRef.current) return;
+    // 이름순 인덱스가 자리를 정한다. 누가 첫 스티커를 받아 목록에 끼어들면
+    // 내 집이 옮겨지는데 산책 벌은 옛 좌표에 남아, 카메라째로 남의 잔디에 선다.
+    // 자리가 달라졌으면(또는 내 집이 사라졌으면) 산책을 정리한다 — 다시 누르면
+    // 최신 목록 기준으로 시작한다.
+    if (walkRef.current.active && walkRef.current.startedAt !== selfPlotIndex) stopWalk();
     const gen = ++genRef.current;
 
     // 이전 플롯 정리 — geometry/material 만 (텍스처는 공유 캐시라 유지)
     while (group.children.length > 0) {
       const child = group.children[0];
       group.remove(child);
-      child.traverse((obj) => {
-        const mesh = obj as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const mat = (mesh as unknown as { material?: THREE.Material | THREE.Material[] }).material;
-        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-        else if (mat) mat.dispose();
-      });
+      disposeSubtree(child);
     }
 
     // 중앙: 공동 시설 (해금 순서대로 광장에 배치)
@@ -677,10 +798,82 @@ export default function VillageMap3D({
     // 학생 플롯 — 나선 배치 (호출부가 이름순 정렬 = 결정적 순서)
     plots.forEach((plot, i) => {
       const { x, z } = plotPosition(i);
+      // Connect each doorstep to the closest earlier doorstep (or the plaza).
+      // A connected village with one short path per house, without new textures.
+      const door = new THREE.Vector3(x, 0.025, z + 3.6);
+      let junction = new THREE.Vector3(0, 0.025, 0);
+      let distance = door.distanceToSquared(junction);
+      for (let j = 0; j < i; j++) {
+        const previous = plotPosition(j);
+        const candidate = new THREE.Vector3(previous.x, 0.025, previous.z + 3.6);
+        const d = door.distanceToSquared(candidate);
+        if (d < distance) { junction = candidate; distance = d; }
+      }
+      const direction = door.clone().sub(junction);
+      const road = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.45, direction.length()),
+        new THREE.MeshLambertMaterial({ color: 0xf0d9a3 }),
+      );
+      road.rotation.set(-Math.PI / 2, 0, Math.atan2(direction.x, direction.z));
+      road.position.copy(door.clone().add(junction).multiplyScalar(0.5));
+      group.add(road);
       const plotGroup = new THREE.Group();
       plotGroup.position.set(x, 0, z);
       plotGroup.userData.clientId = plot.id;
       group.add(plotGroup);
+
+      const lawn = new THREE.Mesh(
+        new THREE.CircleGeometry(3.6, 24),
+        new THREE.MeshLambertMaterial({ color: plot.isSelf ? 0xc9e994 : 0xb5dc8a }),
+      );
+      lawn.rotation.x = -Math.PI / 2;
+      lawn.position.y = 0.035;
+      plotGroup.add(lawn);
+
+      // Small living garden; instancing keeps the growth detail to three draws.
+      const level = Math.max(0, Math.floor(Number.isFinite(plot.gardenLevel) ? plot.gardenLevel : 0));
+      const water = THREE.MathUtils.clamp(Math.floor(plot.gardenWater || 0), 0, WATER_PER_LEVEL - 1);
+      const flowers = Math.min(1 + level, 5);
+      /* 크기 기준: 집 스프라이트가 3.6 유닛 폭이다. 처음 잡았던 꽃(반지름
+         0.13~0.20)은 집의 5% 도 안 돼서 기본 카메라 거리에서 아이 눈에 보이지
+         않았다 — 실제로 캡처해 보고 키웠다. 꽃 5송이가 잔디(반지름 3.6) 밖으로
+         나가지 않는 선이 상한이다: 가장 바깥 꽃이 √(2.0² + 2.9²) = 3.52,
+         가장 바깥 물방울이 √(0.88² + 3.35²) = 3.46 으로 둘 다 잔디 안이다. */
+      const stems = new THREE.InstancedMesh(
+        new THREE.CylinderGeometry(0.075, 0.1, 0.7, 5),
+        new THREE.MeshLambertMaterial({ color: 0x4d853a }), flowers,
+      );
+      const blooms = new THREE.InstancedMesh(
+        new THREE.SphereGeometry(level ? 0.34 : 0.22, 8, 6),
+        new THREE.MeshLambertMaterial({ color: level ? 0xffbc68 : 0x6fa64b }), flowers,
+      );
+      const transform = new THREE.Object3D();
+      for (let f = 0; f < flowers; f++) {
+        // 집 앞 구성: 문패(x=-0.9)는 왼쪽, 꽃밭은 오른쪽, 물방울은 앞 가운데.
+        // 가운데에 두면 문패 스프라이트 뒤로 숨는다 — 캡처에서 실제로 가려졌다.
+        // 송이 수가 적을 때도 꽃밭 자리 가운데에 모이도록 정렬한다.
+        const spread = 0.5;
+        const x0 = 1.0 - ((flowers - 1) * spread) / 2;
+        transform.position.set(x0 + f * spread, 0.35, 2.9);
+        transform.updateMatrix();
+        stems.setMatrixAt(f, transform.matrix);
+        transform.position.y = 0.82;
+        transform.updateMatrix();
+        blooms.setMatrixAt(f, transform.matrix);
+      }
+      const drops = new THREE.InstancedMesh(
+        new THREE.SphereGeometry(0.17, 8, 6),
+        new THREE.MeshBasicMaterial(), WATER_PER_LEVEL,
+      );
+      for (let d = 0; d < WATER_PER_LEVEL; d++) {
+        transform.position.set(-0.88 + d * 0.44, 0.2, 3.35);
+        transform.updateMatrix();
+        drops.setMatrixAt(d, transform.matrix);
+        // 빈 칸도 '아직 안 받은 자리' 로 보여야 한다 — 잔디에 묻히지 않게
+        // 흰색보다 한 단계 가라앉은 색을 쓴다.
+        drops.setColorAt(d, new THREE.Color(d < water ? 0x168bc1 : 0xd3ddcb));
+      }
+      plotGroup.add(stems, blooms, drops);
 
       // 내 집 표시 — 금색 바닥 링
       if (plot.isSelf) {
@@ -795,40 +988,116 @@ export default function VillageMap3D({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plots, facilities]);
 
+  const selectedPlot = plots.find((plot) => plot.id === destination);
+
+  /* 크기·색·모서리는 전부 아동 UX 토큰이 정한다. data-ux-role="control" 이
+     min-height/min-width(기본 48px, 큰 글씨 56px)·글자 크기·패딩·반경을 주고,
+     여기서는 색만 얹는다 — px 를 새로 만들면 '큰 글씨' 와 터치 최소 크기
+     계약이 이 화면에서만 깨진다(lib/childUx/tokens.ts). */
+  const controlSkin = {
+    border: "2px solid var(--ux-primary-border)",
+    background: "var(--ux-surface)",
+    color: "var(--ux-ink)",
+    fontFamily: "inherit",
+    fontWeight: 800,
+    cursor: "pointer",
+  } as const;
+
   return (
-    <div style={{ position: "relative", width: "100%", height }}>
+    <section aria-label="우리 꿀벌마을" style={{ width: "100%" }}>
       <div
-        ref={mountRef}
-        style={{ width: "100%", height: "100%", borderRadius: 16, overflow: "hidden" }}
-      />
-      {selfPlotIndex >= 0 && (
+        role="group"
+        aria-label="마을 이동"
+        style={{
+          display: "flex", flexWrap: "wrap",
+          gap: "var(--ux-control-gap)", padding: "0 var(--ux-space-1) var(--ux-space-3)",
+        }}
+      >
+        <button type="button" data-ux-role="control" style={controlSkin} onClick={() => focusPlace(null)}>🌳 광장</button>
+        {selfPlotIndex >= 0 && (
+          <button type="button" data-ux-role="control" style={controlSkin} onClick={() => focusPlace(selfPlotIndex)}>🏡 내 집</button>
+        )}
+        <button type="button" data-ux-role="control" style={controlSkin} aria-label="지도 확대" onClick={() => zoom(0.8)}>＋</button>
+        <button type="button" data-ux-role="control" style={controlSkin} aria-label="지도 축소" onClick={() => zoom(1.25)}>−</button>
         <button
-          onClick={() => (walking ? stopWalk() : startWalk())}
-          style={{
-            position: "absolute", right: 12, bottom: 12,
-            minHeight: 48, padding: "10px 18px", borderRadius: 16,
-            border: "none", cursor: "pointer",
-            fontSize: 15, fontWeight: 900, fontFamily: "inherit",
-            color: "#fff",
-            background: walking
-              ? "linear-gradient(135deg, #64748B, #475569)"
-              : "linear-gradient(135deg, #F59E0B, #D97706)",
-            boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+          type="button" data-ux-role="control" style={controlSkin}
+          aria-expanded={helpOpen} onClick={() => setHelpOpen(!helpOpen)}
+        >조작 안내</button>
+      </div>
+      {helpOpen && (
+        <p data-ux-role="body" style={{ margin: "0 var(--ux-space-1) var(--ux-space-3)" }}>
+          한 손가락으로 돌리고, 두 손가락으로 이동·확대해요. 마우스는 드래그로 회전, 오른쪽 드래그로 이동해요.
+          집을 누르거나 아래 목록에서 친구를 골라 방문할 수 있어요.
+        </p>
+      )}
+      <div style={{ position: "relative", width: "100%", height, maxHeight: "65dvh", minHeight: 280 }}>
+        {/* 지도는 그림이다 — 방문·이동·확대는 모두 위아래 DOM 조작으로도 된다.
+            role="img" 로 알려 주고, 조작은 진짜 버튼에 맡긴다. */}
+        <div
+          ref={mountRef}
+          role="img"
+          aria-label="친구들의 집이 길로 이어진 꿀벌마을 지도"
+          style={{ width: "100%", height: "100%", borderRadius: "var(--ux-radius-surface)", overflow: "hidden" }}
+        />
+        {/* 산책 중이면 내 집이 목록에서 빠져도 '마치기' 는 남아야 한다 —
+            버튼만 사라지고 산책이 계속되면 빠져나갈 길이 없다. */}
+        {(selfPlotIndex >= 0 || walking) && (
+          <button
+            type="button" data-ux-role="action" aria-pressed={walking}
+            onClick={() => (walking ? stopWalk() : startWalk())}
+            style={{
+              ...controlSkin,
+              position: "absolute", right: "var(--ux-space-3)", bottom: "var(--ux-space-3)",
+              border: "none",
+              background: walking ? "var(--ux-surface-sunk)" : "var(--ux-primary-fill)",
+              color: walking ? "var(--ux-ink-soft)" : "var(--ux-primary-ink)",
+              boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+            }}
+          >
+            {walking ? "산책 마치기" : "🐝 산책하기"}
+          </button>
+        )}
+      </div>
+      <p data-ux-role="secondary" role="status" style={{ margin: "var(--ux-space-3) var(--ux-space-1)" }}>
+        {walking
+          ? "빈 바닥을 누르면 벌이 걸어가요. 친구 집을 눌러 방문해요."
+          : "집 앞의 꽃은 정원 성장, 파란 점은 받은 물을 보여줘요."}
+      </p>
+      <div
+        data-ux-surface
+        style={{
+          display: "flex", flexWrap: "wrap", alignItems: "center",
+          gap: "var(--ux-control-gap)", padding: "var(--ux-space-3)",
+          background: "var(--ux-surface-sunk)",
+        }}
+      >
+        <label htmlFor="village-destination" data-ux-role="label" style={{ fontWeight: 800 }}>친구 찾기</label>
+        <select
+          id="village-destination" data-ux-role="control"
+          value={selectedPlot?.id ?? ""}
+          onChange={(event) => {
+            setDestination(event.target.value);
+            const index = plots.findIndex((plot) => plot.id === event.target.value);
+            if (index >= 0) focusPlace(index);
           }}
+          style={{ ...controlSkin, flex: "1 1 150px", minWidth: 0, maxWidth: "100%" }}
         >
-          {walking ? "✕ 그만" : "🚶 산책"}
-        </button>
-      )}
-      {walking && (
-        <div style={{
-          position: "absolute", left: 12, bottom: 14,
-          padding: "6px 12px", borderRadius: 12,
-          background: "rgba(255,255,255,0.85)", color: "#92400E",
-          fontSize: 12, fontWeight: 800, pointerEvents: "none",
-        }}>
-          바닥을 탭하면 그곳으로 걸어가요 🐝
-        </div>
-      )}
-    </div>
+          <option value="">방문할 집을 골라요</option>
+          {plots.map((plot) => (
+            <option key={plot.id} value={plot.id}>{plot.name}{plot.isSelf ? " (내 집)" : ""}</option>
+          ))}
+        </select>
+        <button
+          type="button" data-ux-role="control" disabled={!selectedPlot}
+          onClick={() => selectedPlot && onSelectRef.current(selectedPlot.id)}
+          style={{ ...controlSkin, opacity: selectedPlot ? 1 : 0.5 }}
+        >집 방문</button>
+        {selectedPlot && (
+          <p data-ux-role="body" style={{ flexBasis: "100%", margin: 0 }}>
+            {selectedPlot.name}의 정원 · {selectedPlot.gardenLevel}단계 · 물 {selectedPlot.gardenWater}/{WATER_PER_LEVEL}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

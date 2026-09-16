@@ -377,6 +377,8 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
           plate: h.plate,
           fence: h.fence,
           yard: h.yard,
+          gardenLevel: e.village.gardenLevel ?? 0,
+          gardenWater: e.village.gardenWater ?? 0,
         };
       }),
     [entries, myClientId, user.isTeacher],
@@ -512,9 +514,14 @@ export default function BeeVillage({ lang, roomCode, user, myClientId, roomConfi
       </h2>
       <p data-ux-role="secondary" style={{ margin: "0 var(--ux-space-2) var(--ux-space-3)" }}>
         {map3d === "on"
-          ? `한 손가락으로 돌리고, 두 손가락으로 이동·확대해요 · 집을 눌러 방문 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`
+          ? `길을 따라 친구 집에 놀러 가요 · 물 ${WATER_PER_LEVEL}번을 받으면 집 앞 정원이 자라요`
           : `친구 집을 눌러 하루 한 번 💧 물을 줘요 — 물 ${WATER_PER_LEVEL}번이면 정원이 자라요`}
       </p>
+      {map3d === "off" && (
+        <p data-ux-role="secondary" role="status" style={{ margin: "0 8px 12px" }}>
+          지금은 간단한 지도로 보여주고 있어요. 집 방문과 물주기는 그대로 할 수 있어요.
+        </p>
+      )}
       {entries.length === 0 ? (
         <p data-ux-role="body" style={{ textAlign: "center", padding: "var(--ux-space-6) 0" }}>
           아직 마을에 집이 없어요 — 칭찬 스티커를 받으면 집이 생겨요!
