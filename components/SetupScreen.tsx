@@ -9,7 +9,6 @@ import {
   ANIMALS, animalAssetPath, animalLabel, fallbackAnimal, isAnimalId, type AnimalId,
 } from "@/lib/animals";
 import FlyingBees from "./ui/FlyingBees";
-import BeeBanner from "./BeeBanner";
 import SpeakButton from "./ui/SpeakButton";
 import ScopedStyle from "./ui/child/ScopedStyle";
 import AnimalArt from "./ui/child/AnimalArt";
@@ -128,7 +127,6 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
 
       <div className="setup-shell">
         <div className="setup-hero">
-          <BeeBanner />
           <img src="/mascot/bee-welcome.png" alt="" aria-hidden="true" className="setup-hero-bee" />
         </div>
 

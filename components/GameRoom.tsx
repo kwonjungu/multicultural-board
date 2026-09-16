@@ -353,6 +353,10 @@ export default function GameRoom({ myLang, onClose, onChangeMyLang, roomLangs, r
     <div style={{
       position: "fixed", inset: 0, zIndex: 460,
       display: "flex", flexDirection: "column",
+      // 게임은 화면을 통째로 덮는다(inset:0). 상시 이름표(BeeBanner)는
+      // position:fixed 라 html 여백이 안 통하므로, 여기서 직접 그 높이만큼
+      // 위를 비운다 — 안 그러면 띠가 게임 제목·뒤로가기 줄을 가린다.
+      paddingTop: "var(--bee-banner-h, 0px)",
       // 🐝 이 방 전용 배경 — '꿀벌 놀이터'(교실 한켠의 놀이 공간).
       //    scripts/gen-backgrounds.mjs 로 뽑는다. 다른 화면과 돌려 쓰던 협곡
       //    풍경에서 바꿨다 — 여기는 '놀이터'라는 것이 그림으로 먼저 보여야 한다.

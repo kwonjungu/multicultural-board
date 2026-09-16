@@ -66,6 +66,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           *, *::before, *::after { box-sizing: border-box; }
           body { color: var(--ink); }
 
+          /* 상시 이름표(BeeBanner)는 position:fixed 로 화면 맨 위에 떠 있다.
+             그대로 두면 아래 깔린 화면의 첫 줄(뒤로가기·제목)을 덮으므로,
+             문서 위쪽을 그 높이만큼 비운다. --bee-banner-h 는 배너가 떠 있는
+             동안에만 있어서 배너 없는 화면(관리자·프리뷰·픽스처)의 레이아웃은
+             그대로다. body 가 아니라 html 에 거는 이유는 '큰 글씨' 의
+             body zoom 이 이 여백까지 배로 키우면 안 되기 때문이다. */
+          html { padding-top: var(--bee-banner-h, 0px); }
+
           button, input, textarea, select { font-family: inherit; }
           *:focus-visible { outline: 3px solid var(--ux-focus); outline-offset: 2px; border-radius: 4px; }
 

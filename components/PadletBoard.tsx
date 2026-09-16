@@ -1371,7 +1371,9 @@ const BOARD_CSS = `
   font-family: 'Pretendard Variable','Pretendard','Noto Sans KR',sans-serif;
 }
 .bd-bar{
-  position: sticky; top: 0; z-index: 30;
+  /* 상시 이름표(BeeBanner)가 화면 맨 위를 차지한다. top:0 으로 붙이면
+     스크롤할 때 이 줄이 띠 밑으로 들어가 가려진다 — 그 높이만큼 내린다. */
+  position: sticky; top: var(--bee-banner-h, 0px); z-index: 30;
   display: flex; align-items: center; gap: var(--ux-space-3);
   padding: var(--ux-space-2) var(--ux-space-4);
   background: var(--ux-surface);
