@@ -78,6 +78,21 @@ const GROUPS = [
     recursive: true,
   },
   {
+    // 내장 동화책. 실측 26장 전부 1024x1024 PNG 로 장당 1.1~1.9 MB 였다.
+    // 자리는 등장인물 얼굴 120px(BookStudy), 서재 표지 200px, 읽기 판 600px 이다.
+    id: "storybooks",
+    dir: "storybooks",
+    widths: [256, 480, 1024],
+    quality: 86,
+    recursive: true,
+  },
+  {
+    id: "story",
+    dir: "story",
+    widths: [256, 480, 1024],
+    quality: 86,
+  },
+  {
     id: "ui-icons",
     dir: "ui-icons/v1",
     widths: [64, 128, 256],

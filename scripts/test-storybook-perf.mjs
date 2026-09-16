@@ -118,6 +118,41 @@ if (!existsSync(sample)) {
     + ` · alpha ${before.hasAlpha} -> ${after.hasAlpha}`);
 }
 
+// ── C. 파생본이 빠짐없이 있는가 ───────────────────────────────
+// CSS background 자리는 폴백이 없다(lib/imageOpt.ts 주석 참조) — 파생본이 하나만
+// 없어도 그 자리가 빈 채로 뜬다. 사다리의 모든 폭이 실제로 있는지 확인한다.
+{
+  const { readdir } = await import("node:fs/promises");
+  const LADDER = [256, 480, 1024];
+  const groups = [
+    ["public/storybooks", true],
+    ["public/story", false],
+  ];
+  let checked = 0;
+  const missing = [];
+  for (const [dir, recursive] of groups) {
+    if (!existsSync(dir)) continue;
+    const walk = async (d) => {
+      for (const e of await readdir(d, { withFileTypes: true })) {
+        const full = `${d}/${e.name}`;
+        if (e.isDirectory()) { if (recursive) await walk(full); continue; }
+        if (!/\.(png|jpe?g)$/i.test(e.name)) continue;
+        const stem = e.name.replace(/\.[^.]+$/, "");
+        const rel = d.replace(/^public\//, "");
+        for (const w of LADDER) {
+          const derived = `public/_opt/${rel.replace(/^public\//, "")}/${stem}-${w}.webp`
+            .replace("public/_opt/public/", "public/_opt/");
+          checked++;
+          if (!existsSync(derived)) missing.push(derived);
+        }
+      }
+    };
+    await walk(dir);
+  }
+  check(missing.length === 0, `동화책 파생본이 빠짐없이 있다 (${checked}개 확인)`,
+    missing.length ? `없는 것 ${missing.length}개, 예: ${missing[0]}` : "");
+}
+
 // ── 결과 ─────────────────────────────────────────────────────
 console.log(`\n통과 ${ok.length}건`);
 for (const o of ok) console.log(`  · ${o}`);

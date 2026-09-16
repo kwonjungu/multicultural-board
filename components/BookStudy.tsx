@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LADDERS, optimizedBackground } from "@/lib/imageOpt";
 import {
   ref,
   onValue,
@@ -427,8 +428,10 @@ function CharacterQuestion({
       }}>
         <div style={{
           width: 120, height: 120, borderRadius: "50%",
+          // 지름 120px 원인데 원본 동화책 그림은 장당 1.1~1.9 MB 다 —
+          // 파생본을 먼저 쓰고, 없으면 CSS 가 뒤의 원본 url 로 내려간다.
           background: imageUrl
-            ? `url(${imageUrl}) center/cover no-repeat`
+            ? `${optimizedBackground(imageUrl, 120, LADDERS.storybook)} center/cover no-repeat`
             : "linear-gradient(135deg, #FDE68A, #F59E0B)",
           border: "4px solid #fff",
           boxShadow: "0 8px 24px rgba(245,158,11,0.35)",

@@ -1,7 +1,991 @@
 {
   "version": 1,
-  "generated": "2026-09-16T02:53:17.440Z",
+  "generated": "2026-09-16T04:41:28.562Z",
   "entries": {
+    "/story/bridge.png": {
+      "hash": "3ef39fe071c9",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 990137,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/bridge-256.webp",
+          "bytes": 8286
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/bridge-480.webp",
+          "bytes": 20708
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/bridge-1024.webp",
+          "bytes": 57806
+        }
+      ]
+    },
+    "/story/door.png": {
+      "hash": "93be9ad61436",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 937832,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/door-256.webp",
+          "bytes": 3556
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/door-480.webp",
+          "bytes": 9176
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/door-1024.webp",
+          "bytes": 23118
+        }
+      ]
+    },
+    "/story/dream.png": {
+      "hash": "9da99711d816",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 906647,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/dream-256.webp",
+          "bytes": 3954
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/dream-480.webp",
+          "bytes": 8600
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/dream-1024.webp",
+          "bytes": 21438
+        }
+      ]
+    },
+    "/story/family.png": {
+      "hash": "08ccf03f17ea",
+      "width": 372,
+      "height": 303,
+      "bytes": 174774,
+      "alpha": true,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/family-256.webp",
+          "bytes": 30210
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/family-480.webp",
+          "bytes": 48884
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/family-1024.webp",
+          "bytes": 48884
+        }
+      ]
+    },
+    "/story/friend.png": {
+      "hash": "8da79c628d97",
+      "width": 372,
+      "height": 300,
+      "bytes": 135724,
+      "alpha": true,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/friend-256.webp",
+          "bytes": 21444
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/friend-480.webp",
+          "bytes": 31844
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/friend-1024.webp",
+          "bytes": 31844
+        }
+      ]
+    },
+    "/story/gift.png": {
+      "hash": "0c4119fe725a",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1023278,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/gift-256.webp",
+          "bytes": 7526
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/gift-480.webp",
+          "bytes": 16618
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/gift-1024.webp",
+          "bytes": 41182
+        }
+      ]
+    },
+    "/story/heart.png": {
+      "hash": "95771dd60a19",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 248844,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/heart-256.webp",
+          "bytes": 2688
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/heart-480.webp",
+          "bytes": 5710
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/heart-1024.webp",
+          "bytes": 13584
+        }
+      ]
+    },
+    "/story/journey.png": {
+      "hash": "d1c86fdb90c6",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1054313,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/journey-256.webp",
+          "bytes": 7332
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/journey-480.webp",
+          "bytes": 17072
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/journey-1024.webp",
+          "bytes": 46174
+        }
+      ]
+    },
+    "/story/letter.png": {
+      "hash": "054477048136",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 934102,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/letter-256.webp",
+          "bytes": 4362
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/letter-480.webp",
+          "bytes": 10086
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/letter-1024.webp",
+          "bytes": 25864
+        }
+      ]
+    },
+    "/story/music.png": {
+      "hash": "a06b0b0ae335",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 922689,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/music-256.webp",
+          "bytes": 4932
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/music-480.webp",
+          "bytes": 9750
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/music-1024.webp",
+          "bytes": 22666
+        }
+      ]
+    },
+    "/story/question.png": {
+      "hash": "099e73c3b2b1",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 862232,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/question-256.webp",
+          "bytes": 5738
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/question-480.webp",
+          "bytes": 12110
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/question-1024.webp",
+          "bytes": 28312
+        }
+      ]
+    },
+    "/story/rain.png": {
+      "hash": "68f0c9f2d4ab",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 880171,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/rain-256.webp",
+          "bytes": 4074
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/rain-480.webp",
+          "bytes": 8634
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/rain-1024.webp",
+          "bytes": 19530
+        }
+      ]
+    },
+    "/story/secret.png": {
+      "hash": "f65044aa95eb",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 969390,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/secret-256.webp",
+          "bytes": 6660
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/secret-480.webp",
+          "bytes": 14414
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/secret-1024.webp",
+          "bytes": 33488
+        }
+      ]
+    },
+    "/story/star.png": {
+      "hash": "bd02a3b0bc59",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 899871,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/star-256.webp",
+          "bytes": 3814
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/star-480.webp",
+          "bytes": 8226
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/star-1024.webp",
+          "bytes": 20198
+        }
+      ]
+    },
+    "/story/thanks.png": {
+      "hash": "7602dfb3f810",
+      "width": 218,
+      "height": 372,
+      "bytes": 103677,
+      "alpha": true,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/story/thanks-256.webp",
+          "bytes": 17604
+        },
+        {
+          "w": 480,
+          "url": "/_opt/story/thanks-480.webp",
+          "bytes": 17604
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/story/thanks-1024.webp",
+          "bytes": 17604
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/char-buzzy.png": {
+      "hash": "59d0094f2943",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1138690,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/char-buzzy-256.webp",
+          "bytes": 4648
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/char-buzzy-480.webp",
+          "bytes": 11676
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/char-buzzy-1024.webp",
+          "bytes": 39756
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/char-star-grandpa.png": {
+      "hash": "49d41386ed0a",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1352448,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/char-star-grandpa-256.webp",
+          "bytes": 6516
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/char-star-grandpa-480.webp",
+          "bytes": 18082
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/char-star-grandpa-1024.webp",
+          "bytes": 71988
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/cover.png": {
+      "hash": "42368674a487",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1378806,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/cover-256.webp",
+          "bytes": 9708
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/cover-480.webp",
+          "bytes": 25314
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/cover-1024.webp",
+          "bytes": 69708
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-1.png": {
+      "hash": "4eb3182000e4",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1688089,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-1-256.webp",
+          "bytes": 14738
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-1-480.webp",
+          "bytes": 40528
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-1-1024.webp",
+          "bytes": 123522
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-10.png": {
+      "hash": "2988cf6749a5",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1751716,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-10-256.webp",
+          "bytes": 15086
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-10-480.webp",
+          "bytes": 41034
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-10-1024.webp",
+          "bytes": 132948
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-2.png": {
+      "hash": "216bae5ef3d1",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1795146,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-2-256.webp",
+          "bytes": 14182
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-2-480.webp",
+          "bytes": 41846
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-2-1024.webp",
+          "bytes": 170902
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-3.png": {
+      "hash": "1e59113ac1b3",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1622283,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-3-256.webp",
+          "bytes": 10456
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-3-480.webp",
+          "bytes": 30596
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-3-1024.webp",
+          "bytes": 97020
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-4.png": {
+      "hash": "a331d538eb38",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1787802,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-4-256.webp",
+          "bytes": 17454
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-4-480.webp",
+          "bytes": 47184
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-4-1024.webp",
+          "bytes": 144144
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-5.png": {
+      "hash": "cd7e936cf6d7",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1753586,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-5-256.webp",
+          "bytes": 13096
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-5-480.webp",
+          "bytes": 37268
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-5-1024.webp",
+          "bytes": 138830
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-6.png": {
+      "hash": "3a4a08393bd6",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1996103,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-6-256.webp",
+          "bytes": 23088
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-6-480.webp",
+          "bytes": 64104
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-6-1024.webp",
+          "bytes": 234524
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-7.png": {
+      "hash": "ab7dd22d7c58",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1627307,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-7-256.webp",
+          "bytes": 12722
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-7-480.webp",
+          "bytes": 33646
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-7-1024.webp",
+          "bytes": 107962
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-8.png": {
+      "hash": "089312d0e605",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1604302,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-8-256.webp",
+          "bytes": 11058
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-8-480.webp",
+          "bytes": 30228
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-8-1024.webp",
+          "bytes": 97358
+        }
+      ]
+    },
+    "/storybooks/curious-worlds/page-9.png": {
+      "hash": "38828f1d3c84",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1791044,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/curious-worlds/page-9-256.webp",
+          "bytes": 14136
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/curious-worlds/page-9-480.webp",
+          "bytes": 38254
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/curious-worlds/page-9-1024.webp",
+          "bytes": 138368
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/char-butterfly-friend.png": {
+      "hash": "25dc6602d3f7",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1185923,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/char-butterfly-friend-256.webp",
+          "bytes": 6110
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/char-butterfly-friend-480.webp",
+          "bytes": 14914
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/char-butterfly-friend-1024.webp",
+          "bytes": 43616
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/char-buzzy.png": {
+      "hash": "e9b44c8334c6",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1128659,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/char-buzzy-256.webp",
+          "bytes": 4466
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/char-buzzy-480.webp",
+          "bytes": 10750
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/char-buzzy-1024.webp",
+          "bytes": 33272
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/cover.png": {
+      "hash": "6114b62c26a8",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1613681,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/cover-256.webp",
+          "bytes": 9236
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/cover-480.webp",
+          "bytes": 24642
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/cover-1024.webp",
+          "bytes": 85256
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-1.png": {
+      "hash": "a7afea9ef1c8",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1743498,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-1-256.webp",
+          "bytes": 12176
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-1-480.webp",
+          "bytes": 34126
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-1-1024.webp",
+          "bytes": 122832
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-10.png": {
+      "hash": "c5c0c3ad1071",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1592450,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-10-256.webp",
+          "bytes": 11924
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-10-480.webp",
+          "bytes": 29292
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-10-1024.webp",
+          "bytes": 91968
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-2.png": {
+      "hash": "a4268e75811b",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1490575,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-2-256.webp",
+          "bytes": 11634
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-2-480.webp",
+          "bytes": 28878
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-2-1024.webp",
+          "bytes": 78200
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-3.png": {
+      "hash": "d729c519dd9a",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1594251,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-3-256.webp",
+          "bytes": 11164
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-3-480.webp",
+          "bytes": 30322
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-3-1024.webp",
+          "bytes": 93950
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-4.png": {
+      "hash": "2c5aa1254054",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1902910,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-4-256.webp",
+          "bytes": 20936
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-4-480.webp",
+          "bytes": 56242
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-4-1024.webp",
+          "bytes": 182506
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-5.png": {
+      "hash": "d2f293c8f6ce",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1818044,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-5-256.webp",
+          "bytes": 16208
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-5-480.webp",
+          "bytes": 45168
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-5-1024.webp",
+          "bytes": 161444
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-6.png": {
+      "hash": "bd7f9ca41792",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1628521,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-6-256.webp",
+          "bytes": 12550
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-6-480.webp",
+          "bytes": 33074
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-6-1024.webp",
+          "bytes": 105956
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-7.png": {
+      "hash": "a553da907b1a",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1661966,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-7-256.webp",
+          "bytes": 16204
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-7-480.webp",
+          "bytes": 41736
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-7-1024.webp",
+          "bytes": 124788
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-8.png": {
+      "hash": "6903da368765",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1415819,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-8-256.webp",
+          "bytes": 6684
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-8-480.webp",
+          "bytes": 17556
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-8-1024.webp",
+          "bytes": 54742
+        }
+      ]
+    },
+    "/storybooks/seasons-beauty/page-9.png": {
+      "hash": "8734c76b1920",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1861409,
+      "alpha": false,
+      "derived": [
+        {
+          "w": 256,
+          "url": "/_opt/storybooks/seasons-beauty/page-9-256.webp",
+          "bytes": 18756
+        },
+        {
+          "w": 480,
+          "url": "/_opt/storybooks/seasons-beauty/page-9-480.webp",
+          "bytes": 53172
+        },
+        {
+          "w": 1024,
+          "url": "/_opt/storybooks/seasons-beauty/page-9-1024.webp",
+          "bytes": 169508
+        }
+      ]
+    },
     "/ui-icons/v1/animals/bear.png": {
       "hash": "acdad7fa9f8a",
       "width": 1254,

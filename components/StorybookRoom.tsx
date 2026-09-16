@@ -643,8 +643,9 @@ function TeacherSetup({
                 onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
               >
                 <span className="sbl-cover">
+                  {/* 책장은 모든 표지를 한 번에 그린다 — 화면 밖 표지까지 즉시 받으면 첫 화면이 그만큼 늦어진다. */}
                   {b.coverImageUrl
-                    ? <img src={b.coverImageUrl} alt="" aria-hidden="true" />
+                    ? <img src={b.coverImageUrl} alt="" aria-hidden="true" loading="lazy" decoding="async" />
                     : <span aria-hidden className="sbl-coveremoji">{b.coverEmoji}</span>}
                 </span>
                 <div style={{ minWidth: 0 }}>
@@ -918,8 +919,9 @@ function StudentFreeLibrary({
                 style={{ cursor: loadingBook ? "wait" : "pointer" }}
               >
                 <span className="sbl-cover">
+                  {/* 책장은 모든 표지를 한 번에 그린다 — 화면 밖 표지까지 즉시 받으면 첫 화면이 그만큼 늦어진다. */}
                   {b.coverImageUrl
-                    ? <img src={b.coverImageUrl} alt="" aria-hidden="true" />
+                    ? <img src={b.coverImageUrl} alt="" aria-hidden="true" loading="lazy" decoding="async" />
                     : <span aria-hidden className="sbl-coveremoji">{b.coverEmoji}</span>}
                 </span>
                 <span data-ux-role="label" className="sbl-booktitle">{b.titleKo}</span>
@@ -1115,7 +1117,14 @@ function StorybookFreeReader({
         {/* content */}
         {onCover
           ? <CoverCard lang={viewerLang} book={book} />
-          : curPage && <PageCard lang={viewerLang} page={curPage} total={total} />}
+          : curPage && (
+            <PageCard
+              lang={viewerLang}
+              page={curPage}
+              total={total}
+              nextImageUrl={book.pages.find((p) => p.idx === curPage.idx + 1)?.illustration?.imageUrl}
+            />
+          )}
 
         {/* [#1] 이 책으로 했던 수업의 친구들 답변 — 책 단위로 영속 저장되어 그대로 보인다 */}
         {(onCover
@@ -2167,7 +2176,13 @@ function DuringPhase({
 
   return (
     <>
-      <PageCard lang={lang} page={page} total={book.pages.length} autoReading={!isTeacher && !!session.autoReading} />
+      <PageCard
+        lang={lang}
+        page={page}
+        total={book.pages.length}
+        autoReading={!isTeacher && !!session.autoReading}
+        nextImageUrl={book.pages.find((p) => p.idx === page.idx + 1)?.illustration?.imageUrl}
+      />
 
       {currentQ && (
         <QuestionCard
@@ -2262,13 +2277,26 @@ function DuringPhase({
 }
 
 function PageCard({
-  lang, page, total, autoReading,
+  lang, page, total, autoReading, nextImageUrl,
 }: {
   lang: string;
   page: StorybookPage;
   total: number;
   autoReading?: boolean;
+  /** 다음 페이지 그림. 아이가 글을 읽는 동안 미리 받아 둔다. */
+  nextImageUrl?: string;
 }) {
+  // 지금까지는 페이지를 넘기는 그 순간에 받기 시작했다. 그림은 장당 1 MB 를
+  // 넘기 때문에 넘길 때마다 멈췄다 — 한 권에 열 번이다. 읽는 동안 다음 한 장만
+  // 미리 받아 둔다. **한 장만** 받는다: 열 장을 한꺼번에 받으면 처음 문제로
+  // 돌아간다. 자유읽기와 교사 진행이 만나는 곳이 여기뿐이라 여기에 둔다.
+  useEffect(() => {
+    if (!nextImageUrl || typeof window === "undefined") return;
+    const img = new Image();
+    img.decoding = "async";
+    img.src = nextImageUrl;
+  }, [nextImageUrl]);
+
   return (
     <div
       style={{
