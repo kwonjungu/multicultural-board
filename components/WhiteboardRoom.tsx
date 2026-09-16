@@ -5,7 +5,7 @@
 //         스냅샷이 자동 업로드.
 //   교사: 전 학생 보드를 갤러리로 실시간 모니터링 + 확대 + 공통 주제 내려주기.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import type { UserConfig } from "@/lib/types";
 import { useBackLayer } from "@/lib/backStack";
 import DrawBoard from "./DrawBoard";
@@ -215,6 +215,29 @@ export default function WhiteboardRoom({ user, roomCode, myClientId, onBack, fix
   );
 }
 
+// 갤러리 카드 — 한 학생의 보드 1장. lib/whiteboard.ts 의 subscribeWhiteboardBoards
+// 가 변경되지 않은 학생의 board 객체 참조를 그대로 유지해 주므로, 여기서
+// React.memo 로 감싸두면 다른 학생이 스냅샷을 올려도 이 카드는 (board, onEnlarge
+// 둘 다 참조가 그대로면) 리렌더되지 않는다.
+const GalleryCard = memo(function GalleryCard({
+  board, onEnlarge,
+}: { board: WhiteboardBoard; onEnlarge: (b: WhiteboardBoard) => void }) {
+  return (
+    <button
+      onClick={() => onEnlarge(board)}
+      data-ux-role="control"
+      className="wb-gcard"
+    >
+      <img
+        src={board.dataUrl}
+        alt={`${board.name} 그림`}
+        style={{ width: "100%", borderRadius: 10, display: "block", background: "#fff", aspectRatio: `${CANVAS_W} / ${CANVAS_H}`, objectFit: "cover" }}
+      />
+      <div data-ux-role="label" className="wb-gcard-name">{board.name}</div>
+    </button>
+  );
+});
+
 // ════════════════════ 교사: 갤러리 + 프롬프트 ════════════════════
 function TeacherWhiteboard({
   roomCode, prompt, active, offline, initialBoards,
@@ -226,6 +249,11 @@ function TeacherWhiteboard({
   const [toggling, setToggling] = useState(false);
 
   useEffect(() => { setDraft(prompt); }, [prompt]);
+
+  // setEnlarged 는 useState 가 보장하는 안정 참조이므로 이 콜백도 매 렌더
+  // 새로 만들어지지 않는다 — GalleryCard 가 참조 동일성으로 리렌더를
+  // 걸러낼 수 있도록 props 를 안정적으로 유지하기 위함.
+  const handleEnlarge = useCallback((b: WhiteboardBoard) => setEnlarged(b), []);
 
   async function toggleActive() {
     if (offline) return;
@@ -320,19 +348,7 @@ function TeacherWhiteboard({
           ) : (
             <div className="wb-gallery">
               {boards.map((b) => (
-                <button
-                  key={b.clientId}
-                  onClick={() => setEnlarged(b)}
-                  data-ux-role="control"
-                  className="wb-gcard"
-                >
-                  <img
-                    src={b.dataUrl}
-                    alt={`${b.name} 그림`}
-                    style={{ width: "100%", borderRadius: 10, display: "block", background: "#fff", aspectRatio: `${CANVAS_W} / ${CANVAS_H}`, objectFit: "cover" }}
-                  />
-                  <div data-ux-role="label" className="wb-gcard-name">{b.name}</div>
-                </button>
+                <GalleryCard key={b.clientId} board={b} onEnlarge={handleEnlarge} />
               ))}
             </div>
           )}

@@ -85,7 +85,12 @@ export function reactionLabel(id: string, viewerLang: string): string {
   return "";   // 옛 5종은 부르는 쪽이 t(r.key) 로 뽑는다
 }
 
-/** 실제 Firebase 노드 모양: `rooms/{room}/cards/{card}/likes/{clientId}`. */
+/**
+ * 실제 Firebase 노드 모양: `{clientId}` → 반응 종류.
+ * 저장 위치는 lib/boardPaths.ts 가 정한다 — 옛 방은 `cards/{card}/likes`,
+ * 새로 쓰는 것은 `cardLikes/{card}` 이고, 읽을 때 겹쳐서 이 한 덩어리가 된다.
+ * `false` 는 "옛 자리의 공감을 취소했다"는 가림표다(아래에서 세지 않는다).
+ */
 export type RawReactions = Record<string, string | boolean>;
 
 export interface ReactionSummary {

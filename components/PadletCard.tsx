@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, memo } from "react";
 import { ref, onValue, off, push, set, remove } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { CardData, CommentData, TranscriptData } from "@/lib/types";
@@ -11,6 +11,10 @@ import {
   REACTIONS, readReactions, nextReaction,
   type ReactionKind, type RawReactions,
 } from "@/lib/cardReactions";
+import {
+  cardLikesPath, cardLikePath, cardCommentsPath, cardCommentPath,
+  legacyCardCommentPath, mergeById,
+} from "@/lib/boardPaths";
 import { resolveAnimal } from "@/lib/animals";
 import AnimalArt from "./ui/child/AnimalArt";
 import AppIcon from "./ui/child/AppIcon";
@@ -41,9 +45,14 @@ interface Props {
   isTeacher?: boolean;
   myClientId?: string;
   authorName?: string;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  onPraise?: () => void;
+  /**
+   * 카드 id 를 받는다(콜백 자체가 아니라). PadletBoard 가 카드마다 새 클로저를
+   * 만들면 React.memo 가 무력화된다 — 부모는 카드 id 하나로 최신 카드를 찾는
+   * **한 개의 안정된 함수**를 모든 카드에 똑같이 내려보낸다.
+   */
+  onEdit?: (cardId: string) => void;
+  onDelete?: (cardId: string) => void;
+  onPraise?: (cardId: string) => void;
   isPending?: boolean;
   roomCode: string;
   roomLangs: string[];
@@ -61,9 +70,16 @@ interface Props {
    * 모양은 실제 노드와 같다: `{ [clientId]: 반응문자열 | true }`.
    */
   fixtureReactions?: RawReactions;
+  /**
+   * 옛 방 호환 바탕값 — 카드 밑에 남아 있던 공감·답장이다(lib/boardPaths.ts).
+   * 보드의 카드 구독이 이미 실어 온 것을 그대로 내려받는 것이라, 이 값을 쓰려고
+   * 구독을 새로 만들지 않는다. 새 노드를 위에 겹쳐 읽고 같은 열쇠는 새 것이 이긴다.
+   */
+  legacyLikes?: RawReactions;
+  legacyComments?: Record<string, CommentData>;
 }
 
-export default function PadletCard({
+function PadletCard({
   card,
   viewerLang,
   colColor,
@@ -80,11 +96,15 @@ export default function PadletCard({
   fixture,
   learners,
   fixtureReactions,
+  legacyLikes,
+  legacyComments,
 }: Props) {
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
   const [now, setNow] = useState(card.timestamp);
   const cardType = card.cardType || "text";
+  /** B 의 시계 effect 가 dep 배열에서 곧바로 쓴다 — 그 effect보다 먼저 선언한다. */
+  const isMyCard = !!myClientId && card.authorClientId === myClientId;
 
   // 읽기 상태
   const [showOriginal, setShowOriginal] = useState(false);
@@ -127,12 +147,32 @@ export default function PadletCard({
   const [reactOpen, setReactOpen] = useState(false);
   const [reactError, setReactError] = useState<string | null>(null);
 
-  // Tick to update edit window expiry
+  /**
+   * B — 수정 창(EDIT_WINDOW_MS) 만료를 보려고 도는 시계.
+   *
+   * `now` 는 오직 아래 `withinEditWindow` 한 곳에만 쓰이고, 그 값은
+   * `canEdit`/`canDelete` 에서 `isMyCard && withinEditWindow` 로만 읽힌다
+   * (교사는 `isTeacher ||` 앞부분에서 이미 판가름 나 시계를 볼 필요가 없다).
+   * 즉 시계가 의미 있는 경우는 "내가 쓴 글이고, 아직 교사가 아닐 때" 뿐이다.
+   * 예전에는 카드마다 조건 없이 10초 타이머를 돌려 25장이면 25개 타이머가
+   * 쉬지 않고 전체를 다시 그렸다(A 의 memo 도 이 타이머 때문에 무력화됐다).
+   * 옛 글(대다수)은 isMyCard 가 거짓이라 타이머가 아예 생기지 않고, 내 글도
+   * 5분이 지나 만료되면 그 순간 스스로 멈추고 다시는 돌지 않는다.
+   */
   useEffect(() => {
-    setNow(Date.now());
-    const interval = setInterval(() => setNow(Date.now()), 10000);
+    if (isTeacher || !isMyCard) return;
+    const tick = () => {
+      const current = Date.now();
+      setNow(current);
+      return current - card.timestamp < EDIT_WINDOW_MS;
+    };
+    if (!tick()) return; // 마운트 시점에 이미 만료 — 시계를 켤 이유가 없다.
+    const interval = setInterval(() => {
+      if (!tick()) clearInterval(interval);
+    }, 10000);
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTeacher, isMyCard, card.timestamp]);
 
   useEffect(() => { speakingRef.current = speaking; }, [speaking]);
 
@@ -148,11 +188,13 @@ export default function PadletCard({
     return () => { if (speakingRef.current) cancelSpeak(); };
   }, [card.id]);
 
-  // 반응 listener — 개수는 항상 보이게 상시 구독
+  /* 반응 listener — 개수는 항상 보이게 상시 구독.
+     cards 밖의 새 자리만 본다. 옛 자리는 legacyLikes 로 이미 손에 있으므로
+     구독을 하나 더 만들지 않는다 — 그러면 옮긴 이유가 없어진다. */
   useEffect(() => {
     if (fixture) return;
     const db = getClientDb();
-    const likesRef = ref(db, `rooms/${roomCode}/cards/${card.id}/likes`);
+    const likesRef = ref(db, cardLikesPath(roomCode, card.id));
     const unsub = onValue(likesRef, (snap) => {
       setReactRaw((snap.val() as RawReactions | null) || {});
     });
@@ -169,7 +211,12 @@ export default function PadletCard({
     stableId: card.authorClientId || card.authorName,
   }).id;
 
-  const { counts, legacy, mine, total } = readReactions(reactRaw, myClientId);
+  /** 옛 자리 위에 새 자리를 겹친 것. 세고 표시하는 것은 전부 이 값을 본다. */
+  const mergedReactions = useMemo(
+    () => mergeById(legacyLikes, reactRaw),
+    [legacyLikes, reactRaw],
+  );
+  const { counts, legacy, mine, total } = readReactions(mergedReactions, myClientId);
   const myReaction = REACTIONS.find((r) => r.id === mine) ?? null;
 
   /* U06 disclosure: 트리거·패널을 id 로 묶고, Escape·바깥 클릭으로 닫은 뒤
@@ -209,10 +256,23 @@ export default function PadletCard({
     const prevMine = mine;
     const next = nextReaction(prevMine, kind);
     setReactError(null);
+    /**
+     * 취소를 옛 자리 위에 어떻게 얹는가.
+     *
+     * 이 아이가 옛 방에서 이미 하트를 눌러 둔 카드라면, 새 자리에서 값을 지워도
+     * 겹쳐 읽기가 다시 옛 값을 꺼내 와 취소가 없던 일이 된다. 옛 자리를 직접
+     * 지우면 되겠지만 그건 cards 를 건드리는 일이고, 우리가 고친 바로 그 길이
+     * 다시 깨어난다 — 공감은 가장 자주 눌리는 버튼이라 예외를 둘 수 없다.
+     * 그래서 새 자리에 `false` 를 남겨 옛 값을 가린다. readReactions 가 거짓값을
+     * 세지 않으므로 개수도 내 선택 표시도 정확히 꺼진다.
+     * 옛 값이 없으면 그냥 지운다 — 쓸데없는 자국을 남기지 않는다.
+     */
+    const hadLegacyMine = !!legacyLikes?.[myClientId];
+    const optimistic: string | boolean | null = next ?? (hadLegacyMine ? false : null);
     // 낙관적 반영 — 실패하면 아래에서 되돌린다.
     setReactRaw((prev) => {
       const copy = { ...prev };
-      if (next) copy[myClientId] = next; else delete copy[myClientId];
+      if (optimistic !== null) copy[myClientId] = optimistic; else delete copy[myClientId];
       return copy;
     });
     // 고르면 패널을 닫고 포커스를 트리거로 돌려준다.
@@ -221,36 +281,42 @@ export default function PadletCard({
     if (fixture) return;
 
     const db = getClientDb();
-    const myRef = ref(db, `rooms/${roomCode}/cards/${card.id}/likes/${myClientId}`);
+    const myRef = ref(db, cardLikePath(roomCode, card.id, myClientId));
     reactQueue.current = reactQueue.current
       .then(async () => {
-        if (next) await set(myRef, next);
+        if (optimistic !== null) await set(myRef, optimistic);
         else await remove(myRef);
       })
       .catch(() => {
         // 낙관적 상태를 영구히 남기지 않는다 — 이전 선택으로 되돌리고 알린다.
         setReactRaw((prev) => {
           const copy = { ...prev };
-          if (prevMine) copy[myClientId] = prevMine; else delete copy[myClientId];
+          if (prevMine) copy[myClientId] = prevMine;
+          /* 옛 공감을 이미 취소해 둔 상태였다면 그 가림표를 되살린다. 그냥
+             지우면 옛 값이 다시 비쳐 나와 취소가 풀린 것처럼 보인다. */
+          else if (hadLegacyMine) copy[myClientId] = false;
+          else delete copy[myClientId];
           return copy;
         });
         setReactError(t("cardReactFailed", viewerLang));
       });
   }
 
-  // 답장 listener (열었을 때만)
+  /* 답장 listener (열었을 때만). 공감과 같은 이유로 새 자리만 구독하고,
+     옛 방에 남은 답장(legacyComments)은 바탕으로 깔아 겹쳐 읽는다. */
   useEffect(() => {
     if (!commentsOpen || fixture) return;
     const db = getClientDb();
-    const commentsRef = ref(db, `rooms/${roomCode}/cards/${card.id}/comments`);
+    const commentsRef = ref(db, cardCommentsPath(roomCode, card.id));
     const unsub = onValue(commentsRef, (snap) => {
-      const data = snap.val();
-      if (!data) {
+      const data = snap.val() as Record<string, CommentData> | null;
+      const merged = mergeById(legacyComments, data);
+      const list: CommentData[] = Object.values(merged);
+      if (list.length === 0) {
         setComments([]);
         setCommentCount(0);
         return;
       }
-      const list: CommentData[] = Object.values(data) as CommentData[];
       list.sort((a, b) => a.timestamp - b.timestamp);
       const visible = isTeacher ? list : list.filter((c) => !c.status || c.status === "approved");
       setComments(visible);
@@ -260,7 +326,7 @@ export default function PadletCard({
       off(commentsRef);
       void unsub;
     };
-  }, [commentsOpen, roomCode, card.id, isTeacher, fixture]);
+  }, [commentsOpen, roomCode, card.id, isTeacher, fixture, legacyComments]);
 
   // Draft restore on open
   useEffect(() => {
@@ -270,7 +336,6 @@ export default function PadletCard({
     if (saved) setCommentInput(saved);
   }, [commentsOpen, roomCode, card.id, fixture]);
 
-  const isMyCard = !!myClientId && card.authorClientId === myClientId;
   const withinEditWindow = now - card.timestamp < EDIT_WINDOW_MS;
   const canEdit = (isTeacher || (isMyCard && withinEditWindow)) && !!onEdit;
   const canDelete = isTeacher || (isMyCard && withinEditWindow);
@@ -383,7 +448,7 @@ export default function PadletCard({
       const translations: Record<string, string> = data.translations || { [viewerLang]: text };
 
       const db = getClientDb();
-      const commentRef = push(ref(db, `rooms/${roomCode}/cards/${card.id}/comments`));
+      const commentRef = push(ref(db, cardCommentsPath(roomCode, card.id)));
       const commentId = commentRef.key!;
       const comment: CommentData = {
         id: commentId,
@@ -414,13 +479,31 @@ export default function PadletCard({
         Date.now() - comment.timestamp < 5 * 60 * 1000);
     if (!allowed || fixture) return;
     const db = getClientDb();
-    remove(ref(db, `rooms/${roomCode}/cards/${card.id}/comments/${commentId}`));
+    remove(ref(db, cardCommentPath(roomCode, card.id, commentId)));
+    /* 옛 자리에 있던 답장은 거기서 지워야 진짜로 사라진다 — 가림표로는 지울 수
+       없다. 지웠다고 해 놓고 데이터가 남는 쪽이 더 나쁘다. 이때만 cards 가 다시
+       울리는데, 옛 답장 삭제는 드물고 한 번뿐이라 감수한다. */
+    if (legacyComments?.[commentId]) {
+      remove(ref(db, legacyCardCommentPath(roomCode, card.id, commentId)));
+    }
   }
 
-  function approveComment(commentId: string) {
+  /**
+   * 답장 승인. 새 자리에 **전문을 통째로** 쓴다.
+   *
+   * status 한 칸만 쓰지 않는 이유: 옛 방의 답장은 아직 카드 밑에 있고 새
+   * 자리에는 아무것도 없다. 거기에 status 만 쓰면 `{status:"approved"}` 뿐인
+   * 조각이 생기고, 새 것이 이기는 겹쳐 읽기 규칙 때문에 그 조각이 본문 있는
+   * 옛 답장을 덮어 글이 사라진다. 전문을 쓰면 옛 것을 온전히 가리면서 승인만
+   * 반영된다 — 그 답장 하나가 새 자리로 옮겨 오는 셈이다.
+   */
+  function approveComment(comment: CommentData) {
     if (fixture) return;
     const db = getClientDb();
-    set(ref(db, `rooms/${roomCode}/cards/${card.id}/comments/${commentId}/status`), "approved");
+    set(ref(db, cardCommentPath(roomCode, card.id, comment.id)), {
+      ...comment,
+      status: "approved",
+    });
   }
 
   // YouTube 자막: 토글 + 최초 1회 서버 호출(이후엔 Firebase 캐시가 card.transcript 로 들어옴)
@@ -554,13 +637,13 @@ export default function PadletCard({
         {(canEdit || (canDelete && onDelete) || (isTeacher && onPraise && !card.isTeacher)) && (
           <span className="pc-owner-tools">
             {canEdit && (
-              <button type="button" data-ux-role="control" className="pc-btn" onClick={() => onEdit?.()}>고치기</button>
+              <button type="button" data-ux-role="control" className="pc-btn" onClick={() => onEdit?.(card.id)}>고치기</button>
             )}
             {isTeacher && onPraise && !card.isTeacher && (
-              <button type="button" data-ux-role="control" className="pc-btn" onClick={() => onPraise()}>{tPlain("praiseAction", viewerLang)}</button>
+              <button type="button" data-ux-role="control" className="pc-btn" onClick={() => onPraise(card.id)}>{tPlain("praiseAction", viewerLang)}</button>
             )}
             {canDelete && onDelete && (
-              <button type="button" data-ux-role="control" className="pc-btn danger" onClick={() => onDelete()}>지우기</button>
+              <button type="button" data-ux-role="control" className="pc-btn danger" onClick={() => onDelete(card.id)}>지우기</button>
             )}
           </span>
         )}
@@ -922,7 +1005,7 @@ export default function PadletCard({
                   <div className="pc-actions">
                     <ListenButton id={`c:${comment.id}`} text={displayText} lang={viewerLang} />
                     {isTeacher && isPendingComment && (
-                      <button type="button" data-ux-role="control" className="pc-btn" onClick={() => approveComment(comment.id)}>{tPlain("approve", viewerLang)}</button>
+                      <button type="button" data-ux-role="control" className="pc-btn" onClick={() => approveComment(comment)}>{tPlain("approve", viewerLang)}</button>
                     )}
                     {canDeleteThis && (
                       <button type="button" data-ux-role="control" className="pc-btn danger" onClick={() => deleteComment(comment.id, comment)}>{tPlain("deleteComment", viewerLang)}</button>
@@ -968,6 +1051,15 @@ export default function PadletCard({
     </article>
   );
 }
+
+/**
+ * B — 카드 목록에서 학생 하나가 반응해도 전원 다시 그려지지 않으려면(위 카드
+ * 구독은 이제 형제 노드라 안 울리지만, 부모가 새 props 를 내려도 이 카드
+ * 자신이 다시 그려지는 걸 막는 마지막 방어선이 이 memo 다) — props 가 그대로면
+ * 그리지 않는다. 얕은 비교라 card 객체 자체의 참조 동일성이 지켜져야
+ * 효과가 있다(PadletBoard 의 cards onValue 가 그 몫을 진다).
+ */
+export default memo(PadletCard);
 
 /* ── 읽기 카드 규칙 ───────────────────────────────────────────────────
    카드는 가용 폭 전체를 쓰고, 읽는 글줄만 42ch 로 묶는다. 글자 크기는 토큰이

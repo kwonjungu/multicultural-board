@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { ref, onValue, off, set, remove, update } from "firebase/database";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { ref, onValue, off, set, remove, update, query, limitToLast } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
+import {
+  cardLikesPath, cardCommentsPath, cardCommentPath, roomCardCommentsPath,
+  legacyCardCommentPath, mergeById,
+} from "@/lib/boardPaths";
+import type { RawReactions } from "@/lib/cardReactions";
 import { COLUMNS_DEFAULT, LANGUAGES, CARD_PALETTES } from "@/lib/constants";
 import { CardData, UserConfig, PostData, RoomConfig, CardStatus, CommentData } from "@/lib/types";
 import { useBackLayer } from "@/lib/backStack";
@@ -104,8 +109,31 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
   const [roomConfigState, setRoomConfigState] = useState<RoomConfig>(roomConfig);
   const [rosterText, setRosterText] = useState("");
 
-  // Pending items (cards + comments) for approval panel
-  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
+  /**
+   * 옛 방 호환 바탕값. 공감·답장을 cards 형제로 옮겼지만(lib/boardPaths.ts)
+   * 이미 카드 밑에 쌓인 것은 옮기지 못한다 — 마이그레이션을 돌릴 자격증명이
+   * 없다. 카드 구독이 어차피 그 값을 실어 오므로, 여기에 받아 두었다가
+   * 카드에 내려보내 새 노드와 겹쳐 읽게 한다. 구독을 더 만들지 않는 게 핵심.
+   */
+  const [legacyLikes, setLegacyLikes] = useState<Record<string, RawReactions>>({});
+  const [legacyComments, setLegacyComments] = useState<Record<string, Record<string, CommentData>>>({});
+  /** 새 자리의 방 전체 답장. 교사만 구독한다(승인 대기 목록 재료). */
+  const [liveComments, setLiveComments] = useState<Record<string, Record<string, CommentData>>>({});
+
+  /**
+   * C — cards 는 방이 쌓일수록 통째로 내려받는 양이 늘어난다. 처음엔 최근
+   * N개만 받고, "더 보기" 를 누르면 한도를 늘려 다시 구독한다. 카드 id 는
+   * 항상 push() 키다(app/api/translate/route.ts: `cardRef = ...push()`,
+   * `id: cardId` 가 그 키 그대로) — push 키는 시간순이라 정렬용
+   * orderByChild 없이 limitToLast 만으로 "가장 최근 N개"가 정확하다.
+   */
+  const [cardsLimit, setCardsLimit] = useState(60);
+  /** 이번 스냅샷에 실려 온 카드 수. 한도와 같으면 더 있을 가능성이 있다는 뜻. */
+  const [cardsLoadedCount, setCardsLoadedCount] = useState(0);
+  /** A2 — 카드별 원본 JSON 스냅샷. 안 바뀐 카드는 새 객체를 만들지 않고
+      이전 객체 참조를 그대로 재사용해 React.memo 가 실제로 동작하게 한다. */
+  const prevRawJsonRef = useRef<Record<string, string>>({});
+  const prevCardByIdRef = useRef<Record<string, CardData>>({});
 
   // Feature modals
   const [showQR, setShowQR] = useState(false);
@@ -261,42 +289,112 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     if (offline) return;
     const db = getClientDb();
     const cardsRef = ref(db, `rooms/${roomCode}/cards`);
-    onValue(cardsRef, (snapshot) => {
+    // C — 최근 cardsLimit 개만 구독한다. 한도가 바뀌면(더 보기) 재구독한다.
+    const cardsQuery = query(cardsRef, limitToLast(cardsLimit));
+    const unsub = onValue(cardsQuery, (snapshot) => {
       const data = snapshot.val();
-      if (!data) { setCards([]); setPendingItems([]); return; }
+      if (!data) {
+        setCards([]); setLegacyLikes({}); setLegacyComments({}); setCardsLoadedCount(0);
+        prevRawJsonRef.current = {};
+        prevCardByIdRef.current = {};
+        return;
+      }
 
-      // Raw data includes nested comments sub-tree
-      type RawCard = CardData & { comments?: Record<string, CommentData> };
-      const rawList: RawCard[] = Object.values(data);
+      // Raw data includes nested comments/likes sub-trees (옛 방에만 남아 있다)
+      type RawCard = CardData & {
+        comments?: Record<string, CommentData>;
+        likes?: RawReactions;
+      };
+      const rawEntries = Object.entries(data) as [string, RawCard][];
+      setCardsLoadedCount(rawEntries.length);
 
-      // Cards without comments for normal display
-      const list: CardData[] = rawList.map(({ comments: _c, ...rest }) => rest as CardData);
+      /**
+       * A2 — memo 가 실제로 먹으려면 안 바뀐 카드는 **객체 참조**도 그대로여야
+       * 한다. onValue 는 형제 하나가 바뀌어도 트리 전체 스냅샷을 다시 주므로,
+       * 매번 rest 를 새로 만들면 카드 25장이 전부 새 객체가 되어 memo 가
+       * 죽는다. 카드별 원본 JSON 을 이전 스냅샷과 비교해, 안 바뀐 카드는
+       * 이전 렌더에서 쓰던 바로 그 CardData 객체를 재사용한다.
+       */
+      const nextRawJson: Record<string, string> = {};
+      const nextCardById: Record<string, CardData> = {};
+      const oldLikes: Record<string, RawReactions> = {};
+      const oldComments: Record<string, Record<string, CommentData>> = {};
+      const list: CardData[] = [];
+
+      for (const [key, raw] of rawEntries) {
+        const { comments: rawComments, likes: rawLikes, ...rest } = raw;
+        if (rawLikes) oldLikes[raw.id] = rawLikes;
+        if (rawComments) oldComments[raw.id] = rawComments;
+
+        const json = JSON.stringify(rest);
+        nextRawJson[key] = json;
+        const prevJson = prevRawJsonRef.current[key];
+        const prevCard = prevCardByIdRef.current[key];
+        const card: CardData = prevJson === json && prevCard ? prevCard : (rest as CardData);
+        nextCardById[key] = card;
+        list.push(card);
+      }
+
       list.sort((a, b) => b.timestamp - a.timestamp);
-      setCards(list);
+      prevRawJsonRef.current = nextRawJson;
+      prevCardByIdRef.current = nextCardById;
 
-      // Build pending items (cards + comments)
-      const pending: PendingItem[] = [];
-      for (const raw of rawList) {
-        const card = list.find((c) => c.id === raw.id)!;
-        if (!card) continue;
-        if (raw.status === "pending") pending.push({ kind: "card", data: card });
-        if (raw.comments) {
-          for (const comment of Object.values(raw.comments)) {
-            if (comment.status === "pending") {
-              pending.push({ kind: "comment", data: comment, parentCard: card });
-            }
-          }
+      setCards(list);
+      /* 옛 곁가지를 카드에서 떼어 따로 모은다. 새 글에는 아예 없으므로 대개
+         빈 객체이고, 옛 방에서는 값이 더 변하지 않는(쓰기가 새 자리로 가므로)
+         고정된 바탕이 된다. */
+      setLegacyLikes(oldLikes);
+      setLegacyComments(oldComments);
+    });
+    return () => unsub();
+  }, [roomCode, offline, cardsLimit]);
+
+  /**
+   * 새 자리의 방 전체 답장 — **교사만** 구독한다.
+   *
+   * 승인 대기 목록은 방 안의 모든 답장을 봐야 만들 수 있다. 학생에게까지
+   * 이 구독을 주면 cards 에서 겪던 일(누가 답장할 때마다 전원 재구독)을
+   * 나무만 바꿔 되풀이하게 된다. 답장은 공감보다 훨씬 드물어 교사 한 명이
+   * 통째로 보는 비용은 감당할 수 있다.
+   */
+  useEffect(() => {
+    if (offline || !isTeacher) return;
+    const db = getClientDb();
+    const commentsRef = ref(db, roomCardCommentsPath(roomCode));
+    const cb = onValue(commentsRef, (snap) => {
+      setLiveComments((snap.val() as Record<string, Record<string, CommentData>> | null) || {});
+    });
+    return () => off(commentsRef, "value", cb);
+  }, [roomCode, offline, isTeacher]);
+
+  /**
+   * 승인 대기 목록. 예전에는 카드 구독 콜백 안에서 만들었지만, 이제 재료가
+   * 두 곳(카드 + 새 답장 나무)에서 따로 도착하므로 계산으로 합친다.
+   * 옛 답장은 바탕, 새 답장이 위 — 같은 id 면 새 것이 이긴다(옛 답장을
+   * 승인하면 승인된 전문이 같은 id 로 새 자리에 쓰여 옛 것을 가린다).
+   *
+   * C 의 cardsLimit 창 밖으로 밀린 카드는 여기 안 잡힐 수 있다는 게 걱정거리
+   * 였는데, pending 카드는 정의상 "방금 올라와 아직 승인 안 된" 새 글이다
+   * (app/api/translate/route.ts 가 매번 새 timestamp 로 push() 한다) — 즉
+   * push 키 순서로도 언제나 최신 축에 속해 limitToLast 창 안에 있다. 교실
+   * 한 방에서 승인 대기 중에 다른 학생이 60개 넘게 새 글을 쏟아붓는 극단적인
+   * 경우가 아니면 놓칠 일이 없다. 그런 진짜 빈틈이 생기면 여기 주석을 지우고
+   * 승인 대기만은 별도로(예: status=="pending" 쿼리) 구독해야 한다.
+   */
+  const pendingItems: PendingItem[] = useMemo(() => {
+    const pending: PendingItem[] = [];
+    for (const card of cards) {
+      if (card.status === "pending") pending.push({ kind: "card", data: card });
+      const merged = mergeById(legacyComments[card.id], liveComments[card.id]);
+      for (const comment of Object.values(merged)) {
+        if (comment?.status === "pending") {
+          pending.push({ kind: "comment", data: comment, parentCard: card });
         }
       }
-      pending.sort((a, b) => {
-        const tsA = a.kind === "card" ? a.data.timestamp : a.data.timestamp;
-        const tsB = b.kind === "card" ? b.data.timestamp : b.data.timestamp;
-        return tsA - tsB;
-      });
-      setPendingItems(pending);
-    });
-    return () => off(cardsRef);
-  }, [roomCode, offline]);
+    }
+    pending.sort((a, b) => a.data.timestamp - b.data.timestamp);
+    return pending;
+  }, [cards, legacyComments, liveComments]);
 
   // Card visibility
   const visibleCards = isTeacher ? cards : cards.filter((c) => !c.status || c.status === "approved");
@@ -370,14 +468,46 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     const snap = await dbGet(dbRef(db, `rooms/${roomCode}/cards/${cardId}`));
     const fullCard = snap.val();
     if (!fullCard) return;
+    /* 공감·답장이 카드 밖으로 나갔으니 카드만 지우면 그 둘이 주인 없이 남는다.
+       되돌리기가 카드를 통째로 되살리는 화면이므로, 곁가지도 먼저 받아 두었다가
+       같이 되살린다 — 지웠다 되돌렸는데 하트만 사라지면 안 된다. */
+    const side = await readCardSideData(cardId);
     await remove(ref(db, `rooms/${roomCode}/cards/${cardId}`));
+    await removeCardSideData(cardId);
     const authorName = typeof fullCard.authorName === "string" ? fullCard.authorName : "";
     showUndoToast(
       authorName ? `"${authorName}"님의 카드를 삭제했습니다` : "카드를 삭제했습니다",
       () => {
         set(ref(db, `rooms/${roomCode}/cards/${cardId}`), fullCard);
+        restoreCardSideData(cardId, side);
       }
     );
+  }
+
+  /** 카드 밖으로 나간 곁가지(공감·답장)를 읽어 둔다. 되돌리기 재료다. */
+  async function readCardSideData(cardId: string) {
+    const db = getClientDb();
+    const { get: dbGet, ref: dbRef } = await import("firebase/database");
+    const [likes, comments] = await Promise.all([
+      dbGet(dbRef(db, cardLikesPath(roomCode, cardId))),
+      dbGet(dbRef(db, cardCommentsPath(roomCode, cardId))),
+    ]);
+    return { likes: likes.val(), comments: comments.val() };
+  }
+
+  /** 카드가 사라지면 곁가지도 함께 지운다 — 고아 노드가 쌓이지 않게. */
+  async function removeCardSideData(cardId: string) {
+    const db = getClientDb();
+    await Promise.all([
+      remove(ref(db, cardLikesPath(roomCode, cardId))),
+      remove(ref(db, cardCommentsPath(roomCode, cardId))),
+    ]);
+  }
+
+  function restoreCardSideData(cardId: string, side: { likes: unknown; comments: unknown }) {
+    const db = getClientDb();
+    if (side.likes) set(ref(db, cardLikesPath(roomCode, cardId)), side.likes);
+    if (side.comments) set(ref(db, cardCommentsPath(roomCode, cardId)), side.comments);
   }
 
   // 패들렛식 즉시 추가 — 누르면 칸이 바로 생기고 교사가 제목을 인라인 편집한다.
@@ -409,18 +539,37 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     if (offline) return;
     const db = getClientDb();
     await remove(ref(db, `rooms/${roomCode}/cards/${cardId}`));
+    await removeCardSideData(cardId);
   }
 
-  async function approveComment(cardId: string, commentId: string) {
+  /**
+   * 답장 승인. 새 자리에 **전문을 통째로** 쓴다.
+   *
+   * status 한 칸만 쓰지 않는 이유: 옛 방의 답장은 아직 카드 밑에 있고 새
+   * 자리에는 아무것도 없다. 거기에 status 만 쓰면 `{status:"approved"}` 뿐인
+   * 조각이 생기고, 새 것이 이기는 겹쳐 읽기 규칙 때문에 그 조각이 본문 있는
+   * 옛 답장을 덮어 글이 사라진다. 전문을 쓰면 옛 것을 온전히 가리면서
+   * 승인만 반영된다 — 그 답장 하나가 새 자리로 옮겨 오는 셈이다.
+   */
+  async function approveComment(cardId: string, comment: CommentData) {
     if (offline) return;
     const db = getClientDb();
-    await set(ref(db, `rooms/${roomCode}/cards/${cardId}/comments/${commentId}/status`), "approved" as CardStatus);
+    await set(ref(db, cardCommentPath(roomCode, cardId, comment.id)), {
+      ...comment,
+      status: "approved" as CardStatus,
+    });
   }
 
-  async function rejectComment(cardId: string, commentId: string) {
+  async function rejectComment(cardId: string, comment: CommentData) {
     if (offline) return;
     const db = getClientDb();
-    await remove(ref(db, `rooms/${roomCode}/cards/${cardId}/comments/${commentId}`));
+    await remove(ref(db, cardCommentPath(roomCode, cardId, comment.id)));
+    /* 옛 자리에 있던 답장은 거기서 지워야 진짜로 사라진다. 가림 표시로는
+       지울 수 없다 — 지웠다고 해 놓고 데이터가 남는 쪽이 더 나쁘다.
+       이때만 cards 가 다시 울리는데, 반려는 드물고 한 번뿐이라 감수한다. */
+    if (legacyComments[cardId]?.[comment.id]) {
+      await remove(ref(db, legacyCardCommentPath(roomCode, cardId, comment.id)));
+    }
   }
 
   const handlePost = useCallback(async (data: PostData) => {
@@ -603,6 +752,51 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
     setModal({ colId: col.id, colTitle: col.title, colColor: col.color });
   }
 
+  /**
+   * A — 카드에 내려줄 조작 콜백을 카드마다(renderCard 호출마다) 새로
+   * 만들면(인라인 클로저) React.memo 가 무력화된다. 그래서 부모는 **카드
+   * id 하나만 받는, 참조가 절대 안 바뀌는 함수 하나**를 모든 카드에 똑같이
+   * 내려주고, 그 함수가 최신 카드·컬럼을 ref 에서 찾아 쓴다.
+   */
+  const cardsByIdRef = useRef<Record<string, CardData>>({});
+  cardsByIdRef.current = useMemo(() => {
+    const map: Record<string, CardData> = {};
+    for (const c of cards) map[c.id] = c;
+    return map;
+  }, [cards]);
+
+  const columnsByIdRef = useRef<Record<string, FirebaseColumn>>({});
+  columnsByIdRef.current = useMemo(() => {
+    const map: Record<string, FirebaseColumn> = {};
+    for (const c of columns) map[c.id] = c;
+    return map;
+  }, [columns]);
+
+  /** deleteCard·onPraiseStudent 는 렌더마다 참조가 바뀔 수 있어(클로저·props)
+      거울 ref 에 최신 것만 담아 안정된 콜백 안에서 그때그때 꺼내 쓴다. */
+  const deleteCardRef = useRef(deleteCard);
+  deleteCardRef.current = deleteCard;
+  const onPraiseStudentRef = useRef(onPraiseStudent);
+  onPraiseStudentRef.current = onPraiseStudent;
+
+  const handleCardEdit = useCallback((cardId: string) => {
+    const card = cardsByIdRef.current[cardId];
+    if (!card) return;
+    const col = columnsByIdRef.current[card.colId];
+    setEditModal({ card, colTitle: col?.title ?? "", colColor: col?.color ?? "" });
+  }, []);
+
+  const handleCardDelete = useCallback((cardId: string) => {
+    deleteCardRef.current(cardId);
+  }, []);
+
+  const handleCardPraise = useCallback((cardId: string) => {
+    const card = cardsByIdRef.current[cardId];
+    const praise = onPraiseStudentRef.current;
+    if (!card || !praise) return;
+    praise(card.authorClientId || card.authorName, card.authorName);
+  }, []);
+
   /** 카드 한 장. 주제 보기와 전체 보기가 같은 계약(카드 ID·columnId)을 쓴다. */
   function renderCard(card: CardData, col: FirebaseColumn) {
     return (
@@ -615,11 +809,11 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         myClientId={myClientId}
         authorName={user.myName}
         isPending={isTeacher && card.status === "pending"}
-        onEdit={() => setEditModal({ card, colTitle: col.title, colColor: col.color })}
-        onDelete={isTeacher ? () => deleteCard(card.id) : undefined}
+        onEdit={handleCardEdit}
+        onDelete={isTeacher ? handleCardDelete : undefined}
         onPraise={
           isTeacher && onPraiseStudent && !card.isTeacher
-            ? () => onPraiseStudent(card.authorClientId || card.authorName, card.authorName)
+            ? handleCardPraise
             : undefined
         }
         roomCode={roomCode}
@@ -628,6 +822,9 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
         fixture={offline}
         learners={roomConfigState.learners}
         fixtureReactions={fixture?.reactions?.[card.id]}
+        /* 옛 방 호환 바탕값 — 카드 구독이 이미 실어 온 것이라 구독이 늘지 않는다. */
+        legacyLikes={legacyLikes[card.id]}
+        legacyComments={legacyComments[card.id]}
       />
     );
   }
@@ -950,6 +1147,21 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
           </>
         )}
 
+        {/* C — 로딩한 카드 수가 지금 한도와 같으면 더 있을 수 있다는 뜻이다
+            (limitToLast 가 한도 딱 채워 보낸 것과 "그게 전부인 것"은 구분되지
+            않으니 넉넉하게 보여준다). fixture 는 구독 자체가 없어 늘 0 이라
+            뜨지 않는다. */}
+        {!offline && cardsLoadedCount === cardsLimit && (
+          <div className="bd-loadmore">
+            <button
+              type="button"
+              data-ux-role="control"
+              className="bd-btn"
+              onClick={() => setCardsLimit((n) => n + 60)}
+            >더 보기</button>
+          </div>
+        )}
+
         {!isTeacher && (
           <div className="bd-compose-side">
             {practiceCards.length > 0 && (
@@ -1254,8 +1466,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
                       </p>
                       <p data-ux-role="body" data-ux-reading className="bd-pending-text">{comment.text}</p>
                       <div className="bd-admin-row">
-                        <button type="button" data-ux-role="control" className="bd-btn" onClick={() => approveComment(parentCard.id, comment.id)}>{t("approve", lang)}</button>
-                        <button type="button" data-ux-role="control" className="bd-btn danger" onClick={() => rejectComment(parentCard.id, comment.id)}>{t("reject", lang)}</button>
+                        <button type="button" data-ux-role="control" className="bd-btn" onClick={() => approveComment(parentCard.id, comment)}>{t("approve", lang)}</button>
+                        <button type="button" data-ux-role="control" className="bd-btn danger" onClick={() => rejectComment(parentCard.id, comment)}>{t("reject", lang)}</button>
                       </div>
                     </div>
                   );
@@ -1449,6 +1661,7 @@ const BOARD_CSS = `
   box-sizing: border-box;
 }
 .bd-compose-side{ display: flex; gap: var(--ux-space-2); flex-wrap: wrap; }
+.bd-loadmore{ display: flex; justify-content: center; margin: var(--ux-space-4) 0; }
 .bd-compose .bd-cta{ max-width: 760px; margin: 0 auto; }
 
 /* 선생님 도구 — 아이 화면과 시각적으로 분리한다. */

@@ -151,7 +151,21 @@ check('반응은 의미 있는 말이고, 기존 좋아요 데이터를 보존�
   for (const id of ['"thanks"', '"same"', '"nice"']) {
     assert.match(reactions, new RegExp(`id: ${id}`), `기존 반응 id 가 바뀌었다: ${id}`);
   }
-  assert.match(cc, /rooms\/\$\{roomCode\}\/cards\/\$\{card\.id\}\/likes/, '반응 저장 경로(likes)를 바꾸지 말 것');
+  /* 저장 위치는 바뀌었다(2026-09-16). 공감이 `cards/{card}/likes` 로 카드 **안에**
+     있어, 보드가 통째로 구독하는 `cards` 가 하트 한 번마다 다시 울렸다 — 25명
+     수업에서 가장 느린 길이었다. 그래서 `cards` 의 **형제**로 옮겼다(lib/boardPaths.ts).
+     지킬 것은 경로 문자열이 아니라 원래 의도다: **옛 좋아요 데이터를 보존한다.**
+     마이그레이션을 돌릴 수 없으므로 자리를 옮기는 대신 **읽기는 둘 다, 쓰기는
+     새 곳만** 으로 한다 — 옛 것을 바탕에 깔고 새 것을 위에 겹친다(mergeById).
+     겹쳐 읽기가 정말 맞는지는 소스로 판단할 수 없어
+     scripts/test-board-paths.mjs 가 **실제로 실행해서** 검사한다. 여기서는 카드가
+     그 계약을 쓰고 있는지만 본다. */
+  assert.match(cc, /from "@\/lib\/boardPaths"/, '공감은 저장 위치를 직접 적지 말고 boardPaths 의 경로를 쓸 것');
+  assert.match(cc, /cardLikePath\(roomCode, card\.id, myClientId\)/, '반응 쓰기가 새 자리(cardLikes)로 가지 않는다');
+  assert.match(cc, /cardLikesPath\(roomCode, card\.id\)/, '반응 구독이 새 자리(cardLikes)를 보지 않는다');
+  assert.match(cc, /mergeById\(legacyLikes, reactRaw\)/, '옛 공감을 겹쳐 읽지 않아 옛 방의 공감이 사라진다');
+  assert.ok(!/cards\/\$\{card\.id\}\/likes/.test(cc),
+    '공감이 다시 cards 밑으로 들어갔다 — 하트 한 번에 교실 전체가 다시 그려진다');
   assert.match(reactions, /let legacy = 0;/, '옛 true 값을 세는 호환 어댑터가 없다');
   // 예전 좋아요는 이제 '좋아요'(like)로 집계돼 화면 개수에 그대로 남는다.
   assert.match(reactions, /val === true\s*\?\s*"like"/, '옛 true 가 좋아요로 집계되지 않는다');
