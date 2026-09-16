@@ -72,6 +72,25 @@ function plotPosition(i: number): { x: number; z: number } {
   return { x: r * Math.cos(th), z: r * Math.sin(th) };
 }
 
+/**
+ * 씬의 한 갈래를 버린다.
+ *
+ * Sprite 의 geometry 만은 dispose 하지 않는다 — three 는 모든 Sprite 가
+ * 모듈 전역 객체 하나를 함께 쓴다(three/src/objects/Sprite.js 의 `let _geometry`,
+ * 생성자에서 처음 한 번만 만들고 이후 전부 그것을 가리킨다). 산책 벌 하나를
+ * 치우면서 그걸 버리면 아직 화면에 남아 있는 집·문패·울타리·마당 스프라이트의
+ * GPU 버퍼까지 같이 풀린다. 스프라이트는 material 만 버린다.
+ */
+function disposeSubtree(root: THREE.Object3D): void {
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh & { isSprite?: boolean };
+    if (!mesh.isSprite) mesh.geometry?.dispose();
+    const material = (mesh as unknown as { material?: THREE.Material | THREE.Material[] }).material;
+    if (Array.isArray(material)) material.forEach((m) => m.dispose());
+    else material?.dispose();
+  });
+}
+
 function colorOf(id: string | null | undefined): number {
   const hex = id ? decoV2ById(id)?.color : null;
   if (!hex) return FALLBACK_COLOR;
@@ -122,6 +141,9 @@ export default function VillageMap3D({
   const plotsRef = useRef(plots);
   plotsRef.current = plots;
   const reducedMotionRef = useRef(false);
+  /** 산책 루프가 지금 이 프레임을 직접 그리는 중인가. controls.update() 가
+   *  부르는 onControlsChange 의 requestRender 와 겹치지 않게 하는 표시. */
+  const walkFrameRef = useRef(false);
   const wakeWalkRef = useRef<() => void>(() => {});
   const [destination, setDestination] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
@@ -154,13 +176,7 @@ export default function VillageMap3D({
     if (scene) {
       if (w.sprite) {
         scene.remove(w.sprite);
-        w.sprite.traverse((obj) => {
-          const mesh = obj as THREE.Mesh;
-          mesh.geometry?.dispose();
-          const material = mesh.material;
-          if (Array.isArray(material)) material.forEach((m) => m.dispose());
-          else material?.dispose();
-        });
+        disposeSubtree(w.sprite);
       }
       if (w.highlight) {
         scene.remove(w.highlight);
@@ -172,6 +188,7 @@ export default function VillageMap3D({
     w.highlight = null;
     w.target = null;
     w.raf = 0;
+    walkFrameRef.current = false;
     wakeWalkRef.current = () => {};
     const controls = controlsRef.current;
     if (controls) controls.enablePan = true;
@@ -242,6 +259,7 @@ export default function VillageMap3D({
     const step = (now: number) => {
       w.raf = 0;
       if (!w.active || document.hidden) return;
+      walkFrameRef.current = true;
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       // 이동 보간
@@ -283,6 +301,7 @@ export default function VillageMap3D({
       camera.position.add(delta);
       controls.update();
       renderer.render(scene, camera);
+      walkFrameRef.current = false;
       if (w.target || (settling && !reducedMotionRef.current)) w.raf = requestAnimationFrame(step);
     };
     wakeWalkRef.current = () => {
@@ -598,6 +617,9 @@ export default function VillageMap3D({
       t.x = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, t.x));
       t.z = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, t.z));
       t.y = 1;
+      // 산책 루프가 이 프레임을 이미 그린다. 여기서 또 예약하면 한 프레임에
+      // render 가 두 번 돈다 — 실측으로 60Hz 화면에서 초당 122회였다.
+      if (walkFrameRef.current) return;
       requestRender();
     };
     controls.addEventListener("change", onControlsChange);
@@ -701,13 +723,7 @@ export default function VillageMap3D({
       controls.removeEventListener("change", onControlsChange);
       controls.dispose();
       // 씬 전체 dispose (geometry/material) — 텍스처 캐시는 별도 정리
-      scene.traverse((obj) => {
-        const mesh = obj as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const mat = (mesh as unknown as { material?: THREE.Material | THREE.Material[] }).material;
-        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-        else if (mat) mat.dispose();
-      });
+      disposeSubtree(scene);
       texCacheRef.current.forEach((e) => {
         if (e.status === "ok") e.tex.dispose();
       });
@@ -740,13 +756,7 @@ export default function VillageMap3D({
     while (group.children.length > 0) {
       const child = group.children[0];
       group.remove(child);
-      child.traverse((obj) => {
-        const mesh = obj as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const mat = (mesh as unknown as { material?: THREE.Material | THREE.Material[] }).material;
-        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-        else if (mat) mat.dispose();
-      });
+      disposeSubtree(child);
     }
 
     // 중앙: 공동 시설 (해금 순서대로 광장에 배치)
@@ -805,32 +815,44 @@ export default function VillageMap3D({
       const level = Math.max(0, Math.floor(Number.isFinite(plot.gardenLevel) ? plot.gardenLevel : 0));
       const water = THREE.MathUtils.clamp(Math.floor(plot.gardenWater || 0), 0, WATER_PER_LEVEL - 1);
       const flowers = Math.min(1 + level, 5);
+      /* 크기 기준: 집 스프라이트가 3.6 유닛 폭이다. 처음 잡았던 꽃(반지름
+         0.13~0.20)은 집의 5% 도 안 돼서 기본 카메라 거리에서 아이 눈에 보이지
+         않았다 — 실제로 캡처해 보고 키웠다. 꽃 5송이가 잔디(반지름 3.6) 밖으로
+         나가지 않는 선이 상한이다: 가장 바깥 꽃이 √(2.0² + 2.9²) = 3.52,
+         가장 바깥 물방울이 √(0.88² + 3.35²) = 3.46 으로 둘 다 잔디 안이다. */
       const stems = new THREE.InstancedMesh(
-        new THREE.CylinderGeometry(0.045, 0.06, 0.42, 5),
+        new THREE.CylinderGeometry(0.075, 0.1, 0.7, 5),
         new THREE.MeshLambertMaterial({ color: 0x4d853a }), flowers,
       );
       const blooms = new THREE.InstancedMesh(
-        new THREE.SphereGeometry(level ? 0.20 : 0.13, 7, 5),
+        new THREE.SphereGeometry(level ? 0.34 : 0.22, 8, 6),
         new THREE.MeshLambertMaterial({ color: level ? 0xffbc68 : 0x6fa64b }), flowers,
       );
       const transform = new THREE.Object3D();
       for (let f = 0; f < flowers; f++) {
-        transform.position.set(-1.15 + f * 0.48, 0.29, 3.0);
+        // 집 앞 구성: 문패(x=-0.9)는 왼쪽, 꽃밭은 오른쪽, 물방울은 앞 가운데.
+        // 가운데에 두면 문패 스프라이트 뒤로 숨는다 — 캡처에서 실제로 가려졌다.
+        // 송이 수가 적을 때도 꽃밭 자리 가운데에 모이도록 정렬한다.
+        const spread = 0.5;
+        const x0 = 1.0 - ((flowers - 1) * spread) / 2;
+        transform.position.set(x0 + f * spread, 0.35, 2.9);
         transform.updateMatrix();
         stems.setMatrixAt(f, transform.matrix);
-        transform.position.y = 0.53;
+        transform.position.y = 0.82;
         transform.updateMatrix();
         blooms.setMatrixAt(f, transform.matrix);
       }
       const drops = new THREE.InstancedMesh(
-        new THREE.SphereGeometry(0.105, 7, 5),
+        new THREE.SphereGeometry(0.17, 8, 6),
         new THREE.MeshBasicMaterial(), WATER_PER_LEVEL,
       );
       for (let d = 0; d < WATER_PER_LEVEL; d++) {
-        transform.position.set(-0.65 + d * 0.32, 0.14, 3.45);
+        transform.position.set(-0.88 + d * 0.44, 0.2, 3.35);
         transform.updateMatrix();
         drops.setMatrixAt(d, transform.matrix);
-        drops.setColorAt(d, new THREE.Color(d < water ? 0x168bc1 : 0xe2eadc));
+        // 빈 칸도 '아직 안 받은 자리' 로 보여야 한다 — 잔디에 묻히지 않게
+        // 흰색보다 한 단계 가라앉은 색을 쓴다.
+        drops.setColorAt(d, new THREE.Color(d < water ? 0x168bc1 : 0xd3ddcb));
       }
       plotGroup.add(stems, blooms, drops);
 
@@ -948,52 +970,112 @@ export default function VillageMap3D({
   }, [plots, facilities]);
 
   const selectedPlot = plots.find((plot) => plot.id === destination);
-  const buttonStyle = {
-    minHeight: 44, minWidth: 44, padding: "8px 12px", borderRadius: 12,
-    border: "1px solid #d9dfc8", background: "#fffdf5", color: "#49351f",
-    font: "inherit", fontWeight: 800, cursor: "pointer",
+
+  /* 크기·색·모서리는 전부 아동 UX 토큰이 정한다. data-ux-role="control" 이
+     min-height/min-width(기본 48px, 큰 글씨 56px)·글자 크기·패딩·반경을 주고,
+     여기서는 색만 얹는다 — px 를 새로 만들면 '큰 글씨' 와 터치 최소 크기
+     계약이 이 화면에서만 깨진다(lib/childUx/tokens.ts). */
+  const controlSkin = {
+    border: "2px solid var(--ux-primary-border)",
+    background: "var(--ux-surface)",
+    color: "var(--ux-ink)",
+    fontFamily: "inherit",
+    fontWeight: 800,
+    cursor: "pointer",
   } as const;
 
   return (
     <section aria-label="우리 꿀벌마을" style={{ width: "100%" }}>
-      <div role="group" aria-label="마을 이동" style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "0 4px 10px" }}>
-        <button type="button" style={buttonStyle} onClick={() => focusPlace(null)}>🌳 광장</button>
-        {selfPlotIndex >= 0 && <button type="button" style={buttonStyle} onClick={() => focusPlace(selfPlotIndex)}>🏡 내 집</button>}
-        <button type="button" style={buttonStyle} aria-label="지도 확대" onClick={() => zoom(0.8)}>＋</button>
-        <button type="button" style={buttonStyle} aria-label="지도 축소" onClick={() => zoom(1.25)}>−</button>
-        <button type="button" style={buttonStyle} aria-expanded={helpOpen} onClick={() => setHelpOpen(!helpOpen)}>조작 안내</button>
+      <div
+        role="group"
+        aria-label="마을 이동"
+        style={{
+          display: "flex", flexWrap: "wrap",
+          gap: "var(--ux-control-gap)", padding: "0 var(--ux-space-1) var(--ux-space-3)",
+        }}
+      >
+        <button type="button" data-ux-role="control" style={controlSkin} onClick={() => focusPlace(null)}>🌳 광장</button>
+        {selfPlotIndex >= 0 && (
+          <button type="button" data-ux-role="control" style={controlSkin} onClick={() => focusPlace(selfPlotIndex)}>🏡 내 집</button>
+        )}
+        <button type="button" data-ux-role="control" style={controlSkin} aria-label="지도 확대" onClick={() => zoom(0.8)}>＋</button>
+        <button type="button" data-ux-role="control" style={controlSkin} aria-label="지도 축소" onClick={() => zoom(1.25)}>−</button>
+        <button
+          type="button" data-ux-role="control" style={controlSkin}
+          aria-expanded={helpOpen} onClick={() => setHelpOpen(!helpOpen)}
+        >조작 안내</button>
       </div>
-      {helpOpen && <p style={{ margin: "0 4px 12px", color: "#49351f", lineHeight: 1.6 }}>
-        한 손가락으로 돌리고, 두 손가락으로 이동·확대해요. 마우스는 드래그로 회전, 오른쪽 드래그로 이동해요.
-        집을 누르거나 아래 목록에서 친구를 골라 방문할 수 있어요.
-      </p>}
+      {helpOpen && (
+        <p data-ux-role="body" style={{ margin: "0 var(--ux-space-1) var(--ux-space-3)" }}>
+          한 손가락으로 돌리고, 두 손가락으로 이동·확대해요. 마우스는 드래그로 회전, 오른쪽 드래그로 이동해요.
+          집을 누르거나 아래 목록에서 친구를 골라 방문할 수 있어요.
+        </p>
+      )}
       <div style={{ position: "relative", width: "100%", height, maxHeight: "65dvh", minHeight: 280 }}>
-        <div ref={mountRef} aria-label="집을 눌러 방문하는 마을 지도" style={{ width: "100%", height: "100%", borderRadius: 16, overflow: "hidden" }} />
-        {selfPlotIndex >= 0 && <button type="button" aria-pressed={walking}
-          onClick={() => (walking ? stopWalk() : startWalk())}
-          style={{ ...buttonStyle, position: "absolute", right: 12, bottom: 12,
-            background: walking ? "#475569" : "#925508", color: "white", border: "none" }}>
-          {walking ? "산책 마치기" : "🐝 산책하기"}
-        </button>}
+        {/* 지도는 그림이다 — 방문·이동·확대는 모두 위아래 DOM 조작으로도 된다.
+            role="img" 로 알려 주고, 조작은 진짜 버튼에 맡긴다. */}
+        <div
+          ref={mountRef}
+          role="img"
+          aria-label="친구들의 집이 길로 이어진 꿀벌마을 지도"
+          style={{ width: "100%", height: "100%", borderRadius: "var(--ux-radius-surface)", overflow: "hidden" }}
+        />
+        {selfPlotIndex >= 0 && (
+          <button
+            type="button" data-ux-role="action" aria-pressed={walking}
+            onClick={() => (walking ? stopWalk() : startWalk())}
+            style={{
+              ...controlSkin,
+              position: "absolute", right: "var(--ux-space-3)", bottom: "var(--ux-space-3)",
+              border: "none",
+              background: walking ? "var(--ux-surface-sunk)" : "var(--ux-primary-fill)",
+              color: walking ? "var(--ux-ink-soft)" : "var(--ux-primary-ink)",
+              boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+            }}
+          >
+            {walking ? "산책 마치기" : "🐝 산책하기"}
+          </button>
+        )}
       </div>
-      <p role="status" style={{ margin: "10px 4px", color: "#5c4a30", fontSize: 14, lineHeight: 1.6 }}>
-        {walking ? "빈 바닥을 누르면 벌이 걸어가요. 친구 집을 눌러 방문해요." : "집 앞의 꽃은 정원 성장, 파란 점은 받은 물을 보여줘요."}
+      <p data-ux-role="secondary" role="status" style={{ margin: "var(--ux-space-3) var(--ux-space-1)" }}>
+        {walking
+          ? "빈 바닥을 누르면 벌이 걸어가요. 친구 집을 눌러 방문해요."
+          : "집 앞의 꽃은 정원 성장, 파란 점은 받은 물을 보여줘요."}
       </p>
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: 12, background: "#f7f5e9", borderRadius: 16 }}>
-        <label htmlFor="village-destination" style={{ fontWeight: 800, color: "#49351f" }}>친구 찾기</label>
-        <select id="village-destination" value={selectedPlot?.id ?? ""} onChange={(event) => {
-          setDestination(event.target.value);
-          const index = plots.findIndex((plot) => plot.id === event.target.value);
-          if (index >= 0) focusPlace(index);
-        }} style={{ ...buttonStyle, flex: "1 1 150px", minWidth: 0, maxWidth: "100%" }}>
+      <div
+        data-ux-surface
+        style={{
+          display: "flex", flexWrap: "wrap", alignItems: "center",
+          gap: "var(--ux-control-gap)", padding: "var(--ux-space-3)",
+          background: "var(--ux-surface-sunk)",
+        }}
+      >
+        <label htmlFor="village-destination" data-ux-role="label" style={{ fontWeight: 800 }}>친구 찾기</label>
+        <select
+          id="village-destination" data-ux-role="control"
+          value={selectedPlot?.id ?? ""}
+          onChange={(event) => {
+            setDestination(event.target.value);
+            const index = plots.findIndex((plot) => plot.id === event.target.value);
+            if (index >= 0) focusPlace(index);
+          }}
+          style={{ ...controlSkin, flex: "1 1 150px", minWidth: 0, maxWidth: "100%" }}
+        >
           <option value="">방문할 집을 골라요</option>
-          {plots.map((plot) => <option key={plot.id} value={plot.id}>{plot.name}{plot.isSelf ? " (내 집)" : ""}</option>)}
+          {plots.map((plot) => (
+            <option key={plot.id} value={plot.id}>{plot.name}{plot.isSelf ? " (내 집)" : ""}</option>
+          ))}
         </select>
-        <button type="button" disabled={!selectedPlot} onClick={() => selectedPlot && onSelectRef.current(selectedPlot.id)}
-          style={{ ...buttonStyle, opacity: selectedPlot ? 1 : 0.5 }}>집 방문</button>
-        {selectedPlot && <p style={{ flexBasis: "100%", margin: 0, color: "#49351f" }}>
-          {selectedPlot.name}의 정원 · {selectedPlot.gardenLevel}단계 · 물 {selectedPlot.gardenWater}/{WATER_PER_LEVEL}
-        </p>}
+        <button
+          type="button" data-ux-role="control" disabled={!selectedPlot}
+          onClick={() => selectedPlot && onSelectRef.current(selectedPlot.id)}
+          style={{ ...controlSkin, opacity: selectedPlot ? 1 : 0.5 }}
+        >집 방문</button>
+        {selectedPlot && (
+          <p data-ux-role="body" style={{ flexBasis: "100%", margin: 0 }}>
+            {selectedPlot.name}의 정원 · {selectedPlot.gardenLevel}단계 · 물 {selectedPlot.gardenWater}/{WATER_PER_LEVEL}
+          </p>
+        )}
       </div>
     </section>
   );
