@@ -57,6 +57,9 @@ const AZIMUTH_LIMIT = Math.PI / 6;       // 회전 ±30°
 const ZOOM_MIN = 0.7;
 const ZOOM_MAX = 2.0;
 const PAN_LIMIT = 46;
+/** 카메라가 바라보는 지점은 마을 안이어야 한다. 밖이면 onControlsChange 의
+ *  클램프가 매 프레임 같은 크기의 delta 를 되살려 rAF 가 멈추지 않는다. */
+const clampToVillage = (v: number) => Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, v));
 const GROUND_SIZE = 130;
 const GROUND_COLOR = 0x9fdd82;    // 연두 단색 폴백 (ground-meadow 부재 시)
 const SKY_COLOR = 0xbfe7fb;
@@ -83,7 +86,12 @@ function plotPosition(i: number): { x: number; z: number } {
  */
 function disposeSubtree(root: THREE.Object3D): void {
   root.traverse((obj) => {
-    const mesh = obj as THREE.Mesh & { isSprite?: boolean };
+    const mesh = obj as THREE.Mesh & { isSprite?: boolean; isInstancedMesh?: boolean };
+    // InstancedMesh 의 instanceMatrix/instanceColor 는 geometry 가 아니라 메시가
+    //들고 있고, 그 GPU 버퍼는 InstancedMesh.dispose() 가 쏘는 'dispose' 이벤트로만
+    // 풀린다(three 0.184.0 renderers/webgl/WebGLObjects.js 의 onInstancedMeshDispose).
+    // geometry.dispose() 로는 안 풀려서, 재빌드마다 집마다 두 개씩 새어 나간다.
+    if (mesh.isInstancedMesh) (mesh as unknown as THREE.InstancedMesh).dispose();
     if (!mesh.isSprite) mesh.geometry?.dispose();
     const material = (mesh as unknown as { material?: THREE.Material | THREE.Material[] }).material;
     if (Array.isArray(material)) material.forEach((m) => m.dispose());
@@ -164,7 +172,10 @@ export default function VillageMap3D({
     target: THREE.Vector3 | null;
     raf: number;
     highlight: THREE.Mesh | null;
-  }>({ active: false, sprite: null, pos: new THREE.Vector3(), target: null, raf: 0, highlight: null });
+    /** 산책을 시작한 시점의 내 집 인덱스. 명렬표가 바뀌어 자리가 옮겨지면
+     *  벌만 옛 자리에 남으므로, 그때는 산책을 정리하고 최신 목록에서 다시 시작한다. */
+    startedAt: number;
+  }>({ active: false, sprite: null, pos: new THREE.Vector3(), target: null, raf: 0, highlight: null, startedAt: -1 });
 
   const selfPlotIndex = plots.findIndex((p) => p.isSelf);
 
@@ -210,7 +221,8 @@ export default function VillageMap3D({
 
     // 시작 위치 = 내 집 앞
     const { x, z } = plotPosition(selfPlotIndex);
-    w.pos.set(x, 0, z + 3.2);
+    w.pos.set(clampToVillage(x), 0, clampToVillage(z + 3.2));
+    w.startedAt = selfPlotIndex;
     w.target = null;
 
     // 플레이어 스프라이트 (내 벌 후보 체인 재사용, 실패 시 노란 박스)
@@ -293,7 +305,7 @@ export default function VillageMap3D({
         hl.visible = false;
       }
       // 카메라 리지드 팔로우 — target 이동분을 camera 에도 더해 오프셋 보존
-      const follow = new THREE.Vector3(w.pos.x, 1, w.pos.z);
+      const follow = new THREE.Vector3(clampToVillage(w.pos.x), 1, clampToVillage(w.pos.z));
       const delta = follow.clone().sub(controls.target);
       const settling = delta.lengthSq() > 0.0001;
       delta.multiplyScalar(reducedMotionRef.current || !settling ? 1 : 0.14);
@@ -318,7 +330,9 @@ export default function VillageMap3D({
     const controls = controlsRef.current;
     if (!camera || !controls) return;
     const p = index === null ? { x: 0, z: 0 } : plotPosition(index);
-    const target = new THREE.Vector3(p.x, 1, p.z);
+    // 클램프는 onControlsChange 가 카메라를 옮긴 뒤에 걸린다 — 먼저 잘라 두지
+    // 않으면 controls.target 과 camera 가 어긋난 채 남아 다음 조작에서 튄다.
+    const target = new THREE.Vector3(clampToVillage(p.x), 1, clampToVillage(p.z));
     camera.position.add(target.clone().sub(controls.target));
     controls.target.copy(target);
     controls.update();
@@ -750,6 +764,11 @@ export default function VillageMap3D({
   useEffect(() => {
     const group = plotsGroupRef.current;
     if (!group || !sceneRef.current) return;
+    // 이름순 인덱스가 자리를 정한다. 누가 첫 스티커를 받아 목록에 끼어들면
+    // 내 집이 옮겨지는데 산책 벌은 옛 좌표에 남아, 카메라째로 남의 잔디에 선다.
+    // 자리가 달라졌으면(또는 내 집이 사라졌으면) 산책을 정리한다 — 다시 누르면
+    // 최신 목록 기준으로 시작한다.
+    if (walkRef.current.active && walkRef.current.startedAt !== selfPlotIndex) stopWalk();
     const gen = ++genRef.current;
 
     // 이전 플롯 정리 — geometry/material 만 (텍스처는 공유 캐시라 유지)
@@ -1020,7 +1039,9 @@ export default function VillageMap3D({
           aria-label="친구들의 집이 길로 이어진 꿀벌마을 지도"
           style={{ width: "100%", height: "100%", borderRadius: "var(--ux-radius-surface)", overflow: "hidden" }}
         />
-        {selfPlotIndex >= 0 && (
+        {/* 산책 중이면 내 집이 목록에서 빠져도 '마치기' 는 남아야 한다 —
+            버튼만 사라지고 산책이 계속되면 빠져나갈 길이 없다. */}
+        {(selfPlotIndex >= 0 || walking) && (
           <button
             type="button" data-ux-role="action" aria-pressed={walking}
             onClick={() => (walking ? stopWalk() : startWalk())}

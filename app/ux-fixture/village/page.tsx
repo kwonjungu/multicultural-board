@@ -23,7 +23,7 @@ export default function Page({
     const v = searchParams?.[k];
     return Array.isArray(v) ? v[0] : v;
   };
-  const n = Math.max(0, Math.min(40, Number(pick("n") ?? 12) || 0));
+  const n = Math.max(0, Math.min(60, Number(pick("n") ?? 12) || 0));
   return (
     <VillageFixture
       n={n}
