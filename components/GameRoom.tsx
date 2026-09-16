@@ -8,6 +8,7 @@ import { GameText, prefetchGameTexts } from "@/lib/gameI18n";
 import { reportQuestEvent } from "@/lib/quests";
 import { gt, type LangMap } from "./games/uiText";
 import ScopedStyle from "./ui/child/ScopedStyle";
+import { LADDERS, optimizedSrc, pickWidth } from "@/lib/imageOpt";
 import BeeMascot from "./BeeMascot";
 import CountryGuess from "./games/CountryGuess";
 import WordMemory from "./games/WordMemory";
@@ -134,16 +135,23 @@ function GameIcon({ icon, iconImg, size, fill }: {
   /** 액자를 꽉 채운다. 로비 칩처럼 그림이 주인공인 자리에서 쓴다. */
   fill?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
-  if (!iconImg || failed) {
+  // 파생본(WebP) -> 원본 PNG -> 이모지. fill 일 때 액자는 최대 190px 이라
+  // (.gr-grid 의 minmax(148px, 190px)) 480 폭이면 DPR 2 를 넘고도 남는다.
+  const [stage, setStage] = useState<"opt" | "original" | "emoji">("opt");
+  if (!iconImg || stage === "emoji") {
     return <div style={{ fontSize: size, lineHeight: 1 }}>{icon}</div>;
   }
+  const src = stage === "opt"
+    ? optimizedSrc(iconImg, pickWidth(fill ? 190 : size + 10, [...LADDERS.gameIcons]))
+    : iconImg;
   return (
     <img
-      src={iconImg}
+      key={src}
+      src={src}
       alt=""
       aria-hidden="true"
-      onError={() => setFailed(true)}
+      decoding="async"
+      onError={() => setStage((v) => (v === "opt" ? "original" : "emoji"))}
       style={fill
         ? { width: "100%", height: "100%", objectFit: "contain" }
         : { width: size + 10, height: size + 10, objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.15))" }}

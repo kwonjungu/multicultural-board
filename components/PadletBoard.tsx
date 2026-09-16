@@ -852,7 +852,8 @@ export default function PadletBoard({ user, roomCode, roomLangs, onLogout, roomC
 
                 {activeCards.length === 0 ? (
                   <div className="bd-empty" data-ux-surface>
-                    <img src="/mascot/bee-sleep.png" alt="" aria-hidden="true" className="bd-empty-bee" />
+                    <img src="/_opt/mascot/bee-sleep-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-sleep.png"; }} alt="" aria-hidden="true" className="bd-empty-bee" />
                     <p data-ux-role="body-emphasis" data-ux-reading className="bd-empty-title">{t("boardEmptyExample", lang)}</p>
                     <button
                       type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LADDERS, optimizedSrc, pickWidth } from "@/lib/imageOpt";
 import { t, tFmt } from "@/lib/i18n";
 import { subscribeCosmetics, setCosmetics } from "@/lib/stickers";
 import {
@@ -238,7 +239,8 @@ export default function CosmeticPicker({
           background: "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)",
         }}>
           <img
-            src="/mascot/bee-welcome.png"
+            src="/_opt/mascot/bee-welcome-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-welcome.png"; }}
             alt=""
             aria-hidden="true"
             style={{
@@ -695,6 +697,7 @@ interface TileProps {
 }
 
 function Tile({ active, unlocked, onClick, lockedHint, imageSrc, lockedAt, fallbackEmoji }: TileProps) {
+  const [optStage, setOptStage] = useState<"opt" | "original">("opt");
   const [imgFail, setImgFail] = useState(false);
   return (
     <button
@@ -727,10 +730,18 @@ function Tile({ active, unlocked, onClick, lockedHint, imageSrc, lockedAt, fallb
         }}>{fallbackEmoji}</div>
       ) : (
         <img
-          src={imageSrc}
+          // 타일은 80x80 이다. 배경(backdrop) 원본은 1MB 가 넘어서, 꾸미기 화면
+          // 하나에 14MB 가 실렸다 — 파생본(256폭)으로 받고 없으면 원본으로,
+          // 그래도 안 되면 기존 이모지 폴백으로 내려간다.
+          key={optStage}
+          src={optStage === "opt" ? optimizedSrc(imageSrc, pickWidth(80, [...LADDERS.stickers])) : imageSrc}
           alt=""
           aria-hidden="true"
-          onError={() => setImgFail(true)}
+          decoding="async"
+          onError={() => {
+            if (optStage === "opt") { setOptStage("original"); return; }
+            setImgFail(true);
+          }}
           style={{
             width: 80, height: 80, objectFit: "contain",
             filter: unlocked ? "none" : "grayscale(1) opacity(0.45)",

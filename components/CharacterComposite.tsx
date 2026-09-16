@@ -16,6 +16,7 @@
  *  - 로드 실패는 자산당 1회만 시도하고, 장식이 바뀌면 실패 상태를 비운다(ART-05).
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { LADDERS, optimizedSrc, pickWidth } from "@/lib/imageOpt";
 import type { CSSProperties } from "react";
 import type { Stage, SkinId, HatId, BackdropId, AuraId, HeldId, AccId } from "@/lib/types";
 import { useChildUx } from "@/lib/childUx";
@@ -226,9 +227,17 @@ function layerKey(l: RenderLayer): string {
 }
 
 function LayerImage({ layer, onError }: { layer: RenderLayer; onError: (assetId: string) => void }) {
+  // 배포용 파생본(WebP) 을 먼저 쓰고, 없으면 원본 PNG, 그래도 실패하면 기존
+  // 폴백(plan 의 assetId 실패 처리)으로 넘긴다. 레이어 박스는 그대로라
+  // data-plan-box 검증(scripts/shot-character.mjs)에도 영향이 없다.
+  const [useOriginal, setUseOriginal] = useState(false);
+  const src = useOriginal
+    ? layer.src
+    : optimizedSrc(layer.src, pickWidth(layer.width, [...LADDERS.stickers]));
   return (
     <img
-      src={layer.src}
+      key={src}
+      src={src}
       alt=""
       aria-hidden="true"
       draggable={false}
@@ -236,7 +245,11 @@ function LayerImage({ layer, onError }: { layer: RenderLayer; onError: (assetId:
       data-layer-asset={layer.assetId}
       /** 계산값 검증용(scripts/shot-character.mjs) — 렌더 박스와 3px 이내여야 한다. */
       data-plan-box={`${layer.left},${layer.top},${layer.width},${layer.height}`}
-      onError={() => onError(layer.assetId)}
+      decoding="async"
+      onError={() => {
+        if (!useOriginal) { setUseOriginal(true); return; }
+        onError(layer.assetId);
+      }}
       style={{
         position: "absolute",
         left: layer.left,

@@ -534,7 +534,8 @@ export default function PadletCard({
             같은 테두리를 갖는다(.pc-avatar). */}
         <span aria-hidden className="pc-avatar" style={{ background: colColor }}>
           {card.isTeacher
-            ? <img src="/mascot/bee-teacher.png" alt="" aria-hidden="true" width={40} height={40}
+            ? <img src="/_opt/mascot/bee-teacher-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-teacher.png"; }} alt="" aria-hidden="true" width={40} height={40}
                    className="pc-avatar-art" style={{ width: 40, height: 40 }} />
             : <AnimalArt id={authorAnimal} size={40} className="pc-avatar-art" />}
         </span>

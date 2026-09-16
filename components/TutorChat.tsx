@@ -313,11 +313,16 @@ export default function TutorChat({
           onClick={() => { setOpen(true); setCollapsed(false); }}
         >
           <img
-            src="/mascot/bee-tutor.png"
+            src="/_opt/mascot/bee-tutor-384.webp"
             alt=""
             aria-hidden="true"
             className="tc-fab-img"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            // 파생본 -> 원본 -> 숨김 순으로 내려간다.
+            onError={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              if (!img.dataset.fellBack) { img.dataset.fellBack = "1"; img.src = "/mascot/bee-tutor.png"; return; }
+              img.style.display = "none";
+            }}
           />
           <span data-ux-role="label" className="tc-fab-label">{t("tutorOpenLabel", lang)}</span>
         </button>
@@ -330,7 +335,8 @@ export default function TutorChat({
           style={{ bottom: 16 + vp.bottomInset, height: collapsed ? "auto" : panelHeight }}
         >
           <header className="tc-head">
-            <img src="/mascot/bee-tutor.png" alt="" aria-hidden="true" className="tc-head-img" />
+            <img src="/_opt/mascot/bee-tutor-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-tutor.png"; }} alt="" aria-hidden="true" className="tc-head-img" />
             <h2 data-ux-role="label" className="tc-title">{pickL(L_TITLE, lang)}</h2>
             <button
               type="button"

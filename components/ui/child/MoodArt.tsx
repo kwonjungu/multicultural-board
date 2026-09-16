@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LADDERS, optimizedSrc, pickWidth } from "@/lib/imageOpt";
 import { beeMoodAssetPath, beeMoodEmoji, isBeeMoodId } from "@/lib/beeMoods";
 
 /**
@@ -29,7 +30,10 @@ export default function MoodArt({
   label?: string;
   className?: string;
 }) {
-  const [failed, setFailed] = useState(false);
+  // 파생본(WebP) -> 원본 PNG -> 이모지. 파일명이 이미 크기를 담고 있어서
+  // (예: happy-64.png) 폭은 그 파일 기준으로 고른다.
+  const [stage, setStage] = useState<"opt" | "original" | "emoji">("opt");
+  const failed = stage === "emoji";
   const valid = isBeeMoodId(id);
 
   if (failed || !valid) {
@@ -46,13 +50,17 @@ export default function MoodArt({
 
   return (
     <img
-      src={beeMoodAssetPath(id, size > 64 ? 128 : 64)}
+      key={stage}
+      src={stage === "opt"
+        ? optimizedSrc(beeMoodAssetPath(id, size > 64 ? 128 : 64), pickWidth(size, [...LADDERS.uiIcons]))
+        : beeMoodAssetPath(id, size > 64 ? 128 : 64)}
       alt={decorative ? "" : (label ?? "")}
       aria-hidden={decorative || undefined}
       width={size}
       height={size}
       className={className}
-      onError={() => setFailed(true)}
+      decoding="async"
+      onError={() => setStage((v) => (v === "opt" ? "original" : "emoji"))}
       style={{ width: size, height: size, objectFit: "contain", display: "inline-block" }}
     />
   );

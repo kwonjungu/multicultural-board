@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { LADDERS, optimizedSrc, pickWidth } from "@/lib/imageOpt";
 import { QRCodeSVG } from "qrcode.react";
 import { UserConfig } from "@/lib/types";
 import { LANGUAGES } from "@/lib/constants";
@@ -165,7 +166,8 @@ export default function HomeHub({
         {/* 상단 설정 영역: 계정 · 언어 · 글자 크기를 한 곳에 모은다 */}
         <header data-tutorial-id="hub-header" className="hub-head" data-ux-surface="panel">
           <div className="hub-who">
-            <img src="/mascot/bee-welcome.png" alt="" aria-hidden="true" className="hub-who-bee" />
+            <img src="/_opt/mascot/bee-welcome-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-welcome.png"; }} alt="" aria-hidden="true" className="hub-who-bee" />
             <div className="hub-who-text">
               <p data-ux-role="body-emphasis" className="hub-hello">
                 {tFmt("hubGreeting", lang, { name: user.myName })}
@@ -265,7 +267,14 @@ export default function HomeHub({
               onClick={() => onSelect(live.kind === "storybook" ? "storybook" : "whiteboard")}
             >
               <img
-                src={live.kind === "storybook" ? "/mascot/bee-book.png" : "/mascot/bee-cheer.png"}
+                src={optimizedSrc(
+                  live.kind === "storybook" ? "/mascot/bee-book.png" : "/mascot/bee-cheer.png",
+                  pickWidth(56, [...LADDERS.mascot]),
+                )}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = live.kind === "storybook" ? "/mascot/bee-book.png" : "/mascot/bee-cheer.png";
+                }}
                 alt="" aria-hidden="true" className="hub-live-bee"
               />
               <span className="hub-live-text">
@@ -318,7 +327,13 @@ export default function HomeHub({
               onClick={() => onSelect(a.id)}
             >
               <span className={a.hex ? "hub-point-icon hex" : "hub-point-icon"} style={{ background: a.tint }}>
-                <img src={a.mascot} alt="" aria-hidden="true" className="hub-point-bee" />
+                {/* 타일 그림은 부모의 62%(≈90px)다. 원본 마스코트는 한 장에 0.5MB
+                    가 넘어 허브 한 화면에 2.4MB 가 실렸다 — 파생본으로 받는다. */}
+                <img
+                  src={optimizedSrc(a.mascot, pickWidth(90, [...LADDERS.mascot]))}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = a.mascot; }}
+                  alt="" aria-hidden="true" className="hub-point-bee"
+                />
               </span>
               {/* 아이콘만으로 안내하지 않는다 — 글자 라벨은 언제나 붙어 있다. */}
               <span data-ux-role="label" className="hub-point-label">{t(a.titleKey, lang)}</span>

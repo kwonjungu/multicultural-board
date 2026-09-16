@@ -129,7 +129,8 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
       <div className="setup-shell">
         <div className="setup-hero">
           <BeeBanner />
-          <img src="/mascot/bee-welcome.png" alt="" aria-hidden="true" className="setup-hero-bee" />
+          <img src="/_opt/mascot/bee-welcome-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-welcome.png"; }} alt="" aria-hidden="true" className="setup-hero-bee" />
         </div>
 
         <main className="setup-panel" data-ux-surface="panel">

@@ -56,10 +56,15 @@ export default function InterpreterFab({
           }}
         >
           <img
-            src="/mascot/bee-headset.png"
+            src="/_opt/mascot/bee-headset-384.webp"
             alt=""
             aria-hidden="true"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).outerHTML = "🎙️"; }}
+            // 파생본 -> 원본 -> 이모지 순으로 내려간다.
+            onError={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              if (!img.dataset.fellBack) { img.dataset.fellBack = "1"; img.src = "/mascot/bee-headset.png"; return; }
+              img.outerHTML = "🎙️";
+            }}
             style={{ width: "100%", height: "100%", objectFit: "contain" }}
           />
         </button>

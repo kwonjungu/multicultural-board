@@ -768,7 +768,8 @@ function StudentWaiting({ lang, onBack }: { lang: string; onBack: () => void }) 
         }}
       >←</button>
       <img
-        src="/mascot/bee-sleep.png"
+        src="/_opt/mascot/bee-sleep-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-sleep.png"; }}
         alt=""
         aria-hidden="true"
         style={{ width: 160, height: 160, animation: "heroBeeFloat 3s ease-in-out infinite" }}

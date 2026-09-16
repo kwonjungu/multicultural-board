@@ -153,7 +153,8 @@ export default function StickerGiveModal({
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <img
-            src="/mascot/bee-cheer.png"
+            src="/_opt/mascot/bee-cheer-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-cheer.png"; }}
             alt=""
             aria-hidden="true"
             style={{
@@ -200,7 +201,8 @@ export default function StickerGiveModal({
             aria-live="polite"
           >
             <img
-              src="/mascot/bee-celebrate.png"
+              src="/_opt/mascot/bee-celebrate-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-celebrate.png"; }}
               alt=""
               aria-hidden="true"
               style={{

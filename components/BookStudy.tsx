@@ -985,7 +985,8 @@ function TeacherCreatePanel({
     }}>
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <img
-          src="/mascot/bee-think.png"
+          src="/_opt/mascot/bee-think-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-think.png"; }}
           alt=""
           style={{ width: 80, height: 80, objectFit: "contain" }}
         />
@@ -1179,7 +1180,8 @@ function WaitingScreen() {
       background: "#fff", borderRadius: 24, border: "2px solid #FDE68A",
     }}>
       <img
-        src="/mascot/bee-welcome.png"
+        src="/_opt/mascot/bee-welcome-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-welcome.png"; }}
         alt=""
         style={{ width: 100, height: 100, objectFit: "contain", marginBottom: 16 }}
       />

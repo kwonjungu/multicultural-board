@@ -308,7 +308,8 @@ export default function PraiseHive({
             </div>
           </div>
           <img
-            src="/mascot/bee-welcome.png"
+            src="/_opt/mascot/bee-welcome-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-welcome.png"; }}
             alt=""
             aria-hidden="true"
             style={{

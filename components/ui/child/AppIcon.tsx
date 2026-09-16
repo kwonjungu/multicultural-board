@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LADDERS, optimizedSrc, pickWidth } from "@/lib/imageOpt";
 import { isUiIconId, uiIconAssetPath, uiIconEmoji, uiIconLabel, type UiIconId } from "@/lib/uiIcons";
 
 /**
@@ -30,7 +31,10 @@ export default function AppIcon({
   decorative?: boolean;
   className?: string;
 }) {
-  const [failed, setFailed] = useState(false);
+  // 파생본(WebP) -> 원본 PNG -> 이모지. 파일명이 이미 크기를 담고 있어서
+  // (예: happy-64.png) 폭은 그 파일 기준으로 고른다.
+  const [stage, setStage] = useState<"opt" | "original" | "emoji">("opt");
+  const failed = stage === "emoji";
   const valid = isUiIconId(name);
   const label = valid ? uiIconLabel(name) : "";
   const emoji = uiIconEmoji(name);
@@ -53,13 +57,17 @@ export default function AppIcon({
 
   return (
     <img
-      src={uiIconAssetPath(name, size)}
+      key={stage}
+      src={stage === "opt"
+        ? optimizedSrc(uiIconAssetPath(name, size), pickWidth(size, [...LADDERS.uiIcons]))
+        : uiIconAssetPath(name, size)}
       alt={decorative ? "" : label}
       aria-hidden={decorative || undefined}
       width={size}
       height={size}
       className={className}
-      onError={() => setFailed(true)}
+      decoding="async"
+      onError={() => setStage((v) => (v === "opt" ? "original" : "emoji"))}
       // 6개 원본의 여백/시각 질량이 서로 달라도 찌그러지지 않게 한다 (03 에셋가이드).
       style={{ width: size, height: size, objectFit: "contain", display: "inline-block" }}
     />

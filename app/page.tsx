@@ -376,7 +376,8 @@ export default function Home() {
           {view === "join" && (
             <>
               <div className="root-hero">
-                <img src="/mascot/bee-welcome.png" alt="" aria-hidden="true" className="root-hero-bee" />
+                <img src="/_opt/mascot/bee-welcome-384.webp"
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-welcome.png"; }} alt="" aria-hidden="true" className="root-hero-bee" />
                 <h1 data-ux-role="title" className="root-title">우리 교실에 들어가요</h1>
                 <p data-ux-role="body" className="root-sub">교실 번호 네 자리를 눌러 주세요</p>
                 {/* 크롬북·노트북에서는 그냥 치는 게 빠르다. 키보드가 없는
