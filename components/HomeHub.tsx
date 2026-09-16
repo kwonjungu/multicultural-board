@@ -7,6 +7,7 @@ import { LANGUAGES } from "@/lib/constants";
 import { t, tFmt } from "@/lib/i18n";
 import { subscribeSession } from "@/lib/storybook";
 import { subscribeWhiteboardMeta } from "@/lib/whiteboard";
+import BeeBanner from "./BeeBanner";
 import RoomManagePanel from "./RoomManagePanel";
 import FontSizeButton from "./FontSizeButton";
 import FlyingBees from "./ui/FlyingBees";
@@ -159,6 +160,8 @@ export default function HomeHub({
       <FlyingBees />
 
       <div className="hub-shell">
+        <BeeBanner />
+
         {/* 상단 설정 영역: 계정 · 언어 · 글자 크기를 한 곳에 모은다 */}
         <header data-tutorial-id="hub-header" className="hub-head" data-ux-surface="panel">
           <div className="hub-who">

@@ -6,7 +6,6 @@ import { ref, onValue } from "firebase/database";
 import { getClientDb } from "@/lib/firebase-client";
 import { LANGUAGES } from "@/lib/constants";
 import SetupScreen from "@/components/SetupScreen";
-import BeeBanner from "@/components/BeeBanner";
 import PadletBoard from "@/components/PadletBoard";
 import HomeHub, { HubView } from "@/components/HomeHub";
 import GameRoom from "@/components/GameRoom";
@@ -287,15 +286,12 @@ export default function RoomPage() {
 
   if (!user) {
     return (
-      <>
-        <BeeBanner />
-        <SetupScreen
-          onDone={(u) => { setUser(u); setHubView("hub"); }}
-          roomCode={roomCode}
-          availableLangs={roomLangs}
-          roomConfig={roomConfig}
-        />
-      </>
+      <SetupScreen
+        onDone={(u) => { setUser(u); setHubView("hub"); }}
+        roomCode={roomCode}
+        availableLangs={roomLangs}
+        roomConfig={roomConfig}
+      />
     );
   }
 
@@ -461,9 +457,6 @@ export default function RoomPage() {
 
   return (
     <TutorialProvider roomCode={roomCode} userName={user.myName}>
-      {/* 앱 이름표 — 어느 세부 공간/활동에 있든 화면 맨 위에 상주한다.
-          hubView 분기 밖에 있어야 화면을 옮겨도 다시 그려지지 않는다. */}
-      <BeeBanner />
       {body}
       {overlays}
     </TutorialProvider>

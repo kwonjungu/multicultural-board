@@ -285,8 +285,6 @@ export default function DiscussionSession({
         background: "#0F0C28",
         display: "flex", flexDirection: "column",
         overflow: "hidden",
-        // 화면 전체를 덮는 세션 — 상시 이름표 높이만큼 위를 비운다.
-        paddingTop: "var(--bee-banner-h, 0px)",
       }}>
         <div style={{
           flex: 1, minHeight: 0,

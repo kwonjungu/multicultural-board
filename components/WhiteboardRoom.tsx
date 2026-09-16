@@ -131,8 +131,7 @@ const WB_CSS = `
    세로로만 쌓으면 학생이 늘수록 갤러리가 계속 아래로 밀린다. */
 @media (min-width: 900px){
   .wb-teacher{ display: flex; align-items: flex-start; gap: var(--ux-space-4); }
-  /* 상시 이름표 높이를 더해 붙인다 — 안 그러면 띠 밑으로 들어간다. */
-  .wb-teacher-side{ width: 320px; flex-shrink: 0; position: sticky; top: calc(var(--bee-banner-h, 0px) + var(--ux-space-4)); }
+  .wb-teacher-side{ width: 320px; flex-shrink: 0; position: sticky; top: var(--ux-space-4); }
   .wb-teacher-main{ flex: 1; min-width: 0; }
 }
 `;

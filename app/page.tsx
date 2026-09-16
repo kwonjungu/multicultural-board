@@ -363,16 +363,14 @@ export default function Home() {
   };
 
   return (
-    <>
-    {/* 앱 이름표 — 화면 맨 위에 상시로 뜬다. position:fixed 라서
-        transform 이 걸린 조상 안에 두면 고정이 깨진다. 최상위에 둔다. */}
-    <BeeBanner />
     <div data-ux-root className="root-page">
       <ScopedStyle css={ROOT_CSS} />
       <div aria-hidden="true" className="root-backdrop" />
       <FlyingBees />
 
       <div className="root-shell">
+        <BeeBanner />
+
         <main className={view === "join" ? "root-panel join" : "root-panel"} data-ux-surface="panel">
           {/* ── 기본 화면: 우리 교실에 들어가요 ─────────────────────── */}
           {view === "join" && (
@@ -690,7 +688,6 @@ export default function Home() {
         </main>
       </div>
     </div>
-    </>
   );
 }
 

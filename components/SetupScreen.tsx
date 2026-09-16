@@ -8,6 +8,7 @@ import { landmarkFor } from "@/lib/assets";
 import {
   ANIMALS, animalAssetPath, animalLabel, fallbackAnimal, isAnimalId, type AnimalId,
 } from "@/lib/animals";
+import BeeBanner from "./BeeBanner";
 import FlyingBees from "./ui/FlyingBees";
 import SpeakButton from "./ui/SpeakButton";
 import ScopedStyle from "./ui/child/ScopedStyle";
@@ -127,6 +128,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
 
       <div className="setup-shell">
         <div className="setup-hero">
+          <BeeBanner />
           <img src="/mascot/bee-welcome.png" alt="" aria-hidden="true" className="setup-hero-bee" />
         </div>
 
