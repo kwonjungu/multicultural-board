@@ -96,14 +96,11 @@ function pickL(table: Record<string, string>, lang: string): string {
 const MAX_STORED = 40;
 
 export default function TutorChat({
-  roomCode, myClientId, user, hidden,
+  roomCode, myClientId, user,
 }: {
   roomCode: string;
   myClientId: string;
   user: UserConfig;
-  /** 전체화면 인터랙티브 뷰(게임룸 등)에서는 숨김 — 플로팅 버튼(zIndex 900)이
-   *  게임의 우하단 버튼을 가려 탭을 가로채는 사고 방지 */
-  hidden?: boolean;
 }) {
   const lang = user.myLang;
   const storageKey = `tutorChat:${roomCode}:${myClientId}`;
@@ -187,11 +184,6 @@ export default function TutorChat({
     setCollapsed(false);
   }
 
-  // hidden 으로 숨겨질 때도 생성을 남겨 두지 않는다.
-  useEffect(() => {
-    if (hidden) stopStream();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hidden]);
 
   async function ask(text: string) {
     const mySeq = reqSeqRef.current + 1;
@@ -290,7 +282,7 @@ export default function TutorChat({
     handleSend();
   }
 
-  if (hidden || !mounted) return null;
+  if (!mounted) return null;
 
   const panelHeight = vp.height > 0
     ? `min(560px, ${Math.max(vp.height - 32, 240)}px)`
@@ -441,15 +433,21 @@ function TutorBubble({ role, content }: {
 const TC_CSS = `
 .tc-root{ position: static; }
 .tc-fab{
-  position: fixed; right: 12px; z-index: 300;
-  display: inline-flex; align-items: center; gap: var(--ux-space-2);
+  /* 사용자 지시: 꿀비는 게임·토론 등 어떤 화면에서도 늘 떠 있어야 한다.
+     게임룸(460)·토론(450)보다 위인 470. 모달이 열리면 openLayers 가 버튼을
+     비켜 주므로(아래 훅) z 를 올려도 "창 위로 튀어나오는" 문제는 안 돌아온다. */
+  position: fixed; right: 12px; z-index: 470;
+  /* 통역 버튼(60px 원)과 크기를 맞춘다 — 둘이 세로로 나란히 쌓이는데
+     크기가 달라 짝이 안 맞아 보였다(사용자 보고). */
+  width: 60px; height: 60px;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--ux-space-2);
   background: var(--ux-primary-fill); color: var(--ux-primary-ink);
   border: 2px solid var(--ux-primary-border);
   border-radius: var(--ux-radius-pill);
   font-family: inherit; font-weight: 800;
   box-shadow: 0 6px 18px rgba(137,83,0,.28);
 }
-.tc-fab-img{ width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+.tc-fab-img{ width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
 /* 평소에는 접어 둔다.
    화면 위에 늘 떠 있는 물건이라 글자까지 펼쳐 두면 아이 화면을 계속 가린다
    (사용자 지시: "접어놔 학생 것에서"). 뜻은 aria-label 과 title 이 지키고,
@@ -462,7 +460,7 @@ const TC_CSS = `
   transition: max-width .18s ease, opacity .18s ease, margin-inline-end .18s ease;
   margin-inline-end: 0;
 }
-.tc-fab:hover, .tc-fab:focus-visible{ border-radius: var(--ux-radius-pill); }
+.tc-fab:hover, .tc-fab:focus-visible{ border-radius: var(--ux-radius-pill); width: auto; padding-inline: 12px; }
 .tc-fab:hover .tc-fab-label, .tc-fab:focus-visible .tc-fab-label{
   max-width: 12rem; opacity: 1; margin-inline-end: var(--ux-space-2);
 }
@@ -473,7 +471,8 @@ const TC_CSS = `
 }
 
 .tc-panel{
-  position: fixed; right: 8px; left: 8px; z-index: 320;
+  /* 대화 패널도 게임룸(460) 위 — 게임 중에 열어도 보여야 한다. */
+  position: fixed; right: 8px; left: 8px; z-index: 480;
   max-width: 420px; margin-left: auto;
   display: flex; flex-direction: column; gap: var(--ux-space-2);
   background: var(--ux-surface);

@@ -19,19 +19,15 @@ const L_LABEL: Record<string, string> = {
 export default function InterpreterFab({
   viewerLang,
   availableLangs,
-  hidden,
 }: {
   viewerLang: string;
   availableLangs: string[];
   /** 전체화면 인터랙티브 뷰(게임룸 등)에서는 숨김 — 좌하단 버튼이 화면을 가리지 않도록 */
-  hidden?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
   // 뒤로 가기 한 번이면 통역 드로어를 닫는다 (사이트 이탈 방지).
   useBackLayer(open, () => setOpen(false));
-
-  if (hidden) return null;
 
   const label = L_LABEL[viewerLang] || L_LABEL.ko;
 
@@ -43,9 +39,9 @@ export default function InterpreterFab({
           aria-label={label}
           title={label}
           style={{
-            // zIndex 는 전체화면 뷰(게임룸 460·토론 450·모달 400)보다 낮게 —
-            // 튜터 꿀비(우하단 bottom 84 · 60px) 바로 위에 세로로 쌓는다.
-            position: "fixed", bottom: 156, right: 18, zIndex: 300,
+            // 사용자 지시: 통역도 게임·토론 어디서나 늘 떠 있는다 — 게임룸(460)
+            // 위인 470. 튜터 꿀비(우하단 bottom 84 · 60px) 바로 위에 세로로 쌓는다.
+            position: "fixed", bottom: 156, right: 18, zIndex: 470,
             width: 60, height: 60, borderRadius: "50%",
             border: "3px solid #BFDBFE",
             background: "linear-gradient(135deg, #3B82F6, #2563EB)",

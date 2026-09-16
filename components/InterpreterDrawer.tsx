@@ -51,14 +51,15 @@ async function speakText(text: string, lang: string) {
  */
 const ITP_CSS = `
 .itp-scrim{
-  position: fixed; inset: 0; z-index: 200;
+  /* 게임 중에도 통역을 열 수 있어야 하므로 게임룸(460) 위. */
+  position: fixed; inset: 0; z-index: 480;
   background: rgba(41,37,31,.45);
   opacity: 0; pointer-events: none; transition: opacity .2s;
 }
 .itp-scrim.on{ opacity: 1; pointer-events: auto; }
 
 .itp-sheet{
-  position: fixed; inset: 0; z-index: 201;
+  position: fixed; inset: 0; z-index: 481;
   display: flex; flex-direction: column;
   background: var(--ux-bg);
   transform: translateY(100%); transition: transform .28s cubic-bezier(.22,.61,.36,1);

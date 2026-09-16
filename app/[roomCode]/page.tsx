@@ -323,18 +323,16 @@ export default function RoomPage() {
         tone={toast?.tone}
         onDismiss={() => setToast(null)}
       />
-      {/* 앱 전역 AI 튜터 — 게임룸에서는 숨김 (게임 우하단 버튼 가림 방지) */}
+      {/* 앱 전역 AI 튜터 — 게임·토론 포함 어디서나 상주 (사용자 지시) */}
       <TutorChat
         roomCode={roomCode}
         myClientId={myClientId}
         user={user}
-        hidden={hubView === "games"}
       />
       {/* 앱 전역 실시간 통역 — 튜터 꿀비와 대칭(좌하단). 모든 탭에서 상주. */}
       <InterpreterFab
         viewerLang={user.myLang}
         availableLangs={roomLangs}
-        hidden={hubView === "games"}
       />
       {/* 교사 전용 — 칭찬 스티커 주는 화면 바로가기. 번역 위젯(InterpreterFab) 바로 위에 상시 표시.
           /praise/hive-button.png 가 있으면 꿀벌집 UI, 없으면 기존 🍯 원형 버튼으로 폴백. */}

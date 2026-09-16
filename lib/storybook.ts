@@ -41,6 +41,12 @@ function bookAnswersPath(roomCode: string, bookId: string, questionId: string): 
 // === Book loading ===
 // Static books live under /public/storybooks/{id}/book.json.
 // Generated books live under Firebase at generated_books/{id}.
+// [설계서 3.8] 서재 목록 전용 얕은 색인 — generated_books_index/{id}.
+// 책 본문(페이지·번역·질문)을 통째로 받지 않고도 표지 목록을 그리기 위함.
+const GENERATED_BOOKS_INDEX_ROOT = "generated_books_index";
+function generatedBooksIndexPath(bookId: string): string {
+  return `${GENERATED_BOOKS_INDEX_ROOT}/${bookId}`;
+}
 
 const STATIC_BOOK_IDS = ["curious-worlds", "seasons-beauty"];
 
@@ -54,7 +60,16 @@ export async function loadBook(bookId: string): Promise<Storybook> {
   const db = getClientDb();
   const snap = await get(ref(db, `generated_books/${bookId}`));
   const val = snap.val() as Storybook | null;
-  if (!val) throw new Error(`Generated book ${bookId} not found`);
+  if (!val) {
+    // 색인(generated_books_index)엔 카드가 있는데 책 본문이 없는 경우 — 이
+    // 색인을 모르는 예전 클라이언트가 deleteGeneratedBook 로 책만 지우고
+    // 색인을 못 지웠을 때 생긴다. 스스로 못 고치면 서재에 죽은 카드가
+    // 영원히 남는다 — 지워서 다음 목록 조회부터 정상화한다. 부가 쓰기라
+    // await 하지 않는다: 이 함수의 실패 계약(throw)은 그대로고, 호출부는
+    // 이미 "그림책을 불러오지 못했어요" 알림으로 이 경우를 처리한다.
+    remove(ref(db, generatedBooksIndexPath(bookId))).catch(() => {});
+    throw new Error(`Generated book ${bookId} not found`);
+  }
   return val;
 }
 
@@ -82,6 +97,11 @@ function stripUndefined<T>(value: T): T {
 export async function saveGeneratedBook(book: Storybook): Promise<void> {
   const db = getClientDb();
   await set(ref(db, `generated_books/${book.id}`), stripUndefined(book));
+  // 서재 색인도 같이 만든다(설계서 3.8) — 책 자체와는 다른 leaf 라 여기서
+  // 실패해도 방금 끝낸 책 저장은 무효가 되지 않는다(부가 쓰기는 await 금지).
+  // 실패하더라도 다음 listGeneratedBooks 호출이 백필로 채워 준다.
+  set(ref(db, generatedBooksIndexPath(book.id)), summarizeGeneratedBook(book)).catch((err) =>
+    console.warn("generated_books_index write failed", err));
 }
 
 export interface BookListEntry {
@@ -98,27 +118,82 @@ export interface BookListEntry {
   chatEnabled?: boolean;       // 자유 읽기(복습) 중 캐릭터 챗봇 허용 (설계서 항목 3)
 }
 
+// 책 전체(Storybook)에서 서재 카드가 실제로 쓰는 필드만 골라낸다.
+// generated_books_index 에 그대로 저장하는 값이자, 색인이 없을 때의
+// 구세대 백필에도 같은 로직을 쓴다 — 두 갈래가 다른 모양을 만들면 색인이
+// 있을 때/없을 때 카드가 미묘하게 달라진다.
+function summarizeGeneratedBook(b: Storybook): BookListEntry {
+  return {
+    id: b.id,
+    titleKo: b.title?.ko || b.id,
+    coverEmoji: b.cover?.emoji || "📖",
+    coverImageUrl: b.cover?.imageUrl,
+    source: "generated",
+    createdAt: b.createdAt,
+    authorName: b.authorName,
+    visible: b.visible ?? false,
+    wordQuizEnabled: b.wordQuizEnabled ?? false,
+    hasVocab: (b.vocab?.length ?? 0) >= 4,
+    chatEnabled: b.chatEnabled ?? false,
+  };
+}
+
+// [구세대 책 보정, 한 번만] 색인이 도입되기 전에 만들어진 책은
+// generated_books_index 에 없을 수 있다. 색인이 이미 있는 방이라도 그 안에
+// 색인 이전/이후 책이 섞여 있을 수 있어 완전히 안전하지는 않다 — 그렇다고
+// 매번 책 전체를 읽으면 색인을 둔 의미가 없어지므로, 세션(페이지 로드)당
+// 한 번만 백그라운드로 전체를 읽어 색인에 없는 아이디만 채운다.
+let indexReconciledThisSession = false;
+async function reconcileGeneratedBooksIndexOnce(knownIds: Set<string>): Promise<void> {
+  if (indexReconciledThisSession) return;
+  indexReconciledThisSession = true;
+  try {
+    const db = getClientDb();
+    const snap = await get(ref(db, "generated_books"));
+    const val = snap.val() as Record<string, Storybook> | null;
+    if (!val) return;
+    const updates: Record<string, unknown> = {};
+    for (const b of Object.values(val)) {
+      if (!b || knownIds.has(b.id)) continue;
+      updates[generatedBooksIndexPath(b.id)] = summarizeGeneratedBook(b);
+    }
+    if (Object.keys(updates).length === 0) return;
+    // 루트 기준 다중 경로 update — 색인 트리 전체를 읽거나 통째로 쓰지 않고,
+    // 빠진 아이디의 leaf 만 채운다(형제 항목은 건드리지 않는다).
+    await update(ref(db), updates);
+  } catch (err) {
+    console.warn("generated_books_index reconcile failed", err);
+  }
+}
+
 export async function listGeneratedBooks(): Promise<BookListEntry[]> {
   const db = getClientDb();
-  const snap = await get(ref(db, "generated_books"));
-  const val = snap.val() as Record<string, Storybook> | null;
-  if (!val) return [];
-  return Object.values(val)
-    .filter(Boolean)
-    .map((b) => ({
-      id: b.id,
-      titleKo: b.title?.ko || b.id,
-      coverEmoji: b.cover?.emoji || "📖",
-      coverImageUrl: b.cover?.imageUrl,
-      source: "generated" as const,
-      createdAt: b.createdAt,
-      authorName: b.authorName,
-      visible: b.visible ?? false,
-      wordQuizEnabled: b.wordQuizEnabled ?? false,
-      hasVocab: (b.vocab?.length ?? 0) >= 4,
-      chatEnabled: b.chatEnabled ?? false,
-    }))
-    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  // 서재는 이제 목록 전용 얕은 색인부터 읽는다(설계서 1.7/3.8) — 책이
+  // 늘어도 여기서 받는 양은 늘지 않는다.
+  const indexSnap = await get(ref(db, GENERATED_BOOKS_INDEX_ROOT));
+  const indexVal = indexSnap.val() as Record<string, BookListEntry> | null;
+
+  let summaries: BookListEntry[];
+  if (indexVal && Object.keys(indexVal).length > 0) {
+    // 색인을 신뢰한다 — 다만 색인 이전 책이 섞여 있을 수 있으니 놓친 것을
+    // 채우는 보정은 서재 렌더링을 막지 않고 백그라운드로 돌린다.
+    summaries = Object.values(indexVal).filter(Boolean);
+    reconcileGeneratedBooksIndexOnce(new Set(summaries.map((s) => s.id))).catch(() => {});
+  } else {
+    // 색인이 비어 있다 = 이 방이 색인 도입 이전부터 있었다(구세대 방). 예전
+    // 처럼 책 전체를 한 번만 읽고, 이번 김에 색인을 채워 다음 접속부터는
+    // 목록만 읽도록 만든다.
+    const snap = await get(ref(db, "generated_books"));
+    const val = snap.val() as Record<string, Storybook> | null;
+    summaries = val ? Object.values(val).filter(Boolean).map(summarizeGeneratedBook) : [];
+    if (summaries.length > 0) {
+      const updates: Record<string, unknown> = {};
+      for (const s of summaries) updates[generatedBooksIndexPath(s.id)] = s;
+      // 부가 쓰기 — 실패해도 이번 서재 렌더링에는 지장 없다. 다음에 또 시도한다.
+      update(ref(db), updates).catch((err) => console.warn("generated_books_index backfill failed", err));
+    }
+  }
+  return summaries.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 }
 
 /** [신규] 책의 공개 여부 / 단어 퀴즈 / 복습 챗봇 토글을 즉시 갱신. */
@@ -137,7 +212,13 @@ export async function setBookFlags(
 
 export async function deleteGeneratedBook(bookId: string): Promise<void> {
   const db = getClientDb();
-  await remove(ref(db, `generated_books/${bookId}`));
+  // 색인도 같이 지운다 — 여기서 함께 지우면 아래 loadBook 의 "죽은 카드
+  // 자가 치유"가 애초에 필요 없는 정상 경로가 된다(그 자가 치유는 이 함수를
+  // 몰랐던 예전 클라이언트가 남긴 색인을 위한 안전망이다).
+  await Promise.all([
+    remove(ref(db, `generated_books/${bookId}`)),
+    remove(ref(db, generatedBooksIndexPath(bookId))),
+  ]);
 }
 
 /**
@@ -160,6 +241,11 @@ export async function updateGeneratedBookPageImage(
   if (pageIdx === 0) {
     // 표지는 자리가 고정이라 읽지 않아도 된다.
     await set(ref(db, `generated_books/${bookId}/cover/imageUrl`), imageUrl);
+    // 서재 색인의 표지도 맞춘다 — 위 set 과는 다른 leaf 라 풀 3 이 겹쳐도
+    // 서로 지우지 않는다. 부가 쓰기라 await 하지 않는다(표지 자체는 이미
+    // 저장됐다); 실패해도 다음 백필이 채운다.
+    update(ref(db, generatedBooksIndexPath(bookId)), { coverImageUrl: imageUrl }).catch((err) =>
+      console.warn("generated_books_index coverImageUrl sync failed", err));
     return;
   }
   const snap = await get(ref(db, `generated_books/${bookId}/pages`));
@@ -181,6 +267,14 @@ export async function updateGeneratedBookField(
 ): Promise<void> {
   const db = getClientDb();
   await update(ref(db, `generated_books/${bookId}`), stripUndefined(updates) as Record<string, unknown>);
+  // 제목이 바뀌면 색인의 표시용 사본도 맞춘다 — 서재는 이제 색인만 읽는다
+  // (설계서 3.8). pages/questions/characters 등 다른 필드는 색인에 없는
+  // 값이라 손댈 것이 없다. 부가 쓰기라 await 하지 않는다.
+  if (updates.title !== undefined) {
+    const titleKo = updates.title?.ko || bookId;
+    update(ref(db, generatedBooksIndexPath(bookId)), { titleKo }).catch((err) =>
+      console.warn("generated_books_index titleKo sync failed", err));
+  }
 }
 
 /** 등장인물 그림 한 개. 위 두 함수와 같은 이유로 그 잎만 쓴다. */

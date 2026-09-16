@@ -117,6 +117,17 @@ async function ensureVoicesReady(): Promise<void> {
 
 // Tracks the current HTML5 audio element so cancelSpeak() can stop it.
 let currentAudio: HTMLAudioElement | null = null;
+// 다음 조각을 앞 조각 재생 중에 미리 만들어(= 미리 내려받기 시작해) 둔 것.
+// 아직 play() 를 부르지 않은 상태라서 소리는 절대 안 난다. cancelSpeak() 이
+// 이것도 함께 버려야 취소 후 뒤늦게 재생되는 '유령 오디오' 가 안 생긴다.
+let prefetchedAudio: HTMLAudioElement | null = null;
+// 취소 여부를 currentAudio 가 null 인지로 판단하면 안 된다 — 조각이 정상
+// 종료(ended)될 때도 done() 이 currentAudio 를 null 로 만들기 때문에, 그
+// 방식으로는 '정상 종료' 와 '취소' 를 구분하지 못해 둘째 조각부터 재생이
+// 아예 안 되는 문제가 있었다. 세대 번호로 명확히 구분한다: cancelSpeak() 이
+// 세대를 올리면, 그 이전 세대로 시작된 재생은 이후 어떤 시점에도 스스로
+// '취소됐다' 는 걸 알아챈다.
+let playGeneration = 0;
 
 // Chrome 은 긴 글을 읽다가 15초쯤에서 스스로 멈춘다. 살아 있는 동안 resume()
 // 을 계속 넣어 끊기지 않게 한다. cancelSpeak() 이 함께 정리한다.
@@ -155,17 +166,41 @@ const AUDIO_START_MS = 2000;
 /** 길이를 알기 전까지 쓰는 임시 상한. 알게 되면 실제 길이로 좁힌다. */
 const AUDIO_MAX_MS = 15000;
 
+function ttsUrlFor(langShort: string, part: string): string {
+  return `/api/tts?lang=${encodeURIComponent(langShort)}&text=${encodeURIComponent(part)}`;
+}
+
 async function playServerTts(text: string, langShort: string): Promise<void> {
   const chunks = chunkText(text);
-  for (const part of chunks) {
-    const url = `/api/tts?lang=${encodeURIComponent(langShort)}&text=${encodeURIComponent(part)}`;
-    await new Promise<void>((resolve, reject) => {
-      const audio = new Audio(url);
-      currentAudio = audio;
-      const tuning = TUNING[langShort] || DEFAULT_TUNING;
-      audio.playbackRate = tuning.rate;
-      audio.volume = tuning.volume;
+  if (chunks.length === 0) return;
+  // 이 재생 호출 전용 세대 번호. cancelSpeak() 이 playGeneration 을 올리면
+  // 이 값과 어긋나 '취소됨' 을 알 수 있다.
+  const myGen = ++playGeneration;
+  const tuning = TUNING[langShort] || DEFAULT_TUNING;
 
+  // 미리 받기와 실제 재생이 같은 생성 함수를 쓴다. new Audio(url) 시점에
+  // 브라우저가 알아서 내려받기 시작하지만, play() 를 부르기 전까지는
+  // 절대 소리가 나지 않는다 — 그래서 취소된 미리받기는 안전하게 버릴 수 있다.
+  const createAudio = (part: string): HTMLAudioElement => {
+    const audio = new Audio(ttsUrlFor(langShort, part));
+    audio.playbackRate = tuning.rate;
+    audio.volume = tuning.volume;
+    return audio;
+  };
+
+  // 다음에 재생할(또는 이미 미리 받아 둔) 오디오. 루프 시작 전에 첫 조각을
+  // 만들어 두는 것도 같은 흐름이다 — 그냥 '한 조각 미리' 상태로 시작한다.
+  let pending: HTMLAudioElement | null = createAudio(chunks[0]);
+
+  for (let i = 0; i < chunks.length; i++) {
+    if (myGen !== playGeneration) return; // 취소됨 — cancelSpeak() 이 이미 정리했다
+
+    const audio = pending as HTMLAudioElement;
+    pending = null;
+    currentAudio = audio;
+    if (prefetchedAudio === audio) prefetchedAudio = null; // 미리받기 신분 졸업, 이제 '현재' 다
+
+    await new Promise<void>((resolve, reject) => {
       /**
        * 'ended' 만 기다리면 재생이 시작되지 못했을 때 영영 끝나지 않는다.
        * 그러면 호출부의 finally 가 안 돌아 듣기 버튼이 눌린 채로 굳는다
@@ -199,13 +234,27 @@ async function playServerTts(text: string, langShort: string): Promise<void> {
         maxGuard = window.setTimeout(() => done(true), (d / rate) * 1000 + 1200);
       }, { once: true });
 
-      audio.addEventListener("playing", () => { started = true; }, { once: true });
+      audio.addEventListener("playing", () => {
+        started = true;
+        // 이 조각이 재생을 "시작"한 바로 그 시점에 다음 조각을 미리 만든다.
+        // play() 는 아직 안 부르므로(다음 루프 차례가 됐을 때 부른다) 지금
+        // 취소돼도 이 오디오는 절대 소리를 내지 않는다.
+        if (
+          myGen === playGeneration &&
+          i + 1 < chunks.length &&
+          !prefetchedAudio
+        ) {
+          const next = createAudio(chunks[i + 1]);
+          prefetchedAudio = next;
+          pending = next;
+        }
+      }, { once: true });
       audio.addEventListener("ended", () => done(true), { once: true });
       audio.addEventListener("error", () => done(false, "audio error"), { once: true });
       audio.play().then(() => { started = true; }).catch((e) => done(false, String(e && e.name)));
     });
-    // 도중에 취소됐으면 다음 조각으로 넘어가지 않는다.
-    if (!currentAudio) break;
+
+    if (myGen !== playGeneration) return; // 도중에 취소됐으면 다음 조각으로 넘어가지 않는다
   }
 }
 
@@ -337,9 +386,20 @@ export function cancelSpeak() {
   if (typeof window === "undefined") return;
   clearKeepAlive();
   window.speechSynthesis?.cancel();
+  // 세대를 먼저 올린다 — playServerTts 의 진행 중이던 루프가 다음 확인
+  // 시점에 곧바로 '취소됨' 을 알아채고 더 진행하지 않게 한다.
+  playGeneration++;
   if (currentAudio) {
     try { currentAudio.pause(); } catch {}
     currentAudio.src = "";
     currentAudio = null;
+  }
+  // 미리 받아 둔 다음 조각도 함께 버린다 — play() 를 부른 적이 없으니
+  // pause() 는 안전 장치일 뿐이고, 핵심은 참조를 끊어 이후 그 누구도
+  // 이 오디오에 play() 를 부르지 못하게 하는 것이다(유령 재생 방지).
+  if (prefetchedAudio) {
+    try { prefetchedAudio.pause(); } catch {}
+    prefetchedAudio.src = "";
+    prefetchedAudio = null;
   }
 }
