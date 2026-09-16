@@ -4,6 +4,7 @@ import { getAdminApp } from "@/lib/firebase-admin";
 import { getStorage } from "firebase-admin/storage";
 import { createHash, randomUUID } from "crypto";
 import { removeLightBackground } from "@/lib/image-bg-removal";
+import sharp from "sharp";
 
 // Nano Banana image calls take 10-30s each. Run up to 60s budget.
 export const maxDuration = 60;
@@ -189,13 +190,30 @@ async function generateAndUpload(
     }
   }
 
+  // === WebP 재인코딩 ===
+  // Nano Banana 가 주는 1024px PNG 는 실측 장당 1.1~1.9MB — 동화책 한 권이면
+  // 표지·페이지·캐릭터 합쳐 수십 MB 라 교실 와이파이에서 첫 로딩이 버틴다.
+  // 해상도는 그대로 두고 포맷만 바꾼다. alphaQuality 100 은 위 배경 제거로
+  // 만든 캐릭터 투명도가 뭉개지지 않게 하기 위한 것. effort 는 생성까지 포함한
+  // 60s 예산을 갉아먹지 않도록 5 가 아니라 4.
+  let ext = "png";
+  let contentType = img.mimeType || "image/png";
+  try {
+    buffer = Buffer.from(await sharp(buffer).webp({ quality: 86, alphaQuality: 100, effort: 4 }).toBuffer());
+    ext = "webp";
+    contentType = "image/webp";
+  } catch (webpErr) {
+    // 용량 최적화 실패가 이미 성공한 이미지 생성을 무효로 만들면 안 된다 — 원본 PNG 그대로 올린다.
+    console.warn("webp encode failed, uploading original", webpErr);
+  }
+
   // === Upload to Firebase Storage ===
   const token = randomUUID();
   const filename = hasChar
-    ? `storybooks/${body.bookId}/char-${body.characterId}.png`
+    ? `storybooks/${body.bookId}/char-${body.characterId}.${ext}`
     : body.pageIdx === 0
-      ? `storybooks/${body.bookId}/cover.png`
-      : `storybooks/${body.bookId}/page-${body.pageIdx}.png`;
+      ? `storybooks/${body.bookId}/cover.${ext}`
+      : `storybooks/${body.bookId}/page-${body.pageIdx}.${ext}`;
 
   const app = getAdminApp();
   const storage = getStorage(app);
@@ -203,7 +221,7 @@ async function generateAndUpload(
 
   const fileRef = bucket.file(filename);
   await fileRef.save(buffer, {
-    contentType: img.mimeType || "image/png",
+    contentType,
     metadata: {
       metadata: { firebaseStorageDownloadTokens: token },
     },

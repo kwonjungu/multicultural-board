@@ -140,51 +140,62 @@ export async function deleteGeneratedBook(bookId: string): Promise<void> {
   await remove(ref(db, `generated_books/${bookId}`));
 }
 
+/**
+ * 그림 URL 한 개를 적는다.
+ *
+ * 예전에는 책 전체를 get 해서 고친 뒤 **책 전체를 다시 set** 했다. 만들기는
+ * 작업 풀 3으로 돌기 때문에(StorybookCreator 의 POOL) 세 장이 겹치면 나중에 쓴
+ * 쪽이 앞에서 막 적은 imageUrl 을 덮어썼다 — 그림이 가끔 하나 비는 원인이다.
+ * 이제 **그 잎만** 쓴다. 겹쳐도 서로를 지우지 않는다.
+ *
+ * 위치를 찾으려면 아직 책을 읽어야 한다(RTDB 는 필드만 골라 읽지 못한다).
+ * 그 읽기는 느릴 뿐 덮어쓰지 않으므로 이 수정의 목적과는 무관하다.
+ */
 export async function updateGeneratedBookPageImage(
   bookId: string,
   pageIdx: number,
   imageUrl: string,
 ): Promise<void> {
   const db = getClientDb();
-  const snap = await get(ref(db, `generated_books/${bookId}`));
-  const book = snap.val() as Storybook | null;
-  if (!book) throw new Error("book not found");
   if (pageIdx === 0) {
-    // Cover image
-    book.cover = { ...book.cover, imageUrl };
-  } else {
-    const page = book.pages.find((p) => p.idx === pageIdx);
-    if (!page) throw new Error("page not found");
-    page.illustration = { ...page.illustration, imageUrl };
+    // 표지는 자리가 고정이라 읽지 않아도 된다.
+    await set(ref(db, `generated_books/${bookId}/cover/imageUrl`), imageUrl);
+    return;
   }
-  await set(ref(db, `generated_books/${bookId}`), stripUndefined(book));
+  const snap = await get(ref(db, `generated_books/${bookId}/pages`));
+  const pages = snap.val() as Storybook["pages"] | null;
+  if (!pages) throw new Error("book not found");
+  // idx 는 모델이 매긴 번호이고 배열 자리와 같다는 보장이 없다 — 자리를 찾아 쓴다.
+  const pos = pages.findIndex((p) => p?.idx === pageIdx);
+  if (pos < 0) throw new Error("page not found");
+  await set(ref(db, `generated_books/${bookId}/pages/${pos}/illustration/imageUrl`), imageUrl);
 }
 
+/**
+ * 책의 일부 항목만 고친다. update 는 넘긴 키만 합치므로 형제 항목을 건드리지
+ * 않는다 — 읽고 합쳐서 통째로 set 할 이유가 없었다(위 함수와 같은 이유).
+ */
 export async function updateGeneratedBookField(
   bookId: string,
   updates: Partial<Storybook>,
 ): Promise<void> {
   const db = getClientDb();
-  const snap = await get(ref(db, `generated_books/${bookId}`));
-  const book = snap.val() as Storybook | null;
-  if (!book) throw new Error("book not found");
-  const merged = { ...book, ...updates };
-  await set(ref(db, `generated_books/${bookId}`), stripUndefined(merged));
+  await update(ref(db, `generated_books/${bookId}`), stripUndefined(updates) as Record<string, unknown>);
 }
 
+/** 등장인물 그림 한 개. 위 두 함수와 같은 이유로 그 잎만 쓴다. */
 export async function updateGeneratedBookCharacterAvatar(
   bookId: string,
   characterId: string,
   avatarUrl: string,
 ): Promise<void> {
   const db = getClientDb();
-  const snap = await get(ref(db, `generated_books/${bookId}`));
-  const book = snap.val() as Storybook | null;
-  if (!book) throw new Error("book not found");
-  book.characters = book.characters.map((c) =>
-    c.id === characterId ? { ...c, avatarUrl } : c,
-  );
-  await set(ref(db, `generated_books/${bookId}`), stripUndefined(book));
+  const snap = await get(ref(db, `generated_books/${bookId}/characters`));
+  const characters = snap.val() as Storybook["characters"] | null;
+  if (!characters) throw new Error("book not found");
+  const pos = characters.findIndex((c) => c?.id === characterId);
+  if (pos < 0) throw new Error("character not found");
+  await set(ref(db, `generated_books/${bookId}/characters/${pos}/avatarUrl`), avatarUrl);
 }
 
 // === Session ===
