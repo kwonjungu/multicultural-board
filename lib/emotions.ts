@@ -1,4 +1,4 @@
-import { ref, push, set, runTransaction, onValue, off } from "firebase/database";
+import { ref, push, set, runTransaction, onValue, off } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import { giveIndividualSticker } from "./stickers";
 import { reportQuestEvent } from "./quests";

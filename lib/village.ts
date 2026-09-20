@@ -14,7 +14,7 @@
 // 일일 1회 보상·재화 증감은 전부 runTransaction (CLAUDE.md 가드레일 —
 // get+set 분리 금지, 결과는 result.snapshot.val() 로 재독).
 
-import { ref, onValue, off, update, runTransaction } from "firebase/database";
+import { ref, onValue, off, update, runTransaction } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import { reportQuestEvent } from "./quests";
 

@@ -3,7 +3,7 @@
 //
 // Firebase path: rooms/{roomCode}/expressions/{clientId}/{exprId} = ExpressionEntry
 
-import { ref, push, set, update, onValue, off, get } from "firebase/database";
+import { ref, push, set, update, onValue, off, get } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import { initialBox, initialDue, nextBoxAfter, nextDueAt, isDueNow, type SrsBox } from "./srs";
 

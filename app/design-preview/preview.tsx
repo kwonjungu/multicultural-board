@@ -4,7 +4,7 @@
 // emulator and taken offline BEFORE any component mounts or fixture is seeded.
 import { useEffect, useState } from "react";
 import { getApps, initializeApp } from "firebase/app";
-import { connectDatabaseEmulator, goOffline, ref, set } from "firebase/database";
+import { connectDatabaseEmulator, goOffline, ref, set } from "@/lib/db";
 import { getClientDb } from "@/lib/firebase-client";
 import { COLUMNS_DEFAULT } from "@/lib/constants";
 import { UserConfig } from "@/lib/types";

@@ -1085,7 +1085,7 @@ function CharacterEditor({
   c, onSaveField,
 }: {
   c: {
-    id: string; avatarEmoji: string;
+    id: string; avatarEmoji: string; avatarUrl?: string;
     name?: Record<string, string>;
     personality: string; speechStyle: string; bookContext: string;
   };
@@ -1097,7 +1097,20 @@ function CharacterEditor({
       border: "1px solid #FDE68A", borderRadius: 12,
       display: "grid", gridTemplateColumns: "60px 1fr", gap: 10,
     }}>
-      <div style={{ fontSize: 44, textAlign: "center" }}>{c.avatarEmoji}</div>
+      {/* 생성된 캐릭터 초상(avatarUrl)이 있으면 이미지, 없으면 이모지 폴백 */}
+      {c.avatarUrl ? (
+        <img
+          src={c.avatarUrl}
+          alt={c.name?.ko || ""}
+          style={{
+            width: 56, height: 56, objectFit: "contain",
+            justifySelf: "center", alignSelf: "start",
+            filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.15))",
+          }}
+        />
+      ) : (
+        <div style={{ fontSize: 44, textAlign: "center" }}>{c.avatarEmoji}</div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <EditableLine
           label="이름"

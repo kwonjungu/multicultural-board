@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 연구대회 USB 포터블 실행용: server.js + 최소 의존성만 담긴 self-contained 빌드
+  output: "standalone",
   experimental: {
     serverComponentsExternalPackages: ["firebase-admin", "pdf-parse"],
   },

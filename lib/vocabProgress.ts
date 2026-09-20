@@ -5,7 +5,7 @@
 // 머지 규칙: 같은 wordId 면 doneSentences 합집합 + 최신 lastStudied/listenCount.
 // 원격 > 로컬 시 원격 승리 (다른 기기/세션 편집 반영).
 
-import { ref, set, onValue, update } from "firebase/database";
+import { ref, set, onValue, update } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 
 export interface WordProgress {

@@ -1,7 +1,7 @@
 // Duolingo 스타일 LMS 상태 — 학생당 XP, 하트, 스트릭, 데일리 골, 레슨 완료.
 // Firebase path: rooms/{roomCode}/lms/{clientId} = LearnerState
 
-import { ref, get, set, onValue, off, update, runTransaction } from "firebase/database";
+import { ref, get, set, onValue, off, update, runTransaction } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 
 export const MAX_HEARTS = 5;

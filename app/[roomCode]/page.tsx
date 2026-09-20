@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue } from "@/lib/db";
 import { getClientDb } from "@/lib/firebase-client";
 import { LANGUAGES } from "@/lib/constants";
 import SetupScreen from "@/components/SetupScreen";

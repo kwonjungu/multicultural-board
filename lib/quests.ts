@@ -14,7 +14,7 @@
 //   중간 실패가 미지급으로 굳지 않도록 재처리 경로를 함께 둔다.
 // ⚠ 이 파일은 오케스트레이션 계약 — UI(A)·계측(B) 에이전트는 수정 금지.
 
-import { ref, onValue, runTransaction, update, get } from "firebase/database";
+import { ref, onValue, runTransaction, update, get } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import { awardXp } from "./lms";
 import {

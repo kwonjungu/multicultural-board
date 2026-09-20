@@ -96,6 +96,16 @@
   이미지 대량 생성은 반드시 `batchGenerateContent`(배치 API, 50% 할인)로.
   **생성 스크립트 실행(=과금)은 사용자가 명시적으로 요청/승인한 웨이브만.**
 
+- **`firebase/database` 를 직접 import 하지 말 것 — 반드시 `@/lib/db` 를 통해서.**
+  2026-09-20 연구대회 USB 포터블화: `lib/db.ts` 가 RTDB 사용 표면 전체(ref/get/set/
+  update/push/remove/onValue/onChild*/off/query/limitToLast/runTransaction/
+  serverTimestamp/onDisconnect)를 감싼다. 온라인이면 실 SDK 위임, 오프라인(프로브
+  4초 실패)이면 `public/offline-seed-1111.json` 시드 + localStorage 목 DB 로 동작.
+  새 파일이 `firebase/database` 를 직접 import 하면 오프라인 모드에서 그 기능만
+  조용히 죽는다. push 키는 Firebase 공식 알고리즘 재현이라 실 키와 정렬 호환.
+  next.config.js 의 `output: "standalone"` 도 이 포터블 빌드용 — 제거 금지.
+  bat 실행기는 **CP949 로 저장해야** 한다(UTF-8 배치는 cmd 파서가 줄을 오염시킴).
+
 - **모델 세대 교체 이력 — 전부 지원 종료가 이유다.** 이 프로젝트는 이미 세 번 겪었다.
   | 모델 | 사유 |
   |---|---|

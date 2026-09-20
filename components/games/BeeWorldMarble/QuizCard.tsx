@@ -297,16 +297,16 @@ const QUIZ_CSS = `
 .mb-quizchoice[aria-disabled="true"]{ cursor: default; }
 `;
 
-// 국기 선택지 — flagcdn 실물 국기 이미지 우선, 로드 실패 시 국기 이모지 폴백.
-// (CountryGuess 와 동일한 오픈 라이선스 CDN. 선택지 key 가 ISO 국가코드.)
+// 국기 선택지 — 로컬 번들 국기 이미지 우선, 로드 실패 시 국기 이모지 폴백.
+// (CountryGuess 와 동일한 오픈/CC 라이선스 원본(flagcdn). 선택지 key 가 ISO 국가코드.)
 function FlagChoice({ code, emoji }: { code: string; emoji: string }) {
   const [failed, setFailed] = useState(false);
   if (failed) return <span aria-hidden="true" style={{ fontSize: "var(--ux-font-title)" }}>{emoji}</span>;
   const cc = code.toLowerCase();
   return (
     <img
-      src={`https://flagcdn.com/w80/${cc}.png`}
-      srcSet={`https://flagcdn.com/w160/${cc}.png 2x`}
+      src={`/flags/w80/${cc}.png`}
+      srcSet={`/flags/w160/${cc}.png 2x`}
       alt=""
       aria-hidden="true"
       onError={() => setFailed(true)}

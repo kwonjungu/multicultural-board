@@ -10,7 +10,7 @@
 // 일일 1회 제한은 반드시 runTransaction 으로 원자화 (CLAUDE.md 가드레일 —
 // get+set 분리하면 동시 탭에서 중복 지급된다).
 
-import { ref, push, set, onValue, off, runTransaction } from "firebase/database";
+import { ref, push, set, onValue, off, runTransaction } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import { reportQuestEvent } from "./quests";
 

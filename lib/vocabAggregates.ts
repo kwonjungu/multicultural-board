@@ -2,7 +2,7 @@
 // rooms/{roomCode}/vocab/progress/* + rooms/{roomCode}/vocab/attempts/* 를
 // 한 번에 가져와 학생별/단어별/포맷별/카테고리별 통계로 롤업한다.
 
-import { ref, get, onValue, off } from "firebase/database";
+import { ref, get, onValue, off } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import { VOCAB_WORDS, type VocabWord } from "./vocabWords";
 import type { WordProgress, ProgressMap } from "./vocabProgress";

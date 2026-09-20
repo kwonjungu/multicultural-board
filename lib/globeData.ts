@@ -38,6 +38,7 @@ export function globeCountryName(c: GlobeCountry, viewerLang: string): string {
   return tr(item ? item.names : c.fallbackName, viewerLang);
 }
 
+// 로컬 번들 국기 이미지 (원본 flagcdn, 오픈/CC 라이선스) — 오프라인에서도 표시.
 export function flagUrlFor(code: string, size: "w80" | "w160" = "w160"): string {
-  return `https://flagcdn.com/${size}/${code.toLowerCase()}.png`;
+  return `/flags/${size}/${code.toLowerCase()}.png`;
 }

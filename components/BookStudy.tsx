@@ -7,7 +7,7 @@ import {
   onValue,
   set,
   push,
-} from "firebase/database";
+} from "@/lib/db";
 import { getClientDb } from "@/lib/firebase-client";
 import { BRAND_GRADIENT, LANGUAGES } from "@/lib/constants";
 import { compressToUnder1MB } from "@/lib/imageUtils";

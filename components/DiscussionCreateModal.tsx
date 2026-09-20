@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ref, push, set, update } from "firebase/database";
+import { ref, push, set, update } from "@/lib/db";
 import { getClientDb } from "@/lib/firebase-client";
 import { compressToUnder1MB } from "@/lib/imageUtils";
 import { BRAND_GRADIENT } from "@/lib/constants";

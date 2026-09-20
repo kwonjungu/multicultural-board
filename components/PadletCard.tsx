@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, memo } from "react";
-import { ref, onValue, off, push, set, remove } from "firebase/database";
+import { ref, onValue, off, push, set, remove } from "@/lib/db";
 import { getClientDb } from "@/lib/firebase-client";
 import { CardData, CommentData, TranscriptData } from "@/lib/types";
 import { LANGUAGES } from "@/lib/constants";

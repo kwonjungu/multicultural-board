@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { ref, onValue, off, set, remove, update, query, limitToLast } from "firebase/database";
+import { ref, onValue, off, set, remove, update, query, limitToLast } from "@/lib/db";
 import { getClientDb } from "@/lib/firebase-client";
 import {
   cardLikesPath, cardCommentsPath, cardCommentPath, roomCardCommentsPath,

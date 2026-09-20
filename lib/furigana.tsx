@@ -5,7 +5,7 @@
 // 영구 캐시 (책 텍스트는 불변). 검증 실패·API 실패 시 평문 폴백.
 
 import React, { useEffect, useState } from "react";
-import { ref, get, set } from "firebase/database";
+import { ref, get, set } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 
 // 순수 함수는 furiganaCore.ts 에서 — node --test 가 JSX 파싱을 못 하므로 분리

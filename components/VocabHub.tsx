@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue } from "@/lib/db";
 import { getClientDb } from "@/lib/firebase-client";
 import { VOCAB_WORDS, VocabWord } from "@/lib/vocabWords";
 import {

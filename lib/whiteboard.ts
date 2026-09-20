@@ -10,7 +10,7 @@ import {
   ref, set, update, onValue, remove,
   onChildAdded, onChildChanged, onChildRemoved,
   type DataSnapshot,
-} from "firebase/database";
+} from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 
 export interface WhiteboardMeta {

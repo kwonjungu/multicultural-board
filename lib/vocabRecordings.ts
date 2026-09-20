@@ -27,7 +27,7 @@ import {
   get,
   remove,
   onValue,
-} from "firebase/database";
+} from "@/lib/db";
 import { getClientStorage, getClientDb } from "./firebase-client";
 
 export const RECORDING_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30일

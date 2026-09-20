@@ -5,7 +5,7 @@
 // Firebase path:
 //   rooms/{roomCode}/vocab/attempts/{clientId}/{attemptId} = VocabAttempt
 
-import { ref, push, set, onValue, off, get } from "firebase/database";
+import { ref, push, set, onValue, off, get } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import type { QuizFormat } from "./quizFormats";
 

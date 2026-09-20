@@ -378,6 +378,10 @@ export default function Home() {
               <div className="root-hero">
                 <img src="/_opt/mascot/bee-welcome-384.webp"
           onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/mascot/bee-welcome.png"; }} alt="" aria-hidden="true" className="root-hero-bee" />
+                {/* 연구대회 요강: 시작 화면에 연구보고서 제목·대상학년 명시 (시도·학교·출품자명 제외) */}
+                <p data-ux-role="secondary" className="root-worktitle">
+                  다.문.화(多.問.話)로 함께 알아가는 다문화: 초등학생 주도형 AI 그림책 에이전트 · 초등 전 학년
+                </p>
                 <h1 data-ux-role="title" className="root-title">우리 교실에 들어가요</h1>
                 <p data-ux-role="body" className="root-sub">교실 번호 네 자리를 눌러 주세요</p>
                 {/* 크롬북·노트북에서는 그냥 치는 게 빠르다. 키보드가 없는
@@ -735,6 +739,7 @@ const ROOT_CSS = `
 }
 .root-hero-bee{ width: 96px; height: 96px; object-fit: contain; }
 .root-title{ margin: 0; color: var(--ux-ink); font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
+.root-worktitle{ margin: 0 0 4px; font-size: 12px; color: var(--ux-ink-soft, #8a7a55); font-weight: 700; word-break: keep-all; text-align: center; }
 .root-title.small{ flex: 1; min-width: 0; text-align: left; }
 .root-sub{ margin: 0; color: var(--ux-ink-soft); word-break: keep-all; }
 /* 키보드 안내 — 터치만 쓰는 태블릿에서는 화면을 차지하지 않게 작게 둔다.

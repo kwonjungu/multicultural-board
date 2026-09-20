@@ -94,9 +94,10 @@ const CG: Record<string, LangMap> = {
   },
 };
 
-// Real flag image via flagcdn (open, CC-licensed). Provide 2x for sharp displays.
+// Real flag image — bundled locally (originally from flagcdn, open/CC-licensed)
+// so it also works offline. Provide 2x for sharp displays.
 function flagUrl(code: string, size: "w320" | "w640" = "w640"): string {
-  return `https://flagcdn.com/${size}/${code.toLowerCase()}.png`;
+  return `/flags/${size}/${code.toLowerCase()}.png`;
 }
 
 interface DifficultyMeta {

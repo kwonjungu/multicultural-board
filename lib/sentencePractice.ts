@@ -2,7 +2,7 @@
 // Firebase path: rooms/{roomCode}/practice/{clientId}/{cardId}
 //   = { listened: bool, spoken: bool, written: bool, lastPracticed: ms }
 
-import { ref, set, onValue } from "firebase/database";
+import { ref, set, onValue } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import type { CardData } from "./types";
 

@@ -1,4 +1,4 @@
-import { ref, push, set, remove, onValue, off, update } from "firebase/database";
+import { ref, push, set, remove, onValue, off, update } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import type {
   IndividualSticker,

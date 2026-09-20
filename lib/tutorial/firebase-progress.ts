@@ -1,6 +1,6 @@
 "use client";
 
-import { ref, get, set, serverTimestamp } from "firebase/database";
+import { ref, get, set, serverTimestamp } from "@/lib/db";
 import { getClientDb } from "@/lib/firebase-client";
 import type { TutorialSectionId } from "./types";
 

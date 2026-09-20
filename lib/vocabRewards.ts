@@ -1,4 +1,4 @@
-import { ref, get, set } from "firebase/database";
+import { ref, get, set } from "@/lib/db";
 import { getClientDb } from "./firebase-client";
 import { giveIndividualSticker } from "./stickers";
 import type { StickerType } from "./types";

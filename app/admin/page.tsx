@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ref, onValue, off, get, update } from "firebase/database";
+import { ref, onValue, off, get, update } from "@/lib/db";
 import { getClientDb } from "@/lib/firebase-client";
 import { LANGUAGES } from "@/lib/constants";
 import { useRouter } from "next/navigation";
