@@ -123,7 +123,11 @@ export interface BookListEntry {
 // 구세대 백필에도 같은 로직을 쓴다 — 두 갈래가 다른 모양을 만들면 색인이
 // 있을 때/없을 때 카드가 미묘하게 달라진다.
 function summarizeGeneratedBook(b: Storybook): BookListEntry {
-  return {
+  // stripUndefined 필수: 표지 생성이 실패한 책은 coverImageUrl 이 undefined 인데,
+  // RTDB set/update 는 undefined 가 하나라도 있으면 쓰기 전체를 거부한다 —
+  // 색인에서 titleKo·createdAt 까지 통째로 유실돼 서재에 제목 없는 카드가 남는
+  // 사고의 원인이었다 (2026-09-21, 방 1111 「오늘 내 마음의 날씨」).
+  return stripUndefined({
     id: b.id,
     titleKo: b.title?.ko || b.id,
     coverEmoji: b.cover?.emoji || "📖",
@@ -135,7 +139,7 @@ function summarizeGeneratedBook(b: Storybook): BookListEntry {
     wordQuizEnabled: b.wordQuizEnabled ?? false,
     hasVocab: (b.vocab?.length ?? 0) >= 4,
     chatEnabled: b.chatEnabled ?? false,
-  };
+  }) as BookListEntry;
 }
 
 // [구세대 책 보정, 한 번만] 색인이 도입되기 전에 만들어진 책은
@@ -154,7 +158,9 @@ async function reconcileGeneratedBooksIndexOnce(knownIds: Set<string>): Promise<
     if (!val) return;
     const updates: Record<string, unknown> = {};
     for (const b of Object.values(val)) {
-      if (!b || knownIds.has(b.id)) continue;
+      // b.id 가드: 색인 쓰기 실패 잔재 등으로 id 없는 항목이 섞이면
+      // 경로가 "" 가 되어 update 전체가 거부된다 ("invalid path" 사고).
+      if (!b || !b.id || knownIds.has(b.id)) continue;
       updates[generatedBooksIndexPath(b.id)] = summarizeGeneratedBook(b);
     }
     if (Object.keys(updates).length === 0) return;
