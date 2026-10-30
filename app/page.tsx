@@ -513,6 +513,9 @@ export default function Home() {
                 <button type="button" data-ux-role="control" className="root-link quiet" onClick={() => router.push("/admin")}>
                   🔧 관리자 패널
                 </button>
+                <a data-ux-role="control" className="root-link quiet" href="/privacy">
+                  🔒 개인정보 처리방침
+                </a>
               </div>
             </>
           )}
