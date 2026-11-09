@@ -11,11 +11,10 @@ import { buildTutorSystemPrompt } from "@/lib/prompts/chatPrompts";
 export const dynamic = "force-dynamic";
 
 // 챗봇 Groq 모델 체인. llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
-// qwen3.6-27b 는 <think> 영어 추론이 응답에 그대로 유출돼 챗에서는 사용 금지.
+// qwen 계열은 <think> 영어 추론이 응답에 유출될 수 있어 학생 챗에서는 사용 금지.
 const GROQ_MODELS = [
   "openai/gpt-oss-120b",            // fallback 1 — Groq 권장 대체 모델
   "openai/gpt-oss-20b",             // fallback 2 — 별도 한도 버킷
-  "qwen/qwen3.8-27b",                 // fallback 3 — 다른 계열·별도 버킷
 ];
 
 interface IncomingMessage {

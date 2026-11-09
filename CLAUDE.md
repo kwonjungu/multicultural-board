@@ -90,7 +90,7 @@
 ## 🛡 가드레일 (반복하지 말아야 할 함정)
 
 - **🔒 학생 이용 기능에 Gemini 금지 (2026-11-09).** Gemini API 약관은 18세 미만이 이용할 가능성이
-  높은 앱을 금지한다. 챗봇·튜터·번역은 Groq 전용이고 사진 글자 인식은 중단했다. 학생 화면에서
+  높은 앱을 금지한다. 챗봇·튜터는 Groq 전용, 번역은 LibreTranslate·Groq(Gemini 미사용)이고 사진 글자 인식은 중단했다. 학생 화면에서
   Gemini 를 호출하는 경로를 새로 만들지 말 것. 아래 Gemini 항목은 교사용 그림책 생성에만 해당한다.
 - **🔒 Gemini 비용 하드캡 (사용자 지시, 절대 규칙).** **Flash 계열만. Pro 등 고가 모델 금지.**
   허용 목록은 `lib/gemini.ts` 의 `ALLOWED_GEMINI_MODELS`(정규식이 아니라 **명시 집합** —
@@ -169,10 +169,10 @@
   (함초롱 아님 — 오타면 교체 무효). 대상 언어별 폰트는 pptxFontForLang /
   hwpxFontForLang 맵으로만 정한다 (태국어·아랍어 등에 한국어 폰트 강제 금지).
 
-- **활동지 사진 번역은 OCR 과 번역을 분리한다.** 비전 모델(Gemini 2.5 flash →
+- **(2026-11-09 사진 경로 중단, 재개 시 참고) 활동지 사진 번역은 OCR 과 번역을 분리한다.** 비전 모델(Gemini 2.5 flash →
   flash-lite + 키 로테이션. Groq scout 은 2026-07 목록에서 사라져 폴백 불가)에는
   블록+좌표 추출만 시키고, 번역은 `lib/segment-translate.ts`
-  (LibreTranslate→Groq→Gemini flash-lite 최후 폴백, 품질검증 공통) 파이프라인으로.
+  (LibreTranslate→Groq, 품질검증 공통) 파이프라인으로.
   비전 한 방에 OCR+좌표+번역을 다 시키면 셋 다 망가진다. 좌표는
   `sanitizeOcrBlocks` 로 반드시 검증(0~1 클램프, % 변환, 픽셀 응답 폐기).
 

@@ -203,8 +203,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
             </div>
             <div style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.7 }}>
               클릭하거나 파일을 드래그해서 놓으세요<br />
-              <span style={{ fontWeight: 600, color: "#6B7280" }}>PDF</span> 또는{" "}
-              <span style={{ fontWeight: 600, color: "#6B7280" }}>사진 (JPG, PNG)</span> 지원
+              <span style={{ fontWeight: 600, color: "#6B7280" }}>PDF</span> 파일만 지원
             </div>
           </div>
         </>

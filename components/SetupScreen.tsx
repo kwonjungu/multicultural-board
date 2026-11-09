@@ -127,8 +127,8 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
   async function saveNewTeacherPin() {
     if (submitted.current || savingPin) return;
     const pin = newPin.trim();
-    if (pin.length < 4 || pin === roomCode) {
-      setNewPinError("방 번호와 다른 4~8자 암호를 입력해 주세요.");
+    if (!/^\d{4,8}$/.test(pin) || pin === roomCode) {
+      setNewPinError("방 번호와 다른 숫자 4~8자를 입력해 주세요.");
       return;
     }
     setSavingPin(true);
@@ -449,12 +449,13 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
               <p data-ux-role="body" className="setup-sub">방 번호는 학생도 알 수 있어요. 앞으로 교사 입장에 쓸 암호를 정해 주세요.</p>
 
               <label data-ux-role="label" className="setup-label" htmlFor="setup-new-pin">
-                새 암호 (4~8자)
+                새 암호 (숫자 4~8자)
               </label>
               <input
                 id="setup-new-pin"
                 className="setup-input pin"
                 type="password"
+                inputMode="numeric"
                 value={newPin}
                 onChange={(e) => { setNewPin(e.target.value); setNewPinError(null); }}
                 onKeyDown={enterUnlessComposing(() => { void saveNewTeacherPin(); })}

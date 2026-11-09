@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
       const originalText = pdfData.text.trim();
       if (!originalText) {
-        return NextResponse.json({ error: "PDF에서 텍스트를 찾지 못했습니다. 스캔된 PDF라면 이미지 탭을 이용해주세요." }, { status: 400 });
+        return NextResponse.json({ error: "PDF에서 텍스트를 찾지 못했습니다. 스캔된 PDF는 번역할 수 없습니다." }, { status: 400 });
       }
 
       // Truncate to avoid token limits
