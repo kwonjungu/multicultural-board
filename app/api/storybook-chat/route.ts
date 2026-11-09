@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 // Groq inference provider (OpenAI-compatible). Primary key: GROQ_API_KEY.
 // Backup key: GROQ_API_KEY_BACKUP (auto-fallback on 429/401/403 via withGroqKeyFallback).
-// Gemini 폴백용 Groq 체인. llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
+// 챗봇 Groq 모델 체인. llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
 // qwen3.6-27b 는 <think> 영어 추론이 응답에 그대로 유출돼 챗에서는 사용 금지.
 const GROQ_MODELS = [
   "openai/gpt-oss-120b",            // fallback 1 — Groq 권장 대체 모델
@@ -118,17 +118,12 @@ export async function POST(req: NextRequest) {
   ];
 
   // === Layer 2~4: 스트리밍 + 증분 안전검사 + 정리/질문형 종결 강제(final 에 반영) ===
-  // 핫시팅 챗봇은 Gemini(2.5 flash) 1순위 — 캐릭터 연기·다국어 품질, 실패 시 Groq 폴백.
+  // 학생용 챗봇은 Groq 전용 (Gemini API 약관의 18세 미만 앱 금지 조항 때문).
   return streamChatResponse({
-    provider: "gemini",
     messages,
     models: GROQ_MODELS,
     lang: replyLang,
     temperature: 0.6,
-    // max_tokens 는 thinking+본문 합계다. 3.8 의 thinking 은 lib/gemini.ts 의
-    // THINKING_OFF 로 꺼 두었으므로 종전 값 그대로 충분하다(계측: 3문장 답이
-    // 한국어 58·미얀마어 49·크메르어 52 토큰). thinking 이 다시 켜지면 답이
-    // 잘리므로 scripts/prompt-harness.mjs 의 "잘리지 않음(finish=stop)" 판정으로 감시.
     maxTokens: 180,
     finalize: (full) => {
       // #8 전 언어 외국어 토큰 제거 → (ko) 명사절 의문형 교정 → 질문형 종결 강제

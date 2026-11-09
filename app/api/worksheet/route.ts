@@ -1,71 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LANGUAGES } from "@/lib/constants";
 import { translateLongText } from "@/lib/groq-translate";
-import { translateSegments } from "@/lib/segment-translate";
-import { extractJson, visionCompletion } from "@/lib/gemini";
-import { sanitizeOcrBlocks, type OcrBlock } from "@/lib/ocrBlocks";
+import { PHOTO_OCR_DISABLED_MESSAGE } from "@/lib/featureLimits";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-/**
- * 활동지 번역 파이프라인 (사진):
- *   1) 비전 OCR — 텍스트 블록 + 좌표만 추출 (번역은 시키지 않는다)
- *      Gemini 2.5 flash 계열 전용 (visionCompletion 이 모델+키 폴백 처리).
- *      Groq 의 llama-4-scout 비전 모델은 2026-07 목록에서 사라져 폴백 대상이 없다.
- *   2) 좌표 검증·정규화 (sanitizeOcrBlocks)
- *   3) 번역은 전용 파이프라인 (LibreTranslate → Groq, 품질 검증 포함)
- * 예전처럼 비전 모델 한 방에 OCR+좌표+번역을 다 시키면 셋 다 품질이 떨어졌다.
- */
-
-function ocrPrompt(fromName: string): string {
-  return `This image is a photo of a classroom worksheet. The text is mainly in ${fromName}.
-
-Detect every distinct text block (title, question, instruction, paragraph, label, table cell group) visible in the image.
-For each block report:
-- "text": the original text exactly as written (do NOT translate, do NOT correct)
-- "x","y": top-left corner as fractions (0-1) of image width/height
-- "w","h": block width/height as fractions (0-1)
-
-Return ONLY a JSON object, no markdown, no commentary:
-{"blocks":[{"x":0.05,"y":0.08,"w":0.9,"h":0.06,"text":"..."},...]}
-
-Rules:
-- Cover ALL visible text, top to bottom, left to right
-- One item per logical block (a question and its sub-items may be separate blocks)
-- All coordinates must be fractions between 0 and 1`;
-}
-
-interface OcrOutcome {
-  blocks: OcrBlock[];
-  rawText: string;   // 블록 파싱 실패 시 살릴 수 있는 원시 응답
-  model: string;
-}
-
-async function runOcr(imageDataUrl: string, fromName: string): Promise<OcrOutcome> {
-  const prompt = ocrPrompt(fromName);
-  let lastRaw = "";
-  let lastModel = "";
-
-  // 비전 OCR 은 Gemini 2.5 flash 계열 전용 (visionCompletion 이 모델 폴백 +
-  // 키 로테이션 처리). scout 이 죽어 Groq 비전 폴백은 존재하지 않는다.
-  // 블록 파싱에 실패하거나 0개여도 원시 응답(lastRaw)은 살려 상위에서 통짜 번역으로 폴백.
-  try {
-    const { content, model } = await visionCompletion({
-      prompt, imageUrl: imageDataUrl, json: true, maxTokens: 8192,
-    });
-    lastRaw = content; lastModel = model;
-    const parsed = extractJson<{ blocks?: unknown }>(content);
-    const blocks = sanitizeOcrBlocks(parsed.blocks);
-    if (blocks.length > 0) return { blocks, rawText: content, model };
-    console.warn("[worksheet] Gemini OCR 이 블록 0개 반환 — 원시 응답으로 통짜 번역 폴백");
-    return { blocks: [], rawText: content, model };
-  } catch (err) {
-    console.warn("[worksheet] Gemini vision 실패:", (err as Error).message);
-    if (lastRaw) return { blocks: [], rawText: lastRaw, model: lastModel };
-    throw err;
-  }
-}
+// 활동지 번역: PDF 전용. 사진 글자 인식은 Gemini API 전용이라 학생 이용 앱에서 중단했다.
 
 export async function POST(req: NextRequest) {
   try {
@@ -112,39 +53,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ originalText: truncated, translatedText });
     }
 
-    // ── Image: OCR(블록+좌표) → 번역 분리 파이프라인 ────────────────
     if (type === "image") {
-      const buffer   = Buffer.from(await file.arrayBuffer());
-      const base64   = buffer.toString("base64");
-      const mimeType = file.type || "image/jpeg";
-      const dataUrl  = `data:${mimeType};base64,${base64}`;
-
-      const ocr = await runOcr(dataUrl, fromName);
-
-      if (ocr.blocks.length === 0) {
-        // 블록 추출 실패 — 원시 텍스트라도 있으면 통짜 번역으로 살린다
-        const plain = ocr.rawText.replace(/```json|```/g, "").trim();
-        if (!plain) {
-          return NextResponse.json({ error: "이미지에서 글자를 인식하지 못했습니다. 더 밝은 곳에서 다시 찍어보세요." }, { status: 422 });
-        }
-        const translatedText = await translateLongText(plain.slice(0, 6000), fromName, toName);
-        return NextResponse.json({ blocks: [], originalText: plain, translatedText });
-      }
-
-      // 블록 텍스트만 모아 전용 번역 파이프라인으로 (중복 제거)
-      const uniqueTexts = Array.from(new Set(ocr.blocks.map((b) => b.text)));
-      const translatedArr = await translateSegments(uniqueTexts, fromLang, toLang, "worksheet");
-      const trMap = new Map<string, string>();
-      uniqueTexts.forEach((t, i) => trMap.set(t, translatedArr[i] || t));
-
-      const blocks = ocr.blocks.map((b) => ({
-        x: b.x, y: b.y, w: b.w, h: b.h,
-        original: b.text,
-        translated: trMap.get(b.text) || b.text,
-      }));
-      const originalText   = blocks.map((b) => b.original).join("\n");
-      const translatedText = blocks.map((b) => b.translated).join("\n");
-      return NextResponse.json({ blocks, originalText, translatedText, model: ocr.model });
+      return NextResponse.json({ error: PHOTO_OCR_DISABLED_MESSAGE }, { status: 403 });
     }
 
     return NextResponse.json({ error: "알 수 없는 타입" }, { status: 400 });

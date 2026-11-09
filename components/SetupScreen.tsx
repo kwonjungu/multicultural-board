@@ -12,6 +12,9 @@ import BeeBanner from "./BeeBanner";
 import FlyingBees from "./ui/FlyingBees";
 import SpeakButton from "./ui/SpeakButton";
 import ScopedStyle from "./ui/child/ScopedStyle";
+import { ref, set } from "@/lib/db";
+import { getClientDb } from "@/lib/firebase-client";
+import { REVIEW_ROOM_CODE } from "@/lib/featureLimits";
 import AnimalArt from "./ui/child/AnimalArt";
 
 interface Props {
@@ -28,7 +31,7 @@ interface Props {
  *
  * onDone payload · roomCode · rosterMode · teacherPin 처리는 종전 계약 그대로다.
  */
-type Step = "lang" | "name" | "animal" | "teacher";
+type Step = "lang" | "name" | "animal" | "teacher" | "teacherNewPin";
 
 export default function SetupScreen({ onDone, roomCode, availableLangs, roomConfig }: Props) {
   const [step, setStep] = useState<Step>("lang");
@@ -36,6 +39,9 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
     availableLangs.includes("ko") ? "ko" : availableLangs[0] ?? "ko"
   );
   const [teacherCode, setTeacherCode] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [newPinError, setNewPinError] = useState<string | null>(null);
+  const [savingPin, setSavingPin] = useState(false);
   const [codeError, setCodeError] = useState(false);
   const [myName, setMyName] = useState("");
   /** U05 — 이번 입장에서 고른 동물. null 이면 아직 안 골랐다(저장된 값/폴백을 쓴다). */
@@ -104,8 +110,35 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
     // 교사 암호: 관리 패널에서 바꾼 teacherPin 이 있으면 그것, 없으면 방 번호.
     const expected = roomConfig.teacherPin || roomCode;
     if (teacherCode !== expected) { setCodeError(true); return; }
+    // 방 번호는 학생도 아는 값이라 최초 입장에만 쓰고 새 암호를 정하게 한다.
+    // 심사용 학급방은 여러 심사위원이 같은 코드로 들어오므로 제외한다.
+    if (!roomConfig.teacherPin && roomCode !== REVIEW_ROOM_CODE) {
+      setStep("teacherNewPin");
+      return;
+    }
+    enterAsTeacher();
+  }
+
+  function enterAsTeacher() {
     submitted.current = true;
     onDone({ myLang, myName: "선생님", isTeacher: true, teacherLangs: availableLangs });
+  }
+
+  async function saveNewTeacherPin() {
+    if (submitted.current || savingPin) return;
+    const pin = newPin.trim();
+    if (pin.length < 4 || pin === roomCode) {
+      setNewPinError("방 번호와 다른 4~8자 암호를 입력해 주세요.");
+      return;
+    }
+    setSavingPin(true);
+    try {
+      await set(ref(getClientDb(), `rooms/${roomCode}/config/teacherPin`), pin);
+      enterAsTeacher();
+    } catch {
+      setNewPinError("저장하지 못했어요. 다시 시도해 주세요.");
+      setSavingPin(false);
+    }
   }
 
   /** 한국어·일본어·중국어 조합 중 Enter 는 확정용이다 — 전송으로 쓰지 않는다. */
@@ -144,6 +177,7 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 onClick={() => {
                   // 한 단계씩 돌아간다. 동물에서 뒤로 가면 고르던 값은 버린다.
                   if (step === "animal") { setAnimalId(null); setStep("name"); return; }
+                  if (step === "teacherNewPin") { setStep("teacher"); setNewPinError(null); return; }
                   setStep("lang"); setNeedName(false); setCodeError(false);
                 }}
               >
@@ -406,6 +440,43 @@ export default function SetupScreen({ onDone, roomCode, availableLangs, roomConf
                 aria-disabled={teacherCode.length === 0}
                 onClick={finishTeacher}
               >{t("enterAsTeacher", myLang)}</button>
+            </>
+          )}
+
+          {step === "teacherNewPin" && (
+            <>
+              <h1 data-ux-role="title" className="setup-title">새 교사 암호 정하기</h1>
+              <p data-ux-role="body" className="setup-sub">방 번호는 학생도 알 수 있어요. 앞으로 교사 입장에 쓸 암호를 정해 주세요.</p>
+
+              <label data-ux-role="label" className="setup-label" htmlFor="setup-new-pin">
+                새 암호 (4~8자)
+              </label>
+              <input
+                id="setup-new-pin"
+                className="setup-input pin"
+                type="password"
+                value={newPin}
+                onChange={(e) => { setNewPin(e.target.value); setNewPinError(null); }}
+                onKeyDown={enterUnlessComposing(() => { void saveNewTeacherPin(); })}
+                maxLength={8}
+                autoFocus
+                aria-invalid={!!newPinError}
+                aria-describedby={newPinError ? "setup-new-pin-error" : undefined}
+              />
+              {newPinError && (
+                <p id="setup-new-pin-error" data-ux-role="body" className="setup-needname" role="alert">
+                  {newPinError}
+                </p>
+              )}
+
+              <button
+                type="button"
+                data-ux-role="action"
+                className="setup-cta"
+                aria-disabled={newPin.trim().length < 4 || savingPin}
+                aria-busy={savingPin}
+                onClick={() => { void saveNewTeacherPin(); }}
+              >암호 저장하고 입장</button>
             </>
           )}
         </main>

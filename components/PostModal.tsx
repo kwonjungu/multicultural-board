@@ -687,9 +687,6 @@ export default function PostModal({
             {/* 기존 기능은 지우지 않고 상세 선택으로 남는다 */}
             <p data-ux-role="label" className="pm-more-head">{t("postMoreWays", lang)}</p>
             <div className="pm-more">
-              <button type="button" data-ux-role="control" className="pm-secondary" onClick={() => goMode("analyze")}>
-                <span aria-hidden>📸</span> {t("postWorksheetShot", lang)}
-              </button>
               <button type="button" data-ux-role="control" className="pm-secondary" onClick={() => goMode("worksheet")}>
                 <span aria-hidden>📋</span> {t("postWorksheetTrans", lang)}
               </button>

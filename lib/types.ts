@@ -23,6 +23,8 @@ export interface RoomConfig {
   approvalMode?: boolean;
   /** 교사 입장 암호. 미설정(기본)이면 방 번호와 동일. 관리 패널에서 변경/초기화. */
   teacherPin?: string;
+  /** false 면 학생 화면에서 AI 튜터를 숨긴다. 미설정(기본)이면 켜짐. */
+  tutorEnabled?: boolean;
   /** 교실 기준 시간대 (IANA). 미설정이면 Asia/Seoul. 일일 퀘스트 dayKey 의 기준 —
    *  기기 시간대가 아니라 이 값으로 '오늘' 을 정한다 (lib/classroomDay.ts). */
   timeZone?: string;

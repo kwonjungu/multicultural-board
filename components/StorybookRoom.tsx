@@ -174,14 +174,12 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack, fixt
 
   // [아바타 self-heal] 생성 당시 이미지가 실패한 캐릭터(avatarUrl 없음 +
   // avatarImagePrompt 있음)를 발견하면 백그라운드로 다시 그린다. 이게 없으면
-  // 핫시팅 챗은 영구히 이모지 폴백으로 남는다. 교사는 어느 단계에서든 즉시,
-  // 학생은 챗 단계(after)에서만 트리거 — 반 전체가 초반에 동시 호출하는 것 방지
-  // (서버는 같은 프롬프트 요청을 캐시·병합하므로 남는 중복도 1회 생성으로 수렴).
+  // 핫시팅 챗은 영구히 이모지 폴백으로 남는다. 교사 화면에서만 트리거한다.
   const healedBookRef = useRef<string | null>(null);
   useEffect(() => {
     if (offline) return;
     if (!book?.id) return;
-    if (!isTeacher && session?.phase !== "after") return;
+    if (!isTeacher) return; // 학생 기기에서는 이미지 생성 API(Gemini)를 호출하지 않는다.
     if (healedBookRef.current === book.id) return;
     const missing = (book.characters || []).filter((c) => !c.avatarUrl && c.avatarImagePrompt);
     if (missing.length === 0) return;

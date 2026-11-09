@@ -10,7 +10,7 @@ import { buildTutorSystemPrompt } from "@/lib/prompts/chatPrompts";
 
 export const dynamic = "force-dynamic";
 
-// Gemini 폴백용 Groq 체인. llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
+// 챗봇 Groq 모델 체인. llama-3.3-70b 는 2026-08-16 decommission 예정이라 제외.
 // qwen3.6-27b 는 <think> 영어 추론이 응답에 그대로 유출돼 챗에서는 사용 금지.
 const GROQ_MODELS = [
   "openai/gpt-oss-120b",            // fallback 1 — Groq 권장 대체 모델
@@ -64,17 +64,12 @@ export async function POST(req: NextRequest) {
   const allowLangs = lang === "ko" ? ["ko"] : [lang, "ko"];
 
   // Layer 2~4: 스트리밍 + 증분 안전검사 + delta 스크럽 + final 새니타이즈
-  // 튜터 챗봇은 Gemini(2.5 flash) 1순위 — 15개 언어 품질이 좋고, 실패 시 Groq 폴백.
+  // 학생용 챗봇은 Groq 전용 (Gemini API 약관의 18세 미만 앱 금지 조항 때문).
   return streamChatResponse({
-    provider: "gemini",
     messages,
     models: GROQ_MODELS,
     lang,
     temperature: 0.6,
-    // max_tokens 는 thinking+본문 합계다. 3.8 의 thinking 은 lib/gemini.ts 의
-    // THINKING_OFF 로 꺼 두었으므로 종전 값 그대로 충분하다(계측: 3문장 답이
-    // 한국어 58·미얀마어 49·크메르어 52 토큰). thinking 이 다시 켜지면 답이
-    // 잘리므로 scripts/prompt-harness.mjs 의 "잘리지 않음(finish=stop)" 판정으로 감시.
     maxTokens: 300,
     scrubLangs: allowLangs,
     finalize: (full) => sanitizeReply(full, allowLangs),

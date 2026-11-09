@@ -324,11 +324,13 @@ export default function RoomPage() {
         onDismiss={() => setToast(null)}
       />
       {/* 앱 전역 AI 튜터 — 게임·토론 포함 어디서나 상주 (사용자 지시) */}
-      <TutorChat
-        roomCode={roomCode}
-        myClientId={myClientId}
-        user={user}
-      />
+      {(user.isTeacher || roomConfig.tutorEnabled !== false) && (
+        <TutorChat
+          roomCode={roomCode}
+          myClientId={myClientId}
+          user={user}
+        />
+      )}
       {/* 앱 전역 실시간 통역 — 튜터 꿀비와 대칭(좌하단). 모든 탭에서 상주. */}
       <InterpreterFab
         viewerLang={user.myLang}

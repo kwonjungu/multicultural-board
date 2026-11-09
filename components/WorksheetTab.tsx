@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/constants";
 import { compressToUnder1MB } from "@/lib/imageUtils";
+import { PHOTO_OCR_DISABLED_MESSAGE } from "@/lib/featureLimits";
 
 interface Block {
   x: number; y: number; w: number; h: number;
@@ -71,8 +72,8 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
   async function handleFile(file: File) {
     const isPDF   = file.type === "application/pdf";
     const isImage = file.type.startsWith("image/");
-    if (!isPDF && !isImage) {
-      setError("PDF 또는 이미지 파일만 지원합니다");
+    if (!isPDF) {
+      setError(PHOTO_OCR_DISABLED_MESSAGE);
       return;
     }
 
@@ -162,7 +163,7 @@ export default function WorksheetTab({ userLang, onPostText, onPostWorksheetImag
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,image/*"
+            accept=".pdf"
             style={{ display: "none" }}
             onChange={(e) => {
               const file = e.target.files?.[0];

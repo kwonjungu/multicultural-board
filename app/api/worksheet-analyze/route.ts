@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withGroqKeyFallback } from "@/lib/groq-client";
-import { visionCompletion, GEMINI_TEXT_MODELS } from "@/lib/gemini";
+import { PHOTO_OCR_DISABLED_MESSAGE } from "@/lib/featureLimits";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -19,9 +19,6 @@ export const maxDuration = 120;
  *   content: 마크다운 (제목·문제 번호·표·수식 유지)
  *   fallback: true 이면 기본 모델이 실패해 대체 모델 사용
  */
-
-// 비전(OCR) 은 Gemini 2.5 flash 계열 전용 (visionCompletion 이 모델+키 폴백 수행).
-// Groq 의 llama-4-scout 비전 모델은 2026-07 목록에서 사라져 폴백 대상이 없다.
 
 // 텍스트 정리(mode="text") 용 Groq 체인.
 // llama-3.3-70b 는 2026-08-16 종료됨.
@@ -68,12 +65,8 @@ export async function POST(req: NextRequest) {
     const mode = body.mode;
 
     if (mode === "image") {
-      const base64 = body.imageBase64 || "";
-      if (!base64) return NextResponse.json({ error: "이미지가 없습니다" }, { status: 400 });
-      const imageUrl = base64.startsWith("data:") ? base64 : `data:image/jpeg;base64,${base64}`;
-      const userPrompt = body.prompt || "이 활동지의 모든 글자를 정확히 읽어 마크다운으로 출력해줘.";
-      const result = await runVision(imageUrl, userPrompt);
-      return NextResponse.json(result);
+      // 사진 글자 인식은 Gemini API 전용이라 학생 이용 앱에서 중단했다.
+      return NextResponse.json({ error: PHOTO_OCR_DISABLED_MESSAGE }, { status: 403 });
     }
 
     if (mode === "text") {
@@ -90,22 +83,6 @@ export async function POST(req: NextRequest) {
     const msg = err instanceof Error ? err.message : "서버 오류";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
-}
-
-async function runVision(imageUrl: string, userPrompt: string) {
-  // 활동지 OCR 은 Gemini 2.5 flash 계열 전용. visionCompletion 이 내부적으로
-  // 모델 폴백(2.5-flash → 2.5-flash-lite) + 키 로테이션(BACKUP*)까지 처리한다.
-  // Groq 비전 모델(scout)은 2026-07 목록에서 제거돼 폴백 대상이 없다.
-  // 사용한 모델이 1순위가 아니면 fallback=true 로 표시.
-  // 모델명을 하드코딩하지 않는다 — 세대가 바뀌면 판정이 조용히 틀어진다.
-  const { content, model } = await visionCompletion({
-    system: OCR_SYSTEM,
-    prompt: userPrompt,
-    imageUrl,
-    maxTokens: 8192,
-    temperature: 0.15,
-  });
-  return { content, model, fallback: model !== GEMINI_TEXT_MODELS[0] };
 }
 
 async function runText(fullPrompt: string) {
