@@ -50,7 +50,7 @@ async function ensureTargetLang(
             messages: [...ctx.messages, strict],
             temperature: Math.min(ctx.temperature, 0.5),
             // 재생성은 짧은 깨끗한 답이면 충분 → 토큰을 캡해 추가 지연을 줄인다.
-            max_tokens: Math.min(ctx.maxTokens, 220),
+            max_tokens: Math.min(ctx.maxTokens, 800),
             stream: false,
           });
           return c.choices?.[0]?.message?.content?.trim() || "";

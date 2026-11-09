@@ -124,7 +124,8 @@ export async function POST(req: NextRequest) {
     models: GROQ_MODELS,
     lang: replyLang,
     temperature: 0.6,
-    maxTokens: 180,
+    // gpt-oss 는 추론 토큰도 max_tokens 에 포함되므로 짧은 답이라도 여유를 둔다.
+    maxTokens: 800,
     finalize: (full) => {
       // #8 전 언어 외국어 토큰 제거 → (ko) 명사절 의문형 교정 → 질문형 종결 강제
       let cleaned = sanitizeReply(full, replyLang);
