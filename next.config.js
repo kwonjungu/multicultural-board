@@ -3,7 +3,7 @@ const nextConfig = {
   // 연구대회 USB 포터블 실행용: server.js + 최소 의존성만 담긴 self-contained 빌드
   output: "standalone",
   experimental: {
-    serverComponentsExternalPackages: ["firebase-admin", "pdf-parse"],
+    serverComponentsExternalPackages: ["firebase-admin", "pdf-parse", "@napi-rs/canvas"],
   },
   webpack: (config, { webpack, isServer }) => {
     // pdf-parse optionally requires canvas; disable it to avoid build warnings

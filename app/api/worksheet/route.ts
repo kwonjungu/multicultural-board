@@ -1,3 +1,5 @@
+// pdf-parse 를 불러오기 전에 서버 환경에 없는 DOMMatrix 등을 채운다 (Vercel 필수).
+import "pdf-parse/worker";
 import { NextRequest, NextResponse } from "next/server";
 import { LANGUAGES } from "@/lib/constants";
 import { translateLongText } from "@/lib/groq-translate";
