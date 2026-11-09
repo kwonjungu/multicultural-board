@@ -18,6 +18,11 @@ import { withGroqKeyFallback } from "./groq-client";
 import { scrubDelta, sanitizeReply, targetScriptRatio } from "./langGuard";
 import { LANGUAGES } from "./constants";
 
+// gpt-oss 는 답변 전 추론 토큰도 max_tokens·분당 한도에 포함된다. 짧은 대화에는 추론을 줄인다.
+function reasoningParams(model: string): Record<string, unknown> {
+  return model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {};
+}
+
 // 타깃 언어 비율이 이 값 미만이면 외국어 오염으로 보고 1회 재생성.
 const POLLUTION_THRESHOLD = 0.6;
 
@@ -52,12 +57,13 @@ async function ensureTargetLang(
             // 재생성은 짧은 깨끗한 답이면 충분 → 토큰을 캡해 추가 지연을 줄인다.
             max_tokens: Math.min(ctx.maxTokens, 800),
             stream: false,
-          });
+            ...reasoningParams(model),
+          } as OpenAI.ChatCompletionCreateParamsNonStreaming);
           return c.choices?.[0]?.message?.content?.trim() || "";
         } catch (err) {
           lastErr = err;
           const status = (err as { status?: number })?.status ?? 0;
-          if (status === 400 || status === 404) continue;
+          if (status === 400 || status === 404 || status === 429) continue;
           throw err;
         }
       }
@@ -106,13 +112,14 @@ async function acquireGroqStream(
       try {
         const stream = await client.chat.completions.create({
           model, messages, temperature, max_tokens: maxTokens, stream: true,
-        });
+          ...reasoningParams(model),
+        } as OpenAI.ChatCompletionCreateParamsStreaming);
         return { stream, model };
       } catch (err) {
         lastErr = err;
         const status = (err as { status?: number })?.status ?? 0;
-        if (status === 400 || status === 404) continue; // 모델 미지원 → 다음 모델
-        throw err; // 429/401/403 등 → 키 폴백으로
+        if (status === 400 || status === 404 || status === 429) continue; // 미지원·모델별 한도 초과 → 다음 모델
+        throw err; // 401/403 등 → 키 폴백으로
       }
     }
     throw lastErr ?? new Error("groq-stream: no model succeeded");

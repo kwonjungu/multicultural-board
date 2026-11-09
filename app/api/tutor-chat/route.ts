@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     lang,
     temperature: 0.6,
     // gpt-oss 는 추론 토큰도 max_tokens 에 포함되므로 짧은 답이라도 여유를 둔다.
-    maxTokens: 800,
+    maxTokens: 500,
     scrubLangs: allowLangs,
     finalize: (full) => sanitizeReply(full, allowLangs),
   });
