@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateJson } from "@/lib/gemini";
+import { generateJson } from "@/lib/llmJson";
 import {
   LENGTH_SPEC,
   buildCritiqueSystemPrompt,
@@ -11,7 +11,7 @@ import {
 import type { TextLength } from "@/lib/prompts/storybookPrompts";
 
 // Vercel Hobby 상한 60s. #7: 시간 예산을 지키기 위해 기본 경로는 LLM 호출을
-// 최소화한다 — draft 1회(2.5-flash, thinking off) + 언어별 번역(병렬). 검수/수정
+// 최소화한다 — draft 1회(Groq gpt-oss, 추론 축소) + 언어별 번역(병렬). 검수/수정
 // (critique/revise) 라운드는 시간을 크게 잡아먹어 기본 비활성(opt-in)으로 둔다.
 export const maxDuration = 60;
 

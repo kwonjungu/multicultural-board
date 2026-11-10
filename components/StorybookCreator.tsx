@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { Storybook, StorybookPage, StorybookCharacter, StorybookQuestion, StorybookVocabWord, QuestionTier, IbConcept } from "@/lib/types";
 import { saveGeneratedBook, updateGeneratedBookPageImage, updateGeneratedBookField, updateGeneratedBookCharacterAvatar } from "@/lib/storybook";
 import { requestStorybookImage } from "@/lib/storybookImageClient";
+import { STORYBOOK_IMAGE_IN_APP, STORYBOOK_IMAGE_LOCAL_NOTICE } from "@/lib/featureLimits";
 
 interface Props {
   teacherName: string;
@@ -214,6 +215,12 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
       const storybook = agentToStorybook(textData.book, bookId, teacherName);
       await saveGeneratedBook(storybook);
       setBook(storybook);
+      if (!STORYBOOK_IMAGE_IN_APP) {
+        // 그림은 이 웹앱에서 만들지 않는다 (lib/featureLimits.ts). 글만 완성하고 미리보기로 간다.
+        setProgress((p) => ({ ...p, textDone: true, imageTotal: 0, message: "✨ 글이 완성됐어요! 미리보기를 확인하세요." }));
+        setStage("preview");
+        return;
+      }
       const imageCount = storybook.pages.length + 1 + storybook.characters.length; // pages + cover + character portraits
       setProgress((p) => ({
         ...p, textDone: true,
@@ -436,6 +443,22 @@ export default function StorybookCreator({ teacherName, onCreated, onCancel }: P
             onBookChange={(next) => setBook(next)}
             onAccept={() => onCreated(book.id)}
             onRegenerateImage={async (pageIdx, prompt) => {
+              if (!STORYBOOK_IMAGE_IN_APP) {
+                // 그림 지시문만 저장한다. 실제 그림은 교사 PC 도구가 이 지시문으로 만든다.
+                try {
+                  if (pageIdx === 0) {
+                    await updateGeneratedBookField(book.id, { cover: { ...book.cover, imagePrompt: prompt } });
+                    setBook((prev) => prev ? { ...prev, cover: { ...prev.cover, imagePrompt: prompt } } : prev);
+                  } else {
+                    const pages = book.pages.map((p) => p.idx === pageIdx ? { ...p, imagePrompt: prompt } : p);
+                    await updateGeneratedBookField(book.id, { pages });
+                    setBook((prev) => prev ? { ...prev, pages } : prev);
+                  }
+                } catch (err) {
+                  console.error("save image prompt failed", err);
+                }
+                return;
+              }
               try {
                 // force: 같은 프롬프트여도 서버 캐시를 건너뛰고 새로 그린다.
                 // 실패 시 helper 가 1회 자동 재시도 후에만 포기.
@@ -1248,6 +1271,7 @@ function PreviewPanel({
 
   async function redrawAllWithCharacters() {
     if (redrawing) return;
+    if (!STORYBOOK_IMAGE_IN_APP) { window.alert(STORYBOOK_IMAGE_LOCAL_NOTICE); return; }
     if (!window.confirm("표지와 모든 페이지를 현재 캐릭터 그림 기준으로 다시 그릴까요? (수 분 소요)")) return;
     const targets = [0, ...book.pages.map((p) => p.idx)];
     for (let i = 0; i < targets.length; i++) {
@@ -1438,7 +1462,14 @@ function PreviewPanel({
         <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginTop: 8, textAlign: "center" }}>
           {book.pages.length}장 · 질문 {book.questions.length}개 · 등장인물 {book.characters.length}명
         </div>
-        <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
+        {!STORYBOOK_IMAGE_IN_APP && (
+          <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 12, background: "#FFFBEB",
+                        border: "2px dashed #FDE68A", color: "#92400E", fontSize: 12, fontWeight: 700, lineHeight: 1.5 }}>
+            🖼️ {STORYBOOK_IMAGE_LOCAL_NOTICE}
+            <div style={{ marginTop: 4, fontFamily: "monospace", fontSize: 12, userSelect: "all" }}>책 번호: {book.id}</div>
+          </div>
+        )}
+        <div style={{ marginTop: 10, display: STORYBOOK_IMAGE_IN_APP ? "flex" : "none", justifyContent: "center" }}>
           <button onClick={redrawAllWithCharacters} disabled={!!redrawing}
             style={{ padding: "10px 14px", borderRadius: 12, border: "2px solid #FDE68A",
                      background: redrawing ? "#F3F4F6" : "#fff", color: "#92400E",

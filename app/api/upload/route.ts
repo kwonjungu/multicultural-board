@@ -49,6 +49,22 @@ export async function POST(req: NextRequest) {
       }
       filename = `vocab-recordings/${roomCode}/${clientId}/${wordId}_${sentenceIdx}.webm`;
       contentType = file.type || "audio/webm";
+    } else if (kind === "storybook-image") {
+      // 교사 PC 그림 도구(scripts/storybook-images-local.mjs)가 완성한 그림책 그림.
+      // 종전 그림 라우트와 같은 경로에 저장한다. 같은 대상은 덮어쓴다.
+      const bookId = sanitizeSegment(String(formData.get("bookId") || ""));
+      const target = sanitizeSegment(String(formData.get("target") || ""));
+      if (!/^gen-[a-z0-9-]+$/.test(bookId) || !/^(cover|page-\d{1,2}|char-[A-Za-z0-9_-]{1,60})$/.test(target)) {
+        return NextResponse.json({ error: "그림책 그림 경로 정보가 올바르지 않습니다" }, { status: 400 });
+      }
+      if (file.type !== "image/webp" && file.type !== "image/png") {
+        return NextResponse.json({ error: "그림은 webp 또는 png 만 올릴 수 있습니다" }, { status: 400 });
+      }
+      if (buffer.length > 3 * 1024 * 1024) {
+        return NextResponse.json({ error: "그림 파일이 너무 큽니다 (3MB 이하)" }, { status: 400 });
+      }
+      filename = `storybooks/${bookId}/${target}.${file.type === "image/webp" ? "webp" : "png"}`;
+      contentType = file.type;
     } else {
       // 이미지 업로드 (기존 동작 유지)
       const ext = file.type === "image/png" ? "png" : "jpg";

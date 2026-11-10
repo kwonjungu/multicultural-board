@@ -46,6 +46,7 @@ import {
   type BookListEntry,
 } from "@/lib/storybook";
 import { requestStorybookImage } from "@/lib/storybookImageClient";
+import { STORYBOOK_IMAGE_IN_APP } from "@/lib/featureLimits";
 import { exportStorybookToPptx } from "@/lib/storybookPptx";
 import { checkSafety, replyForSafety } from "@/lib/chatSafety";
 import { readChatStream } from "@/lib/chatStreamClient";
@@ -179,7 +180,8 @@ export default function StorybookRoom({ user, roomCode, myClientId, onBack, fixt
   useEffect(() => {
     if (offline) return;
     if (!book?.id) return;
-    if (!isTeacher) return; // 학생 기기에서는 이미지 생성 API(Gemini)를 호출하지 않는다.
+    if (!isTeacher) return; // 학생 기기에서는 호출하지 않는다.
+    if (!STORYBOOK_IMAGE_IN_APP) return; // 이 웹앱은 그림을 생성하지 않는다 (lib/featureLimits.ts).
     if (healedBookRef.current === book.id) return;
     const missing = (book.characters || []).filter((c) => !c.avatarUrl && c.avatarImagePrompt);
     if (missing.length === 0) return;

@@ -4,10 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "check:no-gemini": "node scripts/check-no-gemini.mjs",
+    "prebuild": "node scripts/check-no-gemini.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "harness:prompt": "node scripts/prompt-harness.mjs"
+    "harness:prompt": "node scripts/prompt-harness.mjs",
+    "storybook:images": "node scripts/storybook-images-local.mjs"
   },
   "dependencies": {
     "@types/pdf-parse": "^1.1.5",

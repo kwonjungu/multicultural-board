@@ -65,3 +65,6 @@ scripts/.asset_batch_job.json
 
 # UX 검증 스크린샷 (로컬 증거, 38MB — 커밋하지 않음)
 /reports/
+
+# teacher-PC storybook image tool output
+.storybook-images-out/

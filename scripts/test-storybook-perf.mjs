@@ -68,22 +68,25 @@ for (const name of ["updateGeneratedBookPageImage", "updateGeneratedBookCharacte
   }
 }
 
-// ── A2. 이미지 라우트 ─────────────────────────────────────────
-const routePath = "app/api/storybook-agent/image/route.ts";
+// ── A2. 그림 생성 위치 ────────────────────────────────────────
+// 2026-11-11: 그림 생성은 웹앱 라우트에서 교사 PC 도구로 옮겼다.
+// 웹앱 라우트는 Gemini 를 부르지 않고, 인코딩 규칙은 PC 도구가 이어받는다.
+const webRoute = await readFile("app/api/storybook-agent/image/route.ts", "utf8");
+check(!/gemini|generativelanguage/i.test(webRoute.replace(/\/\/.*$/gm, "")),
+  "웹앱 그림 라우트가 Gemini 를 호출하지 않는다",
+  "Gemini API 추가 약관의 연령 조항 — CLAUDE.md 가드레일");
+check(/retryable:\s*false/.test(webRoute), "웹앱 그림 라우트가 재시도 불가로 응답한다",
+  "클라이언트가 재요청을 반복하지 않고 이모지 그림을 유지해야 한다");
+
+const routePath = "scripts/storybook-images-local.mjs";
 const route = await readFile(routePath, "utf8");
 
-check(/\.webp\(\s*\{/.test(route), "이미지 라우트가 WebP 로 인코딩한다");
+check(/\.webp\(\s*\{/.test(route), "그림 도구가 WebP 로 인코딩한다");
 check(/alphaQuality/.test(route), "WebP 인코딩이 alphaQuality 를 지정한다",
   "캐릭터 초상은 배경을 지운 투명 PNG 다");
-// 실패해도 생성 자체는 성공해야 한다.
-const encodeBlock = route.slice(route.indexOf(".webp("));
-check(/catch\s*\(/.test(encodeBlock.slice(0, 600)), "WebP 인코딩 실패에 폴백이 있다");
-// 파일명이 실제 인코딩 결과를 따라가야 한다 — .png 를 하드코딩하면 거짓말이 된다.
-const filenameBlock = route.slice(route.indexOf("const filename"), route.indexOf("const filename") + 400);
-check(/\$\{ext\}/.test(filenameBlock), "저장 파일명이 실제 포맷(ext)을 따른다");
-check(!/storybooks\/\$\{body\.bookId\}\/cover\.png/.test(filenameBlock),
-  "저장 파일명에 .png 가 하드코딩돼 있지 않다");
-check(!/resize\(/.test(route), "이미지 라우트가 해상도를 줄이지 않는다",
+check(/batchGenerateContent/.test(route), "그림 도구가 배치 API 를 쓴다",
+  "비용 규칙 — 단건 생성 금지");
+check(!/resize\(/.test(route), "그림 도구가 해상도를 줄이지 않는다",
   "생성본은 1024x1024 이고 그게 표시 사다리의 상단이다");
 
 // ── B. 실제 인코딩 — 정말 줄어드는가 ──────────────────────────
