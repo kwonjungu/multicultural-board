@@ -89,17 +89,13 @@
 
 ## 🛡 가드레일 (반복하지 말아야 할 함정)
 
-- **🔒 이 웹앱에서 Gemini API 호출 금지 (2026-11-11, 2026-11-09 조치를 확대).** Gemini API 추가 약관은
-  18세 미만이 이용할 가능성이 높은 앱의 **일부로** 서비스를 쓰는 것을 금지한다. 교사만 호출해도 같은 앱이면
-  해당한다(Vertex AI 약관도 같은 조항). 그래서 `app/` `lib/` `components/` 에는 Gemini 호출이 없다.
-  `npm run build` 가 먼저 `scripts/check-no-gemini.mjs` 를 돌려 주소·키·import 흔적이 있으면 빌드를 막는다.
-  Vercel 프로젝트에도 `GEMINI_API_KEY*` 를 두지 않는다. 챗봇·튜터·번역·그림책 **글** 생성은 Groq
-  (`lib/llmJson.ts`, `lib/groq-*.ts`), 사진 글자 인식은 중단, 그림책 **그림** 은 교사가 자기 PC 에서
-  `npm run storybook:images -- <책번호>`(`scripts/storybook-images-local.mjs`, 배치 API)로 만들어 등록한다.
-  Gemini 모듈은 `scripts/local/gemini.ts` 로 옮겼다 — 앱 코드에서 import 금지. 아래 Gemini 항목은 이 PC 도구와
-  에셋 생성 스크립트에만 해당한다.
+- **🔒 학생 이용 기능에 Gemini 금지 (2026-11-09, 2026-11-11 보완).** Gemini API 약관은 18세 미만이 이용할 가능성이
+  높은 앱을 금지한다. 챗봇·튜터·번역·그림책 **글** 생성은 Groq(`lib/llmJson.ts`, `lib/groq-*.ts`), 사진 글자 인식은 중단.
+  Gemini 는 교사 전용 그림책 제작 화면의 **그림** 생성(`app/api/storybook-agent/image`)에만 남긴다(사용자 결정, 2026-11-11).
+  학생 화면에서 Gemini 를 호출하는 경로를 새로 만들지 말 것. 교사 PC 에서 그림을 따로 만들 때는
+  `npm run storybook:images -- <책번호>`(배치 API). 아래 Gemini 항목은 그림 생성과 에셋 스크립트에만 해당한다.
 - **🔒 Gemini 비용 하드캡 (사용자 지시, 절대 규칙).** **Flash 계열만. Pro 등 고가 모델 금지.**
-  허용 목록은 `scripts/local/gemini.ts` 의 `ALLOWED_GEMINI_MODELS`(정규식이 아니라 **명시 집합** —
+  허용 목록은 `lib/gemini.ts` 의 `ALLOWED_GEMINI_MODELS`(정규식이 아니라 **명시 집합** —
   패턴은 의도치 않은 신형 고가 모델까지 통과시킨다). 새 모델 상수는 반드시
   `assertAllowedGeminiModel` 을 거칠 것. 스크립트(scripts/gen-*.mjs)도 같은 규칙.
   이미지 대량 생성은 반드시 `batchGenerateContent`(배치 API, 50% 할인)로.
@@ -122,7 +118,7 @@
   | `llama-3.3-70b` (Groq) | 2026-08-16 종료됨 |
   | `gemini-2.5-flash` | **2026-10-16 종료 예정** → 2026-09-06 에 `gemini-3.8-flash` 로 교체 |
 
-  **현행(2026-09-06, 교사 PC 도구만. 웹앱은 2026-11-11 Gemini 미사용):** 텍스트 `gemini-3.8-flash` → `gemini-3.1-flash-lite` 폴백,
+  **현행(2026-09-06, 교사용 그림책 그림 생성만. 글 생성은 2026-11-11 Groq 전환):** 텍스트 `gemini-3.8-flash` → `gemini-3.1-flash-lite` 폴백,
   이미지 `gemini-3.1-flash-image`(나노바나나 2).
 
   **요금이 올랐다.** 3.8-flash 는 $0.75/$3.75 로 종전 2.5-flash($0.30/$2.50)보다 비싸고,

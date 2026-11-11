@@ -1,6 +1,4 @@
-// ⚠ 교사 PC 에서만 쓰는 도구용 모듈이다 (scripts/storybook-images-local.mjs, prompt-harness.mjs).
-// 학생이 접속하는 웹앱(app/ lib/ components/)에서 import 하지 말 것 — Gemini API 추가 약관의
-// 연령 조항 때문이다. scripts/check-no-gemini.mjs 가 빌드 전에 검사한다.
+// 교사 전용 그림책 제작 화면(그림 생성)과 교사 PC 도구에서만 쓴다. 학생 화면 기능에서 import 하지 말 것.
 // Thin Gemini client. Uses OpenAI-compatible endpoint for text (same pattern
 // as lib/groq-translate.ts) and direct REST for image generation.
 //

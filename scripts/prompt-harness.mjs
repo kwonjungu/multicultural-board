@@ -9,7 +9,7 @@
 //
 // 설계 원칙
 //  1) 프롬프트는 lib/prompts/*.ts 를 그대로 import 한다 (복사본 금지 — 드리프트 방지).
-//  2) 모델도 scripts/local/gemini.ts 의 허용 목록에서 가져온다 (비용 하드캡 준수).
+//  2) 모델도 lib/gemini.ts 의 허용 목록에서 가져온다 (비용 하드캡 준수).
 //  3) 판정은 "기계로 확실히 판정 가능한 것"만 자동화한다 — 문장 수, 마크다운 잔존,
 //     존댓말 혼입, 인물 이탈(AI 자백), 정답 누설, 언어 오염, JSON 스키마.
 //     재미·인물다움처럼 사람이 봐야 하는 것은 human-review.md 통독본으로만 남긴다.
@@ -37,7 +37,7 @@ const { buildDraftSystemPrompt, buildDraftUserPrompt } = await import(
 );
 const { checkSafety } = await import(mod("lib/chatSafety.ts"));
 const { targetScriptRatio } = await import(mod("lib/langGuard.ts"));
-const { GEMINI_CHAT_MODELS, GEMINI_TEXT_MODELS, THINKING_OFF } = await import(mod("scripts/local/gemini.ts"));
+const { GEMINI_CHAT_MODELS, GEMINI_TEXT_MODELS, THINKING_OFF } = await import(mod("lib/gemini.ts"));
 
 const CHAT_MODEL = GEMINI_CHAT_MODELS[0];
 const TEXT_MODEL = GEMINI_TEXT_MODELS[0];
@@ -190,7 +190,7 @@ function judgeChat(c, reply) {
   const maxChars = isHotseat ? 130 : 260;
 
   check(checks, "비어있지 않음", reply.trim().length >= 2, `${reply.trim().length}자`);
-  // 3.8 의 thinking 은 scripts/local/gemini.ts 의 THINKING_OFF 로만 꺼진다. 그게 안 먹히면
+  // 3.8 의 thinking 은 lib/gemini.ts 의 THINKING_OFF 로만 꺼진다. 그게 안 먹히면
   // thinking 이 max_tokens 를 잠식해 답이 문장 중간에서 잘린다 → finish=length 는 회귀.
   check(checks, "잘리지 않음(finish=stop)", c._finish === "stop", `finish=${c._finish}, thinking=${c._thinking}토큰`);
 

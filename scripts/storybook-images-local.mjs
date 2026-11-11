@@ -70,7 +70,7 @@ if (!DRY && !API_KEY) {
 }
 
 // 모델은 허용 목록 상수에서 가져온다 (비용 하드캡).
-const { GEMINI_IMAGE_MODEL } = await import(mod("scripts/local/gemini.ts"));
+const { GEMINI_IMAGE_MODEL } = await import(mod("lib/gemini.ts"));
 const { removeLightBackground } = await import(mod("lib/image-bg-removal.ts"));
 const BASE = "https://generativelanguage.googleapis.com/v1beta";
 const OUT_DIR = join(ROOT, ".storybook-images-out", bookId);

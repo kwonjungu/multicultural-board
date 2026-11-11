@@ -1,9 +1,6 @@
 // 교사용 그림책 글 생성에 쓰는 JSON 생성 도우미 — Groq 전용.
 //
-// 2026-11-11: 학생이 접속하는 이 웹앱에서 Gemini API 호출을 모두 제거했다.
-// Gemini API 추가 약관은 18세 미만이 이용할 가능성이 높은 앱의 일부로 서비스를
-// 쓰는 것을 금지하며, 호출하는 사람이 교사인지는 요건이 아니다.
-// app/ lib/ components/ 에 Gemini 호출을 다시 넣지 말 것 (scripts/check-no-gemini.mjs 가 빌드 전에 검사).
+// 2026-11-11: 그림책 글 생성을 Gemini 에서 Groq 로 옮겼다. 그림 생성만 Gemini(lib/gemini.ts)를 쓴다.
 
 import { withGroqKeyFallback } from "@/lib/groq-client";
 
